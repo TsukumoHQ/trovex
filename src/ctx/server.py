@@ -54,11 +54,26 @@ async def lifespan(app: FastAPI):
         yield
 
 
+_AVATAR_PALETTE = [
+    "#22c55e", "#60a5fa", "#a78bfa", "#f59e0b",
+    "#ec4899", "#06b6d4", "#fb7185", "#84cc16",
+]
+
+
+def _avatar_color(name: str | None) -> str:
+    if not name:
+        return _AVATAR_PALETTE[0]
+    # Sum of code points modulo palette length — deterministic + well-distributed
+    h = sum(ord(c) for c in name)
+    return _AVATAR_PALETTE[h % len(_AVATAR_PALETTE)]
+
+
 def build_app() -> FastAPI:
     # docs_url=None frees the /docs path for our own browse page.
     app = FastAPI(title="ctx", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(UserHeaderMiddleware)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    templates.env.filters["avatar_color"] = _avatar_color
 
     # Mount MCP HTTP transport at /mcp
     app.mount("/mcp", mcp.streamable_http_app())

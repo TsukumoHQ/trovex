@@ -54,7 +54,8 @@ async def lifespan(app: FastAPI):
 
 
 def build_app() -> FastAPI:
-    app = FastAPI(title="ctx", lifespan=lifespan)
+    # docs_url=None frees the /docs path for our own browse page.
+    app = FastAPI(title="ctx", lifespan=lifespan, docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
     # Mount MCP HTTP transport at /mcp

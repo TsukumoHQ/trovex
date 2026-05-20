@@ -1,0 +1,56 @@
+{% extends "_base.html" %}
+{% from "_partials.html" import status_pill, fresh_label %}
+{% set active = 'docs' %}
+{% block title %}ctx — docs{% endblock %}
+
+{% block topbar_meta %}
+  <span class="mono">{{ "{:,}".format(total) }} docs · {{ "{:,}".format(filtered) }} shown</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: var(--s-4);">
+  <div>
+    <h1 style="margin-bottom: 2px;">Docs</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      browse the indexed corpus — filter, sort, triage
+    </div>
+  </div>
+</div>
+
+<form action="/docs" method="get" autocomplete="off"
+      hx-get="/docs/partial"
+      hx-target="#docs-table"
+      hx-swap="innerHTML"
+      hx-trigger="change, keyup changed delay:250ms from:input[name=qpath]"
+      hx-push-url="true"
+      style="display: grid; gap: var(--s-3); grid-template-columns: minmax(0, 1fr) auto auto auto; margin-bottom: var(--s-4); align-items: center;">
+
+  <input type="text" name="qpath" class="input mono" value="{{ qpath }}"
+         placeholder="filter by path substring"
+         aria-label="Filter by path">
+
+  <select name="status" class="input mono" style="width: auto;" aria-label="Status filter">
+    <option value="">all status</option>
+    {% for s in ['canonical', 'plan', 'stale', 'duplicate'] %}
+    <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="sort" class="input mono" style="width: auto;" aria-label="Sort">
+    <option value="recent" {% if sort=='recent' %}selected{% endif %}>recent</option>
+    <option value="oldest" {% if sort=='oldest' %}selected{% endif %}>oldest</option>
+    <option value="largest" {% if sort=='largest' %}selected{% endif %}>largest</option>
+    <option value="path"   {% if sort=='path'   %}selected{% endif %}>path A→Z</option>
+  </select>
+
+  <select name="limit" class="input mono" style="width: auto;" aria-label="Limit">
+    {% for n in [50, 100, 200, 500] %}
+    <option value="{{ n }}" {% if limit == n %}selected{% endif %}>{{ n }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+<div id="docs-table">
+  {% include "_docs_table.html" %}
+</div>
+{% endblock %}

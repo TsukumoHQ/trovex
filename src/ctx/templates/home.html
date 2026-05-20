@@ -1,54 +1,182 @@
 {% extends "_base.html" %}
-{% block title %}ctx — stats{% endblock %}
+{% from "_partials.html" import status_pill, fresh_label, number %}
+{% set active = 'overview' %}
+{% block title %}ctx — overview{% endblock %}
+
+{% block topbar_meta %}
+  {% if last_run %}
+    <span class="dot" aria-hidden="true"></span>
+    <span>indexed {{ last_run_relative }}</span>
+    <span class="subtle">·</span>
+  {% endif %}
+  <span><span class="kbd">/</span> to search</span>
+{% endblock %}
+
 {% block content %}
-<div class="grid">
-  <div class="card">
-    <div class="stat-num">{{ "{:,}".format(total) }}</div>
-    <div class="stat-label">indexed docs</div>
+<div class="section-head" style="margin-bottom: var(--s-6);">
+  <div>
+    <h1 style="margin-bottom: 2px;">Overview</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      synergix_prod · {{ corpus_path }}
+    </div>
   </div>
-  <div class="card">
-    <div class="stat-num">{{ "{:,}".format(total_tokens) }}</div>
-    <div class="stat-label">tokens indexed</div>
-  </div>
-  {% for status, count in by_status.items() %}
-  <div class="card">
-    <div class="stat-num">{{ count }}</div>
-    <div class="stat-label">{{ status }}</div>
-  </div>
-  {% endfor %}
 </div>
 
-{% if last_run %}
-<div class="card">
-  <div class="stat-label">last index run</div>
-  <div>
-    {{ "%.1f"|format(last_run.duration_sec) }}s &middot;
-    +{{ last_run.added }} ~{{ last_run.updated }}
-    ={{ last_run.unchanged }} -{{ last_run.removed }}
+{# ── KPI tiles ─────────────────────────────────────────────────────── #}
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-label">indexed docs</div>
+    <div class="kpi-value">{{ "{:,}".format(total) }}</div>
+    {% if last_run %}
+      <div class="kpi-sub">
+        +{{ last_run.added }} added · ~{{ last_run.updated }} updated
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label">total tokens</div>
+    <div class="kpi-value">{{ number(total_tokens) }}</div>
+    <div class="kpi-sub">
+      avg {{ "{:,}".format(avg_tokens) }} / doc
+    </div>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label">noise to triage</div>
+    <div class="kpi-value">{{ (by_status.get('stale', 0) + by_status.get('duplicate', 0)) }}</div>
+    <div class="kpi-sub">
+      {{ by_status.get('stale', 0) }} stale · {{ by_status.get('duplicate', 0) }} dup
+    </div>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label">last index</div>
+    <div class="kpi-value mono" style="font-size: var(--t-22);">
+      {% if last_run %}{{ "%.1f"|format(last_run.duration_sec) }}s{% else %}–{% endif %}
+    </div>
+    <div class="kpi-sub">
+      {% if last_run %}{{ last_run_relative }}{% else %}never{% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Status distribution stacked bar ───────────────────────────────── #}
+{% if total > 0 %}
+<div class="dist">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--s-2);">
+    <h3 style="margin: 0;">Status distribution</h3>
+    <span class="mono subtle" style="font-size: var(--t-11);">{{ total }} docs · {{ "{:,}".format(total_tokens) }} tokens</span>
+  </div>
+  <div class="dist-track" role="img" aria-label="Status distribution">
+    {% for status in ['canonical', 'plan', 'duplicate', 'stale'] %}
+      {% set c = by_status.get(status, 0) %}
+      {% if c > 0 %}
+        {% set pct = (c / total * 100) %}
+        <div class="dist-seg"
+             style="width: {{ pct }}%; background: var(--{{ status }});"
+             title="{{ status }}: {{ c }} ({{ '%.1f'|format(pct) }}%)"></div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="dist-legend">
+    {% for status in ['canonical', 'plan', 'duplicate', 'stale'] %}
+      {% set c = by_status.get(status, 0) %}
+      <span class="dist-legend-item">
+        <span class="dist-legend-swatch" style="background: var(--{{ status }});"></span>
+        <span><b style="color: var(--fg);">{{ c }}</b> {{ status }}</span>
+      </span>
+    {% endfor %}
   </div>
 </div>
 {% endif %}
 
-<div class="card">
-  <div class="stat-label">recent docs</div>
-  <table>
-    <thead><tr><th>path</th><th>title</th><th>status</th><th>tokens</th></tr></thead>
-    <tbody>
-      {% for r in recent %}
-      <tr>
-        <td class="path">{{ r.path }}</td>
-        <td>{{ r.title }}</td>
-        <td><span class="marker marker-{{ r.status }}">
-          {% if r.status == "canonical" %}★
-          {% elif r.status == "plan" %}◯
-          {% elif r.status == "stale" %}✗
-          {% elif r.status == "duplicate" %}⚠
-          {% else %}·{% endif %}
-        </span> {{ r.status }}</td>
-        <td class="muted">{{ r.tokens_est }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+{# ── Two-column: recent + top-attention ────────────────────────────── #}
+<div class="section" style="display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);">
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">Recently updated</h3>
+      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">{{ recent | length }} shown</span>
+    </div>
+    <div class="table-wrap" style="border: none; border-radius: 0;">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>path</th>
+            <th>status</th>
+            <th style="text-align: right;">age</th>
+            <th style="text-align: right;">tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recent %}
+          <tr>
+            <td class="path">
+              <a href="/search?q={{ r.title | urlencode }}" title="{{ r.title }}">{{ r.path }}</a>
+            </td>
+            <td>{{ status_pill(r.status) }}</td>
+            <td class="num">{{ fresh_label(r.age_days) }}</td>
+            <td class="num">{{ "{:,}".format(r.tokens_est) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">Needs attention</h3>
+    </div>
+    {% if attention %}
+      <div>
+        {% for r in attention %}
+        <div class="card-row" style="padding: var(--s-3) var(--s-4); display: flex; align-items: center; gap: var(--s-3);">
+          {{ status_pill(r.status) }}
+          <a href="/search?q={{ r.path | urlencode }}" class="mono" style="font-size: var(--t-12); color: var(--fg); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;">{{ r.path }}</a>
+          <span class="mono subtle" style="font-size: var(--t-11);">{{ fresh_label(r.age_days) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card-body subtle mono" style="font-size: var(--t-12);">clean — nothing to triage</div>
+    {% endif %}
+  </div>
 </div>
+
+{# ── Heaviest files ────────────────────────────────────────────────── #}
+{% if heaviest %}
+<div class="section">
+  <div class="section-head">
+    <h3>Heaviest files</h3>
+    <span class="subtle mono" style="font-size: var(--t-11);">by token estimate</span>
+  </div>
+  <div class="table-wrap">
+    <table class="t">
+      <thead>
+        <tr>
+          <th>path</th>
+          <th>status</th>
+          <th style="text-align: right;">age</th>
+          <th style="text-align: right;">tokens</th>
+          <th style="text-align: right;">bytes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in heaviest %}
+        <tr>
+          <td class="path">
+            <a href="/search?q={{ r.title | urlencode }}">{{ r.path }}</a>
+          </td>
+          <td>{{ status_pill(r.status) }}</td>
+          <td class="num">{{ fresh_label(r.age_days) }}</td>
+          <td class="num">{{ "{:,}".format(r.tokens_est) }}</td>
+          <td class="num cell-faint">{{ "{:,}".format(r.size_bytes) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

@@ -1,35 +1,56 @@
 {% extends "_base.html" %}
+{% from "_partials.html" import status_pill, fresh_label %}
+{% set active = 'search' %}
 {% block title %}ctx — search{% endblock %}
+
+{% block topbar_meta %}
+  <span class="mono">{{ "{:,}".format(total) }} docs indexed</span>
+{% endblock %}
+
 {% block content %}
-<form method="get" action="/search" hx-get="/search" hx-target="#results" hx-trigger="submit, keyup changed delay:300ms from:input[name=q]">
-  <input type="text" name="q" value="{{ q }}" placeholder="search docs…" autofocus>
-  <label style="display: inline-block; margin-top: 8px; color: var(--dim);">
-    <input type="checkbox" name="summary" {% if summary %}checked{% endif %}> include 50-word summary
-  </label>
+<div class="section-head" style="margin-bottom: var(--s-4);">
+  <div>
+    <h1 style="margin-bottom: 2px;">Search</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      semantic retrieval across the indexed corpus
+    </div>
+  </div>
+</div>
+
+<form id="search-form" action="/search" method="get" autocomplete="off"
+      hx-get="/search/partial"
+      hx-target="#results"
+      hx-swap="innerHTML"
+      hx-trigger="keyup changed delay:250ms from:input[name=q], change from:input[name=summary], submit"
+      hx-push-url="true"
+      hx-indicator="#results-loader">
+  <div class="search-shell">
+    <span class="prefix" aria-hidden="true">⌘</span>
+    <input type="text" name="q" class="input search-input mono"
+           value="{{ q }}"
+           placeholder="search docs — semantic, frontmatter-aware, ranked"
+           autofocus
+           aria-label="Search query">
+    <div class="suffix">
+      <span id="results-loader" class="htmx-indicator mono"
+            style="font-size: var(--t-11); color: var(--fg-subtle);">…</span>
+      <span class="kbd">↵</span>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: var(--s-4); align-items: center;
+              margin-top: var(--s-3); flex-wrap: wrap;">
+    <label class="checkbox">
+      <input type="checkbox" name="summary" value="1" {% if summary %}checked{% endif %}>
+      include 50-word summary
+    </label>
+    <span class="subtle mono" style="font-size: var(--t-11); margin-left: auto;">
+      <span class="kbd">esc</span> to clear focus · <span class="kbd">/</span> to focus
+    </span>
+  </div>
 </form>
 
-<div id="results" style="margin-top: 16px;">
-{% if q %}
-  {% if results %}
-    {% for r in results %}
-    <div class="result">
-      <a href="/search?q={{ q|urlencode }}" style="display:block; color: var(--accent); text-decoration: none;">
-        <span class="marker marker-{{ r.status }}">{{ r.marker }}</span>
-        {{ r.path }}
-      </a>
-      <div class="result-meta">
-        {{ r.title }} &middot; {{ r.fresh_label() }} &middot;
-        score {{ "%.3f"|format(r.score) }} &middot;
-        {{ r.tokens_est }} tokens
-      </div>
-      {% if summary and summaries.get(r.path) %}
-      <div class="summary">{{ summaries[r.path] }}</div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  {% else %}
-    <p class="muted">no results</p>
-  {% endif %}
-{% endif %}
+<div id="results" style="margin-top: var(--s-6);">
+  {% include "_results.html" %}
 </div>
 {% endblock %}

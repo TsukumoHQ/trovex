@@ -1,0 +1,24 @@
+{% macro status_pill(status) -%}
+  {%- set glyph = {'canonical':'★','plan':'◯','stale':'✗','duplicate':'⚠'}.get(status, '·') -%}
+  <span class="pill pill-{{ status }}">
+    <span class="glyph" aria-hidden="true">{{ glyph }}</span>
+    <span>{{ status }}</span>
+  </span>
+{%- endmacro %}
+
+{% macro fresh_label(age_days) -%}
+  {%- if age_days < 1 -%}fresh
+  {%- elif age_days < 7 -%}{{ age_days | round(0, 'floor') | int }}d
+  {%- elif age_days < 30 -%}{{ (age_days / 7) | round(0, 'floor') | int }}w
+  {%- elif age_days < 365 -%}{{ (age_days / 30) | round(0, 'floor') | int }}mo
+  {%- else -%}{{ (age_days / 365) | round(0, 'floor') | int }}y
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro number(n) -%}
+  {%- if n is none -%}–
+  {%- elif n >= 1000000 -%}{{ "%.1fM"|format(n / 1000000) }}
+  {%- elif n >= 1000 -%}{{ "%.1fk"|format(n / 1000) }}
+  {%- else -%}{{ n }}
+  {%- endif -%}
+{%- endmacro %}

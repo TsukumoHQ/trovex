@@ -50,8 +50,21 @@ def ctx(q: str, summary: bool = False) -> str:
         q: Natural-language query (e.g. "auth JWT", "deployment cron").
         summary: Include a 50-word extract per result. Default False.
     """
+    import time as _time
+
+    from .usage import log_query
+
     state = get_state()
+    t0 = _time.perf_counter()
     results = state.searcher.search(q, limit=5)
-    if summary:
-        return state.searcher.format_with_summary(results)
-    return state.searcher.format_minimal(results)
+    out = (state.searcher.format_with_summary(results) if summary
+           else state.searcher.format_minimal(results))
+    elapsed_ms = int((_time.perf_counter() - t0) * 1000)
+    try:
+        log_query(
+            state.searcher.db, q, len(results), summary,
+            response_tokens_est=len(out) // 4, elapsed_ms=elapsed_ms,
+        )
+    except Exception:
+        pass  # never let logging break the tool
+    return out

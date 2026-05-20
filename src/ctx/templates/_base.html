@@ -127,6 +127,12 @@
   }
   .nav a:hover { color: var(--fg); background: var(--bg-hover); }
   .nav a.active { color: var(--fg); background: var(--bg-hover); }
+  .nav a.install-nav {
+    color: var(--accent);
+    border: 1px solid var(--accent-line);
+    margin-left: var(--s-2);
+  }
+  .nav a.install-nav:hover { background: var(--accent-soft); }
 
   .topbar-spacer { flex: 1; }
 
@@ -479,6 +485,8 @@
       <a href="/"        class="{% if active == 'overview' %}active{% endif %}">overview</a>
       <a href="/search"  class="{% if active == 'search'   %}active{% endif %}">search</a>
       <a href="/docs"    class="{% if active == 'docs'     %}active{% endif %}">docs</a>
+      <a href="/usage"   class="{% if active == 'usage'    %}active{% endif %}">usage</a>
+      <a href="/install" class="install-nav {% if active == 'install'  %}active{% endif %}">install</a>
     </nav>
     <div class="topbar-spacer"></div>
     <div class="topbar-meta">

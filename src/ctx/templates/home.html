@@ -13,6 +13,69 @@
 {% endblock %}
 
 {% block content %}
+{# ── Onboarding banner ─────────────────────────────────────────────── #}
+<div id="onboarding-banner" class="banner" hidden>
+  <div class="banner-content">
+    <div>
+      <div class="banner-title">Connect Claude Code to ctx in 30 seconds</div>
+      <div class="banner-sub">paste one prompt into Claude Code — that's it</div>
+    </div>
+    <a href="/install" class="banner-cta">Install →</a>
+  </div>
+  <button class="banner-dismiss" aria-label="Dismiss" onclick="ctxDismissBanner()">×</button>
+</div>
+<script>
+  (function () {
+    if (localStorage.getItem('ctx-banner-dismissed') !== '1') {
+      document.getElementById('onboarding-banner').hidden = false;
+    }
+    window.ctxDismissBanner = function () {
+      localStorage.setItem('ctx-banner-dismissed', '1');
+      document.getElementById('onboarding-banner').hidden = true;
+    };
+  })();
+</script>
+<style>
+  .banner {
+    position: relative;
+    background: linear-gradient(90deg, var(--accent-soft), transparent);
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius);
+    padding: var(--s-4) var(--s-5);
+    margin-bottom: var(--s-6);
+  }
+  .banner-content { display: flex; align-items: center; gap: var(--s-4); }
+  .banner-title { font-weight: 500; color: var(--fg); }
+  .banner-sub {
+    color: var(--fg-muted); font-size: var(--t-12);
+    font-family: var(--font-mono); margin-top: 2px;
+  }
+  .banner-cta {
+    margin-left: auto;
+    padding: var(--s-2) var(--s-4);
+    background: var(--accent);
+    color: var(--bg) !important;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    font-family: var(--font-mono);
+    font-size: var(--t-13);
+    transition: all var(--duration);
+  }
+  .banner-cta:hover { opacity: 0.85; color: var(--bg) !important; }
+  .banner-dismiss {
+    position: absolute;
+    top: var(--s-2); right: var(--s-3);
+    background: transparent;
+    border: none;
+    color: var(--fg-subtle);
+    cursor: pointer;
+    font-size: var(--t-18);
+    line-height: 1;
+    padding: 4px 8px;
+  }
+  .banner-dismiss:hover { color: var(--fg); }
+</style>
+
 <div class="section-head" style="margin-bottom: var(--s-6);">
   <div>
     <h1 style="margin-bottom: 2px;">Overview</h1>
@@ -140,6 +203,69 @@
       </div>
     {% else %}
       <div class="card-body subtle mono" style="font-size: var(--t-12);">clean — nothing to triage</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── MCP usage (per-user) ─────────────────────────────────────────── #}
+<div class="section" style="display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);">
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">MCP usage · last 7d</h3>
+      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">
+        {{ total_queries_7d }} queries
+      </span>
+    </div>
+    {% if by_user %}
+    <div class="table-wrap" style="border: none; border-radius: 0;">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>user</th>
+            <th style="text-align: right;">queries</th>
+            <th style="text-align: right;">tokens served</th>
+            <th style="text-align: right;">last seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in by_user %}
+          <tr>
+            <td class="path">
+              <a href="/usage?user={{ u.user | urlencode }}">{{ u.user }}</a>
+            </td>
+            <td class="num">{{ u.queries }}</td>
+            <td class="num">{{ "{:,}".format(u.resp_tokens) }}</td>
+            <td class="num cell-faint">{{ u.last_seen_label }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body subtle mono" style="font-size: var(--t-12);">
+      no MCP calls yet — <a href="/install" style="color: var(--accent);">connect your Claude Code</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">Recent queries</h3>
+      <a href="/usage" class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">view all →</a>
+    </div>
+    {% if recent_queries %}
+    <div>
+      {% for q in recent_queries %}
+      <div class="card-row" style="padding: var(--s-2) var(--s-4); display: flex; align-items: center; gap: var(--s-3);">
+        <span class="pill" style="background: var(--bg-input); color: var(--fg-muted); padding: 1px 8px;">{{ q.user }}</span>
+        <span class="mono" style="font-size: var(--t-12); color: var(--fg); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ q.query }}</span>
+        <span class="mono subtle" style="font-size: var(--t-11);">{{ q.n_results }}r</span>
+        <span class="mono subtle" style="font-size: var(--t-11); min-width: 60px; text-align: right;">{{ q.age_label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-body subtle mono" style="font-size: var(--t-12);">no queries yet</div>
     {% endif %}
   </div>
 </div>

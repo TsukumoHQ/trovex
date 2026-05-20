@@ -1,0 +1,72 @@
+{% extends "_base.html" %}
+{% set active = 'usage' %}
+{% block title %}ctx — usage{% endblock %}
+
+{% block topbar_meta %}
+  <span class="mono">{{ total_count }} queries in window</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: var(--s-4);">
+  <div>
+    <h1 style="margin-bottom: 2px;">MCP usage</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      who queries ctx, with what, when
+    </div>
+  </div>
+</div>
+
+<form action="/usage" method="get" autocomplete="off"
+      style="display: flex; gap: var(--s-3); margin-bottom: var(--s-4); align-items: center;">
+  <select name="user" class="input mono" style="width: auto;" onchange="this.form.submit()">
+    <option value="">all users</option>
+    {% for u in users %}
+    <option value="{{ u }}" {% if u == user %}selected{% endif %}>{{ u }}</option>
+    {% endfor %}
+  </select>
+  <select name="days" class="input mono" style="width: auto;" onchange="this.form.submit()">
+    {% for d in [1, 7, 14, 30, 90] %}
+    <option value="{{ d }}" {% if d == days %}selected{% endif %}>last {{ d }}d</option>
+    {% endfor %}
+  </select>
+  <span class="subtle mono" style="font-size: var(--t-12); margin-left: auto;">
+    showing {{ total_count }} most recent
+  </span>
+</form>
+
+{% if rows %}
+<div class="table-wrap">
+  <table class="t">
+    <thead>
+      <tr>
+        <th>when</th>
+        <th>user</th>
+        <th>query</th>
+        <th style="text-align: right;">results</th>
+        <th style="text-align: right;">tokens</th>
+        <th style="text-align: right;">elapsed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="num cell-faint" style="min-width: 80px;">{{ r.age_label }}</td>
+        <td class="path">{{ r.user }}</td>
+        <td class="mono" style="white-space: normal; max-width: 600px;">{{ r.query }}</td>
+        <td class="num">{{ r.n_results }}{% if r.summary %} +s{% endif %}</td>
+        <td class="num">{{ "{:,}".format(r.response_tokens_est) }}</td>
+        <td class="num cell-faint">{{ r.elapsed_ms }}ms</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <div class="empty-title mono">no queries{% if user %} for {{ user }}{% endif %} in last {{ days }}d</div>
+  <div class="subtle mono" style="font-size: var(--t-12);">
+    have any devs run the install yet? <a href="/install" style="color: var(--accent);">→ install</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

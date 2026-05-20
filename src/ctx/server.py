@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from .mcp_app import mcp
 from .state import get_state
+from .usage import UserHeaderMiddleware
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -56,6 +57,7 @@ async def lifespan(app: FastAPI):
 def build_app() -> FastAPI:
     # docs_url=None frees the /docs path for our own browse page.
     app = FastAPI(title="ctx", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app.add_middleware(UserHeaderMiddleware)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
     # Mount MCP HTTP transport at /mcp
@@ -104,6 +106,31 @@ def build_app() -> FastAPI:
                FROM docs ORDER BY tokens_est DESC LIMIT 8"""
         ).fetchall())
 
+        # MCP usage (last 7 days)
+        since_7d = _now() - 7 * 86400
+        by_user = db.execute(
+            """SELECT user, COUNT(*) AS queries,
+                      COALESCE(SUM(response_tokens_est),0) AS resp_tokens,
+                      MAX(ts) AS last_seen
+               FROM mcp_queries WHERE ts >= ?
+               GROUP BY user ORDER BY queries DESC""",
+            (since_7d,),
+        ).fetchall()
+        by_user_rows = [
+            {**dict(r), "last_seen_label": _relative_time(_now() - r["last_seen"])}
+            for r in by_user
+        ]
+        recent_queries = [
+            {**dict(r), "age_label": _relative_time(_now() - r["ts"])}
+            for r in db.execute(
+                """SELECT ts, user, query, n_results, summary, elapsed_ms
+                   FROM mcp_queries ORDER BY ts DESC LIMIT 15"""
+            ).fetchall()
+        ]
+        total_queries_7d = db.execute(
+            "SELECT COUNT(*) AS c FROM mcp_queries WHERE ts >= ?", (since_7d,)
+        ).fetchone()["c"]
+
         return templates.TemplateResponse(
             request, "home.html",
             {
@@ -112,6 +139,10 @@ def build_app() -> FastAPI:
                 "last_run_relative": last_run_relative,
                 "recent": recent, "attention": attention, "heaviest": heaviest,
                 "corpus_path": str(state.settings.project_root),
+                "by_user": by_user_rows,
+                "recent_queries": recent_queries,
+                "total_queries_7d": total_queries_7d,
+                "has_any_queries": total_queries_7d > 0 or len(by_user_rows) > 0,
             },
         )
 
@@ -197,6 +228,94 @@ def build_app() -> FastAPI:
     @app.get("/healthz", response_class=PlainTextResponse)
     async def healthz() -> str:
         return "ok"
+
+    # ── Install page + hook downloads ────────────────────────────────
+
+    @app.get("/install", response_class=HTMLResponse)
+    async def install_page(request: Request) -> HTMLResponse:
+        state = get_state()
+        total = state.searcher.db.execute(
+            "SELECT COUNT(*) AS c FROM docs"
+        ).fetchone()["c"]
+        return templates.TemplateResponse(request, "install.html", {"total": total})
+
+    @app.get("/hooks/{name}", response_class=PlainTextResponse)
+    async def hook_download(name: str) -> str:
+        if name not in {"ctx-baseline.sh", "ctx-ambient.sh"}:
+            return ""
+        path = Path("/home/synxadmin/.claude/hooks") / name
+        if not path.exists():
+            return ""
+        return path.read_text()
+
+    # ── Usage page ───────────────────────────────────────────────────
+
+    @app.get("/usage", response_class=HTMLResponse)
+    async def usage_page(
+        request: Request,
+        user: str = "",
+        days: int = 7,
+    ) -> HTMLResponse:
+        state = get_state()
+        db = state.searcher.db
+        days = max(1, min(90, int(days)))
+        since = _now() - days * 86400
+
+        where = ["ts >= ?"]
+        params: list[Any] = [since]
+        if user:
+            where.append("user = ?")
+            params.append(user)
+
+        queries = db.execute(
+            f"""SELECT ts, user, query, n_results, summary,
+                       response_tokens_est, elapsed_ms
+                FROM mcp_queries
+                WHERE {' AND '.join(where)}
+                ORDER BY ts DESC LIMIT 500""",
+            params,
+        ).fetchall()
+
+        users = [r["user"] for r in db.execute(
+            "SELECT DISTINCT user FROM mcp_queries ORDER BY user"
+        ).fetchall()]
+
+        # Enrich
+        now = _now()
+        rows = []
+        for r in queries:
+            d = dict(r)
+            d["age_sec"] = max(0.0, now - d["ts"])
+            d["age_label"] = _relative_time(d["age_sec"])
+            rows.append(d)
+
+        return templates.TemplateResponse(
+            request, "usage.html",
+            {
+                "rows": rows, "users": users, "user": user, "days": days,
+                "total_count": len(rows),
+            },
+        )
+
+    @app.get("/api/usage")
+    async def api_usage(days: int = 7) -> JSONResponse:
+        state = get_state()
+        db = state.searcher.db
+        since = _now() - max(1, min(90, int(days))) * 86400
+        by_user = db.execute(
+            """SELECT user, COUNT(*) AS queries,
+                      COALESCE(SUM(response_tokens_est),0) AS resp_tokens,
+                      MAX(ts) AS last_seen
+               FROM mcp_queries WHERE ts >= ?
+               GROUP BY user ORDER BY queries DESC""",
+            (since,),
+        ).fetchall()
+        return JSONResponse([
+            {"user": r["user"], "queries": r["queries"],
+             "response_tokens_est": r["resp_tokens"],
+             "last_seen": r["last_seen"]}
+            for r in by_user
+        ])
 
     return app
 

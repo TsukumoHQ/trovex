@@ -46,6 +46,19 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             added INTEGER, updated INTEGER, unchanged INTEGER, removed INTEGER
         );
 
+        CREATE TABLE IF NOT EXISTS mcp_queries (
+            id INTEGER PRIMARY KEY,
+            ts REAL NOT NULL,
+            user TEXT NOT NULL DEFAULT 'unknown',
+            query TEXT NOT NULL,
+            n_results INTEGER NOT NULL DEFAULT 0,
+            summary INTEGER NOT NULL DEFAULT 0,
+            response_tokens_est INTEGER NOT NULL DEFAULT 0,
+            elapsed_ms INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_mcp_queries_ts ON mcp_queries(ts DESC);
+        CREATE INDEX IF NOT EXISTS idx_mcp_queries_user ON mcp_queries(user, ts DESC);
+
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_docs USING vec0(
             embedding float[{embed_dim}] distance_metric=cosine
         );

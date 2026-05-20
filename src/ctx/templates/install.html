@@ -1,0 +1,310 @@
+{% extends "_base.html" %}
+{% set active = 'install' %}
+{% block title %}ctx — install{% endblock %}
+
+{% block topbar_meta %}
+  <span class="mono">{{ "{:,}".format(total) }} docs indexed</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: var(--s-6);">
+  <div>
+    <h1 style="margin-bottom: 4px;">Connect Claude Code to ctx</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      30 seconds · paste the prompt below into Claude Code, that's it
+    </div>
+  </div>
+</div>
+
+{# ── Step 1: Required MCP install ──────────────────────── #}
+<div class="install-step">
+  <div class="install-step-head">
+    <span class="install-step-num">1</span>
+    <div>
+      <h2>Minimum install — MCP only</h2>
+      <div class="subtle mono" style="font-size: var(--t-12);">
+        registers ctx with your Claude Code and identifies you for usage stats
+      </div>
+    </div>
+  </div>
+
+  <div class="install-instructions">
+    Open Claude Code, then paste this prompt:
+  </div>
+
+  <div class="code-block">
+    <button class="copy-btn" data-target="prompt-1" type="button">copy</button>
+    <pre id="prompt-1">Set up the ctx MCP on this machine.
+
+1. Read my ~/.claude/settings.json (preserve everything else).
+2. Detect my handle: run `git config user.email`. Take the part before the @.
+   If empty or weird, ask me what handle to use. Confirm with me ([Y/n]) before
+   proceeding.
+3. Add this entry to mcpServers (merge, don't replace siblings):
+
+     "ctx": {
+       "type": "http",
+       "url": "https://ctx.prod.synergix.ch/mcp/",
+       "headers": { "X-CTX-User": "&lt;my-handle&gt;" }
+     }
+
+4. Tell me to restart Claude Code so the MCP loads. After restart, the tool
+   `ctx(q, summary=False)` is available — use it before grep+Read on .md files
+   in synergix_prod.
+5. Then ask me if I also want the optional pieces (ambient + baseline hooks)
+   from https://ctx.prod.synergix.ch/install — those measure adoption and
+   token savings.</pre>
+  </div>
+
+  <div class="install-after">
+    After restart, query the dashboard from <a href="/">ctx.prod.synergix.ch</a>
+    and you should see your handle in MCP usage.
+  </div>
+</div>
+
+{# ── Step 2: Optional ambient hook ──────────────────────── #}
+<details class="install-step install-step-optional">
+  <summary class="install-step-head">
+    <span class="install-step-num install-step-optional-num">2</span>
+    <div>
+      <h2>Optional — Ambient hook <span class="install-tag">recommended</span></h2>
+      <div class="subtle mono" style="font-size: var(--t-12);">
+        when you Read any .md in synergix_prod, related docs are auto-appended
+      </div>
+    </div>
+    <span class="chevron">▾</span>
+  </summary>
+
+  <div class="install-instructions">
+    After step 1 succeeded, paste this prompt:
+  </div>
+
+  <div class="code-block">
+    <button class="copy-btn" data-target="prompt-2" type="button">copy</button>
+    <pre id="prompt-2">Install the ctx ambient hook.
+
+1. Create ~/.claude/hooks/ctx-ambient.sh with the content fetched from
+   https://ctx.prod.synergix.ch/hooks/ctx-ambient.sh
+2. chmod +x it.
+3. Read ~/.claude/settings.json and add this to hooks.PostToolUse (merge with
+   existing entries — don't overwrite):
+
+     {
+       "matcher": "Read",
+       "hooks": [{
+         "type": "command",
+         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-ambient.sh",
+         "timeout": 5
+       }]
+     }
+
+   Replace &lt;me&gt; with $HOME's basename.
+4. Tell me to restart Claude Code.</pre>
+  </div>
+</details>
+
+{# ── Step 3: Optional baseline hook ─────────────────────── #}
+<details class="install-step install-step-optional">
+  <summary class="install-step-head">
+    <span class="install-step-num install-step-optional-num">3</span>
+    <div>
+      <h2>Optional — Baseline hook <span class="install-tag">measurement</span></h2>
+      <div class="subtle mono" style="font-size: var(--t-12);">
+        logs every .md Read to compare token usage before/after ctx adoption
+      </div>
+    </div>
+    <span class="chevron">▾</span>
+  </summary>
+
+  <div class="install-instructions">
+    Same approach as the ambient hook:
+  </div>
+
+  <div class="code-block">
+    <button class="copy-btn" data-target="prompt-3" type="button">copy</button>
+    <pre id="prompt-3">Install the ctx baseline hook.
+
+1. Create ~/.claude/hooks/ctx-baseline.sh with the content fetched from
+   https://ctx.prod.synergix.ch/hooks/ctx-baseline.sh
+2. chmod +x it.
+3. Read ~/.claude/settings.json and add this to hooks.PreToolUse (merge with
+   existing entries — don't overwrite):
+
+     {
+       "matcher": "Read",
+       "hooks": [{
+         "type": "command",
+         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-baseline.sh",
+         "timeout": 3
+       }]
+     }
+
+   Replace &lt;me&gt; with $HOME's basename.
+4. Tell me to restart Claude Code. After ~7 days of usage, run
+   `ctx measure` (from the ctx repo) to see if I hit the -60% target.</pre>
+  </div>
+</details>
+
+{# ── Verify ─────────────────────────────────────────────── #}
+<div class="install-step install-step-verify">
+  <div class="install-step-head">
+    <span class="install-step-num">✓</span>
+    <div>
+      <h2>Verify it works</h2>
+      <div class="subtle mono" style="font-size: var(--t-12);">
+        After restart, open Claude Code and ask:
+      </div>
+    </div>
+  </div>
+  <div class="code-block">
+    <button class="copy-btn" data-target="prompt-verify" type="button">copy</button>
+    <pre id="prompt-verify">Call the ctx tool with q="auth JWT" and show me the raw output.</pre>
+  </div>
+  <div class="install-after">
+    You should see ~5 paths with ★/◯/✗/⚠ markers. Then refresh
+    <a href="/">overview</a> — your handle appears in MCP usage.
+  </div>
+</div>
+
+<style>
+  .install-step {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--s-5) var(--s-5);
+    margin-bottom: var(--s-4);
+  }
+  .install-step-optional {
+    cursor: pointer;
+    padding: 0;
+    overflow: hidden;
+  }
+  .install-step-optional > summary {
+    list-style: none;
+    padding: var(--s-5) var(--s-5);
+    user-select: none;
+  }
+  .install-step-optional > summary::-webkit-details-marker { display: none; }
+  .install-step-optional[open] > summary { border-bottom: 1px solid var(--border); }
+  .install-step-optional[open] > summary .chevron { transform: rotate(180deg); }
+  .install-step-optional .install-instructions,
+  .install-step-optional .code-block { margin-left: var(--s-5); margin-right: var(--s-5); }
+  .install-step-optional .code-block:last-child { margin-bottom: var(--s-5); }
+  .install-step-verify { background: var(--accent-soft); border-color: var(--accent-line); }
+
+  .install-step-head {
+    display: flex; align-items: flex-start; gap: var(--s-3);
+  }
+  .install-step-head h2 {
+    font-size: var(--t-16); margin: 0 0 2px 0;
+    display: flex; align-items: center; gap: var(--s-2);
+  }
+  .install-step-num {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent-line);
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 600;
+    font-size: var(--t-13);
+  }
+  .install-step-optional-num {
+    background: var(--bg-input);
+    color: var(--fg-muted);
+    border-color: var(--border);
+  }
+  .install-tag {
+    padding: 1px 8px;
+    background: var(--bg-input);
+    color: var(--fg-muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    font-weight: 400;
+    text-transform: lowercase;
+  }
+  .chevron {
+    margin-left: auto;
+    color: var(--fg-subtle);
+    transition: transform var(--duration);
+  }
+
+  .install-instructions {
+    margin-top: var(--s-3);
+    color: var(--fg-muted);
+    font-size: var(--t-13);
+  }
+  .install-after {
+    margin-top: var(--s-3);
+    color: var(--fg-muted);
+    font-size: var(--t-12);
+    font-family: var(--font-mono);
+  }
+  .install-after a { color: var(--accent); }
+
+  .code-block {
+    position: relative;
+    margin-top: var(--s-3);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .code-block pre {
+    margin: 0;
+    padding: var(--s-4);
+    padding-right: 80px;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    line-height: 1.65;
+    color: var(--fg);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .copy-btn {
+    position: absolute;
+    top: var(--s-2); right: var(--s-2);
+    padding: var(--s-1) var(--s-3);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg-muted);
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    cursor: pointer;
+    transition: all var(--duration);
+  }
+  .copy-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent-line);
+  }
+  .copy-btn[data-copied="1"] {
+    color: var(--accent);
+    border-color: var(--accent-line);
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const target = document.getElementById(btn.dataset.target);
+      if (!target) return;
+      const text = target.innerText;
+      navigator.clipboard.writeText(text).then(function () {
+        btn.dataset.copied = '1';
+        const original = btn.textContent;
+        btn.textContent = 'copied ✓';
+        setTimeout(function () {
+          btn.textContent = original;
+          delete btn.dataset.copied;
+        }, 1800);
+      });
+    });
+  });
+</script>
+{% endblock %}

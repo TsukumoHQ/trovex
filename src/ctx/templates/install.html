@@ -1,275 +1,501 @@
 {% extends "_base.html" %}
 {% set active = 'install' %}
-{% block title %}ctx — install{% endblock %}
+{% block title %}ctx — connect Claude Code{% endblock %}
 
 {% block topbar_meta %}
   <span class="mono">{{ "{:,}".format(total) }} docs indexed</span>
 {% endblock %}
 
 {% block content %}
-<div class="section-head" style="margin-bottom: var(--s-6);">
-  <div>
-    <h1 style="margin-bottom: 4px;">Connect Claude Code to ctx</h1>
-    <div class="subtle mono" style="font-size: var(--t-12);">
-      30 seconds · paste the prompt below into Claude Code, that's it
-    </div>
+<div class="install-hero">
+  <div class="install-eyebrow mono">QUICKSTART · 30 SECONDS</div>
+  <h1 class="install-h1">Connect Claude Code to&nbsp;ctx</h1>
+  <p class="install-lede">
+    Paste one prompt into Claude Code. It detects your handle from
+    <code>git config</code>, registers the MCP, and you're done. Hooks are optional.
+  </p>
+  <div class="install-progress" aria-label="Install steps">
+    <span class="install-progress-step active"><span>1</span> MCP</span>
+    <span class="install-progress-sep"></span>
+    <span class="install-progress-step"><span>2</span> Ambient</span>
+    <span class="install-progress-sep"></span>
+    <span class="install-progress-step"><span>3</span> Baseline</span>
+    <span class="install-progress-sep"></span>
+    <span class="install-progress-step"><span>✓</span> Verify</span>
   </div>
 </div>
 
-{# ── Step 1: Required MCP install ──────────────────────── #}
-<div class="install-step">
-  <div class="install-step-head">
-    <span class="install-step-num">1</span>
-    <div>
-      <h2>Minimum install — MCP only</h2>
-      <div class="subtle mono" style="font-size: var(--t-12);">
-        registers ctx with your Claude Code and identifies you for usage stats
+{# ── Step 1: required ───────────────────────────────────── #}
+<section class="step step-required" aria-labelledby="step-1-title">
+  <div class="step-rail">
+    <span class="step-num">1</span>
+  </div>
+  <div class="step-body">
+    <div class="step-head">
+      <h2 id="step-1-title">Connect the MCP <span class="step-tag step-tag-required">required</span></h2>
+      <p class="step-sub">
+        Adds a single entry to your <code>~/.claude/settings.json</code>.
+        No filesystem changes, no shell scripts, no sudo.
+      </p>
+    </div>
+
+    <div class="step-action">
+      <div class="step-action-label">
+        <span class="step-action-icon">→</span>
+        Paste this into Claude Code
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang mono">prompt</span>
+          <button class="copy-btn" data-target="prompt-1" type="button" aria-label="Copy prompt">
+            <span class="copy-btn-label">Copy</span>
+          </button>
+        </div>
+        <pre class="code-block-body" id="prompt-1"><span class="code-line"><span class="code-num">1</span><span class="code-text">Set up the ctx MCP on this machine.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Read my ~/.claude/settings.json (preserve everything else).</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">2. Detect my handle: run `git config user.email`. Take the part before</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">   the @. If empty or weird, ask me. Confirm with me ([Y/n]) before</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">   proceeding.</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">3. Add this entry to mcpServers (merge, don't replace siblings):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     "ctx": {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "type": "http",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "url": "https://ctx.prod.synergix.ch/mcp/",</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">       "headers": { "X-CTX-User": "&lt;my-handle&gt;" }</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">4. Tell me to restart Claude Code so the MCP loads. Then the tool</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">   `ctx(q, summary=False)` is available — use it before grep+Read on</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text">   .md files in synergix_prod.</span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">5. Then ask me if I also want the optional pieces (ambient + baseline</span></span><span class="code-line"><span class="code-num">19</span><span class="code-text">   hooks) from https://ctx.prod.synergix.ch/install</span></span></pre>
+      </div>
+    </div>
+
+    <div class="step-callouts">
+      <div class="callout">
+        <div class="callout-icon">✓</div>
+        <div>
+          <div class="callout-title">Preserves your config</div>
+          <div class="callout-body">Claude Code only merges the new entry — nothing else is touched.</div>
+        </div>
+      </div>
+      <div class="callout">
+        <div class="callout-icon">🛡</div>
+        <div>
+          <div class="callout-title">Read-only on the server</div>
+          <div class="callout-body">MCP is exposed under Tailscale — no auth bypass, no write actions.</div>
+        </div>
+      </div>
+      <div class="callout">
+        <div class="callout-icon">~</div>
+        <div>
+          <div class="callout-title">Reversible</div>
+          <div class="callout-body">Remove the entry from <code>settings.json</code> and restart. Zero residue.</div>
+        </div>
       </div>
     </div>
   </div>
+</section>
 
-  <div class="install-instructions">
-    Open Claude Code, then paste this prompt:
+{# ── Step 2: optional ambient hook ──────────────────────── #}
+<section class="step step-optional" aria-labelledby="step-2-title">
+  <div class="step-rail">
+    <span class="step-num step-num-muted">2</span>
   </div>
+  <details class="step-body step-details">
+    <summary class="step-head">
+      <div>
+        <h2 id="step-2-title">
+          Ambient hook
+          <span class="step-tag">optional</span>
+          <span class="step-tag step-tag-rec">recommended</span>
+        </h2>
+        <p class="step-sub">
+          On every Read of a <code>.md</code> in synergix_prod, related docs are
+          auto-appended via a PostToolUse hook. Boosts adoption without changing
+          agent behaviour.
+        </p>
+      </div>
+      <span class="chevron" aria-hidden="true">▾</span>
+    </summary>
 
-  <div class="code-block">
-    <button class="copy-btn" data-target="prompt-1" type="button">copy</button>
-    <pre id="prompt-1">Set up the ctx MCP on this machine.
-
-1. Read my ~/.claude/settings.json (preserve everything else).
-2. Detect my handle: run `git config user.email`. Take the part before the @.
-   If empty or weird, ask me what handle to use. Confirm with me ([Y/n]) before
-   proceeding.
-3. Add this entry to mcpServers (merge, don't replace siblings):
-
-     "ctx": {
-       "type": "http",
-       "url": "https://ctx.prod.synergix.ch/mcp/",
-       "headers": { "X-CTX-User": "&lt;my-handle&gt;" }
-     }
-
-4. Tell me to restart Claude Code so the MCP loads. After restart, the tool
-   `ctx(q, summary=False)` is available — use it before grep+Read on .md files
-   in synergix_prod.
-5. Then ask me if I also want the optional pieces (ambient + baseline hooks)
-   from https://ctx.prod.synergix.ch/install — those measure adoption and
-   token savings.</pre>
-  </div>
-
-  <div class="install-after">
-    After restart, query the dashboard from <a href="/">ctx.prod.synergix.ch</a>
-    and you should see your handle in MCP usage.
-  </div>
-</div>
-
-{# ── Step 2: Optional ambient hook ──────────────────────── #}
-<details class="install-step install-step-optional">
-  <summary class="install-step-head">
-    <span class="install-step-num install-step-optional-num">2</span>
-    <div>
-      <h2>Optional — Ambient hook <span class="install-tag">recommended</span></h2>
-      <div class="subtle mono" style="font-size: var(--t-12);">
-        when you Read any .md in synergix_prod, related docs are auto-appended
+    <div class="step-action">
+      <div class="step-action-label">
+        <span class="step-action-icon">→</span>
+        After step 1, paste this
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang mono">prompt</span>
+          <button class="copy-btn" data-target="prompt-2" type="button" aria-label="Copy prompt">
+            <span class="copy-btn-label">Copy</span>
+          </button>
+        </div>
+        <pre class="code-block-body" id="prompt-2"><span class="code-line"><span class="code-num">1</span><span class="code-text">Install the ctx ambient hook.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Create ~/.claude/hooks/ctx-ambient.sh with the content fetched from</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">   https://ctx.prod.synergix.ch/hooks/ctx-ambient.sh</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">2. chmod +x it.</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">3. Read ~/.claude/settings.json and add this to hooks.PostToolUse</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">   (merge — don't overwrite existing entries):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "matcher": "Read",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "hooks": [{</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">         "type": "command",</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-ambient.sh",</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text">         "timeout": 5</span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">       }]</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">4. Replace &lt;me&gt; with $HOME's basename. Then tell me to restart.</span></span></pre>
       </div>
     </div>
-    <span class="chevron">▾</span>
-  </summary>
+  </details>
+</section>
 
-  <div class="install-instructions">
-    After step 1 succeeded, paste this prompt:
+{# ── Step 3: optional baseline ─────────────────────────── #}
+<section class="step step-optional" aria-labelledby="step-3-title">
+  <div class="step-rail">
+    <span class="step-num step-num-muted">3</span>
   </div>
+  <details class="step-body step-details">
+    <summary class="step-head">
+      <div>
+        <h2 id="step-3-title">
+          Baseline hook
+          <span class="step-tag">optional</span>
+          <span class="step-tag step-tag-measure">measurement</span>
+        </h2>
+        <p class="step-sub">
+          Logs every <code>.md</code> Read to a local JSONL so we can validate
+          the −60% token target after ~7 days of usage. Run <code>ctx measure</code>
+          to see your delta.
+        </p>
+      </div>
+      <span class="chevron" aria-hidden="true">▾</span>
+    </summary>
 
-  <div class="code-block">
-    <button class="copy-btn" data-target="prompt-2" type="button">copy</button>
-    <pre id="prompt-2">Install the ctx ambient hook.
-
-1. Create ~/.claude/hooks/ctx-ambient.sh with the content fetched from
-   https://ctx.prod.synergix.ch/hooks/ctx-ambient.sh
-2. chmod +x it.
-3. Read ~/.claude/settings.json and add this to hooks.PostToolUse (merge with
-   existing entries — don't overwrite):
-
-     {
-       "matcher": "Read",
-       "hooks": [{
-         "type": "command",
-         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-ambient.sh",
-         "timeout": 5
-       }]
-     }
-
-   Replace &lt;me&gt; with $HOME's basename.
-4. Tell me to restart Claude Code.</pre>
-  </div>
-</details>
-
-{# ── Step 3: Optional baseline hook ─────────────────────── #}
-<details class="install-step install-step-optional">
-  <summary class="install-step-head">
-    <span class="install-step-num install-step-optional-num">3</span>
-    <div>
-      <h2>Optional — Baseline hook <span class="install-tag">measurement</span></h2>
-      <div class="subtle mono" style="font-size: var(--t-12);">
-        logs every .md Read to compare token usage before/after ctx adoption
+    <div class="step-action">
+      <div class="step-action-label">
+        <span class="step-action-icon">→</span>
+        Same approach as ambient
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang mono">prompt</span>
+          <button class="copy-btn" data-target="prompt-3" type="button" aria-label="Copy prompt">
+            <span class="copy-btn-label">Copy</span>
+          </button>
+        </div>
+        <pre class="code-block-body" id="prompt-3"><span class="code-line"><span class="code-num">1</span><span class="code-text">Install the ctx baseline hook.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Create ~/.claude/hooks/ctx-baseline.sh with the content fetched from</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">   https://ctx.prod.synergix.ch/hooks/ctx-baseline.sh</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">2. chmod +x it.</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">3. Read ~/.claude/settings.json and add this to hooks.PreToolUse</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">   (merge — don't overwrite existing entries):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "matcher": "Read",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "hooks": [{</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">         "type": "command",</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-baseline.sh",</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text">         "timeout": 3</span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">       }]</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">4. Replace &lt;me&gt; with $HOME's basename. Restart Claude Code. After</span></span><span class="code-line"><span class="code-num">19</span><span class="code-text">   ~7 days, run `ctx measure` to see the delta.</span></span></pre>
       </div>
     </div>
-    <span class="chevron">▾</span>
-  </summary>
-
-  <div class="install-instructions">
-    Same approach as the ambient hook:
-  </div>
-
-  <div class="code-block">
-    <button class="copy-btn" data-target="prompt-3" type="button">copy</button>
-    <pre id="prompt-3">Install the ctx baseline hook.
-
-1. Create ~/.claude/hooks/ctx-baseline.sh with the content fetched from
-   https://ctx.prod.synergix.ch/hooks/ctx-baseline.sh
-2. chmod +x it.
-3. Read ~/.claude/settings.json and add this to hooks.PreToolUse (merge with
-   existing entries — don't overwrite):
-
-     {
-       "matcher": "Read",
-       "hooks": [{
-         "type": "command",
-         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-baseline.sh",
-         "timeout": 3
-       }]
-     }
-
-   Replace &lt;me&gt; with $HOME's basename.
-4. Tell me to restart Claude Code. After ~7 days of usage, run
-   `ctx measure` (from the ctx repo) to see if I hit the -60% target.</pre>
-  </div>
-</details>
+  </details>
+</section>
 
 {# ── Verify ─────────────────────────────────────────────── #}
-<div class="install-step install-step-verify">
-  <div class="install-step-head">
-    <span class="install-step-num">✓</span>
-    <div>
-      <h2>Verify it works</h2>
-      <div class="subtle mono" style="font-size: var(--t-12);">
-        After restart, open Claude Code and ask:
+<section class="step step-verify" aria-labelledby="step-verify-title">
+  <div class="step-rail">
+    <span class="step-num step-num-success">✓</span>
+  </div>
+  <div class="step-body">
+    <div class="step-head">
+      <h2 id="step-verify-title">Verify it works</h2>
+      <p class="step-sub">
+        After restarting Claude Code, run this and you should see ~5 paths
+        with <code>★</code> / <code>◯</code> / <code>✗</code> / <code>⚠</code> markers.
+      </p>
+    </div>
+    <div class="step-action">
+      <div class="code-block code-block-small">
+        <div class="code-block-header">
+          <span class="code-block-lang mono">prompt</span>
+          <button class="copy-btn" data-target="prompt-verify" type="button" aria-label="Copy prompt">
+            <span class="copy-btn-label">Copy</span>
+          </button>
+        </div>
+        <pre class="code-block-body" id="prompt-verify"><span class="code-line"><span class="code-num">1</span><span class="code-text">Call the ctx tool with q="auth JWT" and show me the raw output.</span></span></pre>
       </div>
     </div>
+    <div class="step-after">
+      Then refresh <a href="/">overview</a> — your handle appears in MCP usage.
+    </div>
   </div>
-  <div class="code-block">
-    <button class="copy-btn" data-target="prompt-verify" type="button">copy</button>
-    <pre id="prompt-verify">Call the ctx tool with q="auth JWT" and show me the raw output.</pre>
-  </div>
-  <div class="install-after">
-    You should see ~5 paths with ★/◯/✗/⚠ markers. Then refresh
-    <a href="/">overview</a> — your handle appears in MCP usage.
-  </div>
-</div>
+</section>
 
 <style>
-  .install-step {
+  /* ── Hero ─────────────────────────────────────────────── */
+  .install-hero {
+    margin-bottom: var(--s-10);
+    padding-bottom: var(--s-6);
+    border-bottom: 1px solid var(--border);
+  }
+  .install-eyebrow {
+    color: var(--accent);
+    font-size: var(--t-11);
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    margin-bottom: var(--s-2);
+  }
+  .install-h1 {
+    font-family: var(--font-sans);
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    margin: 0 0 var(--s-3) 0;
+  }
+  .install-lede {
+    color: var(--fg-muted);
+    font-size: var(--t-16);
+    line-height: 1.6;
+    max-width: 64ch;
+    margin: 0 0 var(--s-5) 0;
+  }
+  .install-lede code {
+    color: var(--fg);
     background: var(--bg-card);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: var(--t-13);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--s-5) var(--s-5);
-    margin-bottom: var(--s-4);
   }
-  .install-step-optional {
-    cursor: pointer;
-    padding: 0;
-    overflow: hidden;
+  .install-progress {
+    display: inline-flex; align-items: center;
+    gap: var(--s-2);
+    color: var(--fg-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
   }
-  .install-step-optional > summary {
-    list-style: none;
-    padding: var(--s-5) var(--s-5);
-    user-select: none;
+  .install-progress-step {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
   }
-  .install-step-optional > summary::-webkit-details-marker { display: none; }
-  .install-step-optional[open] > summary { border-bottom: 1px solid var(--border); }
-  .install-step-optional[open] > summary .chevron { transform: rotate(180deg); }
-  .install-step-optional .install-instructions,
-  .install-step-optional .code-block { margin-left: var(--s-5); margin-right: var(--s-5); }
-  .install-step-optional .code-block:last-child { margin-bottom: var(--s-5); }
-  .install-step-verify { background: var(--accent-soft); border-color: var(--accent-line); }
+  .install-progress-step span {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px;
+    background: var(--bg-input);
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .install-progress-step.active {
+    color: var(--accent);
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
+  }
+  .install-progress-step.active span {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .install-progress-sep {
+    width: 16px; height: 1px;
+    background: var(--border);
+  }
 
-  .install-step-head {
-    display: flex; align-items: flex-start; gap: var(--s-3);
+  /* ── Step layout ─────────────────────────────────────── */
+  .step {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: var(--s-5);
+    margin-bottom: var(--s-6);
+    position: relative;
   }
-  .install-step-head h2 {
-    font-size: var(--t-16); margin: 0 0 2px 0;
-    display: flex; align-items: center; gap: var(--s-2);
+  .step-rail {
+    display: flex; flex-direction: column; align-items: center;
+    position: relative;
   }
-  .install-step-num {
-    flex-shrink: 0;
-    width: 28px; height: 28px;
+  .step-rail::after {
+    content: '';
+    position: absolute;
+    top: 44px; bottom: -32px; left: 50%;
+    width: 1px;
+    background: var(--border);
+    transform: translateX(-50%);
+  }
+  .step:last-of-type .step-rail::after { display: none; }
+  .step-num {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: var(--t-14);
     background: var(--accent-soft);
     color: var(--accent);
     border: 1px solid var(--accent-line);
-    border-radius: 50%;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-family: var(--font-mono); font-weight: 600;
-    font-size: var(--t-13);
+    position: relative; z-index: 1;
   }
-  .install-step-optional-num {
-    background: var(--bg-input);
+  .step-num-muted {
+    background: var(--bg-card);
     color: var(--fg-muted);
     border-color: var(--border);
   }
-  .install-tag {
-    padding: 1px 8px;
+  .step-num-success {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
+  .step-body {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .step-required > .step-body {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 1px var(--accent-soft);
+  }
+  .step-verify > .step-body {
+    background: linear-gradient(180deg, var(--accent-soft), var(--bg-card));
+    border-color: var(--accent-line);
+  }
+
+  .step-head {
+    padding: var(--s-5);
+    border-bottom: 1px solid var(--border);
+  }
+  .step-head h2 {
+    font-size: var(--t-18);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 6px 0;
+    display: flex; align-items: center; gap: var(--s-2);
+    flex-wrap: wrap;
+  }
+  .step-head h2 code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--bg-input);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--fg);
+    font-weight: 400;
+  }
+  .step-sub {
+    color: var(--fg-muted);
+    font-size: var(--t-13);
+    line-height: 1.6;
+    margin: 0;
+    max-width: 62ch;
+  }
+  .step-sub code {
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    background: var(--bg-input);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--fg);
+  }
+
+  .step-tag {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px;
     background: var(--bg-input);
     color: var(--fg-muted);
     border: 1px solid var(--border);
     border-radius: 999px;
     font-family: var(--font-mono);
     font-size: var(--t-11);
-    font-weight: 400;
+    font-weight: 500;
     text-transform: lowercase;
+    letter-spacing: 0.02em;
   }
-  .chevron {
-    margin-left: auto;
-    color: var(--fg-subtle);
-    transition: transform var(--duration);
+  .step-tag-required {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent-line);
+  }
+  .step-tag-rec {
+    background: rgba(96, 165, 250, 0.10);
+    color: var(--plan);
+    border-color: rgba(96, 165, 250, 0.25);
+  }
+  .step-tag-measure {
+    background: rgba(245, 158, 11, 0.10);
+    color: var(--duplicate);
+    border-color: rgba(245, 158, 11, 0.25);
   }
 
-  .install-instructions {
-    margin-top: var(--s-3);
+  .step-action {
+    padding: var(--s-5);
+  }
+  .step-action-label {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
     color: var(--fg-muted);
+    margin-bottom: var(--s-3);
+    font-weight: 500;
+  }
+  .step-action-icon {
+    color: var(--accent);
     font-size: var(--t-13);
   }
-  .install-after {
-    margin-top: var(--s-3);
+
+  .step-after {
+    padding: 0 var(--s-5) var(--s-5);
     color: var(--fg-muted);
     font-size: var(--t-12);
     font-family: var(--font-mono);
   }
-  .install-after a { color: var(--accent); }
+  .step-after a { color: var(--accent); }
 
-  .code-block {
-    position: relative;
-    margin-top: var(--s-3);
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
+  /* ── Optional <details> ──────────────────────────────── */
+  .step-details {
+    cursor: default;
   }
-  .code-block pre {
+  .step-details > summary {
+    list-style: none;
+    padding: var(--s-5);
+    cursor: pointer;
+    user-select: none;
+    display: flex; align-items: flex-start; gap: var(--s-3);
+    transition: background var(--duration);
+  }
+  .step-details > summary:hover { background: var(--bg-hover); }
+  .step-details > summary::-webkit-details-marker { display: none; }
+  .step-details[open] > summary { border-bottom: 1px solid var(--border); }
+  .step-details > summary > div { flex: 1; }
+  .chevron {
+    color: var(--fg-subtle);
+    transition: transform var(--duration);
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .step-details[open] > summary .chevron { transform: rotate(180deg); }
+
+  /* ── Code blocks ─────────────────────────────────────── */
+  .code-block {
+    background: #0d1119;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+  .code-block-header {
+    display: flex; align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+  }
+  .code-block-lang {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .code-block-body {
     margin: 0;
-    padding: var(--s-4);
-    padding-right: 80px;
+    padding: var(--s-3) 0;
     font-family: var(--font-mono);
     font-size: var(--t-12);
-    line-height: 1.65;
+    line-height: 1.7;
     color: var(--fg);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    max-height: 420px;
+    overflow-x: auto;
+    max-height: 480px;
     overflow-y: auto;
   }
+  .code-line {
+    display: flex;
+    padding: 0 var(--s-4) 0 0;
+    transition: background var(--duration);
+  }
+  .code-line:hover { background: rgba(34, 197, 94, 0.04); }
+  .code-num {
+    flex-shrink: 0;
+    width: 40px;
+    text-align: right;
+    padding-right: var(--s-3);
+    color: var(--fg-faint);
+    user-select: none;
+    font-feature-settings: 'tnum' 1;
+  }
+  .code-text {
+    flex: 1;
+    white-space: pre;
+    overflow-wrap: anywhere;
+  }
+  .code-block-small .code-block-body { padding: var(--s-3) 0; }
+
+  /* ── Copy button ─────────────────────────────────────── */
   .copy-btn {
-    position: absolute;
-    top: var(--s-2); right: var(--s-2);
-    padding: var(--s-1) var(--s-3);
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -277,32 +503,111 @@
     font-family: var(--font-mono);
     font-size: var(--t-11);
     cursor: pointer;
+    font-weight: 500;
     transition: all var(--duration);
   }
   .copy-btn:hover {
-    color: var(--accent);
-    border-color: var(--accent-line);
+    color: var(--fg);
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+  }
+  .copy-btn::before {
+    content: '⧉';
+    font-size: 12px;
+    transition: transform var(--duration);
   }
   .copy-btn[data-copied="1"] {
     color: var(--accent);
+    background: var(--accent-soft);
     border-color: var(--accent-line);
+  }
+  .copy-btn[data-copied="1"]::before {
+    content: '✓';
+    transform: scale(1.1);
+  }
+
+  /* ── Callouts row ────────────────────────────────────── */
+  .step-callouts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--s-3);
+    padding: 0 var(--s-5) var(--s-5);
+  }
+  .callout {
+    display: flex; gap: var(--s-3);
+    padding: var(--s-3);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .callout-icon {
+    width: 22px; height: 22px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 4px;
+    font-size: var(--t-12);
+    font-weight: 600;
+  }
+  .callout-title {
+    color: var(--fg);
+    font-size: var(--t-13);
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .callout-body {
+    color: var(--fg-muted);
+    font-size: var(--t-12);
+    line-height: 1.5;
+  }
+  .callout-body code {
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    background: var(--bg-card);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--fg);
+  }
+
+  /* ── Responsive ──────────────────────────────────────── */
+  @media (max-width: 640px) {
+    .install-h1 { font-size: 26px; }
+    .install-progress { font-size: var(--t-11); }
+    .install-progress-step { padding: 3px 8px; }
+    .step { grid-template-columns: 32px 1fr; gap: var(--s-3); }
+    .step-num { width: 28px; height: 28px; font-size: var(--t-12); }
+    .step-head, .step-action { padding: var(--s-4); }
+    .step-callouts { padding: 0 var(--s-4) var(--s-4); grid-template-columns: 1fr; }
+    .code-num { width: 32px; padding-right: var(--s-2); }
   }
 </style>
 
 <script>
   document.querySelectorAll('.copy-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
       const target = document.getElementById(btn.dataset.target);
       if (!target) return;
-      const text = target.innerText;
+      // Extract just the text content from .code-text nodes
+      const lines = target.querySelectorAll('.code-text');
+      const text = Array.from(lines).map(l => l.textContent).join('\n');
       navigator.clipboard.writeText(text).then(function () {
         btn.dataset.copied = '1';
-        const original = btn.textContent;
-        btn.textContent = 'copied ✓';
+        const label = btn.querySelector('.copy-btn-label');
+        const original = label.textContent;
+        label.textContent = 'Copied';
         setTimeout(function () {
-          btn.textContent = original;
+          label.textContent = original;
           delete btn.dataset.copied;
         }, 1800);
+      }).catch(function () {
+        // Fallback: select the text
+        const range = document.createRange();
+        range.selectNodeContents(target);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
       });
     });
   });

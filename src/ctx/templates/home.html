@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_partials.html" import status_pill, fresh_label, number %}
+{% from "_partials.html" import status_pill, fresh_label, number, avatar %}
 {% set active = 'overview' %}
 {% block title %}ctx — overview{% endblock %}
 
@@ -154,8 +154,82 @@
 </div>
 {% endif %}
 
-{# ── Two-column: recent + top-attention ────────────────────────────── #}
-<div class="section" style="display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);">
+{# ── Section: humans / activity ────────────────────────────────────── #}
+<div class="section-divider">
+  <span class="section-divider-label">Activity</span>
+  <span class="section-divider-meta mono">last 7d</span>
+</div>
+<div class="row-2col-narrow-wide">
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">MCP usage</h3>
+      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">
+        {{ total_queries_7d }} queries
+      </span>
+    </div>
+    {% if by_user %}
+    <ul class="user-list">
+      {% for u in by_user %}
+      <li class="user-list-item">
+        <a href="/usage?user={{ u.user | urlencode }}" class="user-list-link">
+          {{ avatar(u.user, 26) }}
+          <span class="user-list-name">{{ u.user }}</span>
+          <span class="user-list-stats">
+            <span class="user-list-stat"><b>{{ u.queries }}</b><span class="user-list-stat-label">q</span></span>
+            <span class="user-list-stat cell-faint">{{ number(u.resp_tokens) }}<span class="user-list-stat-label">t</span></span>
+            <span class="user-list-stat cell-faint" style="min-width: 56px; text-align: right;">{{ u.last_seen_label }}</span>
+          </span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="card-body" style="text-align: center; padding: var(--s-6) var(--s-4);">
+      <div class="mono subtle" style="font-size: var(--t-12); margin-bottom: var(--s-2);">
+        no MCP calls yet
+      </div>
+      <a href="/install" class="connect-btn">
+        Connect Claude Code →
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">Recent queries</h3>
+      <a href="/usage" class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">view all →</a>
+    </div>
+    {% if recent_queries %}
+    <ul class="query-feed">
+      {% for q in recent_queries %}
+      <li class="query-feed-item">
+        {{ avatar(q.user, 22) }}
+        <div class="query-feed-body">
+          <div class="query-feed-line mono">
+            <span class="query-feed-user">{{ q.user }}</span>
+            <span class="query-feed-arrow">→</span><span class="query-feed-q">{{ q.query }}</span>
+          </div>
+        </div>
+        <div class="query-feed-meta mono">
+          <span>{{ q.n_results }}r</span>
+          <span class="cell-faint">{{ q.age_label }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="card-body subtle mono" style="font-size: var(--t-12); text-align: center; padding: var(--s-6);">no queries yet</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Section: corpus / content ─────────────────────────────────────── #}
+<div class="section-divider">
+  <span class="section-divider-label">Corpus</span>
+  <span class="section-divider-meta mono">{{ total }} docs</span>
+</div>
+<div class="row-2col-wide-narrow">
   <div class="card">
     <div class="card-header">
       <h3 style="margin: 0;">Recently updated</h3>
@@ -190,85 +264,171 @@
   <div class="card">
     <div class="card-header">
       <h3 style="margin: 0;">Needs attention</h3>
+      {% if attention %}
+      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">{{ attention | length }}</span>
+      {% endif %}
     </div>
     {% if attention %}
-      <div>
+      <ul class="attention-list">
         {% for r in attention %}
-        <div class="card-row" style="padding: var(--s-3) var(--s-4); display: flex; align-items: center; gap: var(--s-3);">
+        <li class="attention-item">
           {{ status_pill(r.status) }}
-          <a href="/search?q={{ r.path | urlencode }}" class="mono" style="font-size: var(--t-12); color: var(--fg); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;">{{ r.path }}</a>
-          <span class="mono subtle" style="font-size: var(--t-11);">{{ fresh_label(r.age_days) }}</span>
-        </div>
+          <a href="/search?q={{ r.path | urlencode }}" class="attention-path mono">{{ r.path }}</a>
+          <span class="mono subtle attention-age">{{ fresh_label(r.age_days) }}</span>
+        </li>
         {% endfor %}
-      </div>
+      </ul>
     {% else %}
-      <div class="card-body subtle mono" style="font-size: var(--t-12);">clean — nothing to triage</div>
+      <div class="card-body" style="text-align: center; padding: var(--s-6);">
+        <div class="attention-clean">✓</div>
+        <div class="subtle mono" style="font-size: var(--t-12);">clean — nothing to triage</div>
+      </div>
     {% endif %}
   </div>
 </div>
 
-{# ── MCP usage (per-user) ─────────────────────────────────────────── #}
-<div class="section" style="display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);">
-  <div class="card">
-    <div class="card-header">
-      <h3 style="margin: 0;">MCP usage · last 7d</h3>
-      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">
-        {{ total_queries_7d }} queries
-      </span>
-    </div>
-    {% if by_user %}
-    <div class="table-wrap" style="border: none; border-radius: 0;">
-      <table class="t">
-        <thead>
-          <tr>
-            <th>user</th>
-            <th style="text-align: right;">queries</th>
-            <th style="text-align: right;">tokens served</th>
-            <th style="text-align: right;">last seen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in by_user %}
-          <tr>
-            <td class="path">
-              <a href="/usage?user={{ u.user | urlencode }}">{{ u.user }}</a>
-            </td>
-            <td class="num">{{ u.queries }}</td>
-            <td class="num">{{ "{:,}".format(u.resp_tokens) }}</td>
-            <td class="num cell-faint">{{ u.last_seen_label }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="card-body subtle mono" style="font-size: var(--t-12);">
-      no MCP calls yet — <a href="/install" style="color: var(--accent);">connect your Claude Code</a>
-    </div>
-    {% endif %}
-  </div>
+<style>
+  /* ── Section dividers ────────────────────────────────── */
+  .section-divider {
+    display: flex; align-items: baseline; gap: var(--s-3);
+    margin: var(--s-8) 0 var(--s-3);
+  }
+  .section-divider-label {
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+  }
+  .section-divider::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+  .section-divider-meta {
+    color: var(--fg-faint);
+    font-size: var(--t-11);
+    order: 3;
+  }
+  .section-divider:has(.section-divider-meta)::after { order: 2; }
 
-  <div class="card">
-    <div class="card-header">
-      <h3 style="margin: 0;">Recent queries</h3>
-      <a href="/usage" class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">view all →</a>
-    </div>
-    {% if recent_queries %}
-    <div>
-      {% for q in recent_queries %}
-      <div class="card-row" style="padding: var(--s-2) var(--s-4); display: flex; align-items: center; gap: var(--s-3);">
-        <span class="pill" style="background: var(--bg-input); color: var(--fg-muted); padding: 1px 8px;">{{ q.user }}</span>
-        <span class="mono" style="font-size: var(--t-12); color: var(--fg); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ q.query }}</span>
-        <span class="mono subtle" style="font-size: var(--t-11);">{{ q.n_results }}r</span>
-        <span class="mono subtle" style="font-size: var(--t-11); min-width: 60px; text-align: right;">{{ q.age_label }}</span>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="card-body subtle mono" style="font-size: var(--t-12);">no queries yet</div>
-    {% endif %}
-  </div>
-</div>
+  /* Layout rows */
+  .row-2col-narrow-wide,
+  .row-2col-wide-narrow {
+    display: grid;
+    gap: var(--s-4);
+  }
+  .row-2col-narrow-wide { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+  .row-2col-wide-narrow { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  @media (max-width: 880px) {
+    .row-2col-narrow-wide, .row-2col-wide-narrow { grid-template-columns: 1fr; }
+  }
+
+  /* ── User list (MCP usage) ───────────────────────────── */
+  .user-list { list-style: none; margin: 0; padding: 0; }
+  .user-list-item + .user-list-item { border-top: 1px solid var(--border); }
+  .user-list-link {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    color: var(--fg) !important;
+    transition: background var(--duration);
+  }
+  .user-list-link:hover { background: var(--bg-hover); color: var(--fg) !important; }
+  .user-list-name {
+    font-family: var(--font-mono); font-weight: 500;
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .user-list-stats {
+    display: inline-flex; gap: var(--s-3); align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+  }
+  .user-list-stat {
+    font-variant-numeric: tabular-nums;
+  }
+  .user-list-stat b { color: var(--fg); font-weight: 500; }
+  .user-list-stat-label {
+    color: var(--fg-faint);
+    margin-left: 2px;
+    font-size: 10px;
+  }
+
+  .connect-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    background: var(--accent);
+    color: var(--bg) !important;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    font-weight: 500;
+    transition: opacity var(--duration);
+  }
+  .connect-btn:hover { opacity: 0.85; color: var(--bg) !important; }
+
+  /* ── Query feed ──────────────────────────────────────── */
+  .query-feed { list-style: none; margin: 0; padding: 0; }
+  .query-feed-item {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-2) var(--s-4);
+    transition: background var(--duration);
+  }
+  .query-feed-item + .query-feed-item { border-top: 1px solid var(--border); }
+  .query-feed-item:hover { background: var(--bg-hover); }
+  .query-feed-body { flex: 1; min-width: 0; }
+  .query-feed-line {
+    font-size: var(--t-12);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .query-feed-user {
+    color: var(--fg-muted);
+    font-weight: 500;
+  }
+  .query-feed-arrow {
+    color: var(--fg-faint);
+    margin: 0 6px;
+  }
+  .query-feed-q { color: var(--fg); }
+  .query-feed-meta {
+    display: inline-flex; gap: var(--s-3); align-items: baseline;
+    font-size: var(--t-11);
+    color: var(--fg-subtle);
+    flex-shrink: 0;
+  }
+
+  /* ── Attention list ──────────────────────────────────── */
+  .attention-list { list-style: none; margin: 0; padding: 0; }
+  .attention-item {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-2) var(--s-4);
+    transition: background var(--duration);
+  }
+  .attention-item + .attention-item { border-top: 1px solid var(--border); }
+  .attention-item:hover { background: var(--bg-hover); }
+  .attention-path {
+    color: var(--fg) !important;
+    font-size: var(--t-12);
+    flex: 1; min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .attention-path:hover { color: var(--accent) !important; }
+  .attention-age { font-size: var(--t-11); flex-shrink: 0; }
+  .attention-clean {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent-line);
+    font-size: var(--t-18);
+    margin: 0 auto var(--s-2);
+  }
+</style>
 
 {# ── Heaviest files ────────────────────────────────────────────────── #}
 {% if heaviest %}

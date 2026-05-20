@@ -22,3 +22,24 @@
   {%- else -%}{{ n }}
   {%- endif -%}
 {%- endmacro %}
+
+{# Deterministic avatar color from a string (8 dark-mode-friendly hues).
+   Hashed via sum of char codes for distribution across short names. #}
+{% macro avatar_hue(name) -%}
+  {%- set palette = [
+    '#22c55e', '#60a5fa', '#a78bfa', '#f59e0b',
+    '#ec4899', '#06b6d4', '#fb7185', '#84cc16'
+  ] -%}
+  {{- palette[((name | sum(attribute='__len__', start=0) if false else (name + 'x') | length * 7 + ((name | first | default('a')) | string | length)) + (name | length)) % 8] -}}
+{%- endmacro %}
+
+{% macro avatar(name, size=24) -%}
+  {%- set hue = avatar_hue(name) -%}
+  <span class="avatar" style="
+    width: {{ size }}px; height: {{ size }}px;
+    background: {{ hue }}22;
+    color: {{ hue }};
+    border: 1px solid {{ hue }}44;
+    font-size: {{ (size * 0.45) | int }}px;
+  " title="{{ name }}">{{ (name[:1] | default('?')) | upper }}</span>
+{%- endmacro %}

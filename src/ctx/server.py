@@ -256,6 +256,8 @@ def build_app() -> FastAPI:
         user: str = "",
         days: int = 7,
     ) -> HTMLResponse:
+        from datetime import datetime, timezone
+
         state = get_state()
         db = state.searcher.db
         days = max(1, min(90, int(days)))
@@ -280,20 +282,62 @@ def build_app() -> FastAPI:
             "SELECT DISTINCT user FROM mcp_queries ORDER BY user"
         ).fetchall()]
 
-        # Enrich
         now = _now()
-        rows = []
+        now_dt = datetime.fromtimestamp(now, tz=timezone.utc)
+        today_start = now_dt.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        yesterday_start = today_start - 86400
+
+        # Group by time bucket
+        buckets: dict[str, list[dict]] = {"Today": [], "Yesterday": [], "Earlier": []}
         for r in queries:
             d = dict(r)
-            d["age_sec"] = max(0.0, now - d["ts"])
-            d["age_label"] = _relative_time(d["age_sec"])
-            rows.append(d)
+            d["age_label"] = _relative_time(now - d["ts"])
+            d["time_label"] = datetime.fromtimestamp(d["ts"], tz=timezone.utc).strftime("%H:%M")
+            if d["ts"] >= today_start:
+                buckets["Today"].append(d)
+            elif d["ts"] >= yesterday_start:
+                buckets["Yesterday"].append(d)
+            else:
+                buckets["Earlier"].append(d)
+
+        # Per-user summary across the window
+        per_user_summary = db.execute(
+            f"""SELECT user, COUNT(*) AS queries,
+                      COALESCE(SUM(response_tokens_est),0) AS resp_tokens,
+                      COALESCE(AVG(elapsed_ms),0) AS avg_elapsed_ms,
+                      MAX(ts) AS last_seen
+               FROM mcp_queries WHERE {' AND '.join(where)}
+               GROUP BY user ORDER BY queries DESC""",
+            params,
+        ).fetchall()
+        per_user = []
+        for r in per_user_summary:
+            d = dict(r)
+            d["last_seen_label"] = _relative_time(now - d["last_seen"])
+            # Sparkline data: 24 buckets over the window
+            sb = _sparkline_buckets(db, d["user"], since, now, 24)
+            d["sparkline"] = sb
+            per_user.append(d)
+
+        # Top-level stats
+        total_queries = len(queries)
+        total_tokens = sum(r["response_tokens_est"] for r in queries)
+        avg_elapsed = (
+            sum(r["elapsed_ms"] for r in queries) / total_queries
+            if total_queries else 0
+        )
+        unique_users = len({r["user"] for r in queries})
 
         return templates.TemplateResponse(
             request, "usage.html",
             {
-                "rows": rows, "users": users, "user": user, "days": days,
-                "total_count": len(rows),
+                "buckets": buckets,
+                "per_user": per_user,
+                "users": users, "user": user, "days": days,
+                "total_queries": total_queries,
+                "total_tokens": total_tokens,
+                "avg_elapsed": int(avg_elapsed),
+                "unique_users": unique_users,
             },
         )
 
@@ -344,6 +388,21 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
     }
     template_name = "_results.html" if partial else "search.html"
     return templates.TemplateResponse(request, template_name, ctx_data)
+
+
+def _sparkline_buckets(db, user: str, since: float, until: float, n: int) -> list[int]:
+    """Return counts per bucket. Used to draw inline activity sparklines."""
+    width = (until - since) / n
+    rows = db.execute(
+        """SELECT ts FROM mcp_queries
+           WHERE user = ? AND ts >= ? AND ts <= ?""",
+        (user, since, until),
+    ).fetchall()
+    out = [0] * n
+    for r in rows:
+        idx = min(n - 1, int((r["ts"] - since) / width))
+        out[idx] += 1
+    return out
 
 
 def _docs_query(qpath: str, status: str, sort: str, limit: int) -> dict[str, Any]:

@@ -113,16 +113,27 @@
     </div>
   </div>
 
-  <div class="kpi">
-    <div class="kpi-label">last index</div>
-    <div class="kpi-value mono" style="font-size: var(--t-22);">
-      {% if last_run %}{{ "%.1f"|format(last_run.duration_sec) }}s{% else %}–{% endif %}
-    </div>
+  <div class="kpi {% if savings_totals.saved > 0 %}kpi-accent{% endif %}">
+    <div class="kpi-label">tokens saved · 7d</div>
+    <div class="kpi-value">{{ number(savings_totals.saved) }}</div>
     <div class="kpi-sub">
-      {% if last_run %}{{ last_run_relative }}{% else %}never{% endif %}
+      {% if savings_totals.queries > 0 %}
+        <a href="/savings" style="color: var(--accent);">
+          {{ "%.0f"|format(savings_totals.ratio * 100) }}% reduction →
+        </a>
+      {% else %}
+        no data yet
+      {% endif %}
     </div>
   </div>
 </div>
+<style>
+  .kpi-accent {
+    border-color: var(--accent-line);
+    background: linear-gradient(180deg, var(--accent-soft), var(--bg-card));
+  }
+  .kpi-accent .kpi-value { color: var(--accent); }
+</style>
 
 {# ── Status distribution stacked bar ───────────────────────────────── #}
 {% if total > 0 %}

@@ -34,12 +34,16 @@ class UserHeaderMiddleware(BaseHTTPMiddleware):
 
 
 def log_query(db, query: str, n_results: int, summary: bool,
-              response_tokens_est: int, elapsed_ms: int) -> None:
+              response_tokens_est: int, elapsed_ms: int,
+              would_have_read_tokens: int = 0,
+              top_result_tokens: int = 0) -> None:
     db.execute(
         """INSERT INTO mcp_queries
-           (ts, user, query, n_results, summary, response_tokens_est, elapsed_ms)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           (ts, user, query, n_results, summary, response_tokens_est, elapsed_ms,
+            would_have_read_tokens, top_result_tokens)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (time.time(), current_user.get(), query[:500],
-         n_results, int(summary), response_tokens_est, elapsed_ms),
+         n_results, int(summary), response_tokens_est, elapsed_ms,
+         would_have_read_tokens, top_result_tokens),
     )
     db.commit()

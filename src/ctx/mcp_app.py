@@ -61,9 +61,17 @@ def ctx(q: str, summary: bool = False) -> str:
            else state.searcher.format_minimal(results))
     elapsed_ms = int((_time.perf_counter() - t0) * 1000)
     try:
+        # Savings model: without ctx, agent typically reads top-3 .md files
+        # matching their grep/glob. With ctx, they read 1 (the canonical top-1).
+        # "would_have_read_tokens" = sum of top-3 results (incl. the one they
+        # still read with ctx). Real savings later subtract top-1 + response.
+        would_have_read = sum(r.tokens_est for r in results[:3])
+        top_tokens = results[0].tokens_est if results else 0
         log_query(
             state.searcher.db, q, len(results), summary,
             response_tokens_est=len(out) // 4, elapsed_ms=elapsed_ms,
+            would_have_read_tokens=would_have_read,
+            top_result_tokens=top_tokens,
         )
     except Exception:
         pass  # never let logging break the tool

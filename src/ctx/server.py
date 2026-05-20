@@ -11,6 +11,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
+from . import savings as savings_mod
 from .mcp_app import mcp
 from .state import get_state
 from .usage import UserHeaderMiddleware
@@ -121,20 +122,26 @@ def build_app() -> FastAPI:
                FROM docs ORDER BY tokens_est DESC LIMIT 8"""
         ).fetchall())
 
-        # MCP usage (last 7 days)
+        # MCP usage (last 7 days) — joined with savings
         since_7d = _now() - 7 * 86400
         by_user = db.execute(
             """SELECT user, COUNT(*) AS queries,
                       COALESCE(SUM(response_tokens_est),0) AS resp_tokens,
+                      COALESCE(SUM(would_have_read_tokens),0) AS whr,
+                      COALESCE(SUM(top_result_tokens),0) AS topr,
                       MAX(ts) AS last_seen
                FROM mcp_queries WHERE ts >= ?
                GROUP BY user ORDER BY queries DESC""",
             (since_7d,),
         ).fetchall()
-        by_user_rows = [
-            {**dict(r), "last_seen_label": _relative_time(_now() - r["last_seen"])}
-            for r in by_user
-        ]
+        by_user_rows = []
+        for r in by_user:
+            d = dict(r)
+            d["saved"] = max(0, d["whr"] - d["topr"] - d["resp_tokens"])
+            d["ratio"] = (d["saved"] / d["whr"]) if d["whr"] else 0.0
+            d["last_seen_label"] = _relative_time(_now() - d["last_seen"])
+            by_user_rows.append(d)
+        savings_totals = savings_mod.totals(db, since_7d)
         recent_queries = [
             {**dict(r), "age_label": _relative_time(_now() - r["ts"])}
             for r in db.execute(
@@ -158,6 +165,7 @@ def build_app() -> FastAPI:
                 "recent_queries": recent_queries,
                 "total_queries_7d": total_queries_7d,
                 "has_any_queries": total_queries_7d > 0 or len(by_user_rows) > 0,
+                "savings_totals": savings_totals,
             },
         )
 
@@ -355,6 +363,33 @@ def build_app() -> FastAPI:
                 "unique_users": unique_users,
             },
         )
+
+    @app.get("/savings", response_class=HTMLResponse)
+    async def savings_page(request: Request, days: int = 7) -> HTMLResponse:
+        state = get_state()
+        db = state.searcher.db
+        days = max(1, min(90, int(days)))
+        since = _now() - days * 86400
+        totals = savings_mod.totals(db, since)
+        per_user = savings_mod.per_user(db, since)
+        daily = savings_mod.daily_series(db, since, _now())
+        top_q = savings_mod.top_queries(db, since, limit=10)
+        return templates.TemplateResponse(
+            request, "savings.html",
+            {
+                "totals": totals, "per_user": per_user,
+                "daily": daily, "top_queries": top_q,
+                "days": days,
+            },
+        )
+
+    @app.get("/api/savings")
+    async def api_savings(days: int = 7) -> JSONResponse:
+        state = get_state()
+        db = state.searcher.db
+        days = max(1, min(90, int(days)))
+        since = _now() - days * 86400
+        return JSONResponse(savings_mod.totals(db, since))
 
     @app.get("/api/usage")
     async def api_usage(days: int = 7) -> JSONResponse:

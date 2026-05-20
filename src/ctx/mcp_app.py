@@ -60,6 +60,7 @@ def ctx(q: str, summary: bool = False) -> str:
     t0 = _time.perf_counter()
     # Fetch a wider candidate pool when reranking is possible.
     candidates = state.searcher.search(q, limit=20)
+    pre_rerank_paths = [c.path for c in candidates]
     results, rerank_info = maybe_rerank(q, candidates, limit=5)
 
     out = (state.searcher.format_with_summary(results) if summary
@@ -82,6 +83,9 @@ def ctx(q: str, summary: bool = False) -> str:
                     "elapsed_ms": rerank_info.elapsed_ms,
                 } if rerank_info else None
             ),
+            # Only pass pre-rerank when actually reranking — otherwise it's
+            # the same list and metrics would be meaningless.
+            pre_rerank_paths=pre_rerank_paths if rerank_info else None,
         )
     except Exception:
         pass  # never let logging break the tool

@@ -57,13 +57,35 @@ def log_query(db, query: str, n_results: int, summary: bool,
               would_have_read_tokens: int = 0,
               top_result_tokens: int = 0,
               results: list | None = None,
-              rerank_info: dict | None = None) -> None:
+              rerank_info: dict | None = None,
+              pre_rerank_paths: list[str] | None = None) -> None:
+    # Divergence metrics: if pre-rerank paths supplied, compare with post-rerank.
+    pre_top1: str | None = None
+    top1_changed = 0
+    top1_lift = 0
+    top5_overlap = 5
+    if pre_rerank_paths and results:
+        pre_top1 = pre_rerank_paths[0] if pre_rerank_paths else None
+        post_top1 = results[0].path if results else None
+        if pre_top1 and post_top1:
+            top1_changed = 1 if pre_top1 != post_top1 else 0
+            try:
+                # Where was the post-rerank top-1 in the original vector order?
+                top1_lift = pre_rerank_paths.index(post_top1)
+            except ValueError:
+                top1_lift = 0
+        # Top-5 set overlap: how many of post-rerank top-5 were in pre top-5?
+        post5 = {r.path for r in results[:5]}
+        pre5 = set(pre_rerank_paths[:5])
+        top5_overlap = len(post5 & pre5)
+
     cur = db.execute(
         """INSERT INTO mcp_queries
            (ts, user, query, n_results, summary, response_tokens_est, elapsed_ms,
             would_have_read_tokens, top_result_tokens,
-            reranked, llm_model, llm_tokens_in, llm_tokens_out, llm_elapsed_ms)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            reranked, llm_model, llm_tokens_in, llm_tokens_out, llm_elapsed_ms,
+            pre_top1_path, top1_changed, top1_lift, top5_overlap)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (time.time(), current_user.get(), query[:500],
          n_results, int(summary), response_tokens_est, elapsed_ms,
          would_have_read_tokens, top_result_tokens,
@@ -71,7 +93,8 @@ def log_query(db, query: str, n_results: int, summary: bool,
          (rerank_info or {}).get("model"),
          (rerank_info or {}).get("tokens_in", 0),
          (rerank_info or {}).get("tokens_out", 0),
-         (rerank_info or {}).get("elapsed_ms", 0)),
+         (rerank_info or {}).get("elapsed_ms", 0),
+         pre_top1, top1_changed, top1_lift, top5_overlap),
     )
     query_id = cur.lastrowid
     if results and query_id is not None:

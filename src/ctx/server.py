@@ -391,6 +391,7 @@ def build_app() -> FastAPI:
         ]
         heatmap = insights_mod.hour_heatmap(db, since)
         rerank = insights_mod.rerank_stats(db, since)
+        divergence = insights_mod.rerank_divergence(db, since)
         return templates.TemplateResponse(
             request, "insights.html",
             {
@@ -398,6 +399,7 @@ def build_app() -> FastAPI:
                 "top_q": top_q, "failed": failed, "repeated": repeated,
                 "most_returned": most_returned, "dead": dead,
                 "heatmap": heatmap, "rerank": rerank,
+                "divergence": divergence,
             },
         )
 

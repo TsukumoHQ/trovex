@@ -65,6 +65,99 @@
     </div>
   </div>
 
+  {# ── Divergence panel — does the LLM actually disagree? ── #}
+  {% if divergence.total > 0 %}
+  <div class="divergence-card">
+    <div class="divergence-head">
+      <div>
+        <div class="divergence-eyebrow mono">DOES THE LLM EARN ITS TOKENS?</div>
+        <div class="divergence-question mono">
+          rerank changed top-1 on <b class="divergence-pct">{{ "%.0f"|format(divergence.changed_pct) }}%</b>
+          of queries
+        </div>
+      </div>
+      <div class="divergence-verdict divergence-verdict-{{ divergence.verdict_class }}">
+        <span class="divergence-verdict-dot" aria-hidden="true"></span>
+        {{ divergence.verdict }}
+      </div>
+    </div>
+
+    <div class="divergence-body">
+      <div class="divergence-stats">
+        <div class="divergence-stat">
+          <div class="divergence-stat-label mono">divergent</div>
+          <div class="divergence-stat-value mono">{{ divergence.changed }}<span class="cell-faint mono" style="font-size: var(--t-13);"> / {{ divergence.total }}</span></div>
+        </div>
+        <div class="divergence-stat">
+          <div class="divergence-stat-label mono">avg lift</div>
+          <div class="divergence-stat-value mono">
+            {{ "+%.1f"|format(divergence.avg_lift) }}
+            <span class="cell-faint mono" style="font-size: var(--t-12);">positions</span>
+          </div>
+        </div>
+        <div class="divergence-stat">
+          <div class="divergence-stat-label mono">top-5 overlap</div>
+          <div class="divergence-stat-value mono">
+            {{ "%.1f"|format(divergence.avg_top5_overlap) }}<span class="cell-faint mono" style="font-size: var(--t-13);">/5</span>
+          </div>
+        </div>
+      </div>
+
+      {# Lift distribution histogram: where did the LLM pick its top-1 from? #}
+      {% set max_lift = (divergence.lift_distribution | max) or 1 %}
+      <div class="lift-histogram">
+        <div class="lift-histogram-title mono">where post-rerank top-1 came from in the vector ranking</div>
+        <div class="lift-bars">
+          {% for v in divergence.lift_distribution %}
+          <div class="lift-bar-wrap">
+            <div class="lift-bar
+              {% if loop.index0 == 0 %}lift-bar-confirm{% endif %}"
+              style="height: {{ (v / max_lift * 100) | round(1) }}%;"
+              title="pos {{ loop.index0 }}: {{ v }} queries"></div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="lift-axis mono">
+          <span class="cell-faint">pos 0</span>
+          <span class="cell-faint" style="margin-left: auto;">pos 19</span>
+        </div>
+        <div class="lift-legend mono">
+          <span><span class="lift-legend-dot lift-legend-dot-confirm"></span>vector top-1 confirmed</span>
+          <span><span class="lift-legend-dot lift-legend-dot-changed"></span>LLM promoted lower result</span>
+        </div>
+      </div>
+    </div>
+
+    {% if divergence.top_disagreements %}
+    <details class="divergence-disagreements">
+      <summary>
+        <span class="mono" style="color: var(--fg-muted); font-size: var(--t-12);">
+          Top disagreements — queries where LLM bypassed the vector top-1 the hardest
+        </span>
+        <span class="chevron">▾</span>
+      </summary>
+      <ul class="query-feed" style="margin: 0;">
+        {% for d in divergence.top_disagreements %}
+        <li class="query-feed-item">
+          <span class="mono" style="color: #a78bfa; font-weight: 600; min-width: 38px; text-align: center; font-size: var(--t-12);">+{{ d.top1_lift }}</span>
+          <div class="query-feed-body">
+            <div class="query-feed-line mono">
+              <span class="query-feed-user">{{ d.user }}</span>
+              <span class="query-feed-arrow">→</span><span class="query-feed-q">{{ d.query }}</span>
+            </div>
+            <div class="query-feed-meta mono">
+              <span class="cell-faint">vector top-1 was:</span>
+              <span style="color: var(--fg-muted);">{{ d.pre_top1_path }}</span>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if rerank.by_model %}
   <div class="rerank-models">
     {% set total_calls = rerank.by_model | sum(attribute='queries') or 1 %}
@@ -286,6 +379,172 @@
     .rerank-hero-number { font-size: 32px; }
     .rerank-hero-cost { font-size: 24px; }
     .rerank-models { grid-template-columns: 1fr; }
+  }
+
+  /* ── Divergence panel ─────────────────────────────────── */
+  .divergence-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--s-5);
+    margin-bottom: var(--s-4);
+  }
+  .divergence-head {
+    display: flex; align-items: flex-start; gap: var(--s-4);
+    margin-bottom: var(--s-4);
+  }
+  .divergence-eyebrow {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    font-weight: 500;
+    letter-spacing: 0.10em;
+    margin-bottom: var(--s-2);
+  }
+  .divergence-question {
+    font-size: var(--t-16);
+    color: var(--fg);
+    line-height: 1.5;
+  }
+  .divergence-pct {
+    color: #a78bfa;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .divergence-verdict {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .divergence-verdict-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .divergence-verdict-good {
+    background: var(--canonical-bg); color: var(--canonical);
+    border: 1px solid var(--accent-line);
+  }
+  .divergence-verdict-good .divergence-verdict-dot { background: var(--canonical); box-shadow: 0 0 6px var(--canonical); }
+  .divergence-verdict-warn {
+    background: var(--stale-bg); color: var(--stale);
+    border: 1px solid rgba(239, 68, 68, 0.30);
+  }
+  .divergence-verdict-warn .divergence-verdict-dot { background: var(--stale); }
+  .divergence-verdict-ambiguous {
+    background: var(--duplicate-bg); color: var(--duplicate);
+    border: 1px solid rgba(245, 158, 11, 0.30);
+  }
+  .divergence-verdict-ambiguous .divergence-verdict-dot { background: var(--duplicate); }
+  .divergence-verdict-muted {
+    background: var(--bg-input); color: var(--fg-muted);
+    border: 1px solid var(--border);
+  }
+  .divergence-verdict-muted .divergence-verdict-dot { background: var(--fg-subtle); }
+
+  .divergence-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: var(--s-5);
+    align-items: start;
+  }
+  .divergence-stats {
+    display: flex; flex-direction: column;
+    gap: var(--s-3);
+  }
+  .divergence-stat {}
+  .divergence-stat-label {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .divergence-stat-value {
+    font-size: var(--t-22);
+    color: var(--fg);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lift-histogram {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--s-3) var(--s-4);
+  }
+  .lift-histogram-title {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    margin-bottom: var(--s-2);
+  }
+  .lift-bars {
+    display: flex; align-items: flex-end;
+    gap: 3px;
+    height: 80px;
+  }
+  .lift-bar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .lift-bar {
+    width: 100%;
+    background: #a78bfa;
+    border-radius: 2px 2px 0 0;
+    min-height: 1px;
+    transition: background var(--duration);
+  }
+  .lift-bar:hover { background: #c4a8ff; }
+  .lift-bar-confirm { background: var(--fg-subtle); }
+  .lift-bar-confirm:hover { background: var(--fg-muted); }
+  .lift-axis {
+    display: flex;
+    margin-top: 4px;
+    font-size: 10px;
+  }
+  .lift-legend {
+    display: flex; gap: var(--s-4);
+    margin-top: var(--s-2);
+    font-size: var(--t-11);
+    color: var(--fg-muted);
+    flex-wrap: wrap;
+  }
+  .lift-legend-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .lift-legend-dot-confirm { background: var(--fg-subtle); }
+  .lift-legend-dot-changed { background: #a78bfa; }
+
+  .divergence-disagreements {
+    margin-top: var(--s-4);
+    border-top: 1px solid var(--border);
+    padding-top: var(--s-3);
+  }
+  .divergence-disagreements > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--s-2) 0;
+    user-select: none;
+  }
+  .divergence-disagreements > summary::-webkit-details-marker { display: none; }
+  .divergence-disagreements[open] > summary { margin-bottom: var(--s-2); }
+  .divergence-disagreements[open] > summary .chevron { transform: rotate(180deg); }
+  .divergence-disagreements .chevron {
+    color: var(--fg-subtle);
+    transition: transform var(--duration);
+  }
+
+  @media (max-width: 720px) {
+    .divergence-head { flex-direction: column; gap: var(--s-3); }
+    .divergence-verdict { margin-left: 0; }
+    .divergence-body { grid-template-columns: 1fr; }
   }
 </style>
 {% endif %}

@@ -61,7 +61,11 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             llm_model TEXT,
             llm_tokens_in INTEGER NOT NULL DEFAULT 0,
             llm_tokens_out INTEGER NOT NULL DEFAULT 0,
-            llm_elapsed_ms INTEGER NOT NULL DEFAULT 0
+            llm_elapsed_ms INTEGER NOT NULL DEFAULT 0,
+            pre_top1_path TEXT,
+            top1_changed INTEGER NOT NULL DEFAULT 0,
+            top1_lift INTEGER NOT NULL DEFAULT 0,
+            top5_overlap INTEGER NOT NULL DEFAULT 5
         );
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_ts ON mcp_queries(ts DESC);
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_user ON mcp_queries(user, ts DESC);

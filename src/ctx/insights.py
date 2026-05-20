@@ -188,6 +188,96 @@ def rerank_stats(db, since: float) -> dict:
     }
 
 
+def rerank_divergence(db, since: float) -> dict:
+    """Did the LLM actually disagree with the vector ranking, or just confirm?
+
+    For each reranked query we logged:
+      pre_top1_path  — what the vector said was best
+      top1_changed   — 1 if the LLM picked something different as #1
+      top1_lift      — index in vector order of the LLM's chosen #1
+                       (0 = same, 5 = LLM promoted result #5 to #1, etc.)
+      top5_overlap   — how many of post-rerank top-5 were in pre top-5
+
+    Decision signal:
+      - changed_pct < 10% → LLM is mostly confirming the vector. Skip it.
+      - changed_pct > 40% → LLM is genuinely re-ordering. Keep it.
+      - in between        → ambiguous; check the lift distribution.
+    """
+    total = db.execute(
+        "SELECT COUNT(*) AS c FROM mcp_queries WHERE ts >= ? AND reranked = 1",
+        (since,),
+    ).fetchone()["c"]
+
+    if total == 0:
+        return {
+            "total": 0, "changed": 0, "changed_pct": 0,
+            "avg_lift": 0, "avg_top5_overlap": 5,
+            "lift_distribution": [0] * 20,
+            "verdict": "no data",
+            "verdict_class": "muted",
+        }
+
+    changed = db.execute(
+        """SELECT COUNT(*) AS c FROM mcp_queries
+           WHERE ts >= ? AND reranked = 1 AND top1_changed = 1""",
+        (since,),
+    ).fetchone()["c"]
+
+    agg = db.execute(
+        """SELECT AVG(top1_lift) AS avg_lift,
+                  AVG(top5_overlap) AS avg_overlap
+           FROM mcp_queries
+           WHERE ts >= ? AND reranked = 1 AND top1_changed = 1""",
+        (since,),
+    ).fetchone()
+
+    # Lift histogram: bucket 0..19 (position the LLM-chosen top-1 was at
+    # in the vector ranking).
+    rows = db.execute(
+        """SELECT top1_lift, COUNT(*) AS c FROM mcp_queries
+           WHERE ts >= ? AND reranked = 1
+           GROUP BY top1_lift""",
+        (since,),
+    ).fetchall()
+    lift_dist = [0] * 20
+    for r in rows:
+        idx = min(19, max(0, r["top1_lift"]))
+        lift_dist[idx] = r["c"]
+
+    pct = (changed / total * 100) if total else 0
+    if pct < 10:
+        verdict = "vector is enough"
+        verdict_class = "warn"
+    elif pct > 40:
+        verdict = "LLM earns its tokens"
+        verdict_class = "good"
+    else:
+        verdict = "marginal"
+        verdict_class = "ambiguous"
+
+    # Top queries where LLM disagreed most (highest lift)
+    top_disagreements = db.execute(
+        """SELECT user, query, pre_top1_path, top1_lift, ts
+           FROM mcp_queries
+           WHERE ts >= ? AND reranked = 1 AND top1_changed = 1
+           ORDER BY top1_lift DESC, ts DESC
+           LIMIT 8""",
+        (since,),
+    ).fetchall()
+
+    return {
+        "total": total,
+        "changed": changed,
+        "changed_pct": pct,
+        "avg_lift": float(agg["avg_lift"] or 0),
+        "avg_top5_overlap": float(agg["avg_overlap"] or 5),
+        "lift_distribution": lift_dist,
+        "verdict": verdict,
+        "verdict_class": verdict_class,
+        "top_disagreements": [dict(r) for r in top_disagreements],
+    }
+
+
 def suggest_queries(db, prefix: str, limit: int = 6) -> list[dict]:
     """Autocomplete: past queries that begin with the prefix (case-insensitive),
     grouped + ranked by count."""

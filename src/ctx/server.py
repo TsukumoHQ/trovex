@@ -25,6 +25,16 @@ EXAMPLE_QUERIES = [
 ]
 
 
+def _sources_meta(db) -> list[dict]:
+    """Resolved sources from the index (id + display label + doc count)."""
+    rows = db.execute(
+        """SELECT source_id, COUNT(*) AS c
+           FROM docs WHERE workspace_id = 'default'
+           GROUP BY source_id ORDER BY c DESC"""
+    ).fetchall()
+    return [{"id": r["source_id"], "count": r["c"]} for r in rows]
+
+
 def _now() -> float:
     return time.time()
 
@@ -154,6 +164,7 @@ def build_app() -> FastAPI:
             "SELECT COUNT(*) AS c FROM mcp_queries WHERE ts >= ?", (since_7d,)
         ).fetchone()["c"]
 
+        sources = _sources_meta(db)
         return templates.TemplateResponse(
             request, "home.html",
             {
@@ -167,6 +178,7 @@ def build_app() -> FastAPI:
                 "total_queries_7d": total_queries_7d,
                 "has_any_queries": total_queries_7d > 0 or len(by_user_rows) > 0,
                 "savings_totals": savings_totals,
+                "sources": sources,
             },
         )
 
@@ -183,14 +195,15 @@ def build_app() -> FastAPI:
         request: Request,
         qpath: str = "",
         status: str = "",
+        source: str = "",
         sort: str = "recent",
         limit: int = 100,
     ) -> HTMLResponse:
-        ctx_data = _docs_query(qpath, status, sort, limit)
+        ctx_data = _docs_query(qpath, status, sort, limit, source)
         ctx_data["total"] = get_state().searcher.db.execute(
             "SELECT COUNT(*) AS c FROM docs"
         ).fetchone()["c"]
-        ctx_data.update(qpath=qpath, status=status, sort=sort, limit=limit)
+        ctx_data.update(qpath=qpath, status=status, sort=sort, limit=limit, source=source)
         return templates.TemplateResponse(request, "docs.html", ctx_data)
 
     @app.get("/docs/partial", response_class=HTMLResponse)
@@ -198,10 +211,11 @@ def build_app() -> FastAPI:
         request: Request,
         qpath: str = "",
         status: str = "",
+        source: str = "",
         sort: str = "recent",
         limit: int = 100,
     ) -> HTMLResponse:
-        ctx_data = _docs_query(qpath, status, sort, limit)
+        ctx_data = _docs_query(qpath, status, sort, limit, source)
         return templates.TemplateResponse(request, "_docs_table.html", ctx_data)
 
     # ── JSON API ─────────────────────────────────────────────────────
@@ -508,7 +522,8 @@ def _sparkline_buckets(db, user: str, since: float, until: float, n: int) -> lis
     return out
 
 
-def _docs_query(qpath: str, status: str, sort: str, limit: int) -> dict[str, Any]:
+def _docs_query(qpath: str, status: str, sort: str, limit: int,
+                source: str = "") -> dict[str, Any]:
     state = get_state()
     db = state.searcher.db
 
@@ -520,6 +535,9 @@ def _docs_query(qpath: str, status: str, sort: str, limit: int) -> dict[str, Any
     if status:
         where.append("status = ?")
         params.append(status)
+    if source:
+        where.append("source_id = ?")
+        params.append(source)
 
     order = {
         "recent":  "mtime DESC",
@@ -531,7 +549,7 @@ def _docs_query(qpath: str, status: str, sort: str, limit: int) -> dict[str, Any
     limit = max(10, min(1000, int(limit)))
 
     rows = db.execute(
-        f"""SELECT path, title, mtime, status, tokens_est, size_bytes
+        f"""SELECT path, title, mtime, status, tokens_est, size_bytes, source_id
             FROM docs WHERE {' AND '.join(where)}
             ORDER BY {order} LIMIT ?""",
         (*params, limit),
@@ -541,4 +559,4 @@ def _docs_query(qpath: str, status: str, sort: str, limit: int) -> dict[str, Any
         f"SELECT COUNT(*) AS c FROM docs WHERE {' AND '.join(where)}", params
     ).fetchone()["c"]
 
-    return {"rows": rows, "filtered": filtered_count}
+    return {"rows": rows, "filtered": filtered_count, "sources_meta": _sources_meta(db)}

@@ -14,21 +14,38 @@ console = Console()
 
 @app.command()
 def index(
-    root: Path = typer.Argument(Path.cwd(), help="Root path to index"),
+    root: Path | None = typer.Argument(None, help="Single root override (else uses sources.yaml)"),
 ) -> None:
-    """Scan and index all .md files under root."""
-    settings = Settings(project_root=root.resolve())
+    """Scan and index all .md files. If root is given, indexes only that path.
+    Otherwise reads sources from sources.yaml (or single project_root fallback)."""
+    settings = Settings()
     indexer = Indexer(settings)
-    console.print(f"[bold]Indexing[/bold] {root.resolve()}")
+    if root is not None:
+        settings = Settings(project_root=root.resolve())
+        indexer = Indexer(settings)
+        sources = [None]
+        console.print(f"[bold]Indexing[/bold] {root.resolve()}")
+        stats = indexer.reindex(root=root.resolve())
+    else:
+        sources = settings.load_sources()
+        console.print(f"[bold]Indexing[/bold] {len(sources)} sources:")
+        for s in sources:
+            exists = "✓" if s.root.exists() else "✗"
+            console.print(f"  {exists} [cyan]{s.id}[/cyan]  {s.root}")
+        stats = indexer.reindex(sources=sources)
+
     console.print(f"[dim]Model: {settings.embed_model}[/dim]")
-    start = time.time()
-    stats = indexer.reindex(root.resolve())
-    elapsed = time.time() - start
     console.print(
-        f"[green]Done in {elapsed:.1f}s[/green]  "
+        f"[green]Done in {stats['duration_sec']:.1f}s[/green]  "
         f"added={stats['added']} updated={stats['updated']} "
         f"unchanged={stats['unchanged']} removed={stats['removed']}"
     )
+    if stats.get("by_source"):
+        for s in stats["by_source"]:
+            console.print(
+                f"  [cyan]{s['id']}[/cyan]: +{s['added']} ~{s['updated']} "
+                f"={s['unchanged']} -{s['removed']}"
+            )
 
 
 @app.command()

@@ -37,6 +37,7 @@
   <article class="result">
     <div class="result-head">
       {{ status_pill(r.status) }}
+      {% from "_partials.html" import source_pill %}{{ source_pill(r.source_id) }}
       <span class="result-path">
         <a href="vscode://file{{ r.absolute_path }}" title="open in VS Code">{{ hl(r.path, highlight_terms) }}</a>
       </span>

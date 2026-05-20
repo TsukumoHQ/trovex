@@ -7,7 +7,7 @@ from pathlib import Path
 import fastembed
 import sqlite_vec
 
-from .config import Settings
+from .config import Settings, Source
 from .db import open_db
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
@@ -35,85 +35,117 @@ class Indexer:
                     continue
                 yield p
 
-    def reindex(self, root: Path) -> dict:
-        root = root.resolve()
+    def reindex(self, root: Path | None = None, sources: list[Source] | None = None) -> dict:
+        """Index all configured sources, or a single root for back-compat."""
+        if sources is None:
+            if root is not None:
+                sources = [Source(id="code", label=root.name, root=root.resolve())]
+            else:
+                sources = self.settings.load_sources()
+
         start = time.time()
-        seen_paths: set[str] = set()
-        added = updated = unchanged = 0
+        agg = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0,
+               "by_source": []}
         embed_batch: list[tuple[int, str]] = []
 
-        for path in self.scan(root):
-            try:
-                content = path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+        for source in sources:
+            sr = source.root
+            if not sr.exists():
                 continue
-            rel_path = str(path.relative_to(root))
-            seen_paths.add(rel_path)
-            content_hash = hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
+            seen_paths: set[str] = set()
+            s_added = s_updated = s_unchanged = 0
 
-            existing = self.db.execute(
-                "SELECT id, content_hash FROM docs WHERE path = ? AND workspace_id = 'default'",
-                (rel_path,),
-            ).fetchone()
+            for path in self.scan(sr):
+                try:
+                    content = path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                rel_path = str(path.relative_to(sr))
+                seen_paths.add(rel_path)
+                content_hash = hashlib.sha256(
+                    content.encode("utf-8", errors="replace")
+                ).hexdigest()
 
-            if existing and existing["content_hash"] == content_hash:
-                unchanged += 1
-                continue
+                existing = self.db.execute(
+                    """SELECT id, content_hash FROM docs
+                       WHERE source_id = ? AND path = ? AND workspace_id = 'default'""",
+                    (source.id, rel_path),
+                ).fetchone()
 
-            stat = path.stat()
-            title = self._extract_title(content, path.name)
-            author = self._extract_author(content)
-            tokens_est = len(content) // 4
-            now = time.time()
+                if existing and existing["content_hash"] == content_hash:
+                    s_unchanged += 1
+                    continue
 
-            if existing:
-                self.db.execute(
-                    """UPDATE docs SET content_hash=?, size_bytes=?, tokens_est=?,
-                       mtime=?, last_indexed=?, title=?, absolute_path=?, author_agent=?
-                       WHERE id=?""",
-                    (content_hash, stat.st_size, tokens_est, stat.st_mtime, now,
-                     title, str(path), author, existing["id"]),
-                )
-                doc_id = existing["id"]
-                updated += 1
-            else:
-                cur = self.db.execute(
-                    """INSERT INTO docs (path, absolute_path, content_hash, size_bytes,
-                       tokens_est, mtime, first_indexed, last_indexed, title, author_agent)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (rel_path, str(path), content_hash, stat.st_size, tokens_est,
-                     stat.st_mtime, now, now, title, author),
-                )
-                doc_id = cur.lastrowid
-                added += 1
+                stat = path.stat()
+                title = self._extract_title(content, path.name)
+                author = self._extract_author(content)
+                tokens_est = len(content) // 4
+                now = time.time()
 
-            embed_batch.append((doc_id, self._embed_text(content, title)))
+                if existing:
+                    self.db.execute(
+                        """UPDATE docs SET content_hash=?, size_bytes=?, tokens_est=?,
+                           mtime=?, last_indexed=?, title=?, absolute_path=?, author_agent=?
+                           WHERE id=?""",
+                        (content_hash, stat.st_size, tokens_est, stat.st_mtime, now,
+                         title, str(path), author, existing["id"]),
+                    )
+                    doc_id = existing["id"]
+                    s_updated += 1
+                else:
+                    cur = self.db.execute(
+                        """INSERT INTO docs (source_id, path, absolute_path, content_hash,
+                           size_bytes, tokens_est, mtime, first_indexed, last_indexed,
+                           title, author_agent)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (source.id, rel_path, str(path), content_hash, stat.st_size,
+                         tokens_est, stat.st_mtime, now, now, title, author),
+                    )
+                    doc_id = cur.lastrowid
+                    s_added += 1
 
-            if len(embed_batch) >= 32:
-                self._flush_embeddings(embed_batch)
-                embed_batch.clear()
+                embed_batch.append((doc_id, self._embed_text(content, title)))
+
+                if len(embed_batch) >= 32:
+                    self._flush_embeddings(embed_batch)
+                    embed_batch.clear()
+
+            # Cleanup this source's removed docs
+            s_removed = 0
+            existing_paths = [
+                r["path"]
+                for r in self.db.execute(
+                    """SELECT path FROM docs
+                       WHERE source_id = ? AND workspace_id = 'default'""",
+                    (source.id,),
+                ).fetchall()
+            ]
+            for old_path in existing_paths:
+                if old_path not in seen_paths:
+                    old = self.db.execute(
+                        """SELECT id FROM docs
+                           WHERE source_id = ? AND path = ? AND workspace_id = 'default'""",
+                        (source.id, old_path),
+                    ).fetchone()
+                    if old:
+                        self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (old["id"],))
+                        self.db.execute("DELETE FROM docs WHERE id = ?", (old["id"],))
+                        s_removed += 1
+
+            agg["added"] += s_added
+            agg["updated"] += s_updated
+            agg["unchanged"] += s_unchanged
+            agg["removed"] += s_removed
+            agg["by_source"].append({
+                "id": source.id, "label": source.label,
+                "added": s_added, "updated": s_updated,
+                "unchanged": s_unchanged, "removed": s_removed,
+            })
 
         if embed_batch:
             self._flush_embeddings(embed_batch)
-
-        # Cleanup removed docs
-        removed = 0
-        existing_paths = [
-            r["path"]
-            for r in self.db.execute(
-                "SELECT path FROM docs WHERE workspace_id = 'default'"
-            ).fetchall()
-        ]
-        for old_path in existing_paths:
-            if old_path not in seen_paths:
-                old = self.db.execute(
-                    "SELECT id FROM docs WHERE path = ? AND workspace_id = 'default'",
-                    (old_path,),
-                ).fetchone()
-                if old:
-                    self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (old["id"],))
-                    self.db.execute("DELETE FROM docs WHERE id = ?", (old["id"],))
-                    removed += 1
+        added = agg["added"]; updated = agg["updated"]
+        unchanged = agg["unchanged"]; removed = agg["removed"]
 
         # Recompute status (plan / stale / duplicate / canonical) after indexing
         from .status import compute_status
@@ -129,7 +161,7 @@ class Indexer:
         return {
             "added": added, "updated": updated, "unchanged": unchanged,
             "removed": removed, "duration_sec": elapsed,
-            "status": status_stats,
+            "status": status_stats, "by_source": agg["by_source"],
         }
 
     def _flush_embeddings(self, batch: list[tuple[int, str]]) -> None:

@@ -23,11 +23,18 @@
       hx-swap="innerHTML"
       hx-trigger="change, keyup changed delay:250ms from:input[name=qpath]"
       hx-push-url="true"
-      style="display: grid; gap: var(--s-3); grid-template-columns: minmax(0, 1fr) auto auto auto; margin-bottom: var(--s-4); align-items: center;">
+      style="display: grid; gap: var(--s-3); grid-template-columns: minmax(0, 1fr) auto auto auto auto; margin-bottom: var(--s-4); align-items: center;">
 
   <input type="text" name="qpath" class="input mono" value="{{ qpath }}"
          placeholder="filter by path substring"
          aria-label="Filter by path">
+
+  <select name="source" class="input mono" style="width: auto;" aria-label="Source filter">
+    <option value="">all sources</option>
+    {% for s in sources_meta %}
+    <option value="{{ s.id }}" {% if source == s.id %}selected{% endif %}>{{ s.id }} ({{ s.count }})</option>
+    {% endfor %}
+  </select>
 
   <select name="status" class="input mono" style="width: auto;" aria-label="Status filter">
     <option value="">all status</option>

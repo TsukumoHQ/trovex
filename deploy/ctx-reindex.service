@@ -11,6 +11,8 @@ Environment=PATH=/home/synxadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=CTX_DATA_DIR=/home/synxadmin/.ctx-data
 Environment=FASTEMBED_CACHE_PATH=/home/synxadmin/.ctx-data/fastembed_cache
 Environment=HF_HOME=/home/synxadmin/.ctx-data/hf_cache
-ExecStartPre=/usr/bin/git -C /home/synxadmin/synergix_prod fetch --quiet
-ExecStartPre=/usr/bin/git -C /home/synxadmin/synergix_prod reset --hard origin/main
-ExecStart=/home/synxadmin/Exposemd/.venv/bin/ctx index /home/synxadmin/synergix_prod
+ExecStartPre=-/usr/bin/git -C /home/synxadmin/synergix_prod fetch --quiet
+ExecStartPre=-/usr/bin/git -C /home/synxadmin/synergix_prod reset --hard origin/main
+ExecStartPre=-/usr/bin/git -C /home/synxadmin/obsidian/synergix-prod pull --quiet --rebase
+ExecStartPre=-/usr/bin/git -C /home/synxadmin/obsidian/synergix-dev pull --quiet --rebase
+ExecStart=/home/synxadmin/Exposemd/.venv/bin/ctx index

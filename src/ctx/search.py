@@ -24,6 +24,7 @@ class SearchResult:
     size_bytes: int
     tokens_est: int
     absolute_path: str
+    source_id: str = "code"
 
     def fresh_label(self) -> str:
         d = self.age_days
@@ -48,19 +49,23 @@ class Searcher:
         self.db = open_db(settings.data_dir / "ctx.db", settings.embed_dim)
         self.embedder = embedder or fastembed.TextEmbedding(model_name=settings.embed_model)
 
-    def search(self, query: str, limit: int = 5) -> list[SearchResult]:
+    def search(self, query: str, limit: int = 5,
+               source_ids: list[str] | None = None) -> list[SearchResult]:
         if not query.strip():
             return []
         query_emb = next(self.embedder.embed([query]))
-        rows = self.db.execute(
-            """SELECT d.path, d.title, d.mtime, d.status, d.size_bytes,
-                      d.tokens_est, d.absolute_path, v.distance
-               FROM vec_docs v
-               JOIN docs d ON d.id = v.rowid
-               WHERE v.embedding MATCH ? AND k = ?
-               ORDER BY v.distance""",
-            (sqlite_vec.serialize_float32(query_emb.tolist()), limit * 3),
-        ).fetchall()
+        sql = """SELECT d.path, d.title, d.mtime, d.status, d.size_bytes,
+                        d.tokens_est, d.absolute_path, d.source_id, v.distance
+                 FROM vec_docs v
+                 JOIN docs d ON d.id = v.rowid
+                 WHERE v.embedding MATCH ? AND k = ?"""
+        params: list = [sqlite_vec.serialize_float32(query_emb.tolist()), limit * 5]
+        if source_ids:
+            placeholders = ",".join("?" * len(source_ids))
+            sql += f" AND d.source_id IN ({placeholders})"
+            params.extend(source_ids)
+        sql += " ORDER BY v.distance"
+        rows = self.db.execute(sql, params).fetchall()
 
         now = time.time()
         half_life = self.settings.freshness_half_life_days
@@ -77,6 +82,7 @@ class Searcher:
                     distance=r["distance"], score=score, age_days=age_days,
                     status=r["status"], size_bytes=r["size_bytes"],
                     tokens_est=r["tokens_est"], absolute_path=r["absolute_path"],
+                    source_id=r["source_id"] or "code",
                 )
             )
         results.sort(key=lambda x: -x.score)
@@ -85,12 +91,18 @@ class Searcher:
     def format_minimal(self, results: list[SearchResult]) -> str:
         if not results:
             return "(no results)"
-        # Align paths for readability; markers cost ~1 token each
+        # Show source suffix when results span multiple sources (saves tokens
+        # when single-source; gives the agent the disambiguator otherwise).
+        sources_seen = {r.source_id for r in results}
+        multi = len(sources_seen) > 1
         max_path = max(len(r.path) for r in results)
-        return "\n".join(
-            f"{r.path.ljust(max_path)}  {r.marker} {r.fresh_label()}"
-            for r in results
-        )
+        lines = []
+        for r in results:
+            base = f"{r.path.ljust(max_path)}  {r.marker} {r.fresh_label()}"
+            if multi:
+                base += f"  @{r.source_id}"
+            lines.append(base)
+        return "\n".join(lines)
 
     def format_with_summary(self, results: list[SearchResult]) -> str:
         if not results:

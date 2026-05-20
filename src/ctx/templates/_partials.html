@@ -23,6 +23,14 @@
   {%- endif -%}
 {%- endmacro %}
 
+{% macro source_pill(source_id) -%}
+  {%- if source_id and source_id != 'code' -%}
+  <span class="pill pill-source" title="source: {{ source_id }}">@{{ source_id }}</span>
+  {%- elif source_id == 'code' -%}
+  <span class="pill pill-source pill-source-code" title="source: code">@code</span>
+  {%- endif -%}
+{%- endmacro %}
+
 {% macro avatar(name, size=24) -%}
   {%- set hue = name | avatar_color -%}
   <span class="avatar" style="

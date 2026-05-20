@@ -11,8 +11,65 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     conn.enable_load_extension(True)
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)
+    # Migration must run BEFORE _init_schema: CREATE TABLE IF NOT EXISTS won't
+    # add columns to a pre-existing legacy docs table; we need to recreate it.
+    _migrate_to_multi_source(conn)
     _init_schema(conn, embed_dim)
     return conn
+
+
+def _migrate_to_multi_source(conn: sqlite3.Connection) -> None:
+    """Bring an existing docs table forward to the source_id schema.
+
+    Idempotent — checks current state before acting.
+    """
+    # Skip if docs table doesn't exist yet — _init_schema will create it fresh.
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='docs'"
+    ).fetchone()
+    if not exists:
+        return
+
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    if "source_id" in cols:
+        return  # already migrated
+
+    conn.executescript(
+        """
+        CREATE TABLE docs_new (
+            id INTEGER PRIMARY KEY,
+            workspace_id TEXT NOT NULL DEFAULT 'default',
+            source_id TEXT NOT NULL DEFAULT 'code',
+            path TEXT NOT NULL,
+            absolute_path TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            tokens_est INTEGER NOT NULL,
+            mtime REAL NOT NULL,
+            first_indexed REAL NOT NULL,
+            last_indexed REAL NOT NULL,
+            title TEXT,
+            status TEXT NOT NULL DEFAULT 'canonical',
+            dup_of_id INTEGER REFERENCES docs_new(id),
+            author_agent TEXT,
+            UNIQUE(workspace_id, source_id, path)
+        );
+        INSERT INTO docs_new
+            (id, workspace_id, source_id, path, absolute_path, content_hash,
+             size_bytes, tokens_est, mtime, first_indexed, last_indexed,
+             title, status, dup_of_id, author_agent)
+        SELECT id, workspace_id, 'code', path, absolute_path, content_hash,
+               size_bytes, tokens_est, mtime, first_indexed, last_indexed,
+               title, status, dup_of_id, author_agent
+        FROM docs;
+        DROP TABLE docs;
+        ALTER TABLE docs_new RENAME TO docs;
+        CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
+        CREATE INDEX IF NOT EXISTS idx_docs_mtime ON docs(workspace_id, mtime DESC);
+        CREATE INDEX IF NOT EXISTS idx_docs_source ON docs(workspace_id, source_id);
+        """
+    )
+    conn.commit()
 
 
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
@@ -21,6 +78,7 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         CREATE TABLE IF NOT EXISTS docs (
             id INTEGER PRIMARY KEY,
             workspace_id TEXT NOT NULL DEFAULT 'default',
+            source_id TEXT NOT NULL DEFAULT 'code',
             path TEXT NOT NULL,
             absolute_path TEXT NOT NULL,
             content_hash TEXT NOT NULL,
@@ -33,10 +91,11 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             status TEXT NOT NULL DEFAULT 'canonical',
             dup_of_id INTEGER REFERENCES docs(id),
             author_agent TEXT,
-            UNIQUE(workspace_id, path)
+            UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
         CREATE INDEX IF NOT EXISTS idx_docs_mtime ON docs(workspace_id, mtime DESC);
+        CREATE INDEX IF NOT EXISTS idx_docs_source ON docs(workspace_id, source_id);
 
         CREATE TABLE IF NOT EXISTS index_runs (
             id INTEGER PRIMARY KEY,

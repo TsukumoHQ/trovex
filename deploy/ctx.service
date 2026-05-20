@@ -9,6 +9,7 @@ Type=simple
 User=synxadmin
 Group=synxadmin
 WorkingDirectory=/home/synxadmin/Exposemd
+EnvironmentFile=-/home/synxadmin/.ctx-data/env
 Environment=PATH=/home/synxadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=CTX_PROJECT_ROOT=/home/synxadmin/synergix_prod
 Environment=CTX_DATA_DIR=/home/synxadmin/.ctx-data

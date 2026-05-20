@@ -7,6 +7,7 @@ Type=oneshot
 User=synxadmin
 Group=synxadmin
 WorkingDirectory=/home/synxadmin/Exposemd
+EnvironmentFile=-/home/synxadmin/.ctx-data/env
 Environment=PATH=/home/synxadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=CTX_DATA_DIR=/home/synxadmin/.ctx-data
 Environment=FASTEMBED_CACHE_PATH=/home/synxadmin/.ctx-data/fastembed_cache

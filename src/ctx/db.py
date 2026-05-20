@@ -14,8 +14,37 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     # Migration must run BEFORE _init_schema: CREATE TABLE IF NOT EXISTS won't
     # add columns to a pre-existing legacy docs table; we need to recreate it.
     _migrate_to_multi_source(conn)
+    _migrate_embed_dim(conn, embed_dim)
     _init_schema(conn, embed_dim)
     return conn
+
+
+def _migrate_embed_dim(conn: sqlite3.Connection, embed_dim: int) -> None:
+    """If vec_docs exists with a different dim than the configured embedder,
+    drop it. The indexer will recreate it on next run and re-embed all docs.
+
+    Detects existing dim by querying sqlite_master DDL — vec0 table SQL stores
+    the dim inline like "embedding float[3072]".
+    """
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_docs'"
+    ).fetchone()
+    if not row:
+        return
+    ddl = row["sql"] or ""
+    # Parse the float[N] dim out of the DDL.
+    import re
+    m = re.search(r"float\[(\d+)\]", ddl)
+    if not m:
+        return
+    current_dim = int(m.group(1))
+    if current_dim == embed_dim:
+        return
+    # Dim mismatch — wipe the vec table and clear any docs that referenced it
+    # (forces a full reindex). docs.content_hash will be 0 → all rows re-embed.
+    conn.execute("DROP TABLE IF EXISTS vec_docs")
+    conn.execute("UPDATE docs SET content_hash = ''")
+    conn.commit()
 
 
 def _migrate_to_multi_source(conn: sqlite3.Connection) -> None:

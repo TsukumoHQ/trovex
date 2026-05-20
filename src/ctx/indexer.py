@@ -4,11 +4,11 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 
-import fastembed
 import sqlite_vec
 
 from .config import Settings, Source
 from .db import open_db
+from .embedder import Embedder, build_embedder
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 TITLE_RE = re.compile(r"^\s*#\s+(.+)$", re.MULTILINE)
@@ -16,10 +16,10 @@ AGENT_FRONTMATTER_KEYS = ("agent", "author", "generator", "created_by")
 
 
 class Indexer:
-    def __init__(self, settings: Settings, embedder: fastembed.TextEmbedding | None = None):
+    def __init__(self, settings: Settings, embedder: Embedder | None = None):
         self.settings = settings
-        self.db = open_db(settings.data_dir / "ctx.db", settings.embed_dim)
-        self.embedder = embedder or fastembed.TextEmbedding(model_name=settings.embed_model)
+        self.db = open_db(settings.data_dir / "ctx.db", settings.resolved_embed_dim())
+        self.embedder = embedder or build_embedder(settings.embed_model)
 
     def scan(self, root: Path) -> Iterator[Path]:
         ignore = set(self.settings.ignore_dirs)

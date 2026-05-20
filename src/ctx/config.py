@@ -36,9 +36,11 @@ class Settings(BaseSettings):
     # falls back to a single source built from project_root.
     sources_config_path: Path = Path.home() / ".ctx-data" / "sources.yaml"
 
-    # Embedding (multilingual small, 384 dims, ~120MB)
-    embed_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    embed_dim: int = 384
+    # Embedding — defaults to OpenAI text-embedding-3-large (3072 dims, top
+    # MTEB retrieval). Override via CTX_EMBED_MODEL env var; fastembed models
+    # (e.g. BAAI/bge-small-en-v1.5) work too but trail OpenAI on retrieval.
+    embed_model: str = "text-embedding-3-large"
+    embed_dim: int = 3072
 
     # Indexing
     max_file_size_bytes: int = 1_000_000
@@ -64,6 +66,11 @@ class Settings(BaseSettings):
 
     # Ranking weights
     freshness_half_life_days: float = 90.0
+
+    def resolved_embed_dim(self) -> int:
+        """Return the dim matching embed_model, fall back to declared embed_dim."""
+        from .embedder import model_dim
+        return model_dim(self.embed_model) or self.embed_dim
 
     def load_sources(self) -> list[Source]:
         """Resolve sources from config file, fall back to single source.

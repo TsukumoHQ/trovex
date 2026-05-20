@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-import fastembed
+from typing import Any
 
 from .config import Settings
+from .embedder import build_embedder
 from .indexer import Indexer
 from .search import Searcher
 
@@ -14,7 +14,7 @@ from .search import Searcher
 @dataclass
 class AppState:
     settings: Settings
-    embedder: fastembed.TextEmbedding
+    embedder: Any
     searcher: Searcher
     indexer: Indexer
 
@@ -26,7 +26,7 @@ def get_state() -> AppState:
     global _state
     if _state is None:
         settings = Settings()
-        embedder = fastembed.TextEmbedding(model_name=settings.embed_model)
+        embedder = build_embedder(settings.embed_model)
         searcher = Searcher(settings, embedder=embedder)
         indexer = Indexer(settings, embedder=embedder)
         _state = AppState(

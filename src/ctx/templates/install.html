@@ -21,10 +21,21 @@
     <span class="install-progress-sep"></span>
     <span class="install-progress-step"><span>3</span> Baseline</span>
     <span class="install-progress-sep"></span>
-    <span class="install-progress-step"><span>4</span> LLM</span>
+    <span class="install-progress-step install-progress-step-byok"><span>4</span> LLM</span>
     <span class="install-progress-sep"></span>
     <span class="install-progress-step"><span>✓</span> Verify</span>
   </div>
+  <style>
+    .install-progress-step-byok {
+      color: var(--byok, #a78bfa);
+      border-color: var(--byok-line, rgba(167,139,250,0.30));
+      background: var(--byok-soft, rgba(167,139,250,0.10));
+    }
+    .install-progress-step-byok span {
+      background: var(--byok, #a78bfa);
+      color: var(--bg);
+    }
+  </style>
 </div>
 
 {# ── Step 1: required ───────────────────────────────────── #}
@@ -164,33 +175,60 @@
 </section>
 
 {# ── BYOK: LLM rerank ─────────────────────────────────── #}
-<section class="step step-optional" aria-labelledby="step-byok-title">
+<section class="step step-optional step-byok" aria-labelledby="step-byok-title">
   <div class="step-rail">
-    <span class="step-num step-num-muted">4</span>
+    <span class="step-num step-num-byok">4</span>
   </div>
   <details class="step-body step-details">
-    <summary class="step-head">
+    <summary class="step-head step-head-byok">
       <div>
         <h2 id="step-byok-title">
-          LLM rerank · BYOK
-          <span class="step-tag">optional</span>
+          <span class="byok-glyph" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          </span>
+          LLM rerank
+          <span class="step-tag step-tag-byok">BYOK</span>
           <span class="step-tag step-tag-rec">quality boost</span>
         </h2>
         <p class="step-sub">
-          Bring your own OpenAI key. ctx fetches top-20 from vector search and
-          calls <code>gpt-5.4-mini</code> to re-rank into top-5. Improves top-1
-          reliability for ambiguous queries. ~<code>$0.0017</code> per query, ~$5/month
-          at 100 queries/day. <strong>Key never stored or logged server-side</strong>
-          — sent per-request via HTTPS header.
+          Bring your own OpenAI key. ctx fetches the top-20 from vector search,
+          then asks <code>gpt-5.4-mini</code> to pick the best 5. Improves top-1
+          reliability on ambiguous queries.
         </p>
+        <div class="byok-tldr">
+          <div class="byok-tldr-item">
+            <span class="byok-tldr-label mono">cost</span>
+            <span class="byok-tldr-value mono"><b>~$0.0017</b> / query</span>
+          </div>
+          <div class="byok-tldr-item">
+            <span class="byok-tldr-label mono">budget</span>
+            <span class="byok-tldr-value mono"><b>~$5</b> / month at 100 q/d</span>
+          </div>
+          <div class="byok-tldr-item">
+            <span class="byok-tldr-label mono">paid by</span>
+            <span class="byok-tldr-value mono">your key, your bill</span>
+          </div>
+        </div>
       </div>
       <span class="chevron" aria-hidden="true">▾</span>
     </summary>
 
+    <div class="byok-security-banner">
+      <div class="byok-security-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <div class="byok-security-text">
+        <strong>Key handling</strong> — your API key never touches our database
+        or logs. It's read from the HTTPS request header on each call and
+        dropped immediately after.
+        <a href="#byok-callouts" class="byok-learn-more">read the guarantees ↓</a>
+      </div>
+    </div>
+
     <div class="step-action">
       <div class="step-action-label">
         <span class="step-action-icon">→</span>
-        Paste this into Claude Code
+        Have your OpenAI key ready · paste this into Claude Code
       </div>
       <div class="code-block">
         <div class="code-block-header">
@@ -203,31 +241,130 @@
       </div>
     </div>
 
-    <div class="step-callouts">
-      <div class="callout">
-        <div class="callout-icon">🛡</div>
+    <div class="step-callouts" id="byok-callouts">
+      <div class="callout callout-byok">
+        <div class="callout-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
         <div>
-          <div class="callout-title">Key never stored</div>
-          <div class="callout-body">Read from HTTPS header per-request, dropped after the call returns. Not in logs, not in DB.</div>
+          <div class="callout-title">Never stored, never logged</div>
+          <div class="callout-body">Read from HTTPS header per-request, dropped after the call returns. Not in DB, not in access logs, not in error traces.</div>
         </div>
       </div>
-      <div class="callout">
-        <div class="callout-icon">~</div>
+      <div class="callout callout-byok">
+        <div class="callout-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 5-4 9-9 9s-9-4-9-9 4-9 9-9c2.5 0 4.8 1 6.4 2.6"/></svg>
+        </div>
         <div>
-          <div class="callout-title">Soft dependency</div>
-          <div class="callout-body">If the LLM is slow or errors, ctx falls back to the vector ranking. Your query never hangs.</div>
+          <div class="callout-title">Soft dependency, never blocking</div>
+          <div class="callout-body">If the LLM is slow, errors, or your quota runs out, ctx falls back to vector ranking. Your query never hangs.</div>
         </div>
       </div>
-      <div class="callout">
-        <div class="callout-icon">📊</div>
+      <div class="callout callout-byok">
+        <div class="callout-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M5 9h11a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h12"/></svg>
+        </div>
         <div>
-          <div class="callout-title">Per-call cost</div>
-          <div class="callout-body">~$0.0017 with <code>gpt-5.4-mini</code>. Override with <code>X-CTX-Rerank-Model</code> header.</div>
+          <div class="callout-title">You own the bill</div>
+          <div class="callout-body">Cost goes to your OpenAI account, never ours. Override the model via <code>X-CTX-Rerank-Model</code> if you want cheaper or stronger.</div>
         </div>
       </div>
     </div>
   </details>
 </section>
+<style>
+  /* ── BYOK step-specific theming (purple-blue accent vs green required) ── */
+  :root {
+    --byok: #a78bfa;
+    --byok-soft: rgba(167, 139, 250, 0.10);
+    --byok-line: rgba(167, 139, 250, 0.30);
+  }
+  .step-num-byok {
+    background: var(--byok-soft);
+    color: var(--byok);
+    border-color: var(--byok-line);
+  }
+  .step-byok .step-body {
+    border-color: var(--byok-line);
+  }
+  .step-tag-byok {
+    background: var(--byok-soft);
+    color: var(--byok);
+    border-color: var(--byok-line);
+  }
+  .byok-glyph {
+    display: inline-flex;
+    align-items: center;
+    color: var(--byok);
+    margin-right: 2px;
+  }
+  .step-head-byok h2 {
+    color: var(--fg);
+  }
+
+  /* TL;DR row in the summary */
+  .byok-tldr {
+    display: flex; flex-wrap: wrap;
+    gap: var(--s-4);
+    margin-top: var(--s-3);
+    padding-top: var(--s-3);
+    border-top: 1px dashed var(--border);
+  }
+  .byok-tldr-item {
+    display: inline-flex; flex-direction: column;
+    gap: 1px;
+  }
+  .byok-tldr-label {
+    color: var(--fg-faint);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .byok-tldr-value {
+    color: var(--fg-muted);
+    font-size: var(--t-12);
+  }
+  .byok-tldr-value b {
+    color: var(--byok);
+    font-weight: 600;
+  }
+
+  /* Security banner inside the expanded step */
+  .byok-security-banner {
+    display: flex; align-items: flex-start; gap: var(--s-3);
+    margin: var(--s-5) var(--s-5) 0;
+    padding: var(--s-3) var(--s-4);
+    background: var(--byok-soft);
+    border: 1px solid var(--byok-line);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-size: var(--t-13);
+    line-height: 1.55;
+  }
+  .byok-security-icon {
+    flex-shrink: 0;
+    color: var(--byok);
+    margin-top: 1px;
+  }
+  .byok-security-text strong { color: var(--fg); font-weight: 600; }
+  .byok-learn-more {
+    display: inline-block;
+    margin-left: 4px;
+    color: var(--byok) !important;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+  }
+  .byok-learn-more:hover { color: var(--fg) !important; text-decoration: underline; }
+
+  /* Per-callout BYOK variant — icons use stroke not fill */
+  .callout-byok .callout-icon {
+    background: var(--byok-soft);
+    color: var(--byok);
+    border-radius: 50%;
+    width: 26px; height: 26px;
+  }
+  .callout-byok .callout-icon svg { width: 14px; height: 14px; }
+</style>
 
 {# ── Verify ─────────────────────────────────────────────── #}
 <section class="step step-verify" aria-labelledby="step-verify-title">

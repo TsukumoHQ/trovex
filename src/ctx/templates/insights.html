@@ -26,60 +26,267 @@
 {% if rerank.reranked_queries > 0 %}
 <div class="section">
   <div class="section-divider">
-    <span class="section-divider-label">LLM rerank · BYOK</span>
+    <span class="section-divider-label">
+      <span class="byok-inline-glyph" aria-hidden="true">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </span>
+      LLM rerank · BYOK
+    </span>
     <span class="section-divider-meta mono">last {{ days }}d</span>
   </div>
-  <div class="rerank-grid">
-    <div class="kpi">
-      <div class="kpi-label">reranked queries</div>
-      <div class="kpi-value">{{ rerank.reranked_queries }}</div>
-      <div class="kpi-sub">
-        {{ "%.0f"|format(rerank.coverage_pct) }}% coverage · {{ rerank.total_queries - rerank.reranked_queries }} fallback
+
+  <div class="rerank-hero">
+    <div class="rerank-hero-main">
+      <div class="rerank-hero-eyebrow mono">RERANKED · LAST {{ days }}D</div>
+      <div class="rerank-hero-number mono">
+        {{ "{:,}".format(rerank.reranked_queries) }}
+        <span class="rerank-hero-unit">queries</span>
+      </div>
+      <div class="rerank-coverage">
+        <div class="rerank-coverage-bar" aria-label="Coverage">
+          <div class="rerank-coverage-fill" style="width: {{ rerank.coverage_pct | round(1) }}%;"></div>
+        </div>
+        <span class="rerank-coverage-label mono">
+          <b>{{ "%.0f"|format(rerank.coverage_pct) }}%</b> coverage
+          {% if rerank.total_queries - rerank.reranked_queries > 0 %}
+          <span class="cell-faint">· {{ rerank.total_queries - rerank.reranked_queries }} vector-only fallback</span>
+          {% endif %}
+        </span>
       </div>
     </div>
-    <div class="kpi">
-      <div class="kpi-label">total LLM cost</div>
-      <div class="kpi-value">${{ "%.2f"|format(rerank.total_cost_usd) }}</div>
-      <div class="kpi-sub">across all models · paid by callers' keys</div>
-    </div>
-    <div class="kpi" style="grid-column: span 2;">
-      <div class="kpi-label">by model</div>
-      {% if rerank.by_model %}
-      <table class="t" style="margin-top: var(--s-2);">
-        <thead>
-          <tr>
-            <th>model</th>
-            <th style="text-align: right;">queries</th>
-            <th style="text-align: right;">tokens in</th>
-            <th style="text-align: right;">tokens out</th>
-            <th style="text-align: right;">avg latency</th>
-            <th style="text-align: right;">cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for m in rerank.by_model %}
-          <tr>
-            <td class="path">{{ m.model }}</td>
-            <td class="num">{{ m.queries }}</td>
-            <td class="num cell-faint">{{ "{:,}".format(m.tokens_in) }}</td>
-            <td class="num cell-faint">{{ "{:,}".format(m.tokens_out) }}</td>
-            <td class="num">{{ m.avg_ms }}ms</td>
-            <td class="num" style="color: var(--accent);">${{ "%.3f"|format(m.cost_usd) }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% endif %}
+    <div class="rerank-hero-side">
+      <div class="rerank-hero-cost-label mono">total spend on caller keys</div>
+      <div class="rerank-hero-cost mono">
+        <span class="rerank-hero-cost-currency">$</span>{{ "%.2f"|format(rerank.total_cost_usd) }}
+      </div>
+      <div class="rerank-hero-cost-sub mono">
+        avg ${{ "%.4f"|format(rerank.total_cost_usd / rerank.reranked_queries) }} / query
+      </div>
     </div>
   </div>
+
+  {% if rerank.by_model %}
+  <div class="rerank-models">
+    {% set total_calls = rerank.by_model | sum(attribute='queries') or 1 %}
+    {% for m in rerank.by_model %}
+    {% set share = (m.queries / total_calls * 100) %}
+    <div class="rerank-model-card">
+      <div class="rerank-model-head">
+        <span class="rerank-model-name mono">{{ m.model }}</span>
+        {% if loop.index == 1 %}
+        <span class="rerank-model-default mono">default</span>
+        {% endif %}
+        <span class="rerank-model-share mono">{{ "%.0f"|format(share) }}%</span>
+      </div>
+      <div class="rerank-model-bar">
+        <div class="rerank-model-bar-fill" style="width: {{ share | round(1) }}%;"></div>
+      </div>
+      <div class="rerank-model-stats mono">
+        <span><b>{{ m.queries }}</b> calls</span>
+        <span class="cell-faint">·</span>
+        <span><b>{{ m.avg_ms }}</b>ms</span>
+        <span class="cell-faint">·</span>
+        <span><b>{{ "{:,}".format(m.tokens_in) }}</b>↓<span class="cell-faint">in</span></span>
+        <span class="cell-faint">·</span>
+        <span><b>{{ "{:,}".format(m.tokens_out) }}</b>↑<span class="cell-faint">out</span></span>
+        <span class="rerank-model-cost mono">${{ "%.3f"|format(m.cost_usd) }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 <style>
-  .rerank-grid {
+  /* Inline BYOK glyph in section label */
+  .byok-inline-glyph {
+    display: inline-flex; align-items: center;
+    color: #a78bfa;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+
+  /* Hero card — purple-accent themed (BYOK convention from install) */
+  .rerank-hero {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: var(--s-5);
+    background: var(--bg-card);
+    border: 1px solid rgba(167, 139, 250, 0.30);
+    border-radius: var(--radius);
+    padding: var(--s-5);
+    margin-bottom: var(--s-4);
+    position: relative;
+    overflow: hidden;
+  }
+  .rerank-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(167,139,250,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .rerank-hero-eyebrow {
+    color: #a78bfa;
+    font-size: var(--t-11);
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    margin-bottom: var(--s-2);
+  }
+  .rerank-hero-number {
+    font-size: 42px;
+    font-weight: 500;
+    color: var(--fg);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .rerank-hero-unit {
+    color: var(--fg-muted);
+    font-size: var(--t-13);
+    font-weight: 400;
+    margin-left: var(--s-2);
+  }
+  .rerank-coverage {
+    margin-top: var(--s-3);
+    display: flex; align-items: center; gap: var(--s-3);
+  }
+  .rerank-coverage-bar {
+    flex: 1; max-width: 260px;
+    height: 6px;
+    background: var(--bg-input);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .rerank-coverage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(167,139,250,0.4), #a78bfa);
+    border-radius: 999px;
+    transition: width 400ms var(--ease);
+  }
+  .rerank-coverage-label {
+    font-size: var(--t-12);
+    color: var(--fg-muted);
+  }
+  .rerank-coverage-label b {
+    color: #a78bfa;
+    font-weight: 600;
+    font-size: var(--t-14);
+  }
+
+  .rerank-hero-side {
+    padding-left: var(--s-5);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    justify-content: center;
+  }
+  .rerank-hero-cost-label {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: var(--s-2);
+  }
+  .rerank-hero-cost {
+    font-size: 30px;
+    font-weight: 500;
+    color: var(--fg);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .rerank-hero-cost-currency {
+    color: var(--fg-muted);
+    font-weight: 400;
+    margin-right: 2px;
+  }
+  .rerank-hero-cost-sub {
+    margin-top: var(--s-2);
+    color: var(--fg-muted);
+    font-size: var(--t-12);
+  }
+
+  /* Per-model cards */
+  .rerank-models {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
     gap: var(--s-3);
   }
-  @media (max-width: 640px) { .rerank-grid { grid-template-columns: 1fr; } }
+  .rerank-model-card {
+    padding: var(--s-3) var(--s-4);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color var(--duration);
+  }
+  .rerank-model-card:hover { border-color: var(--border-strong); }
+  .rerank-model-head {
+    display: flex; align-items: center; gap: var(--s-2);
+    margin-bottom: var(--s-2);
+  }
+  .rerank-model-name {
+    color: var(--fg);
+    font-weight: 500;
+    font-size: var(--t-13);
+  }
+  .rerank-model-default {
+    padding: 1px 6px;
+    background: rgba(167,139,250,0.12);
+    color: #a78bfa;
+    border: 1px solid rgba(167,139,250,0.25);
+    border-radius: 999px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .rerank-model-share {
+    margin-left: auto;
+    color: var(--fg-muted);
+    font-size: var(--t-12);
+    font-variant-numeric: tabular-nums;
+  }
+  .rerank-model-bar {
+    height: 3px;
+    background: var(--bg-input);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: var(--s-2);
+  }
+  .rerank-model-bar-fill {
+    height: 100%;
+    background: #a78bfa;
+    border-radius: 999px;
+    transition: width 400ms var(--ease);
+  }
+  .rerank-model-stats {
+    display: flex; flex-wrap: wrap;
+    gap: 6px;
+    font-size: var(--t-11);
+    color: var(--fg-muted);
+    align-items: baseline;
+  }
+  .rerank-model-stats b {
+    color: var(--fg);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .rerank-model-cost {
+    margin-left: auto;
+    color: #a78bfa;
+    font-weight: 500;
+    font-size: var(--t-12);
+  }
+
+  @media (max-width: 720px) {
+    .rerank-hero { grid-template-columns: 1fr; padding: var(--s-4); }
+    .rerank-hero-side {
+      padding-left: 0; padding-top: var(--s-4);
+      border-left: none; border-top: 1px solid var(--border);
+    }
+    .rerank-hero-number { font-size: 32px; }
+    .rerank-hero-cost { font-size: 24px; }
+    .rerank-models { grid-template-columns: 1fr; }
+  }
 </style>
 {% endif %}
 

@@ -89,17 +89,27 @@ def _rerank(
     user = f"Query: {query}\n\nCandidates:\n" + "\n".join(indexed_snippets)
 
     model = _pick_model()
-    t0 = time.perf_counter()
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
+    # GPT-5.x family uses max_completion_tokens; older models accept either.
+    # Send both as kwargs, swallow the deprecated one if API rejects it via fallback.
+    params = {
+        "model": model,
+        "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        response_format={"type": "json_object"},
-        temperature=0,
-        max_tokens=256,
-    )
+        "response_format": {"type": "json_object"},
+    }
+    # max_completion_tokens for gpt-5.x / o-series (which may consume hidden
+    # reasoning tokens before emitting). max_tokens for legacy chat models.
+    # Headroom: a 20-candidate JSON order array is ~80 tokens; 2048 leaves
+    # plenty for reasoning without runaway cost.
+    if model.startswith(("gpt-5", "o1", "o3", "o4")):
+        params["max_completion_tokens"] = 2048
+    else:
+        params["max_tokens"] = 512
+        params["temperature"] = 0
+    t0 = time.perf_counter()
+    resp = client.chat.completions.create(**params)
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
 
     content = (resp.choices[0].message.content or "").strip()

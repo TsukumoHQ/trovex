@@ -1,4 +1,14 @@
 {% from "_partials.html" import status_pill, fresh_label %}
+
+{% macro hl(text, terms) -%}
+  {%- set ns = namespace(out=text) -%}
+  {%- for t in terms -%}
+    {%- set ns.out = ns.out | replace(t, '\x01HL_OPEN\x01' ~ t ~ '\x01HL_CLOSE\x01') -%}
+    {%- set ns.out = ns.out | replace(t | capitalize, '\x01HL_OPEN\x01' ~ (t | capitalize) ~ '\x01HL_CLOSE\x01') -%}
+    {%- set ns.out = ns.out | replace(t | upper, '\x01HL_OPEN\x01' ~ (t | upper) ~ '\x01HL_CLOSE\x01') -%}
+  {%- endfor -%}
+  {{- ns.out | escape | replace('\x01HL_OPEN\x01', '<mark class="hl">') | replace('\x01HL_CLOSE\x01', '</mark>') | safe -}}
+{%- endmacro %}
 {% if not q %}
   <div class="empty">
     <div class="empty-title mono">type a query to search</div>
@@ -28,12 +38,12 @@
     <div class="result-head">
       {{ status_pill(r.status) }}
       <span class="result-path">
-        <a href="vscode://file{{ r.absolute_path }}" title="open in VS Code">{{ r.path }}</a>
+        <a href="vscode://file{{ r.absolute_path }}" title="open in VS Code">{{ hl(r.path, highlight_terms) }}</a>
       </span>
       <span class="mono subtle" style="font-size: var(--t-11);">{{ fresh_label(r.age_days) }}</span>
     </div>
     {% if r.title and r.title != r.path %}
-    <div class="muted" style="margin-top: 2px; font-size: var(--t-13);">{{ r.title }}</div>
+    <div class="muted" style="margin-top: 2px; font-size: var(--t-13);">{{ hl(r.title, highlight_terms) }}</div>
     {% endif %}
     <div class="result-meta">
       <span><b>{{ "{:,}".format(r.tokens_est) }}</b> tokens</span>

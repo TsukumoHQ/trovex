@@ -30,12 +30,17 @@
            value="{{ q }}"
            placeholder="search docs — semantic, frontmatter-aware, ranked"
            autofocus
+           role="combobox"
+           aria-autocomplete="list"
+           aria-controls="suggest-list"
+           aria-expanded="false"
            aria-label="Search query">
     <div class="suffix">
       <span id="results-loader" class="htmx-indicator mono"
             style="font-size: var(--t-11); color: var(--fg-subtle);">…</span>
       <span class="kbd">↵</span>
     </div>
+    <ul id="suggest-list" class="suggest" role="listbox" hidden></ul>
   </div>
 
   <div style="display: flex; gap: var(--s-4); align-items: center;
@@ -53,4 +58,143 @@
 <div id="results" style="margin-top: var(--s-6);">
   {% include "_results.html" %}
 </div>
+
+<style>
+  .suggest {
+    position: absolute;
+    top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    list-style: none;
+    margin: 0; padding: 4px;
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 30;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .suggest-item {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: var(--t-13);
+    color: var(--fg);
+  }
+  .suggest-item:hover, .suggest-item[aria-selected="true"] {
+    background: var(--bg-hover);
+  }
+  .suggest-item .suggest-icon {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+  }
+  .suggest-item .suggest-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .suggest-item .suggest-count {
+    color: var(--fg-faint);
+    font-size: var(--t-11);
+  }
+  .suggest-empty {
+    padding: 12px;
+    color: var(--fg-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    text-align: center;
+  }
+  mark.hl {
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 0 2px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+</style>
+
+<script>
+  (function () {
+    const input = document.querySelector('input[name="q"]');
+    const list = document.getElementById('suggest-list');
+    if (!input || !list) return;
+
+    let activeIdx = -1;
+    let lastFetched = '';
+    let fetchToken = 0;
+
+    function close() {
+      list.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+      activeIdx = -1;
+    }
+    function open() {
+      list.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+    }
+    function highlight(idx) {
+      const items = list.querySelectorAll('.suggest-item');
+      items.forEach((el, i) => el.setAttribute('aria-selected', i === idx ? 'true' : 'false'));
+      activeIdx = idx;
+    }
+
+    async function load(prefix) {
+      const token = ++fetchToken;
+      try {
+        const r = await fetch('/api/suggest?q=' + encodeURIComponent(prefix));
+        if (token !== fetchToken) return;  // stale
+        const data = await r.json();
+        if (data.length === 0) { close(); return; }
+        list.innerHTML = data.map(d =>
+          '<li class="suggest-item" role="option" data-q="' + d.q.replace(/"/g, '&quot;') + '">' +
+            '<span class="suggest-icon">↗</span>' +
+            '<span class="suggest-text">' + d.q.replace(/</g, '&lt;') + '</span>' +
+            '<span class="suggest-count">' + d.n + '×</span>' +
+          '</li>'
+        ).join('');
+        list.querySelectorAll('.suggest-item').forEach(el => {
+          el.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            input.value = el.dataset.q;
+            close();
+            htmx.trigger('#search-form', 'submit');
+          });
+        });
+        open();
+        highlight(-1);
+      } catch (e) { /* silent */ }
+    }
+
+    input.addEventListener('input', function () {
+      const v = input.value.trim();
+      if (v.length < 2) { close(); return; }
+      if (v === lastFetched) return;
+      lastFetched = v;
+      load(v);
+    });
+
+    input.addEventListener('keydown', function (e) {
+      if (list.hidden) return;
+      const items = list.querySelectorAll('.suggest-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlight((activeIdx + 1) % items.length);
+        items[activeIdx]?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlight(activeIdx <= 0 ? items.length - 1 : activeIdx - 1);
+        items[activeIdx]?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' && activeIdx >= 0) {
+        e.preventDefault();
+        input.value = items[activeIdx].dataset.q;
+        close();
+        htmx.trigger('#search-form', 'submit');
+      } else if (e.key === 'Escape') {
+        close();
+      }
+    });
+
+    input.addEventListener('blur', function () { setTimeout(close, 150); });
+    input.addEventListener('focus', function () {
+      if (input.value.trim().length >= 2 && list.children.length > 0) open();
+    });
+  })();
+</script>
 {% endblock %}

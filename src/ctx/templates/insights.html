@@ -1,0 +1,332 @@
+{% extends "_base.html" %}
+{% from "_partials.html" import avatar, status_pill, fresh_label, number %}
+{% set active = 'insights' %}
+{% block title %}ctx — insights{% endblock %}
+
+{% block topbar_meta %}
+  <span class="mono">{{ heatmap.total }} queries · last {{ days }}d</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: var(--s-5);">
+  <div>
+    <h1 style="margin-bottom: 2px;">Insights</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      query patterns, corpus blind spots, retrieval health
+    </div>
+  </div>
+  <div class="filter-pills" style="margin-left: auto; padding: 2px; background: var(--bg-card); border-radius: var(--radius-sm);">
+    {% for d in [1, 7, 14, 30, 90] %}
+      <a href="/insights?days={{ d }}" class="filter-pill {% if d == days %}active{% endif %}">{{ d }}d</a>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Heatmap ──────────────────────────────────────────── #}
+{% if heatmap.total > 0 %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">When ctx is used</span>
+    <span class="section-divider-meta mono">UTC · 7d × 24h</span>
+  </div>
+  <div class="card heatmap-card">
+    <div class="heatmap" role="img" aria-label="Activity heatmap">
+      <div class="heatmap-hour-row">
+        <div class="heatmap-day-label"></div>
+        {% for h in range(0, 24, 3) %}
+        <div class="heatmap-hour-tick mono" style="grid-column: {{ h + 2 }} / span 3;">{{ "%02d"|format(h) }}</div>
+        {% endfor %}
+      </div>
+      {% set days_lbl = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] %}
+      {% for day_i in range(7) %}
+        <div class="heatmap-row">
+          <div class="heatmap-day-label mono">{{ days_lbl[day_i] }}</div>
+          {% for hour in range(24) %}
+            {% set v = heatmap.matrix[day_i][hour] %}
+            {% set intensity = (v / heatmap.max) if heatmap.max > 0 else 0 %}
+            <div class="heatmap-cell"
+                 style="background: rgba(34, 197, 94, {{ (intensity * 0.85) | round(2) }});"
+                 title="{{ days_lbl[day_i] }} {{ '%02d'|format(hour) }}:00 · {{ v }} queries">
+              {% if v > 0 %}<span class="sr-only">{{ v }}</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="heatmap-legend mono">
+      <span class="subtle">less</span>
+      <span class="heatmap-legend-swatch" style="background: rgba(34,197,94,0.04);"></span>
+      <span class="heatmap-legend-swatch" style="background: rgba(34,197,94,0.20);"></span>
+      <span class="heatmap-legend-swatch" style="background: rgba(34,197,94,0.45);"></span>
+      <span class="heatmap-legend-swatch" style="background: rgba(34,197,94,0.85);"></span>
+      <span class="subtle">more</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Top queries + Repeated ───────────────────────────── #}
+<div class="row-2col-equal">
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">Top queries</h3>
+      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">by volume</span>
+    </div>
+    {% if top_q %}
+    <ol class="rank-list">
+      {% for q in top_q %}
+      <li class="rank-item">
+        <span class="rank-num mono">{{ loop.index }}</span>
+        <a href="/usage?days={{ days }}" class="rank-text mono" title="{{ q.q }}">{{ q.q }}</a>
+        <span class="rank-meta mono">
+          <b>{{ q.n }}×</b>
+          {% if q.users > 1 %}<span class="cell-faint">· {{ q.users }} users</span>{% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="card-body subtle mono" style="font-size: var(--t-12); padding: var(--s-5);">no queries yet</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">Repeated queries</h3>
+      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">retrieval might be off</span>
+    </div>
+    {% if repeated %}
+    <ol class="rank-list">
+      {% for r in repeated %}
+      <li class="rank-item">
+        {{ avatar(r.user, 20) }}
+        <span class="rank-text mono" style="flex: 1;" title="{{ r.q }}">{{ r.q }}</span>
+        <span class="rank-meta mono">
+          <b style="color: var(--duplicate);">{{ r.times }}×</b>
+          <span class="cell-faint">{{ r.span_label }}</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="card-body subtle mono" style="font-size: var(--t-12); padding: var(--s-5);">none — clean</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Failed queries (corpus blind spots) ──────────────── #}
+{% if failed %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Corpus blind spots</span>
+    <span class="section-divider-meta mono">no good match (score &lt; 0.30)</span>
+  </div>
+  <div class="card">
+    <ul class="query-feed">
+      {% for f in failed %}
+      <li class="query-feed-item">
+        {{ avatar(f.user, 22) }}
+        <div class="query-feed-body">
+          <div class="query-feed-line mono">
+            <span class="query-feed-user">{{ f.user }}</span>
+            <span class="query-feed-arrow">→</span><span class="query-feed-q">{{ f.query }}</span>
+          </div>
+        </div>
+        <div class="query-feed-meta mono">
+          {% if f.n_results == 0 %}
+            <span style="color: var(--stale);"><b>0</b> results</span>
+          {% else %}
+            <span class="cell-faint">best {{ "%.2f"|format(f.best_score) }}</span>
+          {% endif %}
+          <span class="cell-faint">{{ f.age_label }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+{# ── Hot docs (most returned) ─────────────────────────── #}
+{% if most_returned %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Hot docs</span>
+    <span class="section-divider-meta mono">most frequently returned</span>
+  </div>
+  <div class="card">
+    <div class="table-wrap" style="border: none; border-radius: 0;">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>path</th>
+            <th style="text-align: right;">appearances</th>
+            <th style="text-align: right;">top-1</th>
+            <th style="width: 120px;">share as top-1</th>
+            <th style="text-align: right;">avg score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in most_returned %}
+          <tr>
+            <td class="path">
+              <a href="/search?q={{ p.path | urlencode }}">{{ p.path }}</a>
+            </td>
+            <td class="num">{{ p.appearances }}</td>
+            <td class="num"><b>{{ p.top1 }}</b></td>
+            <td>
+              <div class="user-ratio-bar" style="display: inline-block; width: 80px;">
+                <span class="user-ratio-fill" style="width: {{ (p.top1 / p.appearances * 100) | round(1) }}%;"></span>
+              </div>
+              <span class="mono cell-faint" style="font-size: var(--t-11);">{{ "%.0f"|format(p.top1 / p.appearances * 100) }}%</span>
+            </td>
+            <td class="num cell-faint">{{ "%.3f"|format(p.avg_score) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Dead docs (cleanup candidates) ───────────────────── #}
+{% if dead %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Cold docs</span>
+    <span class="section-divider-meta mono">never surfaced in last {{ days }}d · cleanup candidates</span>
+  </div>
+  <div class="card">
+    <div class="table-wrap" style="border: none; border-radius: 0;">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>path</th>
+            <th>title</th>
+            <th>status</th>
+            <th style="text-align: right;">tokens</th>
+            <th style="text-align: right;">age</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in dead %}
+          <tr>
+            <td class="path">
+              <a href="/search?q={{ d.title | urlencode }}">{{ d.path }}</a>
+            </td>
+            <td class="cell-faint" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ d.title }}</td>
+            <td>{{ status_pill(d.status) }}</td>
+            <td class="num">{{ "{:,}".format(d.tokens_est) }}</td>
+            <td class="num cell-faint">{{ fresh_label(d.age_days) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<style>
+  .row-2col-equal {
+    display: grid;
+    gap: var(--s-4);
+    grid-template-columns: 1fr 1fr;
+    margin-top: var(--s-6);
+  }
+  @media (max-width: 880px) {
+    .row-2col-equal { grid-template-columns: 1fr; }
+  }
+
+  /* ── Rank lists (top queries, repeated) ──────────────── */
+  .rank-list { list-style: none; margin: 0; padding: 0; counter-reset: rank; }
+  .rank-item {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-2) var(--s-4);
+    border-top: 1px solid var(--border);
+    transition: background var(--duration);
+  }
+  .rank-item:first-child { border-top: none; }
+  .rank-item:hover { background: var(--bg-hover); }
+  .rank-num {
+    width: 22px; flex-shrink: 0;
+    color: var(--fg-faint);
+    font-size: var(--t-11);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .rank-text {
+    flex: 1; min-width: 0;
+    font-size: var(--t-12);
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rank-text:hover { color: var(--accent); }
+  .rank-meta {
+    font-size: var(--t-11);
+    color: var(--fg-muted);
+    flex-shrink: 0;
+    display: inline-flex; gap: 6px;
+  }
+  .rank-meta b { color: var(--fg); font-weight: 500; }
+
+  /* ── Heatmap ─────────────────────────────────────────── */
+  .heatmap-card { padding: var(--s-5); }
+  .heatmap {
+    display: grid;
+    gap: 3px;
+  }
+  .heatmap-hour-row, .heatmap-row {
+    display: grid;
+    grid-template-columns: 32px repeat(24, 1fr);
+    gap: 3px;
+    align-items: center;
+  }
+  .heatmap-hour-row { margin-bottom: var(--s-2); }
+  .heatmap-hour-tick {
+    font-size: 10px;
+    color: var(--fg-subtle);
+  }
+  .heatmap-day-label {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    text-align: right;
+    padding-right: var(--s-2);
+  }
+  .heatmap-cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    transition: transform var(--duration);
+  }
+  .heatmap-cell:hover { transform: scale(1.15); border-color: var(--accent); }
+  .heatmap-legend {
+    margin-top: var(--s-3);
+    display: flex; align-items: center; gap: 4px;
+    justify-content: flex-end;
+    font-size: var(--t-11);
+  }
+  .heatmap-legend-swatch {
+    width: 12px; height: 12px; border-radius: 2px;
+    border: 1px solid var(--border);
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+  /* Reuse from savings */
+  .user-ratio-bar { display: inline-block; width: 80px; height: 4px;
+    background: var(--bg-input); border-radius: 999px; overflow: hidden;
+    vertical-align: middle; margin-right: 6px; }
+  .user-ratio-fill { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+  .filter-pills { display: inline-flex; gap: 2px; }
+  .filter-pill { display: inline-flex; padding: 4px 10px;
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-muted); border-radius: 3px;
+    transition: all var(--duration); }
+  .filter-pill:hover { color: var(--fg); background: var(--bg-hover); }
+  .filter-pill.active { color: var(--bg); background: var(--accent); }
+  .filter-pill.active:hover { color: var(--bg); }
+</style>
+{% endblock %}

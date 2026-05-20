@@ -72,6 +72,7 @@ def ctx(q: str, summary: bool = False) -> str:
             response_tokens_est=len(out) // 4, elapsed_ms=elapsed_ms,
             would_have_read_tokens=would_have_read,
             top_result_tokens=top_tokens,
+            results=results,
         )
     except Exception:
         pass  # never let logging break the tool

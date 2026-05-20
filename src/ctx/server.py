@@ -11,6 +11,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
+from . import insights as insights_mod
 from . import savings as savings_mod
 from .mcp_app import mcp
 from .state import get_state
@@ -364,6 +365,47 @@ def build_app() -> FastAPI:
             },
         )
 
+    @app.get("/insights", response_class=HTMLResponse)
+    async def insights_page(request: Request, days: int = 7) -> HTMLResponse:
+        state = get_state()
+        db = state.searcher.db
+        days = max(1, min(90, int(days)))
+        since = _now() - days * 86400
+        now = _now()
+
+        top_q = insights_mod.top_queries(db, since)
+        failed = [
+            {**r, "age_label": _relative_time(now - r["ts"])}
+            for r in insights_mod.failed_queries(db, since)
+        ]
+        repeated = [
+            {**r,
+             "last_label": _relative_time(now - r["last_ts"]),
+             "span_label": _relative_time(r["last_ts"] - r["first_ts"]) if r["last_ts"] > r["first_ts"] else "instant"}
+            for r in insights_mod.repeated_queries(db, since)
+        ]
+        most_returned = insights_mod.most_returned_paths(db, since)
+        dead = [
+            {**r, "age_days": max(0.0, (now - r["mtime"]) / 86400)}
+            for r in insights_mod.dead_docs(db, since)
+        ]
+        heatmap = insights_mod.hour_heatmap(db, since)
+        return templates.TemplateResponse(
+            request, "insights.html",
+            {
+                "days": days,
+                "top_q": top_q, "failed": failed, "repeated": repeated,
+                "most_returned": most_returned, "dead": dead,
+                "heatmap": heatmap,
+            },
+        )
+
+    @app.get("/api/suggest")
+    async def api_suggest(q: str = "") -> JSONResponse:
+        state = get_state()
+        db = state.searcher.db
+        return JSONResponse(insights_mod.suggest_queries(db, q))
+
     @app.get("/savings", response_class=HTMLResponse)
     async def savings_page(request: Request, days: int = 7) -> HTMLResponse:
         state = get_state()
@@ -430,11 +472,19 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
             for r in results:
                 summaries[r.path] = state.searcher._extract_summary(r.absolute_path)
 
+    # Tokens from query (alphanumeric runs >= 2 chars) for inline highlighting.
+    import re as _re
+    highlight_terms = sorted(
+        {t for t in _re.findall(r"[a-zA-Z0-9]{2,}", q.lower()) if len(t) >= 2},
+        key=len, reverse=True,
+    )
+
     ctx_data = {
         "q": q, "summary": summary, "total": total,
         "results": results, "summaries": summaries,
         "elapsed_ms": elapsed_ms,
         "example_queries": EXAMPLE_QUERIES,
+        "highlight_terms": highlight_terms,
     }
     template_name = "_results.html" if partial else "search.html"
     return templates.TemplateResponse(request, template_name, ctx_data)

@@ -36,8 +36,9 @@ class UserHeaderMiddleware(BaseHTTPMiddleware):
 def log_query(db, query: str, n_results: int, summary: bool,
               response_tokens_est: int, elapsed_ms: int,
               would_have_read_tokens: int = 0,
-              top_result_tokens: int = 0) -> None:
-    db.execute(
+              top_result_tokens: int = 0,
+              results: list | None = None) -> None:
+    cur = db.execute(
         """INSERT INTO mcp_queries
            (ts, user, query, n_results, summary, response_tokens_est, elapsed_ms,
             would_have_read_tokens, top_result_tokens)
@@ -46,4 +47,12 @@ def log_query(db, query: str, n_results: int, summary: bool,
          n_results, int(summary), response_tokens_est, elapsed_ms,
          would_have_read_tokens, top_result_tokens),
     )
+    query_id = cur.lastrowid
+    if results and query_id is not None:
+        db.executemany(
+            """INSERT INTO mcp_query_results (query_id, rank, path, status, tokens_est, score)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            [(query_id, i, r.path, r.status, r.tokens_est, r.score)
+             for i, r in enumerate(results)],
+        )
     db.commit()

@@ -22,6 +22,67 @@
   </div>
 </div>
 
+{# ── LLM rerank stats ─────────────────────────────────── #}
+{% if rerank.reranked_queries > 0 %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">LLM rerank · BYOK</span>
+    <span class="section-divider-meta mono">last {{ days }}d</span>
+  </div>
+  <div class="rerank-grid">
+    <div class="kpi">
+      <div class="kpi-label">reranked queries</div>
+      <div class="kpi-value">{{ rerank.reranked_queries }}</div>
+      <div class="kpi-sub">
+        {{ "%.0f"|format(rerank.coverage_pct) }}% coverage · {{ rerank.total_queries - rerank.reranked_queries }} fallback
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">total LLM cost</div>
+      <div class="kpi-value">${{ "%.2f"|format(rerank.total_cost_usd) }}</div>
+      <div class="kpi-sub">across all models · paid by callers' keys</div>
+    </div>
+    <div class="kpi" style="grid-column: span 2;">
+      <div class="kpi-label">by model</div>
+      {% if rerank.by_model %}
+      <table class="t" style="margin-top: var(--s-2);">
+        <thead>
+          <tr>
+            <th>model</th>
+            <th style="text-align: right;">queries</th>
+            <th style="text-align: right;">tokens in</th>
+            <th style="text-align: right;">tokens out</th>
+            <th style="text-align: right;">avg latency</th>
+            <th style="text-align: right;">cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in rerank.by_model %}
+          <tr>
+            <td class="path">{{ m.model }}</td>
+            <td class="num">{{ m.queries }}</td>
+            <td class="num cell-faint">{{ "{:,}".format(m.tokens_in) }}</td>
+            <td class="num cell-faint">{{ "{:,}".format(m.tokens_out) }}</td>
+            <td class="num">{{ m.avg_ms }}ms</td>
+            <td class="num" style="color: var(--accent);">${{ "%.3f"|format(m.cost_usd) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<style>
+  .rerank-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--s-3);
+  }
+  @media (max-width: 640px) { .rerank-grid { grid-template-columns: 1fr; } }
+</style>
+{% endif %}
+
 {# ── Heatmap ──────────────────────────────────────────── #}
 {% if heatmap.total > 0 %}
 <div class="section">

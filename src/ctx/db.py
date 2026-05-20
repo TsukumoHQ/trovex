@@ -56,7 +56,12 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             response_tokens_est INTEGER NOT NULL DEFAULT 0,
             elapsed_ms INTEGER NOT NULL DEFAULT 0,
             would_have_read_tokens INTEGER NOT NULL DEFAULT 0,
-            top_result_tokens INTEGER NOT NULL DEFAULT 0
+            top_result_tokens INTEGER NOT NULL DEFAULT 0,
+            reranked INTEGER NOT NULL DEFAULT 0,
+            llm_model TEXT,
+            llm_tokens_in INTEGER NOT NULL DEFAULT 0,
+            llm_tokens_out INTEGER NOT NULL DEFAULT 0,
+            llm_elapsed_ms INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_ts ON mcp_queries(ts DESC);
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_user ON mcp_queries(user, ts DESC);

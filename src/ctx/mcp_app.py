@@ -54,17 +54,18 @@ def ctx(q: str, summary: bool = False) -> str:
 
     from .usage import log_query
 
+    from .rerank import maybe_rerank
+
     state = get_state()
     t0 = _time.perf_counter()
-    results = state.searcher.search(q, limit=5)
+    # Fetch a wider candidate pool when reranking is possible.
+    candidates = state.searcher.search(q, limit=20)
+    results, rerank_info = maybe_rerank(q, candidates, limit=5)
+
     out = (state.searcher.format_with_summary(results) if summary
            else state.searcher.format_minimal(results))
     elapsed_ms = int((_time.perf_counter() - t0) * 1000)
     try:
-        # Savings model: without ctx, agent typically reads top-3 .md files
-        # matching their grep/glob. With ctx, they read 1 (the canonical top-1).
-        # "would_have_read_tokens" = sum of top-3 results (incl. the one they
-        # still read with ctx). Real savings later subtract top-1 + response.
         would_have_read = sum(r.tokens_est for r in results[:3])
         top_tokens = results[0].tokens_est if results else 0
         log_query(
@@ -73,6 +74,14 @@ def ctx(q: str, summary: bool = False) -> str:
             would_have_read_tokens=would_have_read,
             top_result_tokens=top_tokens,
             results=results,
+            rerank_info=(
+                {
+                    "model": rerank_info.model,
+                    "tokens_in": rerank_info.tokens_in,
+                    "tokens_out": rerank_info.tokens_out,
+                    "elapsed_ms": rerank_info.elapsed_ms,
+                } if rerank_info else None
+            ),
         )
     except Exception:
         pass  # never let logging break the tool

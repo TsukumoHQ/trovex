@@ -390,13 +390,14 @@ def build_app() -> FastAPI:
             for r in insights_mod.dead_docs(db, since)
         ]
         heatmap = insights_mod.hour_heatmap(db, since)
+        rerank = insights_mod.rerank_stats(db, since)
         return templates.TemplateResponse(
             request, "insights.html",
             {
                 "days": days,
                 "top_q": top_q, "failed": failed, "repeated": repeated,
                 "most_returned": most_returned, "dead": dead,
-                "heatmap": heatmap,
+                "heatmap": heatmap, "rerank": rerank,
             },
         )
 

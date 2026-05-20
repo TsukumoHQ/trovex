@@ -21,6 +21,8 @@
     <span class="install-progress-sep"></span>
     <span class="install-progress-step"><span>3</span> Baseline</span>
     <span class="install-progress-sep"></span>
+    <span class="install-progress-step"><span>4</span> LLM</span>
+    <span class="install-progress-sep"></span>
     <span class="install-progress-step"><span>✓</span> Verify</span>
   </div>
 </div>
@@ -156,6 +158,72 @@
           </button>
         </div>
         <pre class="code-block-body" id="prompt-3"><span class="code-line"><span class="code-num">1</span><span class="code-text">Install the ctx baseline hook.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Create ~/.claude/hooks/ctx-baseline.sh with the content fetched from</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">   https://ctx.prod.synergix.ch/hooks/ctx-baseline.sh</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">2. chmod +x it.</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">3. Read ~/.claude/settings.json and add this to hooks.PreToolUse</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">   (merge — don't overwrite existing entries):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "matcher": "Read",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "hooks": [{</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">         "type": "command",</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-baseline.sh",</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text">         "timeout": 3</span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">       }]</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">4. Replace &lt;me&gt; with $HOME's basename. Restart Claude Code. After</span></span><span class="code-line"><span class="code-num">19</span><span class="code-text">   ~7 days, run `ctx measure` to see the delta.</span></span></pre>
+      </div>
+    </div>
+  </details>
+</section>
+
+{# ── BYOK: LLM rerank ─────────────────────────────────── #}
+<section class="step step-optional" aria-labelledby="step-byok-title">
+  <div class="step-rail">
+    <span class="step-num step-num-muted">4</span>
+  </div>
+  <details class="step-body step-details">
+    <summary class="step-head">
+      <div>
+        <h2 id="step-byok-title">
+          LLM rerank · BYOK
+          <span class="step-tag">optional</span>
+          <span class="step-tag step-tag-rec">quality boost</span>
+        </h2>
+        <p class="step-sub">
+          Bring your own OpenAI key. ctx fetches top-20 from vector search and
+          calls <code>gpt-5.4-mini</code> to re-rank into top-5. Improves top-1
+          reliability for ambiguous queries. ~<code>$0.0017</code> per query, ~$5/month
+          at 100 queries/day. <strong>Key never stored or logged server-side</strong>
+          — sent per-request via HTTPS header.
+        </p>
+      </div>
+      <span class="chevron" aria-hidden="true">▾</span>
+    </summary>
+
+    <div class="step-action">
+      <div class="step-action-label">
+        <span class="step-action-icon">→</span>
+        Paste this into Claude Code
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang mono">prompt</span>
+          <button class="copy-btn" data-target="prompt-byok" type="button" aria-label="Copy prompt">
+            <span class="copy-btn-label">Copy</span>
+          </button>
+        </div>
+        <pre class="code-block-body" id="prompt-byok"><span class="code-line"><span class="code-num">1</span><span class="code-text">Enable LLM reranking for ctx.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Ask me for my OpenAI API key (starts with sk-). Do NOT proceed until</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">   I provide it. Treat the value as a secret — never echo it back to me</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">   in chat after the initial confirmation.</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">2. Read my ~/.claude/settings.json and locate the existing "ctx" entry</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">   under mcpServers.</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text">3. Add the key as an additional header (merge, don't replace existing):</span></span><span class="code-line"><span class="code-num">9</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">     "ctx": {</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "type": "http",</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">       "url": "https://ctx.prod.synergix.ch/mcp/",</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">       "headers": {</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text">         "X-CTX-User": "&lt;my-existing-handle&gt;",</span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">         "X-CTX-OpenAI-Key": "&lt;my-sk-key&gt;"</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">       }</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">18</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">19</span><span class="code-text">4. Tell me to restart Claude Code. After restart, ctx() calls will be</span></span><span class="code-line"><span class="code-num">20</span><span class="code-text">   reranked by gpt-5.4-mini. Verify by checking</span></span><span class="code-line"><span class="code-num">21</span><span class="code-text">   https://ctx.prod.synergix.ch/insights — my queries will be flagged</span></span><span class="code-line"><span class="code-num">22</span><span class="code-text">   as reranked.</span></span></pre>
+      </div>
+    </div>
+
+    <div class="step-callouts">
+      <div class="callout">
+        <div class="callout-icon">🛡</div>
+        <div>
+          <div class="callout-title">Key never stored</div>
+          <div class="callout-body">Read from HTTPS header per-request, dropped after the call returns. Not in logs, not in DB.</div>
+        </div>
+      </div>
+      <div class="callout">
+        <div class="callout-icon">~</div>
+        <div>
+          <div class="callout-title">Soft dependency</div>
+          <div class="callout-body">If the LLM is slow or errors, ctx falls back to the vector ranking. Your query never hangs.</div>
+        </div>
+      </div>
+      <div class="callout">
+        <div class="callout-icon">📊</div>
+        <div>
+          <div class="callout-title">Per-call cost</div>
+          <div class="callout-body">~$0.0017 with <code>gpt-5.4-mini</code>. Override with <code>X-CTX-Rerank-Model</code> header.</div>
+        </div>
       </div>
     </div>
   </details>

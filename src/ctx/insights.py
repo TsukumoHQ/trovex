@@ -123,6 +123,71 @@ def hour_heatmap(db, since: float) -> dict:
     }
 
 
+def rerank_stats(db, since: float) -> dict:
+    """Counters + cost estimates for LLM reranking in the window.
+
+    Pricing (per 1M tokens, OpenAI 2026):
+      gpt-5.5        $5.00 / $30.00
+      gpt-5.4        $2.50 / $15.00
+      gpt-5.4-mini   $0.75 / $4.50
+      gpt-4.1-nano   $0.10 / $0.40
+
+    Anything else → $0 (we don't guess on unknown models).
+    """
+    PRICING = {
+        "gpt-5.5":       (5.00, 30.00),
+        "gpt-5.4":       (2.50, 15.00),
+        "gpt-5.4-mini":  (0.75,  4.50),
+        "gpt-4.1-nano":  (0.10,  0.40),
+        "gpt-4o":        (2.50, 10.00),
+        "gpt-4o-mini":   (0.15,  0.60),
+    }
+
+    rows = db.execute(
+        """SELECT llm_model,
+                  COUNT(*) AS n,
+                  COALESCE(SUM(llm_tokens_in), 0) AS tin,
+                  COALESCE(SUM(llm_tokens_out), 0) AS tout,
+                  COALESCE(AVG(llm_elapsed_ms), 0) AS avg_ms
+           FROM mcp_queries
+           WHERE ts >= ? AND reranked = 1 AND llm_model IS NOT NULL
+           GROUP BY llm_model""",
+        (since,),
+    ).fetchall()
+
+    total = db.execute(
+        "SELECT COUNT(*) AS c FROM mcp_queries WHERE ts >= ?",
+        (since,),
+    ).fetchone()["c"]
+    reranked = db.execute(
+        "SELECT COUNT(*) AS c FROM mcp_queries WHERE ts >= ? AND reranked = 1",
+        (since,),
+    ).fetchone()["c"]
+
+    by_model = []
+    total_cost = 0.0
+    for r in rows:
+        price_in, price_out = PRICING.get(r["llm_model"], (0.0, 0.0))
+        cost = (r["tin"] / 1_000_000) * price_in + (r["tout"] / 1_000_000) * price_out
+        total_cost += cost
+        by_model.append({
+            "model": r["llm_model"],
+            "queries": r["n"],
+            "tokens_in": r["tin"],
+            "tokens_out": r["tout"],
+            "avg_ms": int(r["avg_ms"]),
+            "cost_usd": cost,
+        })
+
+    return {
+        "total_queries": total,
+        "reranked_queries": reranked,
+        "coverage_pct": (reranked / total * 100) if total else 0,
+        "by_model": by_model,
+        "total_cost_usd": total_cost,
+    }
+
+
 def suggest_queries(db, prefix: str, limit: int = 6) -> list[dict]:
     """Autocomplete: past queries that begin with the prefix (case-insensitive),
     grouped + ranked by count."""

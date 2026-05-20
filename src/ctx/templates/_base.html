@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}ctx{% endblock %}</title>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<style>
+  :root {
+    --bg: #0f0f10; --fg: #e8e8e8; --dim: #8a8a8a;
+    --accent: #ffd66b; --danger: #ff7575; --ok: #7ce58a;
+    --line: #2a2a2c; --card: #161618;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  header {
+    padding: 16px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 24px;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header nav a {
+    color: var(--dim); text-decoration: none; margin-right: 16px;
+  }
+  header nav a:hover { color: var(--fg); }
+  main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 6px; padding: 16px; margin-bottom: 16px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .stat-num { font-size: 28px; color: var(--accent); }
+  .stat-label { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  th { color: var(--dim); font-weight: normal; font-size: 12px; text-transform: uppercase; }
+  td.path { font-family: inherit; color: var(--accent); }
+  td.muted { color: var(--dim); }
+  input[type="text"] {
+    width: 100%; padding: 10px 12px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 6px;
+    color: var(--fg); font: inherit;
+  }
+  input[type="text"]:focus { outline: 1px solid var(--accent); }
+  .marker { font-size: 16px; }
+  .marker-canonical { color: var(--accent); }
+  .marker-plan { color: #8ec5ff; }
+  .marker-stale { color: var(--danger); }
+  .marker-duplicate { color: #ffa57c; }
+  .result { margin-bottom: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 4px; }
+  .result-meta { color: var(--dim); font-size: 12px; }
+  .summary { color: var(--fg); margin-top: 6px; padding-left: 20px; border-left: 2px solid var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <h1>ctx</h1>
+  <nav>
+    <a href="/">stats</a>
+    <a href="/search">search</a>
+  </nav>
+  <div style="margin-left: auto; color: var(--dim); font-size: 12px;">
+    {% block subtitle %}{% endblock %}
+  </div>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# =============================================================================
+# ctx — Host service (systemd) exposed via Traefik
+# ctx.prod.synergix.ch -> host:8770
+#
+# Serves: SSR UI (/), JSON API (/api/*), MCP HTTP (/mcp/)
+# =============================================================================
+
+http:
+  routers:
+    ctx:
+      rule: "Host(`ctx.prod.synergix.ch`)"
+      entrypoints:
+        - websecure
+      tls: {}
+      service: ctx-service
+      middlewares:
+        - ctx-headers
+
+  middlewares:
+    ctx-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          # MCP uses SSE — disable buffering
+          X-Accel-Buffering: "no"
+
+  services:
+    ctx-service:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:8770"
+        responseForwarding:
+          flushInterval: "10ms"

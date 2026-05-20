@@ -1,0 +1,35 @@
+{% extends "_base.html" %}
+{% block title %}ctx — search{% endblock %}
+{% block content %}
+<form method="get" action="/search" hx-get="/search" hx-target="#results" hx-trigger="submit, keyup changed delay:300ms from:input[name=q]">
+  <input type="text" name="q" value="{{ q }}" placeholder="search docs…" autofocus>
+  <label style="display: inline-block; margin-top: 8px; color: var(--dim);">
+    <input type="checkbox" name="summary" {% if summary %}checked{% endif %}> include 50-word summary
+  </label>
+</form>
+
+<div id="results" style="margin-top: 16px;">
+{% if q %}
+  {% if results %}
+    {% for r in results %}
+    <div class="result">
+      <a href="/search?q={{ q|urlencode }}" style="display:block; color: var(--accent); text-decoration: none;">
+        <span class="marker marker-{{ r.status }}">{{ r.marker }}</span>
+        {{ r.path }}
+      </a>
+      <div class="result-meta">
+        {{ r.title }} &middot; {{ r.fresh_label() }} &middot;
+        score {{ "%.3f"|format(r.score) }} &middot;
+        {{ r.tokens_est }} tokens
+      </div>
+      {% if summary and summaries.get(r.path) %}
+      <div class="summary">{{ summaries[r.path] }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">no results</p>
+  {% endif %}
+{% endif %}
+</div>
+{% endblock %}

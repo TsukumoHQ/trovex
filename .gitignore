@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Project data
+data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+fastembed_cache/
+.ctx-cache/
+
+# Local config
+.env
+.env.local
+*.local.yaml

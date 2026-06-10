@@ -253,7 +253,8 @@ class SqliteStore:
         qemb = next(iter(self.embedder.embed([query])))
         rows = self.db.execute(
             """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
-                      d.ext_id, d.title, d.kind, d.source_id, v.distance
+                      d.ext_id, d.title, d.kind, d.source_id,
+                      d.tokens_est AS doc_tokens, v.distance
                FROM vec_chunks v
                JOIN chunks c ON c.id = v.rowid
                JOIN docs d ON d.id = c.doc_id

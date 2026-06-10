@@ -146,7 +146,7 @@ class SqliteStore:
         return _row_to_doc(row)
 
     def list_docs(self, *, tag: str | None = None, kind: str | None = None,
-                  limit: int = 60, offset: int = 0) -> list[StoredDoc]:
+                  q: str | None = None, limit: int = 60, offset: int = 0) -> list[StoredDoc]:
         where = ["d.source_id = ?"]
         params: list = [CTX_SOURCE_ID]
         if tag:
@@ -155,6 +155,11 @@ class SqliteStore:
         if kind:
             where.append("d.kind = ?")
             params.append(kind)
+        if q:
+            # Lightweight browse filter (title/content substring) — NOT semantic
+            # search; that lives on /search via search_chunks.
+            where.append("(d.title LIKE ? OR d.content LIKE ?)")
+            params += [f"%{q}%", f"%{q}%"]
         rows = self.db.execute(
             f"""SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,
                        d.mtime, GROUP_CONCAT(t.tag) AS tags
@@ -165,7 +170,8 @@ class SqliteStore:
         ).fetchall()
         return [_row_to_doc(r) for r in rows if r["content"] is not None]
 
-    def count_docs(self, *, tag: str | None = None, kind: str | None = None) -> int:
+    def count_docs(self, *, tag: str | None = None, kind: str | None = None,
+                   q: str | None = None) -> int:
         where = ["source_id = ?"]
         params: list = [CTX_SOURCE_ID]
         if tag:
@@ -174,6 +180,9 @@ class SqliteStore:
         if kind:
             where.append("kind = ?")
             params.append(kind)
+        if q:
+            where.append("(title LIKE ? OR content LIKE ?)")
+            params += [f"%{q}%", f"%{q}%"]
         return self.db.execute(
             f"SELECT COUNT(*) AS c FROM docs WHERE {' AND '.join(where)}", params
         ).fetchone()["c"]

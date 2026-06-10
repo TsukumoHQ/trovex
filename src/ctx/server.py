@@ -330,7 +330,9 @@ def build_app() -> FastAPI:
     @app.get("/store", response_class=HTMLResponse)
     async def store_page(request: Request, tag: str = "", kind: str = "",
                          collection: str = "", q: str = "", page: int = 1) -> HTMLResponse:
-        """The ctx-owned doc store — browse, filter, or semantic-search."""
+        """The ctx-owned doc store — browse + quick title/text filter. Semantic
+        search lives on /search (this `q` is a lightweight view filter, paginated
+        like the rest of the browse)."""
         store = get_state().store
         now = _now()
         f_tag, f_kind = tag, kind
@@ -348,20 +350,12 @@ def build_app() -> FastAPI:
                 "age_days": max(0.0, (now - d.mtime) / 86400), "snippet": snippet,
             }
 
-        if q.strip():
-            hits = store.search_chunks(
-                q, limit=40, kind=f_kind or None, tags=[f_tag] if f_tag else None)
-            seen: dict = {}
-            for h in hits:
-                seen.setdefault(h["ext_id"], h["content"][:160])
-            items = [card(d, seen[e]) for e in seen if (d := store.get(e))]
-            total, pages = len(items), 1
-        else:
-            total = store.count_docs(tag=f_tag or None, kind=f_kind or None)
-            docs = store.list_docs(tag=f_tag or None, kind=f_kind or None,
-                                   limit=per, offset=(page - 1) * per)
-            items = [card(d, _snippet(d.content)) for d in docs]
-            pages = (total + per - 1) // per
+        qf = q.strip() or None
+        total = store.count_docs(tag=f_tag or None, kind=f_kind or None, q=qf)
+        docs = store.list_docs(tag=f_tag or None, kind=f_kind or None, q=qf,
+                               limit=per, offset=(page - 1) * per)
+        items = [card(d, _snippet(d.content)) for d in docs]
+        pages = (total + per - 1) // per
 
         facets, other_tags = store.tags_by_facet()
         return templates.TemplateResponse(

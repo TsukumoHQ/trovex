@@ -123,15 +123,19 @@
       <div class="search-shell">
         <span class="prefix" aria-hidden="true"><svg class="icon"><use href="#i-search"></use></svg></span>
         <input type="search" name="q" value="{{ q }}" class="input search-input mono"
-               placeholder="search the store — semantic + keyword…" aria-label="Search the store">
+               placeholder="filter this view — title &amp; text…" aria-label="Filter the store">
         <div class="suffix"><span class="kbd">↵</span></div>
       </div>
       {% if active_kind %}<input type="hidden" name="kind" value="{{ active_kind }}">{% endif %}
       {% if active_tag %}<input type="hidden" name="tag" value="{{ active_tag }}">{% endif %}
     </form>
+    <div class="subtle mono store-hint" style="font-size: var(--t-11); margin-bottom: var(--s-3);">
+      quick filter (title + text) · for ranked semantic search →
+      <a href="/search{% if q %}?q={{ q | urlencode }}{% endif %}" style="color: var(--accent);">advanced search</a>
+    </div>
     {% if q %}
     <div class="subtle mono" style="font-size: var(--t-12); margin-bottom: var(--s-3);">
-      {{ total }} result{{ '' if total == 1 else 's' }} for "{{ q }}" · <a href="/store" style="color: var(--accent);">clear</a>
+      {{ total }} match{{ '' if total == 1 else 'es' }} for "{{ q }}" · <a href="/store{% if active_kind %}?kind={{ active_kind }}{% elif active_tag %}?tag={{ active_tag | urlencode }}{% endif %}" style="color: var(--accent);">clear</a>
     </div>
     {% endif %}
 
@@ -167,9 +171,9 @@
     </div>
     {% endif %}
 
-    {% if not q and pages > 1 %}
+    {% if pages > 1 %}
     <div class="pager">
-      {% set qs = (('&tag=' + active_tag) if active_tag else '') ~ (('&kind=' + active_kind) if active_kind else '') %}
+      {% set qs = (('&q=' + (q | urlencode)) if q else '') ~ (('&tag=' + (active_tag | urlencode)) if active_tag else '') ~ (('&kind=' + active_kind) if active_kind else '') %}
       {% if page > 1 %}<a href="/store?page={{ page - 1 }}{{ qs }}">← prev</a>{% else %}<span class="subtle">← prev</span>{% endif %}
       <span class="subtle">page {{ page }} / {{ pages }}</span>
       {% if page < pages %}<a href="/store?page={{ page + 1 }}{{ qs }}">next →</a>{% else %}<span class="subtle">next →</span>{% endif %}

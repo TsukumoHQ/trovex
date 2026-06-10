@@ -138,6 +138,12 @@ def build_app() -> FastAPI:
         last_run_relative = (
             _relative_time(_now() - last_run["ts"]) if last_run else "never"
         )
+        # The store indexes on write — the reindex (index_runs) is retired, so
+        # surface the latest write instead of stale added/updated counts.
+        lw = db.execute(
+            "SELECT MAX(mtime) AS m FROM docs WHERE source_id = 'ctx'"
+        ).fetchone()
+        last_write_relative = _relative_time(_now() - lw["m"]) if lw and lw["m"] else "never"
 
         recent = _rows_with_age(db.execute(
             """SELECT path, title, mtime, status, tokens_est, size_bytes
@@ -194,6 +200,7 @@ def build_app() -> FastAPI:
                 "total": total, "total_tokens": total_tokens, "avg_tokens": avg_tokens,
                 "by_status": by_status, "last_run": last_run,
                 "last_run_relative": last_run_relative,
+                "last_write_relative": last_write_relative,
                 "recent": recent, "attention": attention, "heaviest": heaviest,
                 "corpus_path": str(state.settings.project_root),
                 "by_user": by_user_rows,

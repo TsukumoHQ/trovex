@@ -4,11 +4,9 @@
 {% block title %}ctx — overview{% endblock %}
 
 {% block topbar_meta %}
-  {% if last_run %}
-    <span class="dot" aria-hidden="true"></span>
-    <span>indexed {{ last_run_relative }}</span>
-    <span class="subtle">·</span>
-  {% endif %}
+  <span class="dot" aria-hidden="true"></span>
+  <span>last write {{ last_write_relative }}</span>
+  <span class="subtle">·</span>
   <span><span class="kbd">/</span> to search</span>
 {% endblock %}
 
@@ -88,13 +86,9 @@
 {# ── KPI tiles ─────────────────────────────────────────────────────── #}
 <div class="kpi-grid">
   <div class="kpi">
-    <div class="kpi-label">indexed docs</div>
+    <div class="kpi-label">docs</div>
     <div class="kpi-value">{{ "{:,}".format(total) }}</div>
-    {% if last_run %}
-      <div class="kpi-sub">
-        +{{ last_run.added }} added · ~{{ last_run.updated }} updated
-      </div>
-    {% endif %}
+    <div class="kpi-sub">indexed on write · last {{ last_write_relative }}</div>
   </div>
 
   <div class="kpi">

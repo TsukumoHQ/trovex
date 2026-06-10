@@ -271,12 +271,13 @@ def build_app() -> FastAPI:
             }
             for d in store.list_docs(tag=f_tag or None, kind=f_kind or None)
         ]
+        facets, other_tags = store.tags_by_facet()
         return templates.TemplateResponse(
             request, "store.html",
             {
                 "items": items,
                 "total_tokens": sum(i["tokens_est"] for i in items),
-                "all_tags": store.all_tags(),
+                "facets": facets, "other_tags": other_tags,
                 "collections": store.list_collections(),
                 "active_tag": tag, "active_kind": kind, "active_collection": collection,
             },

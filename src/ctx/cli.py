@@ -275,6 +275,60 @@ def enrich() -> None:
     console.print(f"[green]Enriched {enriched} docs[/green] (retitled {retitled})")
 
 
+_FACET_TYPE = {
+    "reports": "report", "report": "report", "audit": "audit", "audits": "audit",
+    "decision": "decision", "decisions": "decision", "adr": "decision",
+    "spec": "spec", "specs": "spec", "self-learning": "self-learning",
+    "learnings": "self-learning", "incident": "incident", "incidents": "incident",
+    "runbook": "runbook", "runbooks": "runbook", "plan": "plan", "plans": "plan",
+    "log": "log", "logs": "log", "guide": "guide", "guides": "guide",
+}
+_FACET_DOMAIN = {
+    "accounting", "payroll", "auth", "infra", "iodd", "regulation", "kb", "zefix",
+    "ocr", "minio", "clients", "scripts", "banking", "debtors", "suppliers",
+    "outline", "freescout", "loki", "gitnexus", "supabase", "qdrant", "neo4j",
+    "security", "frontend", "backend", "data",
+}
+_FACET_OWNER = {"cto", "cos", "founder"}
+
+
+@app.command()
+def facet() -> None:
+    """Promote organic folder tags into faceted tags (type/ owner/ domain/).
+
+    Additive — keeps the originals. type/report, owner/backend-lead,
+    domain/accounting, etc. so the store can filter + group by facet.
+    """
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    rows = store.db.execute(
+        "SELECT id FROM docs WHERE source_id = 'ctx'"
+    ).fetchall()
+    added = 0
+    for r in rows:
+        doc_id = r["id"]
+        tags = [t["tag"] for t in store.db.execute(
+            "SELECT tag FROM doc_tags WHERE doc_id = ?", (doc_id,))]
+        facets: set[str] = set()
+        for t in tags:
+            if t in _FACET_TYPE:
+                facets.add(f"type/{_FACET_TYPE[t]}")
+            if t in _FACET_DOMAIN:
+                facets.add(f"domain/{t}")
+            if t.endswith("-lead") or t in _FACET_OWNER:
+                facets.add(f"owner/{t}")
+        for ft in facets:
+            cur = store.db.execute(
+                "INSERT OR IGNORE INTO doc_tags(doc_id, tag) VALUES (?, ?)",
+                (doc_id, ft),
+            )
+            added += cur.rowcount
+    store.db.commit()
+    console.print(f"[green]Added {added} facet tags[/green]")
+
+
 def open_db_for_read(settings: Settings):
     from .db import open_db
     return open_db(settings.data_dir / "ctx.db", settings.embed_dim)

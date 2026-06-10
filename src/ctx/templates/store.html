@@ -64,10 +64,20 @@
       <a href="/store?kind={{ k }}" class="side-link {% if active_kind == k %}active{% endif %}">{{ k }}</a>
       {% endfor %}
     </div>
-    {% if all_tags %}
+    {% for facet in ['type', 'owner', 'domain', 'kind'] if facets.get(facet) %}
     <div class="side-section">
-      <div class="side-label">Tags</div>
-      {% for t, c in all_tags %}
+      <div class="side-label">{{ facet }}</div>
+      {% for tag, label, c in facets[facet] %}
+      <a href="/store?tag={{ tag | urlencode }}" class="side-link {% if active_tag == tag %}active{% endif %}">
+        <span>{{ label }}</span><span class="count">{{ c }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    {% if other_tags %}
+    <div class="side-section">
+      <div class="side-label">tags</div>
+      {% for t, c in other_tags %}
       <a href="/store?tag={{ t | urlencode }}" class="side-link {% if active_tag == t %}active{% endif %}">
         <span>{{ t }}</span><span class="count">{{ c }}</span>
       </a>

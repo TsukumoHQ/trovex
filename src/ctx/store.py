@@ -324,6 +324,24 @@ class SqliteStore:
                GROUP BY t.tag ORDER BY c DESC, t.tag LIMIT ?""",
             (CTX_SOURCE_ID, limit))]
 
+    def tags_by_facet(self, other_limit: int = 12) -> tuple[dict, list]:
+        """Group tags for the sidebar: namespaced (facet/value) into facets,
+        flat ones into 'other' (capped). Each facet entry = (full_tag, label, count)."""
+        rows = self.db.execute(
+            """SELECT t.tag, COUNT(*) AS c FROM doc_tags t
+               JOIN docs d ON d.id = t.doc_id WHERE d.source_id = ?
+               GROUP BY t.tag ORDER BY c DESC, t.tag""", (CTX_SOURCE_ID,)).fetchall()
+        facets: dict[str, list] = {}
+        other: list = []
+        for r in rows:
+            tag, c = r["tag"], r["c"]
+            if "/" in tag:
+                facet, _, label = tag.partition("/")
+                facets.setdefault(facet, []).append((tag, label, c))
+            else:
+                other.append((tag, c))
+        return facets, other[:other_limit]
+
     def create_collection(self, name: str, filter_dict: dict) -> None:
         """A collection = a named saved filter (kind/tag/source)."""
         with self._lock:

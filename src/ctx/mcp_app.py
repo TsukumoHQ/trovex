@@ -57,8 +57,30 @@ def ctx(q: str, summary: bool = False) -> str:
     from .rerank import maybe_rerank
     from .usage import log_query
 
+    from . import cache as _qcache
+
     state = get_state()
+    db = state.searcher.db
     t0 = _time.perf_counter()
+
+    # Exact-match query cache: a repeat against an unchanged corpus skips the
+    # candidate search + the LLM reranker (the cost driver). corpus_version is
+    # derived from the docs table, so any ctx_write/delete auto-invalidates.
+    # Token metrics are replayed so usage/savings dashboards stay accurate.
+    ver = _qcache.corpus_version(db)
+    cached = _qcache.get(db, q, summary, ver)
+    if cached is not None:
+        try:
+            log_query(
+                db, q, cached["n_results"], summary,
+                response_tokens_est=cached["resp_tokens"], elapsed_ms=0,
+                would_have_read_tokens=cached["whr"],
+                top_result_tokens=cached["top_tokens"],
+            )
+        except Exception:
+            pass
+        return cached["output"]
+
     # Fetch a wider candidate pool when reranking is possible.
     candidates = state.searcher.search(q, limit=20)
     pre_rerank_paths = [c.path for c in candidates]
@@ -67,12 +89,13 @@ def ctx(q: str, summary: bool = False) -> str:
     out = (state.searcher.format_with_summary(results) if summary
            else state.searcher.format_minimal(results))
     elapsed_ms = int((_time.perf_counter() - t0) * 1000)
+    would_have_read = sum(r.tokens_est for r in results[:3])
+    top_tokens = results[0].tokens_est if results else 0
+    resp_tokens = len(out) // 4
     try:
-        would_have_read = sum(r.tokens_est for r in results[:3])
-        top_tokens = results[0].tokens_est if results else 0
         log_query(
-            state.searcher.db, q, len(results), summary,
-            response_tokens_est=len(out) // 4, elapsed_ms=elapsed_ms,
+            db, q, len(results), summary,
+            response_tokens_est=resp_tokens, elapsed_ms=elapsed_ms,
             would_have_read_tokens=would_have_read,
             top_result_tokens=top_tokens,
             results=results,
@@ -90,6 +113,11 @@ def ctx(q: str, summary: bool = False) -> str:
         )
     except Exception:
         pass  # never let logging break the tool
+    try:
+        _qcache.put(db, q, summary, ver, out, len(results),
+                    would_have_read, top_tokens, resp_tokens)
+    except Exception:
+        pass  # cache is best-effort, never block the tool
     return out
 
 

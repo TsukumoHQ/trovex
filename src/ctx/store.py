@@ -325,7 +325,9 @@ class SqliteStore:
                     "SELECT tag FROM doc_tags WHERE doc_id = ?", (r["doc_id"],))}
                 if not (tagset & dtags):
                     continue
-            out.append(dict(r))
+            hit = dict(r)
+            hit["score"] = scores[cid]
+            out.append(hit)
             if len(out) >= limit:
                 break
         return out

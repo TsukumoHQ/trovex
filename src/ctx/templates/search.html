@@ -21,11 +21,11 @@
       hx-get="/search/partial"
       hx-target="#results"
       hx-swap="innerHTML"
-      hx-trigger="keyup changed delay:250ms from:input[name=q], change from:input[name=summary], submit"
+      hx-trigger="keyup changed delay:250ms from:input[name=q], submit"
       hx-push-url="true"
       hx-indicator="#results-loader">
   <div class="search-shell">
-    <span class="prefix" aria-hidden="true">⌘</span>
+    <span class="prefix" aria-hidden="true"><svg class="icon"><use href="#i-search"></use></svg></span>
     <input type="text" name="q" class="input search-input mono"
            value="{{ q }}"
            placeholder="search docs — semantic, frontmatter-aware, ranked"
@@ -45,10 +45,6 @@
 
   <div style="display: flex; gap: var(--s-4); align-items: center;
               margin-top: var(--s-3); flex-wrap: wrap;">
-    <label class="checkbox">
-      <input type="checkbox" name="summary" value="1" {% if summary %}checked{% endif %}>
-      include 50-word summary
-    </label>
     <span class="subtle mono" style="font-size: var(--t-11); margin-left: auto;">
       <span class="kbd">esc</span> to clear focus · <span class="kbd">/</span> to focus
     </span>
@@ -107,6 +103,18 @@
     padding: 0 2px;
     border-radius: 2px;
     font-weight: 500;
+  }
+  .result-section {
+    margin-top: 3px;
+    font-size: var(--t-12);
+    color: var(--fg-subtle);
+    overflow-wrap: anywhere;
+  }
+  .result-snippet {
+    margin-top: var(--s-2);
+    font-size: var(--t-13);
+    line-height: 1.6;
+    color: var(--fg-muted);
   }
 </style>
 

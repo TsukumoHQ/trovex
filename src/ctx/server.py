@@ -103,12 +103,52 @@ def _avatar_color(name: str | None) -> str:
     return _AVATAR_PALETTE[h % len(_AVATAR_PALETTE)]
 
 
+def _highlight(text: str, terms: list[str]):
+    """Escape text, then wrap query terms in <mark> (case-insensitive). Returns
+    Markup so Jinja won't re-escape. Terms are alphanumeric, so matching the
+    already-escaped text never splits an HTML entity."""
+    import html as _html
+    import re as _re
+    from markupsafe import Markup
+    esc = _html.escape(text or "")
+    terms = [t for t in (terms or []) if t]
+    if not terms:
+        return Markup(esc)
+    pat = _re.compile(
+        "(" + "|".join(_re.escape(t) for t in sorted(terms, key=len, reverse=True)) + ")",
+        _re.IGNORECASE,
+    )
+    return Markup(pat.sub(lambda m: '<mark class="hl">' + m.group(0) + "</mark>", esc))
+
+
+def _sparkline(values: list[int], w: int = 100, h: int = 30, pad: int = 3) -> dict | None:
+    """Normalise a series into SVG point strings for a stretched (preserveAspectRatio=none) sparkline.
+
+    Returns {line, area, w, h} or None when there's nothing to draw. The line is a
+    polyline of the values; the area is the same closed back to the baseline for a fill.
+    """
+    if not values or max(values) <= 0:
+        return None
+    vmax = max(values)
+    inner = h - 2 * pad
+    n = len(values)
+    pts = []
+    for i, v in enumerate(values):
+        x = pad + (i * (w - 2 * pad) / (n - 1) if n > 1 else (w - 2 * pad) / 2)
+        y = h - pad - (v / vmax) * inner
+        pts.append((round(x, 1), round(y, 1)))
+    line = " ".join(f"{x},{y}" for x, y in pts)
+    area = f"{pad},{h - pad} {line} {round(pts[-1][0], 1)},{h - pad}"
+    return {"line": line, "area": area, "w": w, "h": h}
+
+
 def build_app() -> FastAPI:
     # docs_url=None frees the /docs path for our own browse page.
     app = FastAPI(title="ctx", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(UserHeaderMiddleware)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["avatar_color"] = _avatar_color
+    templates.env.filters["highlight"] = _highlight
 
     # Mount MCP HTTP transport at /mcp
     app.mount("/mcp", mcp.streamable_http_app())
@@ -182,6 +222,23 @@ def build_app() -> FastAPI:
             d["last_seen_label"] = _relative_time(_now() - d["last_seen"])
             by_user_rows.append(d)
         savings_totals = savings_mod.totals(db, since_7d)
+
+        # 7-day savings trend (sparkline) + honest week-over-week delta.
+        # daily_series buckets by UTC midnight, so 14d → ~15 buckets; take the
+        # last 7 as "this week" and the 7 before as "last week".
+        series14 = savings_mod.daily_series(db, _now() - 14 * 86400, _now())
+        savings_series = [d["saved"] for d in series14[-7:]]
+        saved_this = sum(savings_series)
+        saved_prev = sum(d["saved"] for d in series14[-14:-7]) if len(series14) >= 8 else 0
+        saved_delta_pct = ((saved_this - saved_prev) / saved_prev) if saved_prev else None
+        savings_spark = _sparkline(savings_series)
+
+        # Activity this week — writes touch mtime, so these are "written / updated",
+        # not net-new growth. Labelled as such in the UI (no fake +growth delta).
+        docs_written_7d = db.execute(
+            "SELECT COUNT(*) AS c FROM docs WHERE mtime >= ?", (since_7d,)
+        ).fetchone()["c"]
+
         recent_queries = [
             {**dict(r), "age_label": _relative_time(_now() - r["ts"])}
             for r in db.execute(
@@ -208,15 +265,18 @@ def build_app() -> FastAPI:
                 "total_queries_7d": total_queries_7d,
                 "has_any_queries": total_queries_7d > 0 or len(by_user_rows) > 0,
                 "savings_totals": savings_totals,
+                "savings_spark": savings_spark,
+                "saved_delta_pct": saved_delta_pct,
+                "docs_written_7d": docs_written_7d,
                 "sources": sources,
             },
         )
 
-    @app.get("/search")
-    async def search_html(q: str = "") -> RedirectResponse:
-        # The router search page showed mig_ ids; the store search is the real one.
-        from urllib.parse import quote
-        return RedirectResponse("/store?q=" + quote(q), status_code=308)
+    @app.get("/search", response_class=HTMLResponse)
+    async def search_html(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
+        # Dedicated search page over the ctx store (hybrid vector + BM25), not a
+        # redirect to /store — search is ctx's core verb and deserves its own surface.
+        return _render_search(request, templates, q, summary, partial=False)
 
     @app.get("/search/partial", response_class=HTMLResponse)
     async def search_partial(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
@@ -376,6 +436,24 @@ def build_app() -> FastAPI:
             }
             for r in results
         ])
+
+    @app.get("/api/map")
+    async def api_map(canonical_only: bool = True) -> JSONResponse:
+        """The 'map' of the store: titles + tags + status, no content. Cheap enough
+        to inject at session start so an agent *sees the territory* and knows what
+        it can ask ctx for — turning an unknown-unknown into a queryable target."""
+        store = get_state().store
+        docs = store.list_docs(limit=2000)
+        if canonical_only:
+            docs = [d for d in docs if d.status not in ("stale", "duplicate")]
+        return JSONResponse({
+            "count": len(docs),
+            "docs": [
+                {"id": d.ext_id, "title": d.title, "kind": d.kind,
+                 "status": d.status, "tags": d.tags}
+                for d in docs
+            ],
+        })
 
     @app.get("/api/stats")
     async def api_stats() -> JSONResponse:
@@ -644,19 +722,41 @@ def build_app() -> FastAPI:
 
 def _render_search(request: Request, templates: Jinja2Templates, q: str, summary: bool, partial: bool) -> HTMLResponse:
     state = get_state()
-    db = state.searcher.db
-    total = db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+    store = state.store
+    total = store.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+    now = _now()
 
     elapsed_ms = 0
-    results = []
-    summaries: dict[str, str] = {}
+    results: list[dict[str, Any]] = []
     if q.strip():
         t0 = time.perf_counter()
-        results = state.searcher.search(q, limit=10)
+        # Over-fetch chunks, then collapse to the best-scoring chunk per doc so a
+        # single doc with many matching sections doesn't flood the results.
+        hits = store.search_chunks(q, limit=40)
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        if summary:
-            for r in results:
-                summaries[r.path] = state.searcher._extract_summary(r.absolute_path)
+        max_score = hits[0]["score"] if hits else 1.0  # ranked desc → first is max
+        seen: set[str] = set()
+        for h in hits:
+            ext_id = h["ext_id"]
+            if ext_id in seen:
+                continue
+            d = store.get(ext_id)
+            if not d:
+                continue
+            seen.add(ext_id)
+            results.append({
+                "ext_id": ext_id,
+                "title": h["title"] or ext_id,
+                "kind": h["kind"],
+                "status": d.status,
+                "section": h["heading_path"],
+                "snippet": (h["content"] or "").strip()[:280],
+                "tokens_est": h["doc_tokens"],
+                "age_days": max(0.0, (now - d.mtime) / 86400),
+                "score": (h["score"] / max_score) if max_score else 0.0,
+            })
+            if len(results) >= 12:
+                break
 
     # Tokens from query (alphanumeric runs >= 2 chars) for inline highlighting.
     import re as _re
@@ -667,7 +767,7 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
 
     ctx_data = {
         "q": q, "summary": summary, "total": total,
-        "results": results, "summaries": summaries,
+        "results": results,
         "elapsed_ms": elapsed_ms,
         "example_queries": EXAMPLE_QUERIES,
         "highlight_terms": highlight_terms,

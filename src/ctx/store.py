@@ -123,6 +123,14 @@ class SqliteStore:
             self._embed_chunks(self._insert_chunks(doc_id, content, title))
             self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
             self.db.commit()
+            # Rebranch dedup onto the live write path: the indexer that used to
+            # run compute_status() is retired, so flag near-duplicates here as
+            # docs land. Best-effort — never let it block a write.
+            try:
+                from .status import detect_duplicate_for
+                detect_duplicate_for(self.db, self.settings, doc_id)
+            except Exception:
+                pass
         return ext_id
 
     def get(self, ext_id: str) -> StoredDoc | None:

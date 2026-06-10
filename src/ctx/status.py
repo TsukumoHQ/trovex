@@ -153,6 +153,49 @@ def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
     return len(dup_marked)
 
 
+def detect_duplicate_for(db: sqlite3.Connection, settings: Settings, doc_id: int) -> int | None:
+    """Single-doc duplicate check for the live write path (store.put).
+
+    The batch _detect_duplicates() ran only from the retired indexer; this is its
+    one-doc equivalent so ctx_write flags near-dups as they land. If the doc's
+    nearest non-record neighbour is within the cosine threshold, the OLDER of the
+    two becomes a duplicate of the newer. Returns the id marked duplicate, or None.
+    """
+    row = db.execute(
+        "SELECT id, mtime, kind, status FROM docs WHERE id = ?", (doc_id,)
+    ).fetchone()
+    if not row or row["kind"] == "record" or row["status"] not in ("canonical", "plan"):
+        return None
+    emb = db.execute("SELECT embedding FROM vec_docs WHERE rowid = ?", (doc_id,)).fetchone()
+    if not emb:
+        return None
+    threshold = settings.dup_cosine_threshold
+    neighbours = db.execute(
+        """SELECT v.rowid, v.distance, d.mtime, d.kind, d.status
+           FROM vec_docs v JOIN docs d ON d.id = v.rowid
+           WHERE v.embedding MATCH ? AND k = 3 ORDER BY v.distance""",
+        (emb["embedding"],),
+    ).fetchall()
+    for nb in neighbours:
+        if nb["rowid"] == doc_id or nb["kind"] == "record":
+            continue
+        if nb["status"] not in ("canonical", "plan"):
+            continue
+        if 1.0 - nb["distance"] / 2 < threshold:
+            break  # neighbours sorted by distance asc → none closer remain
+        older_id, newer_id = (
+            (nb["rowid"], doc_id) if row["mtime"] >= nb["mtime"]
+            else (doc_id, nb["rowid"])
+        )
+        db.execute(
+            "UPDATE docs SET status = 'duplicate', dup_of_id = ? WHERE id = ?",
+            (newer_id, older_id),
+        )
+        db.commit()
+        return older_id
+    return None
+
+
 def _read_head(path: str, n: int) -> str:
     with open(path, encoding="utf-8", errors="replace") as f:
         return f.read(n)

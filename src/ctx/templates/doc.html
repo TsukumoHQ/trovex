@@ -136,9 +136,9 @@
 <div class="reader">
   <article>
     <header class="doc-head">
-      <a href="/docs?source=ctx" class="doc-back">
+      <a href="/store" class="doc-back">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-        ctx-owned docs
+        store
       </a>
       <h1 class="doc-title">{{ doc.title }}</h1>
       <div class="doc-meta">
@@ -194,7 +194,7 @@
     btn.addEventListener('click', async function () {
       if (!confirm('Delete this doc? This cannot be undone.')) return;
       const r = await fetch('/api/doc/' + btn.dataset.delete, { method: 'DELETE' });
-      if (r.ok) { location.href = '/docs?source=ctx'; }
+      if (r.ok) { location.href = '/store'; }
       else { alert('Delete failed'); }
     });
   });

@@ -8,6 +8,12 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    # WAL: concurrent readers + one writer (the reindex runs in a *separate*
+    # process from the server, so the in-process write lock isn't enough).
+    # busy_timeout: wait for the lock instead of failing with "database is
+    # locked" — fixes ctx_write / ctx_delete racing the reindex.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.enable_load_extension(True)
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)

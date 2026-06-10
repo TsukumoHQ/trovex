@@ -50,6 +50,17 @@ def _relative_time(seconds_ago: float) -> str:
     return f"{int(seconds_ago / 86400)}d ago"
 
 
+def _snippet(content: str, n: int = 160) -> str:
+    """A short plain-text preview of a doc body for the store cards."""
+    import re
+    text = re.sub(r"^---\n.*?\n---\n", "", content, flags=re.DOTALL)  # frontmatter
+    text = re.sub(r"```[\s\S]*?```", " ", text)                       # code blocks
+    text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)            # heading marks
+    text = re.sub(r"[`*_>]", "", text)                                # inline marks
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:n] + ("…" if len(text) > n else "")
+
+
 def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     now = _now()
     out = []
@@ -236,6 +247,24 @@ def build_app() -> FastAPI:
         """Delete a ctx-owned doc. Updates go through ctx_write (same id)."""
         ok = get_state().store.delete(ext_id)
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
+
+    @app.get("/store", response_class=HTMLResponse)
+    async def store_page(request: Request) -> HTMLResponse:
+        """The ctx-owned doc store — what agents write, what humans read here."""
+        now = _now()
+        items = [
+            {
+                "ext_id": d.ext_id, "title": d.title, "kind": d.kind,
+                "status": d.status, "tokens_est": d.tokens_est,
+                "age_days": max(0.0, (now - d.mtime) / 86400),
+                "snippet": _snippet(d.content),
+            }
+            for d in get_state().store.list_docs()
+        ]
+        total_tokens = sum(i["tokens_est"] for i in items)
+        return templates.TemplateResponse(
+            request, "store.html", {"items": items, "total_tokens": total_tokens}
+        )
 
     # ── JSON API ─────────────────────────────────────────────────────
 

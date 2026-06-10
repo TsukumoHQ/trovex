@@ -23,6 +23,7 @@ from typing import Protocol
 
 import sqlite_vec
 
+from .chunking import chunk_markdown
 from .config import Settings
 from .db import open_db
 from .embedder import Embedder, build_embedder
@@ -107,6 +108,7 @@ class SqliteStore:
                 doc_id = cur.lastrowid
 
             self._embed(doc_id, content, title)
+            self._embed_chunks(self._insert_chunks(doc_id, content, title))
             self.db.commit()
         return ext_id
 
@@ -136,6 +138,11 @@ class SqliteStore:
             ).fetchone()
             if not row:
                 return False
+            for c in self.db.execute(
+                "SELECT id FROM chunks WHERE doc_id = ?", (row["id"],)
+            ).fetchall():
+                self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+            self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (row["id"],))
             self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (row["id"],))
             self.db.execute("DELETE FROM docs WHERE id = ?", (row["id"],))
             self.db.commit()
@@ -192,6 +199,51 @@ class SqliteStore:
                 )
             self.db.commit()
         return ext_ids
+
+    def _insert_chunks(self, doc_id: int, content: str, title: str) -> list[tuple[int, str]]:
+        """(Re)chunk a doc into the chunks table; return (chunk_id, embed_text)."""
+        for c in self.db.execute(
+            "SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)
+        ).fetchall():
+            self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+        self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+        pairs: list[tuple[int, str]] = []
+        for ch in chunk_markdown(content):
+            cur = self.db.execute(
+                """INSERT INTO chunks (doc_id, chunk_index, heading_path, content, tokens_est)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (doc_id, ch.index, " > ".join(ch.heading_path), ch.text, ch.tokens_est),
+            )
+            pairs.append((cur.lastrowid, ch.embed_text(title)))
+        return pairs
+
+    def _embed_chunks(self, pairs: list[tuple[int, str]]) -> None:
+        """Batch-embed chunk texts (prefix-fused) into vec_chunks."""
+        if not pairs:
+            return
+        embs = list(self.embedder.embed([t for _, t in pairs]))
+        for (cid, _), emb in zip(pairs, embs, strict=True):
+            self.db.execute(
+                "INSERT INTO vec_chunks(rowid, embedding) VALUES (?, ?)",
+                (cid, sqlite_vec.serialize_float32(emb.tolist())),
+            )
+
+    def search_chunks(self, query: str, limit: int = 5) -> list[dict]:
+        """Chunk-level retrieval: top chunks + their parent-doc context."""
+        if not query.strip():
+            return []
+        qemb = next(iter(self.embedder.embed([query])))
+        rows = self.db.execute(
+            """SELECT c.heading_path, c.content, c.tokens_est,
+                      d.ext_id, d.title, d.kind, v.distance
+               FROM vec_chunks v
+               JOIN chunks c ON c.id = v.rowid
+               JOIN docs d ON d.id = c.doc_id
+               WHERE v.embedding MATCH ? AND k = ?
+               ORDER BY v.distance""",
+            (sqlite_vec.serialize_float32(qemb.tolist()), limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def _embed(self, doc_id: int, content: str, title: str) -> None:
         text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]

@@ -126,6 +126,26 @@ def test_extract_section():
     assert extract_section(doc, "Nonexistent") is None
 
 
+def test_chunk_indexing_and_search(store):
+    store.put(
+        "# Auth\n\n## JWT\n\njwt token signature validation\n\n"
+        "## Deploy\n\nkubernetes pod rollout strategy",
+        kind="reference",
+    )
+    store.put("# Billing\n\n## Invoices\n\nstripe invoice webhook handling", kind="reference")
+    hits = store.search_chunks("jwt token signature", limit=1)
+    assert hits, "expected a chunk hit"
+    assert "jwt token signature" in hits[0]["content"]
+    assert hits[0]["heading_path"] == "Auth > JWT"
+
+
+def test_delete_removes_chunks_too(store):
+    eid = store.put("# Temp\n\n## S\n\nuniquechunkword here")
+    assert store.search_chunks("uniquechunkword", limit=1)
+    store.delete(eid)
+    assert store.search_chunks("uniquechunkword", limit=5) == []
+
+
 def test_delete_removes_doc_and_embedding(store):
     eid = store.put("# temp doc\n\nbody")
     assert store.get(eid) is not None

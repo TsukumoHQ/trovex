@@ -212,6 +212,42 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_docs USING vec0(
             embedding float[{embed_dim}] distance_metric=cosine
         );
+
+        -- Chunk-level retrieval (structure-aware chunks + their embeddings)
+        CREATE TABLE IF NOT EXISTS chunks (
+            id INTEGER PRIMARY KEY,
+            doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            chunk_index INTEGER NOT NULL,
+            heading_path TEXT,
+            content TEXT NOT NULL,
+            tokens_est INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(doc_id);
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
+            embedding float[{embed_dim}] distance_metric=cosine
+        );
+
+        -- Tags (free + hierarchical 'a/b/c') for org + metadata filtering
+        CREATE TABLE IF NOT EXISTS doc_tags (
+            doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            tag TEXT NOT NULL,
+            PRIMARY KEY (doc_id, tag)
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_tags_tag ON doc_tags(tag);
+
+        -- Collections = named saved filters (kind 'filter') or curated lists
+        CREATE TABLE IF NOT EXISTS collections (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            kind TEXT NOT NULL DEFAULT 'filter',
+            filter_json TEXT,
+            created REAL NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS collection_docs (
+            collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+            doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            PRIMARY KEY (collection_id, doc_id)
+        );
         """
     )
     conn.commit()

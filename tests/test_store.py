@@ -168,6 +168,18 @@ def test_chunk_indexing_and_search(store):
     assert hits[0]["heading_path"] == "Auth > JWT"
 
 
+def test_versioning_snapshots_and_restores(store):
+    eid = store.put("# v1\n\nfirst content")
+    store.put("# v2\n\nsecond content", ext_id=eid)  # overwrite snapshots v1
+    versions = store.list_versions(eid)
+    assert len(versions) == 1
+    assert store.get(eid).content == "# v2\n\nsecond content"
+    # restore v1 (which snapshots the current v2 first)
+    assert store.restore_version(eid, versions[0]["id"]) is True
+    assert store.get(eid).content == "# v1\n\nfirst content"
+    assert len(store.list_versions(eid)) == 2
+
+
 def test_delete_removes_chunks_too(store):
     eid = store.put("# Temp\n\n## S\n\nuniquechunkword here")
     assert store.search_chunks("uniquechunkword", limit=1)

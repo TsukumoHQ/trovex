@@ -251,6 +251,16 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
             PRIMARY KEY (collection_id, doc_id)
         );
+
+        -- Doc history: a snapshot of the previous content on every overwrite
+        CREATE TABLE IF NOT EXISTS doc_versions (
+            id INTEGER PRIMARY KEY,
+            doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            content TEXT NOT NULL,
+            title TEXT,
+            ts REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_versions_doc ON doc_versions(doc_id, ts DESC);
         """
     )
     conn.commit()

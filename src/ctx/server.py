@@ -306,6 +306,18 @@ def build_app() -> FastAPI:
         get_state().store.delete_collection(name)
         return JSONResponse({"deleted": True})
 
+    @app.get("/api/doc/{ext_id}/versions")
+    async def api_doc_versions(ext_id: str) -> JSONResponse:
+        return JSONResponse(get_state().store.list_versions(ext_id))
+
+    @app.post("/api/doc/{ext_id}/restore")
+    async def api_doc_restore(ext_id: str, request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
+        body = await request.json()
+        ok = get_state().store.restore_version(ext_id, int(body.get("version_id", 0)))
+        return JSONResponse({"restored": ok}, status_code=200 if ok else 404)
+
     @app.post("/api/doc/{ext_id}/tags")
     async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):

@@ -137,6 +137,17 @@
   }
   .prose hr.md-hr { margin: var(--s-8) 0; border: none; border-top: 1px solid var(--border); }
 
+  .doc-history { margin-top: var(--s-8); border-top: 1px solid var(--border); padding-top: var(--s-4); }
+  .doc-history summary { cursor: pointer; font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted); }
+  .doc-history summary:hover { color: var(--accent); }
+  .history-row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0;
+    font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted);
+    border-top: 1px solid var(--border); }
+  .history-row .restore { margin-left: auto; background: transparent; border: 1px solid var(--border);
+    color: var(--fg-subtle); border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer;
+    font-family: var(--font-mono); font-size: 11px; }
+  .history-row .restore:hover { color: var(--accent); border-color: var(--accent-line); }
+
   @media (max-width: 1024px) {
     .reader { grid-template-columns: minmax(0, 1fr); }
     .toc { display: none; }
@@ -187,6 +198,11 @@
     </header>
 
     <div class="prose">{{ body_html | safe }}</div>
+
+    <details class="doc-history">
+      <summary>History</summary>
+      <div class="history-body" data-doc="{{ doc.ext_id }}">…</div>
+    </details>
   </article>
 
   {% if toc %}
@@ -236,6 +252,41 @@
     const inp = wrap.querySelector('.tag-input');
     inp?.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && inp.value.trim()) { send({ add: inp.value.trim() }); }
+    });
+  })();
+
+  (function () {
+    const det = document.querySelector('.doc-history');
+    if (!det) return;
+    const body = det.querySelector('.history-body');
+    const docId = body.dataset.doc;
+    let loaded = false;
+    det.addEventListener('toggle', async function () {
+      if (!det.open || loaded) return;
+      loaded = true;
+      const vs = await (await fetch('/api/doc/' + docId + '/versions')).json();
+      if (!vs.length) { body.textContent = 'no previous versions'; return; }
+      body.innerHTML = '';
+      vs.forEach(function (v) {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+        row.innerHTML = '<span>' + new Date(v.ts * 1000).toLocaleString() +
+          '</span><span class="subtle">' + v.size + ' chars</span>';
+        const btn = document.createElement('button');
+        btn.className = 'restore'; btn.type = 'button'; btn.textContent = 'restore';
+        btn.addEventListener('click', async function () {
+          if (!confirm('Restore this version? The current content is snapshotted first.')) return;
+          const rr = await fetch('/api/doc/' + docId + '/restore', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, ctxWriteHeaders()),
+            body: JSON.stringify({ version_id: v.id }),
+          });
+          if (rr.ok) { location.reload(); }
+          else { alert(rr.status === 403 ? 'Set the write token in settings' : 'Restore failed'); }
+        });
+        row.appendChild(btn);
+        body.appendChild(row);
+      });
     });
   })();
 </script>

@@ -92,6 +92,15 @@ class SqliteStore:
 
             if existing:
                 doc_id = existing["id"]
+                # Snapshot the current content before overwriting it (undo-able).
+                old = self.db.execute(
+                    "SELECT content, title FROM docs WHERE id = ?", (doc_id,)
+                ).fetchone()
+                if old and old["content"] is not None:
+                    self.db.execute(
+                        "INSERT INTO doc_versions(doc_id, content, title, ts) VALUES (?, ?, ?, ?)",
+                        (doc_id, old["content"], old["title"], now),
+                    )
                 self.db.execute(
                     """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
                            size_bytes=?, mtime=?, last_indexed=?, author_agent=?
@@ -161,6 +170,7 @@ class SqliteStore:
             ).fetchall():
                 self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
             self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (row["id"],))
+            self.db.execute("DELETE FROM doc_versions WHERE doc_id = ?", (row["id"],))
             self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (row["id"],))
             self.db.execute("DELETE FROM docs WHERE id = ?", (row["id"],))
             self.db.commit()
@@ -369,6 +379,23 @@ class SqliteStore:
         with self._lock:
             self.db.execute("DELETE FROM collections WHERE name = ?", (name,))
             self.db.commit()
+
+    def list_versions(self, ext_id: str) -> list[dict]:
+        """Previous content snapshots of a doc (newest first)."""
+        return [dict(r) for r in self.db.execute(
+            """SELECT v.id, v.title, v.ts, LENGTH(v.content) AS size
+               FROM doc_versions v JOIN docs d ON d.id = v.doc_id
+               WHERE d.ext_id = ? ORDER BY v.ts DESC""", (ext_id,))]
+
+    def restore_version(self, ext_id: str, version_id: int) -> bool:
+        """Restore a previous version — put() snapshots the current one first."""
+        row = self.db.execute(
+            """SELECT v.content FROM doc_versions v JOIN docs d ON d.id = v.doc_id
+               WHERE d.ext_id = ? AND v.id = ?""", (ext_id, version_id)).fetchone()
+        if not row:
+            return False
+        self.put(row["content"], ext_id=ext_id)
+        return True
 
     def _embed(self, doc_id: int, content: str, title: str) -> None:
         text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]

@@ -13,7 +13,9 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     # busy_timeout: wait for the lock instead of failing with "database is
     # locked" — fixes ctx_write / ctx_delete racing the reindex.
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
+    # 30s: the reindex writes the whole corpus in one ~25s transaction; a chunk
+    # write or backfill racing it must wait that out, not fail at 5s.
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.enable_load_extension(True)
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)

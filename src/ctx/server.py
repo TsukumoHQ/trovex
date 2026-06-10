@@ -18,7 +18,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import insights as insights_mod
 from . import savings as savings_mod
-from .markdown import render_markdown
+from .markdown import PYGMENTS_CSS, render_markdown
 from .mcp_app import mcp
 from .state import get_state
 from .usage import UserHeaderMiddleware
@@ -313,7 +313,8 @@ def build_app() -> FastAPI:
             return HTMLResponse("(not found)", status_code=404)
         body_html, toc = render_markdown(doc.content)
         return templates.TemplateResponse(
-            request, "doc.html", {"doc": doc, "body_html": body_html, "toc": toc}
+            request, "doc.html",
+            {"doc": doc, "body_html": body_html, "toc": toc, "pygments_css": PYGMENTS_CSS},
         )
 
     @app.delete("/api/doc/{ext_id}")

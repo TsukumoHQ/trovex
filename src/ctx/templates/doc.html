@@ -4,6 +4,7 @@
 {% block title %}ctx — {{ doc.title }}{% endblock %}
 
 {% block head %}
+<style>{{ pygments_css | safe }}</style>
 <style>
   /* ── Doc reader ─────────────────────────────────────── */
   .reader {
@@ -136,6 +137,33 @@
     border-left: 2px solid var(--accent-line); color: var(--fg-muted);
   }
   .prose hr.md-hr { margin: var(--s-8) 0; border: none; border-top: 1px solid var(--border); }
+
+  /* Pygments-highlighted fenced code (mistune block_code) */
+  .prose .highlight {
+    margin: var(--s-4) 0; border: 1px solid var(--border);
+    border-radius: var(--radius); overflow-x: auto;
+  }
+  .prose .highlight pre {
+    margin: 0; padding: var(--s-4);
+    font-family: var(--font-mono); font-size: var(--t-13); line-height: 1.6;
+  }
+  /* GFM tables */
+  .prose table {
+    width: 100%; margin: var(--s-4) 0; border-collapse: collapse;
+    font-size: var(--t-13);
+  }
+  .prose th, .prose td {
+    padding: var(--s-2) var(--s-3); border: 1px solid var(--border);
+    text-align: left; vertical-align: top;
+  }
+  .prose th { background: var(--bg-elevated); color: var(--fg); font-weight: 600; }
+  .prose tbody tr:hover td { background: var(--bg-hover); }
+  /* GFM task lists */
+  .prose ul:has(> li > input[type="checkbox"]) { list-style: none; padding-left: var(--s-3); }
+  .prose li > input[type="checkbox"] { margin-right: var(--s-2); accent-color: var(--accent); }
+  /* Footnotes */
+  .prose .footnotes { margin-top: var(--s-8); border-top: 1px solid var(--border);
+    padding-top: var(--s-4); font-size: var(--t-12); color: var(--fg-muted); }
 
   .doc-history { margin-top: var(--s-8); border-top: 1px solid var(--border); padding-top: var(--s-4); }
   .doc-history summary { cursor: pointer; font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted); }

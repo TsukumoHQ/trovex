@@ -66,6 +66,12 @@ def _snippet(content: str, n: int = 160) -> str:
     return text[:n] + ("…" if len(text) > n else "")
 
 
+def _write_authorized(request: Request) -> bool:
+    """Mirror the MCP write gate for the HTTP /api write endpoints."""
+    tok = get_state().settings.write_token
+    return (not tok) or (request.headers.get("x-ctx-write-token") == tok)
+
+
 def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     now = _now()
     out = []
@@ -238,8 +244,10 @@ def build_app() -> FastAPI:
         )
 
     @app.delete("/api/doc/{ext_id}")
-    async def api_doc_delete(ext_id: str) -> JSONResponse:
+    async def api_doc_delete(ext_id: str, request: Request) -> JSONResponse:
         """Delete a ctx-owned doc. Updates go through ctx_write (same id)."""
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         ok = get_state().store.delete(ext_id)
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
 
@@ -280,6 +288,8 @@ def build_app() -> FastAPI:
 
     @app.post("/api/collections")
     async def api_collection_create(request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         body = await request.json()
         name = (body.get("name") or "").strip()
         if not name:
@@ -289,12 +299,16 @@ def build_app() -> FastAPI:
         return JSONResponse({"ok": True, "name": name, "filter": flt})
 
     @app.delete("/api/collections/{name}")
-    async def api_collection_delete(name: str) -> JSONResponse:
+    async def api_collection_delete(name: str, request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         get_state().store.delete_collection(name)
         return JSONResponse({"deleted": True})
 
     @app.post("/api/doc/{ext_id}/tags")
     async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         body = await request.json()
         tags = get_state().store.set_tags(
             ext_id,

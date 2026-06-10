@@ -93,6 +93,17 @@ def ctx(q: str, summary: bool = False) -> str:
     return out
 
 
+def _authorized() -> bool:
+    """Writes require the shared token (X-CTX-Write-Token) when one is configured.
+    Empty token = open (back-compat). Gates ctx_write / ctx_tag / ctx_delete."""
+    from .usage import current_write_token
+    tok = get_state().settings.write_token
+    return (not tok) or (current_write_token.get() == tok)
+
+
+_DENY = "(unauthorized — set the X-CTX-Write-Token header to the shared write token)"
+
+
 @mcp.tool()
 def ctx_write(content: str, kind: str = "", doc_id: str = "", tags: str = "") -> str:
     """Store a doc INSIDE ctx so every agent of every dev can read it.
@@ -111,6 +122,8 @@ def ctx_write(content: str, kind: str = "", doc_id: str = "", tags: str = "") ->
         tags: Comma-separated tags (free or hierarchical "a/b/c") for organizing
             + filtering. `kind/<kind>` is auto-added.
     """
+    if not _authorized():
+        return _DENY
     state = get_state()
     taglist = [t.strip() for t in tags.split(",") if t.strip()]
     return state.store.put(
@@ -127,6 +140,8 @@ def ctx_tag(doc_id: str, add: str = "", remove: str = "") -> str:
         add: Comma-separated tags to add (free or hierarchical "a/b/c").
         remove: Comma-separated tags to remove.
     """
+    if not _authorized():
+        return _DENY
     state = get_state()
     tags = state.store.set_tags(
         doc_id,
@@ -226,5 +241,7 @@ def ctx_delete(doc_id: str) -> str:
     Args:
         doc_id: Opaque id of the doc to remove.
     """
+    if not _authorized():
+        return _DENY
     state = get_state()
     return "deleted" if state.store.delete(doc_id) else "(not found)"

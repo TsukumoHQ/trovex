@@ -17,48 +17,74 @@
   <div class="empty">
     <svg class="icon icon-lg" aria-hidden="true" style="color: var(--fg-subtle);"><use href="#i-search"></use></svg>
     <div class="empty-title mono" style="margin-top: var(--s-3);">no results for "{{ q }}"</div>
+    {% if has_filters %}
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      filtered by {% if kind %}kind <b>{{ kind }}</b>{% endif %}{% if tags %}{% if kind %} · {% endif %}{{ tags | length }} tag{{ '' if tags|length == 1 else 's' }}{% endif %}
+    </div>
+    <div class="empty-hint">
+      <a class="empty-action" href="{{ clear_url }}">✕ clear filters &amp; retry</a>
+    </div>
+    {% else %}
     <div class="subtle mono" style="font-size: var(--t-12);">
       try shorter or different keywords · semantic matching prefers short concepts
     </div>
+    {% endif %}
   </div>
 {% else %}
-  <div class="mono subtle" style="font-size: var(--t-11); margin-bottom: var(--s-3);">
-    {{ results | length }} {% if results | length == 1 %}result{% else %}results{% endif %}{% if elapsed_ms is defined and elapsed_ms %} · {{ elapsed_ms }}ms{% endif %}
+  <div class="results-bar mono">
+    <span class="subtle">
+      {{ total_results }} result{{ '' if total_results == 1 else 's' }}{% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}{% if elapsed_ms %} · {{ elapsed_ms }}ms{% endif %}
+    </span>
   </div>
+  {% if facets %}
+  <div class="facets">
+    <span class="facets-label">refine</span>
+    {% for f in facets %}<a class="facet" href="{{ f.url }}">{{ f.tag }}<span class="facet-n">{{ f.count }}</span></a>{% endfor %}
+  </div>
+  {% endif %}
+  <ul class="result-list" role="listbox" aria-label="Search results">
   {% for r in results %}
-  <article class="result">
-    {# Whole content block is one link → click anywhere on it opens the doc.
-       Tags below stay separate so they filter instead of opening. #}
-    <a class="result-main" href="/doc/{{ r.ext_id }}" title="{{ r.title }}">
-      <div class="result-head">
-        {{ status_pill(r.status) }}
-        {% if r.kind %}<span class="pill pill-plan">{{ r.kind }}</span>{% endif %}
-        <span class="result-path">{{ r.title | highlight(highlight_terms) }}</span>
-        <span class="mono subtle" style="font-size: var(--t-11);">{{ fresh_label(r.age_days) }}</span>
+    <li>
+    <article class="result" data-href="/doc/{{ r.ext_id }}">
+      {# Whole content block is one link → click anywhere opens the doc. #}
+      <a class="result-main" href="/doc/{{ r.ext_id }}" title="{{ r.title }}">
+        <div class="result-head">
+          {{ status_pill(r.status) }}
+          {% if r.kind %}<span class="pill pill-plan">{{ r.kind }}</span>{% endif %}
+          <span class="result-path">{{ r.title | highlight(highlight_terms) }}</span>
+          <span class="mono subtle" style="font-size: var(--t-11);">{{ fresh_label(r.age_days) }}</span>
+        </div>
+        {% if r.section %}
+        <div class="result-section mono">{{ r.section }}</div>
+        {% endif %}
+        {% if r.snippet %}
+        <div class="result-snippet">{{ r.snippet | highlight(highlight_terms) }}…</div>
+        {% endif %}
+      </a>
+      <div class="result-meta">
+        <span><b>{{ "{:,}".format(r.tokens_est) }}</b> tokens</span>
+        <span><b>{{ "%.0f"|format(r.age_days) }}</b>d old</span>
       </div>
-      {% if r.section %}
-      <div class="result-section mono">{{ r.section }}</div>
-      {% endif %}
-      {% if r.snippet %}
-      <div class="result-snippet">{{ r.snippet | highlight(highlight_terms) }}…</div>
-      {% endif %}
-    </a>
-    <div class="result-meta">
-      <span><b>{{ "{:,}".format(r.tokens_est) }}</b> tokens</span>
-      <span><b>{{ "%.0f"|format(r.age_days) }}</b>d old</span>
-    </div>
-    <div class="score-bar" aria-label="Relevance score">
-      <div class="score-track">
-        <div class="score-fill" style="width: {{ (r.score * 100) | round(1) }}%;"></div>
+      <div class="score-bar" aria-label="Relevance score">
+        <div class="score-track">
+          <div class="score-fill" style="width: {{ (r.score * 100) | round(1) }}%;"></div>
+        </div>
+        <span style="width: 40px; text-align: right;">{{ "%.2f"|format(r.score) }}</span>
       </div>
-      <span style="width: 40px; text-align: right;">{{ "%.2f"|format(r.score) }}</span>
-    </div>
-    {% if r.tags %}
-    <div class="chips result-chips">
-      {% for t in r.tags %}<a class="chip{% if t == tag %} chip-active{% endif %}"
-         href="/search?q={{ q | urlencode }}&amp;tag={{ t | urlencode }}{% if kind %}&amp;kind={{ kind }}{% endif %}{% if sort and sort != 'relevance' %}&amp;sort={{ sort }}{% endif %}">{{ t }}</a>{% endfor %}
-    </div>
-    {% endif %}
-  </article>
+      {% if r.tags %}
+      <div class="chips result-chips">
+        {% for t in r.tags %}<span class="chip{% if t in tags %} chip-active{% endif %}">{{ t }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </article>
+    </li>
   {% endfor %}
+  </ul>
+  {% if pages > 1 %}
+  <div class="pager">
+    {% if prev_url %}<a href="{{ prev_url }}">← prev</a>{% else %}<span class="subtle">← prev</span>{% endif %}
+    <span class="subtle">page {{ page }} / {{ pages }}</span>
+    {% if next_url %}<a href="{{ next_url }}">next →</a>{% else %}<span class="subtle">next →</span>{% endif %}
+  </div>
+  {% endif %}
 {% endif %}

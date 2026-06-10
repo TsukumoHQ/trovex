@@ -43,7 +43,8 @@
     <ul id="suggest-list" class="suggest" role="listbox" hidden></ul>
   </div>
 
-  <input type="hidden" name="tag" value="{{ tag }}">
+  {# active tags travel with the form so q/kind/sort changes keep them #}
+  {% for t in tags %}<input type="hidden" name="tag" value="{{ t }}">{% endfor %}
   <div style="display: flex; gap: var(--s-3); align-items: center;
               margin-top: var(--s-3); flex-wrap: wrap;">
     <label class="ctl">kind
@@ -61,12 +62,14 @@
         <option value="tokens" {% if sort == 'tokens' %}selected{% endif %}>tokens</option>
       </select>
     </label>
-    {% if tag %}
-    <a class="active-tag" title="clear tag filter"
-       href="/search?q={{ q | urlencode }}{% if kind %}&amp;kind={{ kind }}{% endif %}{% if sort and sort != 'relevance' %}&amp;sort={{ sort }}{% endif %}">tag: {{ tag }} ✕</a>
+    {% for at in active_tags %}
+    <a class="active-tag" title="remove tag" href="{{ at.url }}">{{ at.tag }} ✕</a>
+    {% endfor %}
+    {% if has_filters %}
+    <a class="active-tag clear-all" title="clear all filters" href="{{ clear_url }}">clear all ✕</a>
     {% endif %}
     <span class="subtle mono" style="font-size: var(--t-11); margin-left: auto;">
-      <span class="kbd">esc</span> clear · <span class="kbd">/</span> focus
+      <span class="kbd">esc</span> clear · <span class="kbd">/</span> focus · <span class="kbd">↑↓</span> nav · <span class="kbd">↵</span> open
     </span>
   </div>
 </form>
@@ -169,6 +172,53 @@
     padding: 2px 10px;
   }
   .active-tag:hover { color: var(--accent); }
+  .clear-all { color: var(--fg-muted); background: var(--bg-input); border-color: var(--border); }
+  .clear-all:hover { color: var(--stale); border-color: var(--stale); }
+
+  .results-bar { font-size: var(--t-11); margin-bottom: var(--s-3); }
+
+  /* Faceted refine row */
+  .facets {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    margin-bottom: var(--s-4); padding-bottom: var(--s-3);
+    border-bottom: 1px solid var(--border);
+  }
+  .facets-label {
+    font-family: var(--font-mono); font-size: var(--t-11);
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle);
+    margin-right: var(--s-2);
+  }
+  .facet {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--font-mono); font-size: var(--t-11);
+    padding: 2px 8px; border-radius: 999px;
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--fg-muted);
+  }
+  .facet:hover { color: var(--accent); border-color: var(--accent-line); }
+  .facet-n { color: var(--fg-faint); font-size: 10px; }
+
+  /* Result list (semantic + keyboard nav) */
+  .result-list { list-style: none; margin: 0; padding: 0; }
+  .result-list > li + li { margin-top: var(--s-3); }
+  .result.kb-active {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 1px var(--accent-line);
+  }
+
+  /* Pager */
+  .pager {
+    display: flex; align-items: center; justify-content: center; gap: var(--s-4);
+    margin-top: var(--s-6); font-family: var(--font-mono); font-size: var(--t-12);
+  }
+  .pager a { color: var(--accent); }
+
+  .empty-action {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: var(--s-3); padding: 6px 12px;
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent-line); border-radius: var(--radius-sm);
+  }
 </style>
 
 <script>
@@ -225,6 +275,7 @@
 
     input.addEventListener('input', function () {
       const v = input.value.trim();
+      if (v.length === 0) { lastFetched = ''; load(''); return; }  // recent searches
       if (v.length < 2) { close(); return; }
       if (v === lastFetched) return;
       lastFetched = v;
@@ -254,7 +305,46 @@
 
     input.addEventListener('blur', function () { setTimeout(close, 150); });
     input.addEventListener('focus', function () {
-      if (input.value.trim().length >= 2 && list.children.length > 0) open();
+      const v = input.value.trim();
+      if (v.length === 0) { load(''); }                 // show recent searches
+      else if (v.length >= 2 && list.children.length > 0) { open(); }
+    });
+  })();
+</script>
+<script>
+  // Keyboard navigation through results: ↑/↓ (or j/k) move, ↵ opens. The
+  // autocomplete owns the arrows while its dropdown is open; we take over once
+  // it's closed.
+  (function () {
+    const results = () => Array.from(document.querySelectorAll('.result-list .result'));
+    let idx = -1;
+    function setActive(n) {
+      const r = results();
+      if (!r.length) return;
+      idx = Math.max(0, Math.min(n, r.length - 1));
+      r.forEach((el, i) => el.classList.toggle('kb-active', i === idx));
+      r[idx].scrollIntoView({ block: 'nearest' });
+    }
+    document.addEventListener('keydown', function (e) {
+      const suggest = document.getElementById('suggest-list');
+      if (suggest && !suggest.hidden) return;  // autocomplete owns the arrows
+      const tag = (e.target.tagName || '').toLowerCase();
+      const inField = tag === 'input' || tag === 'textarea' || tag === 'select';
+      if (inField) {
+        // From the query box, ↓ jumps focus into the result list.
+        if (e.key === 'ArrowDown') { e.preventDefault(); e.target.blur(); setActive(idx < 0 ? 0 : idx); }
+        return;
+      }
+      if (!results().length) return;
+      if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); setActive(idx + 1); }
+      else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); setActive(idx - 1); }
+      else if (e.key === 'Enter' && idx >= 0) {
+        const href = results()[idx].dataset.href;
+        if (href) location.href = href;
+      }
+    });
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+      if (e.target && e.target.id === 'results') idx = -1;  // reset on new results
     });
   })();
 </script>

@@ -274,17 +274,19 @@ def build_app() -> FastAPI:
 
     @app.get("/search", response_class=HTMLResponse)
     async def search_html(request: Request, q: str = "", summary: bool = False,
-                          tag: str = "", kind: str = "", sort: str = "relevance") -> HTMLResponse:
+                          tag: list[str] = Query(default=[]), kind: str = "",
+                          sort: str = "relevance", page: int = 1) -> HTMLResponse:
         # Dedicated search page over the ctx store (hybrid vector + BM25), not a
         # redirect to /store — search is ctx's core verb and deserves its own surface.
         return _render_search(request, templates, q, summary, partial=False,
-                              tag=tag, kind=kind, sort=sort)
+                              tags=tag, kind=kind, sort=sort, page=page)
 
     @app.get("/search/partial", response_class=HTMLResponse)
     async def search_partial(request: Request, q: str = "", summary: bool = False,
-                             tag: str = "", kind: str = "", sort: str = "relevance") -> HTMLResponse:
+                             tag: list[str] = Query(default=[]), kind: str = "",
+                             sort: str = "relevance", page: int = 1) -> HTMLResponse:
         return _render_search(request, templates, q, summary, partial=True,
-                              tag=tag, kind=kind, sort=sort)
+                              tags=tag, kind=kind, sort=sort, page=page)
 
     @app.get("/docs")
     async def docs_page() -> RedirectResponse:
@@ -726,21 +728,43 @@ def build_app() -> FastAPI:
 
 
 def _render_search(request: Request, templates: Jinja2Templates, q: str, summary: bool,
-                   partial: bool, *, tag: str = "", kind: str = "",
-                   sort: str = "relevance") -> HTMLResponse:
+                   partial: bool, *, tags: list[str] | None = None, kind: str = "",
+                   sort: str = "relevance", page: int = 1) -> HTMLResponse:
+    from urllib.parse import urlencode
+
     state = get_state()
     store = state.store
     total = store.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
     now = _now()
+    tags = [t for t in (tags or []) if t]
+    page = max(1, page)
+    per = 12
+
+    def _u(**over) -> str:
+        """Build a /search URL from current state with overrides (q/kind/sort/tags/page)."""
+        params: list[tuple[str, str]] = []
+        if over.get("q", q):
+            params.append(("q", over.get("q", q)))
+        if over.get("kind", kind):
+            params.append(("kind", over.get("kind", kind)))
+        ss = over.get("sort", sort)
+        if ss and ss != "relevance":
+            params.append(("sort", ss))
+        for t in over.get("tags", tags):
+            params.append(("tag", t))
+        pg = over.get("page", 1)
+        if pg and pg > 1:
+            params.append(("page", str(pg)))
+        return "/search?" + urlencode(params) if params else "/search"
 
     elapsed_ms = 0
-    results: list[dict[str, Any]] = []
+    pool: list[dict[str, Any]] = []
+    facet_counts: dict[str, int] = {}
     if q.strip():
         t0 = time.perf_counter()
-        # Over-fetch chunks (filtered by kind/tag), collapse to the best-scoring
-        # chunk per doc so one doc with many matching sections doesn't flood.
-        hits = store.search_chunks(
-            q, limit=60, kind=kind or None, tags=[tag] if tag else None)
+        # Over-fetch chunks (filtered by kind + any-of tags), collapse to the
+        # best-scoring chunk per doc so one doc with many sections doesn't flood.
+        hits = store.search_chunks(q, limit=240, kind=kind or None, tags=tags or None)
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         max_score = hits[0]["score"] if hits else 1.0  # ranked desc → first is max
         seen: set[str] = set()
@@ -752,7 +776,7 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
             if not d:
                 continue
             seen.add(ext_id)
-            results.append({
+            pool.append({
                 "ext_id": ext_id,
                 "title": h["title"] or ext_id,
                 "kind": h["kind"],
@@ -764,14 +788,30 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
                 "age_days": max(0.0, (now - d.mtime) / 86400),
                 "score": (h["score"] / max_score) if max_score else 0.0,
             })
-            if len(results) >= 40:
+            for t in d.tags:
+                facet_counts[t] = facet_counts.get(t, 0) + 1
+            if len(pool) >= 60:
                 break
-        # Sort: relevance keeps the fused-score order; the others re-rank the set.
         if sort == "recent":
-            results.sort(key=lambda r: r["age_days"])
+            pool.sort(key=lambda r: r["age_days"])
         elif sort == "tokens":
-            results.sort(key=lambda r: r["tokens_est"], reverse=True)
-        results = results[:12]
+            pool.sort(key=lambda r: r["tokens_est"], reverse=True)
+        # relevance = keep the fused-score order
+
+    total_results = len(pool)
+    pages = max(1, (total_results + per - 1) // per)
+    page = min(page, pages)
+    results = pool[(page - 1) * per: page * per]
+
+    # Facets: tags present in the result set (not already selected), by count.
+    facets = [
+        {"tag": t, "count": c, "url": _u(tags=tags + [t], page=1)}
+        for t, c in sorted(facet_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        if t not in tags
+    ][:12]
+    active_tags = [
+        {"tag": t, "url": _u(tags=[x for x in tags if x != t], page=1)} for t in tags
+    ]
 
     # Tokens from query (alphanumeric runs >= 2 chars) for inline highlighting.
     import re as _re
@@ -786,7 +826,13 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
         "elapsed_ms": elapsed_ms,
         "example_queries": EXAMPLE_QUERIES,
         "highlight_terms": highlight_terms,
-        "tag": tag, "kind": kind, "sort": sort,
+        "tags": tags, "kind": kind, "sort": sort,
+        "facets": facets, "active_tags": active_tags,
+        "total_results": total_results, "page": page, "pages": pages,
+        "prev_url": _u(page=page - 1) if page > 1 else "",
+        "next_url": _u(page=page + 1) if page < pages else "",
+        "clear_url": _u(tags=[], kind="", page=1),
+        "has_filters": bool(tags or kind),
     }
     template_name = "_results.html" if partial else "search.html"
     return templates.TemplateResponse(request, template_name, ctx_data)

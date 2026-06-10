@@ -8,6 +8,7 @@ CHANGELOG.md
 LICENSE.md
 LICENSE
 REFONTE.md
+source.md
 *.example
 
 # Agent harness files the tooling reads directly

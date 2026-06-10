@@ -115,7 +115,7 @@ def _as_taglist(v) -> list[str]:
 
 @mcp.tool()
 def ctx_write(content: str, kind: str = "", doc_id: str = "",
-              tags: list[str] | None = None) -> str:
+              tags: list[str] | None = None, ticket: str = "") -> str:
     """Store a doc INSIDE ctx so every agent of every dev can read it.
 
     For records / memory / coordination notes (incidents, decisions, plans) —
@@ -132,13 +132,20 @@ def ctx_write(content: str, kind: str = "", doc_id: str = "",
         tags: List of tags (free or hierarchical "a/b/c"), e.g.
             ["type/report", "owner/cto", "domain/accounting"]. `kind/<kind>`
             is auto-added. A comma string is also accepted.
+        ticket: Optional work-item id (Linear "SYN-1389", GitHub "#123", …).
+            Stored as a `ticket/<id>` tag so the doc links back to its tracker
+            item — tracker-agnostic, no schema change. Find everything tied to
+            it via `ctx_search(tags=["ticket/<id>"])`.
     """
     if not _authorized():
         return _DENY
     state = get_state()
+    taglist = _as_taglist(tags)
+    if ticket.strip():
+        taglist.append(f"ticket/{ticket.strip()}")
     return state.store.put(
         content, kind=kind or None, ext_id=doc_id or None,
-        tags=_as_taglist(tags) or None,
+        tags=taglist or None,
     )
 
 

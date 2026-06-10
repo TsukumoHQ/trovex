@@ -364,7 +364,7 @@ def build_app() -> FastAPI:
 
     @app.get("/hooks/{name}", response_class=PlainTextResponse)
     async def hook_download(name: str) -> str:
-        if name not in {"ctx-baseline.sh", "ctx-ambient.sh", "ctx-md-guard.sh"}:
+        if name not in {"ctx-md-guard.sh", "ctx-md-read-guard.sh"}:
             return ""
         repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"
         for base in (Path("/home/synxadmin/.claude/hooks"), repo_hooks):

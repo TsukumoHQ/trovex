@@ -1,0 +1,173 @@
+{% extends "_base.html" %}
+{% from "_partials.html" import status_pill %}
+{% set active = 'docs' %}
+{% block title %}ctx — {{ doc.title }}{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Doc reader ─────────────────────────────────────── */
+  .reader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: var(--s-10);
+    align-items: start;
+  }
+
+  .doc-head { margin-bottom: var(--s-6); }
+  .doc-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-subtle); margin-bottom: var(--s-3);
+  }
+  .doc-back:hover { color: var(--accent); }
+  .doc-title { font-size: var(--t-28); margin-bottom: var(--s-3); line-height: 1.2; }
+  .doc-meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
+    font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted);
+  }
+  .doc-id {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 6px 2px 8px;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .copy-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; padding: 0;
+    background: transparent; border: none; border-radius: var(--radius-sm);
+    color: var(--fg-subtle); cursor: pointer;
+    transition: color var(--duration), background var(--duration);
+  }
+  .copy-btn:hover { color: var(--accent); background: var(--bg-hover); }
+  .copy-btn svg { width: 14px; height: 14px; }
+  .copy-btn.copied { color: var(--accent); }
+
+  /* TOC */
+  .toc {
+    position: sticky; top: calc(52px + var(--s-6));
+    font-family: var(--font-mono); font-size: var(--t-12);
+    border-left: 1px solid var(--border); padding-left: var(--s-4);
+  }
+  .toc-label {
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: var(--t-11); color: var(--fg-subtle); margin-bottom: var(--s-3);
+  }
+  .toc a {
+    display: block; padding: 3px 0; color: var(--fg-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    transition: color var(--duration);
+  }
+  .toc a:hover { color: var(--accent); }
+  .toc a.lvl-2 { padding-left: var(--s-3); }
+  .toc a.lvl-3 { padding-left: var(--s-5); color: var(--fg-subtle); }
+
+  /* Prose */
+  .prose {
+    max-width: 72ch;
+    font-size: var(--t-16); line-height: 1.7; color: var(--fg);
+  }
+  .prose > :first-child { margin-top: 0; }
+  .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    margin: var(--s-8) 0 var(--s-3); line-height: 1.3; scroll-margin-top: 72px;
+  }
+  .prose h2 {
+    font-size: var(--t-22); padding-bottom: var(--s-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .prose h3 { font-size: var(--t-18); color: var(--fg); text-transform: none; letter-spacing: -0.01em; }
+  .prose h4 { font-size: var(--t-16); color: var(--fg-muted); }
+  .prose p { margin: var(--s-4) 0; }
+  .prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  .prose a:hover { text-decoration-thickness: 2px; }
+  .prose strong { color: var(--fg); font-weight: 600; }
+  .prose ul, .prose ol { margin: var(--s-4) 0; padding-left: var(--s-6); }
+  .prose li { margin: var(--s-2) 0; }
+  .prose code {
+    font-family: var(--font-mono); font-size: 0.88em;
+    padding: 1px 5px; background: var(--bg-input);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--accent);
+  }
+  .prose pre.md-code {
+    position: relative;
+    margin: var(--s-4) 0; padding: var(--s-4);
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow-x: auto;
+  }
+  .prose pre.md-code code {
+    font-family: var(--font-mono); font-size: var(--t-13); line-height: 1.6;
+    padding: 0; background: none; border: none; color: var(--fg);
+  }
+  .prose pre.md-code[data-lang]::before {
+    content: attr(data-lang);
+    position: absolute; top: 0; right: 0;
+    padding: 2px 8px; font-family: var(--font-mono); font-size: 10px;
+    color: var(--fg-subtle); background: var(--bg-card);
+    border-left: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    border-bottom-left-radius: var(--radius-sm);
+  }
+  .prose blockquote {
+    margin: var(--s-4) 0; padding: var(--s-2) var(--s-4);
+    border-left: 2px solid var(--accent-line); color: var(--fg-muted);
+  }
+  .prose hr.md-hr { margin: var(--s-8) 0; border: none; border-top: 1px solid var(--border); }
+
+  @media (max-width: 1024px) {
+    .reader { grid-template-columns: minmax(0, 1fr); }
+    .toc { display: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reader">
+  <article>
+    <header class="doc-head">
+      <a href="/docs?source=ctx" class="doc-back">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        ctx-owned docs
+      </a>
+      <h1 class="doc-title">{{ doc.title }}</h1>
+      <div class="doc-meta">
+        <span class="pill pill-source">@ctx</span>
+        {% if doc.kind %}<span class="pill pill-plan">{{ doc.kind }}</span>{% endif %}
+        {{ status_pill(doc.status) }}
+        <span class="doc-id">
+          <span>{{ doc.ext_id }}</span>
+          <button class="copy-btn" type="button"
+                  aria-label="Copy document id"
+                  data-copy="{{ doc.ext_id }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+        </span>
+        <span>~{{ "{:,}".format(doc.tokens_est) }} tok</span>
+      </div>
+    </header>
+
+    <div class="prose">{{ body_html | safe }}</div>
+  </article>
+
+  {% if toc %}
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-label">On this page</div>
+    {% for item in toc %}
+    <a href="#{{ item.slug }}" class="lvl-{{ item.level }}">{{ item.text }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+</div>
+
+<script>
+  document.querySelectorAll('.copy-btn[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(btn.dataset.copy).then(function () {
+        btn.classList.add('copied');
+        setTimeout(function () { btn.classList.remove('copied'); }, 1200);
+      });
+    });
+  });
+</script>
+{% endblock %}

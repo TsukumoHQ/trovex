@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .state import get_state
-from .store import CTX_SOURCE_ID
+from .store import CTX_SOURCE_ID, extract_section
 
 # Allow override via env so the same code runs locally and behind Traefik.
 EXTRA_HOSTS = [h for h in os.environ.get("CTX_MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
@@ -113,7 +113,7 @@ def ctx_write(content: str, kind: str = "", doc_id: str = "") -> str:
 
 
 @mcp.tool()
-def ctx_read(query: str = "", doc_id: str = "") -> str:
+def ctx_read(query: str = "", doc_id: str = "", section: str = "") -> str:
     """Read a ctx-owned doc — returns its CONTENT (not a pointer).
 
     Pass `doc_id` for a direct fetch, or `query` to semantically route to the
@@ -123,16 +123,21 @@ def ctx_read(query: str = "", doc_id: str = "") -> str:
     Args:
         query: Natural-language query; returns the best-matching ctx doc's body.
         doc_id: Opaque id from a prior `ctx_write`; returns that exact doc.
+        section: Optional heading; return only that section, not the whole body.
     """
     state = get_state()
     if doc_id:
         doc = state.store.get(doc_id)
-        return doc.content if doc else "(not found)"
-    if query.strip():
+    elif query.strip():
         results = state.searcher.search(query, limit=1, source_ids=[CTX_SOURCE_ID])
-        if not results:
-            return "(no results)"
         # For ctx-owned docs, SearchResult.path holds the ext_id.
-        doc = state.store.get(results[0].path)
-        return doc.content if doc else "(not found)"
-    return "(provide query or doc_id)"
+        doc = state.store.get(results[0].path) if results else None
+    else:
+        return "(provide query or doc_id)"
+
+    if doc is None:
+        return "(not found)"
+    if section:
+        sec = extract_section(doc.content, section)
+        return sec if sec is not None else f"(section '{section}' not found)"
+    return doc.content

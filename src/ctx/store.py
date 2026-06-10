@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -64,6 +65,9 @@ class SqliteStore:
             settings.data_dir / "ctx.db", settings.resolved_embed_dim()
         )
         self.embedder = embedder or build_embedder(settings.embed_model)
+        # Serialize writes: the sqlite connection is shared across the server's
+        # worker threads, and put() is a multi-statement insert+embed+commit.
+        self._lock = threading.Lock()
 
     def put(self, content: str, *, kind: str | None = None,
             ext_id: str | None = None, title: str | None = None,
@@ -73,34 +77,35 @@ class SqliteStore:
         title = title or _extract_title(content)
         now = time.time()
         tokens_est = len(content) // 4
+        size = len(content.encode("utf-8"))
 
-        existing = self.db.execute(
-            "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
-        ).fetchone()
+        with self._lock:
+            existing = self.db.execute(
+                "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
+            ).fetchone()
 
-        if existing:
-            doc_id = existing["id"]
-            self.db.execute(
-                """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
-                       size_bytes=?, mtime=?, last_indexed=?, author_agent=?
-                   WHERE id=?""",
-                (content, title, kind, tokens_est, len(content.encode("utf-8")),
-                 now, now, author, doc_id),
-            )
-        else:
-            cur = self.db.execute(
-                """INSERT INTO docs
-                       (source_id, path, absolute_path, content_hash, size_bytes,
-                        tokens_est, mtime, first_indexed, last_indexed, title,
-                        author_agent, content, ext_id, kind)
-                   VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (CTX_SOURCE_ID, ext_id, len(content.encode("utf-8")), tokens_est,
-                 now, now, now, title, author, content, ext_id, kind),
-            )
-            doc_id = cur.lastrowid
+            if existing:
+                doc_id = existing["id"]
+                self.db.execute(
+                    """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
+                           size_bytes=?, mtime=?, last_indexed=?, author_agent=?
+                       WHERE id=?""",
+                    (content, title, kind, tokens_est, size, now, now, author, doc_id),
+                )
+            else:
+                cur = self.db.execute(
+                    """INSERT INTO docs
+                           (source_id, path, absolute_path, content_hash, size_bytes,
+                            tokens_est, mtime, first_indexed, last_indexed, title,
+                            author_agent, content, ext_id, kind)
+                       VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (CTX_SOURCE_ID, ext_id, size, tokens_est,
+                     now, now, now, title, author, content, ext_id, kind),
+                )
+                doc_id = cur.lastrowid
 
-        self._embed(doc_id, content, title)
-        self.db.commit()
+            self._embed(doc_id, content, title)
+            self.db.commit()
         return ext_id
 
     def get(self, ext_id: str) -> StoredDoc | None:
@@ -143,3 +148,32 @@ def _extract_title(content: str) -> str:
     stripped = FRONTMATTER_RE.sub("", content)
     m = TITLE_RE.search(stripped[:2000])
     return m.group(1).strip() if m else "Untitled"
+
+
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def extract_section(content: str, heading: str) -> str | None:
+    """Return the markdown section under `heading` — from that heading down to
+    the next same-or-higher-level heading. None if the heading isn't found.
+
+    Lets ctx_read serve only the relevant slice of a long doc instead of the
+    whole body (the token-efficiency north star).
+    """
+    target = heading.strip().lstrip("#").strip().lower()
+    lines = content.splitlines()
+    start = level = None
+    for i, ln in enumerate(lines):
+        m = HEADING_RE.match(ln)
+        if m and m.group(2).strip().lower() == target:
+            start, level = i, len(m.group(1))
+            break
+    if start is None:
+        return None
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        m = HEADING_RE.match(lines[j])
+        if m and len(m.group(1)) <= level:
+            end = j
+            break
+    return "\n".join(lines[start:end]).strip()

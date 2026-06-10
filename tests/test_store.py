@@ -5,6 +5,7 @@ Hermetic: a deterministic bag-of-words embedder (no OpenAI / no model download).
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
 import re
 import time
@@ -16,7 +17,7 @@ from ctx.config import Settings, Source
 from ctx.indexer import Indexer
 from ctx.search import Searcher
 from ctx.status import compute_status
-from ctx.store import SqliteStore
+from ctx.store import SqliteStore, extract_section
 
 DIM = 384
 
@@ -114,3 +115,24 @@ def test_indexer_does_not_purge_ctx_docs(settings, store, tmp_path):
     indexer.reindex(sources=[Source(id="code", label="repo", root=empty_source)])
 
     assert store.get(ext_id) is not None
+
+
+def test_extract_section():
+    doc = "# Title\n\nintro\n\n## Alpha\n\naaa\n\n## Beta\n\nbbb\n\n### Beta sub\n\nccc\n"
+    assert extract_section(doc, "Alpha") == "## Alpha\n\naaa"
+    beta = extract_section(doc, "Beta")
+    assert "bbb" in beta and "ccc" in beta  # keeps its deeper ### subheading
+    assert "aaa" not in beta
+    assert extract_section(doc, "Nonexistent") is None
+
+
+def test_concurrent_puts_are_serialized(store):
+    def write(i):
+        return store.put(f"# Doc {i}\n\nbody {i}", ext_id=f"id-{i}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        ids = list(ex.map(write, range(20)))
+
+    assert len(set(ids)) == 20
+    assert len(store.list_docs()) == 20
+    assert store.get("id-7").content == "# Doc 7\n\nbody 7"

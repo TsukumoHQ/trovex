@@ -17,7 +17,11 @@
       <tr>
         <td>{{ source_pill(r.source_id) }}</td>
         <td class="path">
+          {% if r.source_id == 'ctx' %}
+          <a href="/doc/{{ r.path }}" title="view ctx-owned doc">{{ r.path[:12] }}…</a>
+          {% else %}
           <a href="/search?q={{ r.title | urlencode }}" title="search this">{{ r.path }}</a>
+          {% endif %}
         </td>
         <td class="cell-faint" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis;">{{ r.title }}</td>
         <td>{{ status_pill(r.status) }}</td>

@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import insights as insights_mod
 from . import savings as savings_mod
+from .markdown import render_markdown
 from .mcp_app import mcp
 from .state import get_state
 from .usage import UserHeaderMiddleware
@@ -218,6 +219,18 @@ def build_app() -> FastAPI:
         ctx_data = _docs_query(qpath, status, sort, limit, source)
         return templates.TemplateResponse(request, "_docs_table.html", ctx_data)
 
+    @app.get("/doc/{ext_id}", response_class=HTMLResponse)
+    async def doc_view(request: Request, ext_id: str) -> HTMLResponse:
+        """Render a ctx-owned doc's content — how humans read what agents store
+        (no local file; the frontend is the human surface)."""
+        doc = get_state().store.get(ext_id)
+        if doc is None:
+            return HTMLResponse("(not found)", status_code=404)
+        body_html, toc = render_markdown(doc.content)
+        return templates.TemplateResponse(
+            request, "doc.html", {"doc": doc, "body_html": body_html, "toc": toc}
+        )
+
     # ── JSON API ─────────────────────────────────────────────────────
 
     @app.get("/api/search")
@@ -279,12 +292,14 @@ def build_app() -> FastAPI:
 
     @app.get("/hooks/{name}", response_class=PlainTextResponse)
     async def hook_download(name: str) -> str:
-        if name not in {"ctx-baseline.sh", "ctx-ambient.sh"}:
+        if name not in {"ctx-baseline.sh", "ctx-ambient.sh", "ctx-md-guard.sh"}:
             return ""
-        path = Path("/home/synxadmin/.claude/hooks") / name
-        if not path.exists():
-            return ""
-        return path.read_text()
+        repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"
+        for base in (Path("/home/synxadmin/.claude/hooks"), repo_hooks):
+            path = base / name
+            if path.exists():
+                return path.read_text()
+        return ""
 
     # ── Usage page ───────────────────────────────────────────────────
 

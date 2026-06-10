@@ -292,6 +292,53 @@ _FACET_DOMAIN = {
 _FACET_OWNER = {"cto", "cos", "founder"}
 
 
+def _pick_query(content: str) -> str:
+    import re
+    text = re.sub(r"^---.*?---", "", content, flags=re.DOTALL)
+    for line in text.splitlines():
+        s = line.strip()
+        if s and not s.startswith(("#", "-", "*", "|", "`")) and len(s) > 40:
+            return s[:200]
+    return ""
+
+
+@app.command()
+def eval(n: int = 40, k: int = 5) -> None:  # noqa: A001
+    """Retrieval eval: sample docs, query with a sentence from each, measure recall.
+
+    recall@1 = top passage is from the right doc; recall@k = right doc in top k.
+    A sanity check so we stop flying blind on retrieval quality.
+    """
+    import random
+
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    docs = store.db.execute(
+        "SELECT ext_id, content, title FROM docs WHERE source_id='ctx' AND content IS NOT NULL"
+    ).fetchall()
+    sample = random.sample(docs, min(n, len(docs)))
+    hit1 = hitk = scored = 0
+    for d in sample:
+        q = _pick_query(d["content"]) or (d["title"] or "")
+        if not q:
+            continue
+        ids = [h["ext_id"] for h in store.search_chunks(q, limit=k)]
+        scored += 1
+        if ids and ids[0] == d["ext_id"]:
+            hit1 += 1
+        if d["ext_id"] in ids:
+            hitk += 1
+    if not scored:
+        console.print("[red]no scorable docs[/red]")
+        return
+    console.print(
+        f"[bold]Retrieval eval[/bold] (n={scored})  "
+        f"[green]recall@1 = {hit1/scored:.0%}[/green]  recall@{k} = {hitk/scored:.0%}"
+    )
+
+
 @app.command()
 def backup() -> None:
     """Snapshot ctx.db into data_dir/backups/ (consistent online copy, keeps 14)."""

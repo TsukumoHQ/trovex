@@ -229,6 +229,10 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
             embedding float[{embed_dim}] distance_metric=cosine
         );
+        -- Keyword side of hybrid retrieval (BM25). chunk_id = chunks.id.
+        CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+            content, chunk_id UNINDEXED
+        );
 
         -- Tags (free + hierarchical 'a/b/c') for org + metadata filtering
         CREATE TABLE IF NOT EXISTS doc_tags (

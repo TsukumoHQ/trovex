@@ -181,7 +181,13 @@ def ctx_read(query: str = "", doc_id: str = "", section: str = "", full: bool = 
         return doc.content if doc else "(no results)"
     t0 = time.perf_counter()
     hits = state.store.search_chunks(query, limit=1)
-    out = _fmt_passage(hits[0]) if hits else "(no results)"
+    if hits:
+        h = hits[0]
+        # small-to-big: match the chunk, return its full parent section.
+        section = state.store.section_text(h["doc_id"], h["heading_path"]) or h["content"]
+        out = _fmt_passage({**h, "content": section})
+    else:
+        out = "(no results)"
     _log_retrieval(state, query, hits, out, t0)
     return out
 

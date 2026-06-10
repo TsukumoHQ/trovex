@@ -169,6 +169,7 @@ class SqliteStore:
                 "SELECT id FROM chunks WHERE doc_id = ?", (row["id"],)
             ).fetchall():
                 self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+                self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
             self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (row["id"],))
             self.db.execute("DELETE FROM doc_versions WHERE doc_id = ?", (row["id"],))
             self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (row["id"],))
@@ -234,6 +235,7 @@ class SqliteStore:
             "SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)
         ).fetchall():
             self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+            self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
         self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
         pairs: list[tuple[int, str]] = []
         for ch in chunk_markdown(content):
@@ -241,6 +243,10 @@ class SqliteStore:
                 """INSERT INTO chunks (doc_id, chunk_index, heading_path, content, tokens_est)
                    VALUES (?, ?, ?, ?, ?)""",
                 (doc_id, ch.index, " > ".join(ch.heading_path), ch.text, ch.tokens_est),
+            )
+            self.db.execute(
+                "INSERT INTO chunks_fts(content, chunk_id) VALUES (?, ?)",
+                (ch.text, cur.lastrowid),
             )
             pairs.append((cur.lastrowid, ch.embed_text(title)))
         return pairs
@@ -258,24 +264,45 @@ class SqliteStore:
 
     def search_chunks(self, query: str, limit: int = 5, *, kind: str | None = None,
                       source: str | None = None, tags: list[str] | None = None) -> list[dict]:
-        """Chunk-level retrieval + metadata filters (post-filtered for robustness)."""
+        """Hybrid chunk retrieval: vector + BM25 fused by reciprocal rank, then
+        metadata-filtered. Vector finds semantic matches; BM25 catches exact terms
+        (error codes, function names, ids) the embedding blurs."""
         if not query.strip():
             return []
+        pool = max(limit * 6, 30)
         qemb = next(iter(self.embedder.embed([query])))
-        rows = self.db.execute(
-            """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
-                      d.ext_id, d.title, d.kind, d.source_id,
-                      d.tokens_est AS doc_tokens, v.distance
-               FROM vec_chunks v
-               JOIN chunks c ON c.id = v.rowid
-               JOIN docs d ON d.id = c.doc_id
-               WHERE v.embedding MATCH ? AND k = ?
-               ORDER BY v.distance""",
-            (sqlite_vec.serialize_float32(qemb.tolist()), max(limit * 5, 20)),
-        ).fetchall()
+        vec_ids = [r["rowid"] for r in self.db.execute(
+            "SELECT v.rowid FROM vec_chunks v WHERE v.embedding MATCH ? AND k = ? ORDER BY v.distance",
+            (sqlite_vec.serialize_float32(qemb.tolist()), pool))]
+
+        terms = re.findall(r"[a-z0-9]{2,}", query.lower())[:24]
+        bm_ids: list[int] = []
+        if terms:
+            try:
+                bm_ids = [r["chunk_id"] for r in self.db.execute(
+                    "SELECT chunk_id FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?",
+                    (" OR ".join(terms), pool))]
+            except sqlite3.OperationalError:
+                bm_ids = []
+
+        # Reciprocal rank fusion (k0=60, the standard).
+        scores: dict[int, float] = {}
+        for rank, cid in enumerate(vec_ids):
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (60 + rank)
+        for rank, cid in enumerate(bm_ids):
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (60 + rank)
+        ranked = sorted(scores, key=lambda c: -scores[c])
+
         tagset = set(tags or [])
         out: list[dict] = []
-        for r in rows:
+        for cid in ranked:
+            r = self.db.execute(
+                """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
+                          d.ext_id, d.title, d.kind, d.source_id, d.tokens_est AS doc_tokens
+                   FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.id = ?""",
+                (cid,)).fetchone()
+            if not r:
+                continue
             if kind and r["kind"] != kind:
                 continue
             if source and r["source_id"] != source:
@@ -289,6 +316,13 @@ class SqliteStore:
             if len(out) >= limit:
                 break
         return out
+
+    def section_text(self, doc_id: int, heading_path: str) -> str:
+        """Small-to-big: all chunks of a doc sharing a heading path = the section."""
+        rows = self.db.execute(
+            """SELECT content FROM chunks WHERE doc_id = ? AND heading_path = ?
+               ORDER BY chunk_index""", (doc_id, heading_path)).fetchall()
+        return "\n\n".join(r["content"] for r in rows)
 
     def _set_tags(self, doc_id: int, tags: list[str]) -> None:
         self.db.execute("DELETE FROM doc_tags WHERE doc_id = ?", (doc_id,))

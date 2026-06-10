@@ -1,0 +1,19 @@
+# .ctxignore — files the ctx hooks leave alone (read/write raw on disk).
+# Everything else .md routes through ctx (ctx_search/ctx_read, ctx_write).
+# One glob per line; matched against repo-relative and absolute paths.
+
+# Repo + meta files you legitimately read/write directly
+README.md
+CHANGELOG.md
+LICENSE.md
+LICENSE
+REFONTE.md
+*.example
+
+# Agent harness files the tooling reads directly
+**/CLAUDE.md
+**/AGENTS.md
+.claude/**
+
+# Build / site generators that consume markdown from disk
+docs/site/**

@@ -8,6 +8,14 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    # WAL: concurrent readers + one writer (the reindex runs in a *separate*
+    # process from the server, so the in-process write lock isn't enough).
+    # busy_timeout: wait for the lock instead of failing with "database is
+    # locked" — fixes ctx_write / ctx_delete racing the reindex.
+    conn.execute("PRAGMA journal_mode=WAL")
+    # 30s: the reindex writes the whole corpus in one ~25s transaction; a chunk
+    # write or backfill racing it must wait that out, not fail at 5s.
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.enable_load_extension(True)
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)
@@ -15,6 +23,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     # add columns to a pre-existing legacy docs table; we need to recreate it.
     _migrate_to_multi_source(conn)
     _migrate_embed_dim(conn, embed_dim)
+    _migrate_add_ctx_store_columns(conn)
     _init_schema(conn, embed_dim)
     return conn
 
@@ -101,6 +110,33 @@ def _migrate_to_multi_source(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_add_ctx_store_columns(conn: sqlite3.Connection) -> None:
+    """Add the ctx-owned-store columns to an existing docs table.
+
+    Additive (ALTER ADD COLUMN), unlike the multi-source migration — these
+    columns are nullable and default NULL, so no table recreate is needed.
+
+      content : doc body held *inside* ctx (NULL for file-backed docs, which
+                are read from absolute_path as before)
+      ext_id  : opaque stable id for ctx-owned docs (the handle agents/relay
+                reference; survives a Pôle A→B substrate swap)
+      kind    : lifecycle flag ('record' = event-anchored, never age-stale)
+
+    Skip entirely if docs doesn't exist yet — _init_schema creates it fresh
+    with these columns already present.
+    """
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='docs'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    for col in ("content", "ext_id", "kind"):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE docs ADD COLUMN {col} TEXT")
+    conn.commit()
+
+
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
     conn.executescript(
         f"""
@@ -120,11 +156,16 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             status TEXT NOT NULL DEFAULT 'canonical',
             dup_of_id INTEGER REFERENCES docs(id),
             author_agent TEXT,
+            content TEXT,
+            ext_id TEXT,
+            kind TEXT,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
         CREATE INDEX IF NOT EXISTS idx_docs_mtime ON docs(workspace_id, mtime DESC);
         CREATE INDEX IF NOT EXISTS idx_docs_source ON docs(workspace_id, source_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_ext_id
+            ON docs(ext_id) WHERE ext_id IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS index_runs (
             id INTEGER PRIMARY KEY,
@@ -172,6 +213,42 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
 
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_docs USING vec0(
             embedding float[{embed_dim}] distance_metric=cosine
+        );
+
+        -- Chunk-level retrieval (structure-aware chunks + their embeddings)
+        CREATE TABLE IF NOT EXISTS chunks (
+            id INTEGER PRIMARY KEY,
+            doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            chunk_index INTEGER NOT NULL,
+            heading_path TEXT,
+            content TEXT NOT NULL,
+            tokens_est INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(doc_id);
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
+            embedding float[{embed_dim}] distance_metric=cosine
+        );
+
+        -- Tags (free + hierarchical 'a/b/c') for org + metadata filtering
+        CREATE TABLE IF NOT EXISTS doc_tags (
+            doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            tag TEXT NOT NULL,
+            PRIMARY KEY (doc_id, tag)
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_tags_tag ON doc_tags(tag);
+
+        -- Collections = named saved filters (kind 'filter') or curated lists
+        CREATE TABLE IF NOT EXISTS collections (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            kind TEXT NOT NULL DEFAULT 'filter',
+            filter_json TEXT,
+            created REAL NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS collection_docs (
+            collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+            doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            PRIMARY KEY (collection_id, doc_id)
         );
         """
     )

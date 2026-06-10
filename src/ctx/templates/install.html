@@ -12,16 +12,15 @@
   <h1 class="install-h1">Connect Claude Code to&nbsp;ctx</h1>
   <p class="install-lede">
     Paste one prompt into Claude Code. It detects your handle from
-    <code>git config</code>, registers the MCP, and you're done. Hooks are optional.
+    <code>git config</code>, registers the MCP, and you're done — your agents can
+    then <code>ctx_search</code> the shared store and <code>ctx_write</code> to it.
   </p>
   <div class="install-progress" aria-label="Install steps">
     <span class="install-progress-step active"><span>1</span> MCP</span>
     <span class="install-progress-sep"></span>
-    <span class="install-progress-step"><span>2</span> Ambient</span>
+    <span class="install-progress-step"><span>2</span> Guard</span>
     <span class="install-progress-sep"></span>
-    <span class="install-progress-step"><span>3</span> Baseline</span>
-    <span class="install-progress-sep"></span>
-    <span class="install-progress-step install-progress-step-byok"><span>4</span> LLM</span>
+    <span class="install-progress-step install-progress-step-byok"><span>3</span> LLM</span>
     <span class="install-progress-sep"></span>
     <span class="install-progress-step"><span>✓</span> Verify</span>
   </div>
@@ -64,7 +63,7 @@
             <span class="copy-btn-label">Copy</span>
           </button>
         </div>
-        <pre class="code-block-body" id="prompt-1"><span class="code-line"><span class="code-num">1</span><span class="code-text">Set up the ctx MCP on this machine.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Read my ~/.claude/settings.json (preserve everything else).</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">2. Detect my handle: run `git config user.email`. Take the part before</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">   the @. If empty or weird, ask me. Confirm with me ([Y/n]) before</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">   proceeding.</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">3. Add this entry to mcpServers (merge, don't replace siblings):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     "ctx": {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "type": "http",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "url": "https://ctx.prod.synergix.ch/mcp/",</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">       "headers": { "X-CTX-User": "&lt;my-handle&gt;" }</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">4. Tell me to restart Claude Code so the MCP loads. Then the tool</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">   `ctx(q, summary=False)` is available — use it before grep+Read on</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text">   .md files in synergix_prod.</span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">5. Then ask me if I also want the optional pieces (ambient + baseline</span></span><span class="code-line"><span class="code-num">19</span><span class="code-text">   hooks) from https://ctx.prod.synergix.ch/install</span></span></pre>
+        <pre class="code-block-body" id="prompt-1"><span class="code-line"><span class="code-num">1</span><span class="code-text">Set up the ctx MCP on this machine.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Read my ~/.claude/settings.json (preserve everything else).</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">2. Detect my handle: run `git config user.email`. Take the part before</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">   the @. If empty or weird, ask me. Confirm with me ([Y/n]) before</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">   proceeding.</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">3. Add this entry to mcpServers (merge, don't replace siblings):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     "ctx": {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "type": "http",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "url": "https://ctx.prod.synergix.ch/mcp/",</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">       "headers": { "X-CTX-User": "&lt;my-handle&gt;" }</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">4. Tell me to restart Claude Code so the MCP loads. Then these tools</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">   are available: `ctx_search(query)` → relevant passages, `ctx_read`,</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text">   and `ctx_write(content, kind, tags)` to store records into the shared store.</span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">5. Then ask me if I also want the optional pieces (ambient + baseline</span></span><span class="code-line"><span class="code-num">19</span><span class="code-text">   hooks) from https://ctx.prod.synergix.ch/install</span></span></pre>
       </div>
     </div>
 
@@ -77,10 +76,10 @@
         </div>
       </div>
       <div class="callout">
-        <div class="callout-icon">🛡</div>
+        <div class="callout-icon">↔</div>
         <div>
-          <div class="callout-title">Read-only on the server</div>
-          <div class="callout-body">MCP is exposed under Tailscale — no auth bypass, no write actions.</div>
+          <div class="callout-title">Read &amp; write</div>
+          <div class="callout-body"><code>ctx_search</code>/<code>ctx_read</code> retrieve; <code>ctx_write</code>/<code>ctx_tag</code>/<code>ctx_delete</code> manage the shared store. Every call attributed to your <code>X-CTX-User</code>.</div>
         </div>
       </div>
       <div class="callout">
@@ -103,14 +102,15 @@
     <summary class="step-head">
       <div>
         <h2 id="step-2-title">
-          Ambient hook
+          Write-guard hook
           <span class="step-tag">optional</span>
           <span class="step-tag step-tag-rec">recommended</span>
         </h2>
         <p class="step-sub">
-          On every Read of a <code>.md</code> in synergix_prod, related docs are
-          auto-appended via a PostToolUse hook. Boosts adoption without changing
-          agent behaviour.
+          A PreToolUse hook that blocks writing a <code>.md</code> to disk and
+          redirects it to <code>ctx_write</code> — so records land in the shared
+          store, not scattered across repos. <code>.ctxignore</code> exempts
+          files that must stay on disk; degrades to allow if ctx is unreachable.
         </p>
       </div>
       <span class="chevron" aria-hidden="true">▾</span>
@@ -128,47 +128,7 @@
             <span class="copy-btn-label">Copy</span>
           </button>
         </div>
-        <pre class="code-block-body" id="prompt-2"><span class="code-line"><span class="code-num">1</span><span class="code-text">Install the ctx ambient hook.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Create ~/.claude/hooks/ctx-ambient.sh with the content fetched from</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">   https://ctx.prod.synergix.ch/hooks/ctx-ambient.sh</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">2. chmod +x it.</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">3. Read ~/.claude/settings.json and add this to hooks.PostToolUse</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">   (merge — don't overwrite existing entries):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "matcher": "Read",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "hooks": [{</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">         "type": "command",</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-ambient.sh",</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text">         "timeout": 5</span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">       }]</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">4. Replace &lt;me&gt; with $HOME's basename. Then tell me to restart.</span></span></pre>
-      </div>
-    </div>
-  </details>
-</section>
-
-{# ── Step 3: optional baseline ─────────────────────────── #}
-<section class="step step-optional" aria-labelledby="step-3-title">
-  <div class="step-rail">
-    <span class="step-num step-num-muted">3</span>
-  </div>
-  <details class="step-body step-details">
-    <summary class="step-head">
-      <div>
-        <h2 id="step-3-title">
-          Baseline hook
-          <span class="step-tag">optional</span>
-          <span class="step-tag step-tag-measure">measurement</span>
-        </h2>
-        <p class="step-sub">
-          Logs every <code>.md</code> Read to a local JSONL so we can validate
-          the −60% token target after ~7 days of usage. Run <code>ctx measure</code>
-          to see your delta.
-        </p>
-      </div>
-      <span class="chevron" aria-hidden="true">▾</span>
-    </summary>
-
-    <div class="step-action">
-      <div class="step-action-label">
-        <span class="step-action-icon">→</span>
-        Same approach as ambient
-      </div>
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang mono">prompt</span>
-          <button class="copy-btn" data-target="prompt-3" type="button" aria-label="Copy prompt">
-            <span class="copy-btn-label">Copy</span>
-          </button>
-        </div>
-        <pre class="code-block-body" id="prompt-3"><span class="code-line"><span class="code-num">1</span><span class="code-text">Install the ctx baseline hook.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Create ~/.claude/hooks/ctx-baseline.sh with the content fetched from</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">   https://ctx.prod.synergix.ch/hooks/ctx-baseline.sh</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">2. chmod +x it.</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">3. Read ~/.claude/settings.json and add this to hooks.PreToolUse</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">   (merge — don't overwrite existing entries):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "matcher": "Read",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "hooks": [{</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">         "type": "command",</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-baseline.sh",</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text">         "timeout": 3</span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">       }]</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">4. Replace &lt;me&gt; with $HOME's basename. Restart Claude Code. After</span></span><span class="code-line"><span class="code-num">19</span><span class="code-text">   ~7 days, run `ctx measure` to see the delta.</span></span></pre>
+        <pre class="code-block-body" id="prompt-2"><span class="code-line"><span class="code-num">1</span><span class="code-text">Install the ctx write-guard hook.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Create ~/.claude/hooks/ctx-md-guard.sh with the content fetched from</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">   https://ctx.prod.synergix.ch/hooks/ctx-md-guard.sh</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">2. chmod +x it.</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">3. Read ~/.claude/settings.json and add this to hooks.PreToolUse</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">   (merge — don't overwrite existing entries):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "matcher": "Write|Edit|MultiEdit",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "hooks": [{</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">         "type": "command",</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">         "command": "/home/&lt;me&gt;/.claude/hooks/ctx-md-guard.sh"</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text">       }]</span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">17</span><span class="code-text">4. Replace &lt;me&gt; with $HOME's basename. Add a .ctxignore at your repo</span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">   root for files that must stay on disk. Then tell me to restart.</span></span></pre>
       </div>
     </div>
   </details>
@@ -177,7 +137,7 @@
 {# ── BYOK: LLM rerank ─────────────────────────────────── #}
 <section class="step step-optional step-byok" aria-labelledby="step-byok-title">
   <div class="step-rail">
-    <span class="step-num step-num-byok">4</span>
+    <span class="step-num step-num-byok">3</span>
   </div>
   <details class="step-body step-details">
     <summary class="step-head step-head-byok">
@@ -375,8 +335,8 @@
     <div class="step-head">
       <h2 id="step-verify-title">Verify it works</h2>
       <p class="step-sub">
-        After restarting Claude Code, run this and you should see ~5 paths
-        with <code>★</code> / <code>◯</code> / <code>✗</code> / <code>⚠</code> markers.
+        After restarting Claude Code, run this — you should get a relevant
+        passage with its <code>title &gt; heading</code> breadcrumb.
       </p>
     </div>
     <div class="step-action">
@@ -387,7 +347,7 @@
             <span class="copy-btn-label">Copy</span>
           </button>
         </div>
-        <pre class="code-block-body" id="prompt-verify"><span class="code-line"><span class="code-num">1</span><span class="code-text">Call the ctx tool with q="auth JWT" and show me the raw output.</span></span></pre>
+        <pre class="code-block-body" id="prompt-verify"><span class="code-line"><span class="code-num">1</span><span class="code-text">Call ctx_search with query="auth JWT" and show me the raw output.</span></span></pre>
       </div>
     </div>
     <div class="step-after">

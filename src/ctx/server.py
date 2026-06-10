@@ -273,14 +273,18 @@ def build_app() -> FastAPI:
         )
 
     @app.get("/search", response_class=HTMLResponse)
-    async def search_html(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
+    async def search_html(request: Request, q: str = "", summary: bool = False,
+                          tag: str = "", kind: str = "", sort: str = "relevance") -> HTMLResponse:
         # Dedicated search page over the ctx store (hybrid vector + BM25), not a
         # redirect to /store — search is ctx's core verb and deserves its own surface.
-        return _render_search(request, templates, q, summary, partial=False)
+        return _render_search(request, templates, q, summary, partial=False,
+                              tag=tag, kind=kind, sort=sort)
 
     @app.get("/search/partial", response_class=HTMLResponse)
-    async def search_partial(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
-        return _render_search(request, templates, q, summary, partial=True)
+    async def search_partial(request: Request, q: str = "", summary: bool = False,
+                             tag: str = "", kind: str = "", sort: str = "relevance") -> HTMLResponse:
+        return _render_search(request, templates, q, summary, partial=True,
+                              tag=tag, kind=kind, sort=sort)
 
     @app.get("/docs")
     async def docs_page() -> RedirectResponse:
@@ -720,7 +724,9 @@ def build_app() -> FastAPI:
     return app
 
 
-def _render_search(request: Request, templates: Jinja2Templates, q: str, summary: bool, partial: bool) -> HTMLResponse:
+def _render_search(request: Request, templates: Jinja2Templates, q: str, summary: bool,
+                   partial: bool, *, tag: str = "", kind: str = "",
+                   sort: str = "relevance") -> HTMLResponse:
     state = get_state()
     store = state.store
     total = store.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
@@ -730,9 +736,10 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
     results: list[dict[str, Any]] = []
     if q.strip():
         t0 = time.perf_counter()
-        # Over-fetch chunks, then collapse to the best-scoring chunk per doc so a
-        # single doc with many matching sections doesn't flood the results.
-        hits = store.search_chunks(q, limit=40)
+        # Over-fetch chunks (filtered by kind/tag), collapse to the best-scoring
+        # chunk per doc so one doc with many matching sections doesn't flood.
+        hits = store.search_chunks(
+            q, limit=60, kind=kind or None, tags=[tag] if tag else None)
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         max_score = hits[0]["score"] if hits else 1.0  # ranked desc → first is max
         seen: set[str] = set()
@@ -749,14 +756,21 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
                 "title": h["title"] or ext_id,
                 "kind": h["kind"],
                 "status": d.status,
+                "tags": d.tags,
                 "section": h["heading_path"],
                 "snippet": (h["content"] or "").strip()[:280],
                 "tokens_est": h["doc_tokens"],
                 "age_days": max(0.0, (now - d.mtime) / 86400),
                 "score": (h["score"] / max_score) if max_score else 0.0,
             })
-            if len(results) >= 12:
+            if len(results) >= 40:
                 break
+        # Sort: relevance keeps the fused-score order; the others re-rank the set.
+        if sort == "recent":
+            results.sort(key=lambda r: r["age_days"])
+        elif sort == "tokens":
+            results.sort(key=lambda r: r["tokens_est"], reverse=True)
+        results = results[:12]
 
     # Tokens from query (alphanumeric runs >= 2 chars) for inline highlighting.
     import re as _re
@@ -771,6 +785,7 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
         "elapsed_ms": elapsed_ms,
         "example_queries": EXAMPLE_QUERIES,
         "highlight_terms": highlight_terms,
+        "tag": tag, "kind": kind, "sort": sort,
     }
     template_name = "_results.html" if partial else "search.html"
     return templates.TemplateResponse(request, template_name, ctx_data)

@@ -27,20 +27,22 @@
   </div>
   {% for r in results %}
   <article class="result">
-    <div class="result-head">
-      {{ status_pill(r.status) }}
-      {% if r.kind %}<span class="pill pill-plan">{{ r.kind }}</span>{% endif %}
-      <span class="result-path">
-        <a href="/doc/{{ r.ext_id }}" title="{{ r.title }}">{{ r.title | highlight(highlight_terms) }}</a>
-      </span>
-      <span class="mono subtle" style="font-size: var(--t-11);">{{ fresh_label(r.age_days) }}</span>
-    </div>
-    {% if r.section %}
-    <div class="result-section mono">{{ r.section }}</div>
-    {% endif %}
-    {% if r.snippet %}
-    <div class="result-snippet">{{ r.snippet | highlight(highlight_terms) }}…</div>
-    {% endif %}
+    {# Whole content block is one link → click anywhere on it opens the doc.
+       Tags below stay separate so they filter instead of opening. #}
+    <a class="result-main" href="/doc/{{ r.ext_id }}" title="{{ r.title }}">
+      <div class="result-head">
+        {{ status_pill(r.status) }}
+        {% if r.kind %}<span class="pill pill-plan">{{ r.kind }}</span>{% endif %}
+        <span class="result-path">{{ r.title | highlight(highlight_terms) }}</span>
+        <span class="mono subtle" style="font-size: var(--t-11);">{{ fresh_label(r.age_days) }}</span>
+      </div>
+      {% if r.section %}
+      <div class="result-section mono">{{ r.section }}</div>
+      {% endif %}
+      {% if r.snippet %}
+      <div class="result-snippet">{{ r.snippet | highlight(highlight_terms) }}…</div>
+      {% endif %}
+    </a>
     <div class="result-meta">
       <span><b>{{ "{:,}".format(r.tokens_est) }}</b> tokens</span>
       <span><b>{{ "%.0f"|format(r.age_days) }}</b>d old</span>
@@ -51,6 +53,12 @@
       </div>
       <span style="width: 40px; text-align: right;">{{ "%.2f"|format(r.score) }}</span>
     </div>
+    {% if r.tags %}
+    <div class="chips result-chips">
+      {% for t in r.tags %}<a class="chip{% if t == tag %} chip-active{% endif %}"
+         href="/search?q={{ q | urlencode }}&amp;tag={{ t | urlencode }}{% if kind %}&amp;kind={{ kind }}{% endif %}{% if sort and sort != 'relevance' %}&amp;sort={{ sort }}{% endif %}">{{ t }}</a>{% endfor %}
+    </div>
+    {% endif %}
   </article>
   {% endfor %}
 {% endif %}

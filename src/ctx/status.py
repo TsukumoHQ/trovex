@@ -161,10 +161,10 @@ def _read_head(path: str, n: int) -> str:
 def _looks_like_plan(head: str) -> bool:
     stripped = FRONTMATTER_RE.sub("", head)
     lines = [ln.strip() for ln in stripped.splitlines() if ln.strip()][:5]
-    for ln in lines:
-        if ln.startswith("#") and PLAN_TITLE_RE.search(ln.lstrip("#").strip()):
-            return True
-    return False
+    return any(
+        ln.startswith("#") and PLAN_TITLE_RE.search(ln.lstrip("#").strip())
+        for ln in lines
+    )
 
 
 def _frontmatter_status(head: str) -> str | None:

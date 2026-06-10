@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .state import get_state
+from .store import CTX_SOURCE_ID
 
 # Allow override via env so the same code runs locally and behind Traefik.
 EXTRA_HOSTS = [h for h in os.environ.get("CTX_MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
@@ -52,9 +53,8 @@ def ctx(q: str, summary: bool = False) -> str:
     """
     import time as _time
 
-    from .usage import log_query
-
     from .rerank import maybe_rerank
+    from .usage import log_query
 
     state = get_state()
     t0 = _time.perf_counter()
@@ -90,3 +90,49 @@ def ctx(q: str, summary: bool = False) -> str:
     except Exception:
         pass  # never let logging break the tool
     return out
+
+
+@mcp.tool()
+def ctx_write(content: str, kind: str = "", doc_id: str = "") -> str:
+    """Store a doc INSIDE ctx so every agent of every dev can read it.
+
+    For records / memory / coordination notes (incidents, decisions, plans) —
+    not code-docs that belong in a repo. The doc lives in ctx's shared store,
+    so a second agent (or a second dev) reads it via `ctx_read` instead of
+    re-deriving it. Returns an opaque id; pass it back to `ctx_write` (as
+    doc_id) to update the same doc.
+
+    Args:
+        content: The markdown body to store.
+        kind: Lifecycle hint. "record" = event-anchored, never goes stale by
+            age. Default "" = a normal living doc.
+        doc_id: Omit to create; pass an existing id to overwrite that doc.
+    """
+    state = get_state()
+    return state.store.put(content, kind=kind or None, ext_id=doc_id or None)
+
+
+@mcp.tool()
+def ctx_read(query: str = "", doc_id: str = "") -> str:
+    """Read a ctx-owned doc — returns its CONTENT (not a pointer).
+
+    Pass `doc_id` for a direct fetch, or `query` to semantically route to the
+    single best ctx doc and return it. Use this before re-deriving anything an
+    agent may already have written — it spends tokens only on the one right doc.
+
+    Args:
+        query: Natural-language query; returns the best-matching ctx doc's body.
+        doc_id: Opaque id from a prior `ctx_write`; returns that exact doc.
+    """
+    state = get_state()
+    if doc_id:
+        doc = state.store.get(doc_id)
+        return doc.content if doc else "(not found)"
+    if query.strip():
+        results = state.searcher.search(query, limit=1, source_ids=[CTX_SOURCE_ID])
+        if not results:
+            return "(no results)"
+        # For ctx-owned docs, SearchResult.path holds the ext_id.
+        doc = state.store.get(results[0].path)
+        return doc.content if doc else "(not found)"
+    return "(provide query or doc_id)"

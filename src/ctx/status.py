@@ -10,8 +10,6 @@ import re
 import sqlite3
 import time
 
-import sqlite_vec
-
 from .config import Settings
 from .indexer import FRONTMATTER_RE
 
@@ -36,7 +34,7 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
 
     # Pass 1: plan + stale (single-doc rules)
     rows = db.execute(
-        "SELECT id, path, absolute_path, mtime FROM docs WHERE workspace_id = 'default'"
+        "SELECT id, path, absolute_path, mtime, kind FROM docs WHERE workspace_id = 'default'"
     ).fetchall()
 
     plan_count = stale_count = 0
@@ -64,8 +62,10 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
         except OSError:
             pass
 
-        # Stale: age (only if not already plan)
-        if new_status is None and row["mtime"] < stale_cutoff:
+        # Stale: age (only if not already plan). Records are event-anchored —
+        # a 2-year-old incident report is still true, so never age-stale them.
+        if (new_status is None and row["kind"] != "record"
+                and row["mtime"] < stale_cutoff):
             new_status = "stale"
 
         if new_status is not None and new_status != "canonical":
@@ -94,10 +94,13 @@ def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
     """For each doc, find nearest neighbour. If cosine sim > threshold,
     older doc becomes duplicate of newer."""
     threshold = settings.dup_cosine_threshold
+    # Records are unique by definition (each incident/decision is its own event)
+    # — exclude them from dedup entirely, as drivers and as neighbours.
     rows = db.execute(
         """SELECT d.id, d.mtime FROM docs d
            WHERE d.status IN ('canonical', 'plan')
-             AND d.workspace_id = 'default'"""
+             AND d.workspace_id = 'default'
+             AND (d.kind IS NULL OR d.kind != 'record')"""
     ).fetchall()
     if len(rows) < 2:
         return 0
@@ -115,7 +118,7 @@ def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
 
         # Find nearest neighbour (k=2 to skip self)
         neighbours = db.execute(
-            """SELECT v.rowid, v.distance, d.mtime
+            """SELECT v.rowid, v.distance, d.mtime, d.kind
                FROM vec_docs v
                JOIN docs d ON d.id = v.rowid
                WHERE v.embedding MATCH ? AND k = 3
@@ -126,6 +129,8 @@ def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
         for nb in neighbours:
             if nb["rowid"] == row["id"]:
                 continue
+            if nb["kind"] == "record":
+                continue  # never pair a record into a duplicate
             similarity = 1.0 - nb["distance"] / 2
             if similarity < threshold:
                 break  # neighbours are sorted by distance asc

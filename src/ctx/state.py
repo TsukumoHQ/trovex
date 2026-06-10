@@ -9,6 +9,7 @@ from .config import Settings
 from .embedder import build_embedder
 from .indexer import Indexer
 from .search import Searcher
+from .store import SqliteStore
 
 
 @dataclass
@@ -17,6 +18,7 @@ class AppState:
     embedder: Any
     searcher: Searcher
     indexer: Indexer
+    store: SqliteStore
 
 
 _state: AppState | None = None
@@ -29,9 +31,10 @@ def get_state() -> AppState:
         embedder = build_embedder(settings.embed_model)
         searcher = Searcher(settings, embedder=embedder)
         indexer = Indexer(settings, embedder=embedder)
+        store = SqliteStore(settings, embedder=embedder)
         _state = AppState(
             settings=settings, embedder=embedder,
-            searcher=searcher, indexer=indexer,
+            searcher=searcher, indexer=indexer, store=store,
         )
     return _state
 

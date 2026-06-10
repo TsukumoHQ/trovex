@@ -45,6 +45,7 @@ class StoredDoc:
     tokens_est: int
     mtime: float
     tags: list[str] = field(default_factory=list)
+    origin: str | None = None
 
 
 class Store(Protocol):
@@ -91,6 +92,15 @@ class SqliteStore:
 
             if existing:
                 doc_id = existing["id"]
+                # Snapshot the current content before overwriting it (undo-able).
+                old = self.db.execute(
+                    "SELECT content, title FROM docs WHERE id = ?", (doc_id,)
+                ).fetchone()
+                if old and old["content"] is not None:
+                    self.db.execute(
+                        "INSERT INTO doc_versions(doc_id, content, title, ts) VALUES (?, ?, ?, ?)",
+                        (doc_id, old["content"], old["title"], now),
+                    )
                 self.db.execute(
                     """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
                            size_bytes=?, mtime=?, last_indexed=?, author_agent=?
@@ -113,12 +123,20 @@ class SqliteStore:
             self._embed_chunks(self._insert_chunks(doc_id, content, title))
             self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
             self.db.commit()
+            # Rebranch dedup onto the live write path: the indexer that used to
+            # run compute_status() is retired, so flag near-duplicates here as
+            # docs land. Best-effort — never let it block a write.
+            try:
+                from .status import detect_duplicate_for
+                detect_duplicate_for(self.db, self.settings, doc_id)
+            except Exception:
+                pass
         return ext_id
 
     def get(self, ext_id: str) -> StoredDoc | None:
         row = self.db.execute(
             """SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,
-                      d.mtime, GROUP_CONCAT(t.tag) AS tags
+                      d.mtime, d.origin, GROUP_CONCAT(t.tag) AS tags
                FROM docs d LEFT JOIN doc_tags t ON t.doc_id = d.id
                WHERE d.ext_id = ? GROUP BY d.id""",
             (ext_id,),
@@ -128,7 +146,7 @@ class SqliteStore:
         return _row_to_doc(row)
 
     def list_docs(self, *, tag: str | None = None, kind: str | None = None,
-                  limit: int = 500) -> list[StoredDoc]:
+                  q: str | None = None, limit: int = 60, offset: int = 0) -> list[StoredDoc]:
         where = ["d.source_id = ?"]
         params: list = [CTX_SOURCE_ID]
         if tag:
@@ -137,15 +155,37 @@ class SqliteStore:
         if kind:
             where.append("d.kind = ?")
             params.append(kind)
+        if q:
+            # Lightweight browse filter (title/content substring) — NOT semantic
+            # search; that lives on /search via search_chunks.
+            where.append("(d.title LIKE ? OR d.content LIKE ?)")
+            params += [f"%{q}%", f"%{q}%"]
         rows = self.db.execute(
             f"""SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,
                        d.mtime, GROUP_CONCAT(t.tag) AS tags
                 FROM docs d LEFT JOIN doc_tags t ON t.doc_id = d.id
                 WHERE {" AND ".join(where)}
-                GROUP BY d.id ORDER BY d.mtime DESC LIMIT ?""",
-            (*params, limit),
+                GROUP BY d.id ORDER BY d.mtime DESC LIMIT ? OFFSET ?""",
+            (*params, limit, offset),
         ).fetchall()
         return [_row_to_doc(r) for r in rows if r["content"] is not None]
+
+    def count_docs(self, *, tag: str | None = None, kind: str | None = None,
+                   q: str | None = None) -> int:
+        where = ["source_id = ?"]
+        params: list = [CTX_SOURCE_ID]
+        if tag:
+            where.append("id IN (SELECT doc_id FROM doc_tags WHERE tag = ?)")
+            params.append(tag)
+        if kind:
+            where.append("kind = ?")
+            params.append(kind)
+        if q:
+            where.append("(title LIKE ? OR content LIKE ?)")
+            params += [f"%{q}%", f"%{q}%"]
+        return self.db.execute(
+            f"SELECT COUNT(*) AS c FROM docs WHERE {' AND '.join(where)}", params
+        ).fetchone()["c"]
 
     def delete(self, ext_id: str) -> bool:
         """Remove a ctx-owned doc (row + its embedding). True if it existed."""
@@ -159,7 +199,9 @@ class SqliteStore:
                 "SELECT id FROM chunks WHERE doc_id = ?", (row["id"],)
             ).fetchall():
                 self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+                self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
             self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (row["id"],))
+            self.db.execute("DELETE FROM doc_versions WHERE doc_id = ?", (row["id"],))
             self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (row["id"],))
             self.db.execute("DELETE FROM docs WHERE id = ?", (row["id"],))
             self.db.commit()
@@ -223,6 +265,7 @@ class SqliteStore:
             "SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)
         ).fetchall():
             self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+            self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
         self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
         pairs: list[tuple[int, str]] = []
         for ch in chunk_markdown(content):
@@ -230,6 +273,10 @@ class SqliteStore:
                 """INSERT INTO chunks (doc_id, chunk_index, heading_path, content, tokens_est)
                    VALUES (?, ?, ?, ?, ?)""",
                 (doc_id, ch.index, " > ".join(ch.heading_path), ch.text, ch.tokens_est),
+            )
+            self.db.execute(
+                "INSERT INTO chunks_fts(content, chunk_id) VALUES (?, ?)",
+                (ch.text, cur.lastrowid),
             )
             pairs.append((cur.lastrowid, ch.embed_text(title)))
         return pairs
@@ -247,24 +294,45 @@ class SqliteStore:
 
     def search_chunks(self, query: str, limit: int = 5, *, kind: str | None = None,
                       source: str | None = None, tags: list[str] | None = None) -> list[dict]:
-        """Chunk-level retrieval + metadata filters (post-filtered for robustness)."""
+        """Hybrid chunk retrieval: vector + BM25 fused by reciprocal rank, then
+        metadata-filtered. Vector finds semantic matches; BM25 catches exact terms
+        (error codes, function names, ids) the embedding blurs."""
         if not query.strip():
             return []
+        pool = max(limit * 6, 30)
         qemb = next(iter(self.embedder.embed([query])))
-        rows = self.db.execute(
-            """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
-                      d.ext_id, d.title, d.kind, d.source_id,
-                      d.tokens_est AS doc_tokens, v.distance
-               FROM vec_chunks v
-               JOIN chunks c ON c.id = v.rowid
-               JOIN docs d ON d.id = c.doc_id
-               WHERE v.embedding MATCH ? AND k = ?
-               ORDER BY v.distance""",
-            (sqlite_vec.serialize_float32(qemb.tolist()), max(limit * 5, 20)),
-        ).fetchall()
+        vec_ids = [r["rowid"] for r in self.db.execute(
+            "SELECT v.rowid FROM vec_chunks v WHERE v.embedding MATCH ? AND k = ? ORDER BY v.distance",
+            (sqlite_vec.serialize_float32(qemb.tolist()), pool))]
+
+        terms = re.findall(r"[a-z0-9]{2,}", query.lower())[:24]
+        bm_ids: list[int] = []
+        if terms:
+            try:
+                bm_ids = [r["chunk_id"] for r in self.db.execute(
+                    "SELECT chunk_id FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?",
+                    (" OR ".join(terms), pool))]
+            except sqlite3.OperationalError:
+                bm_ids = []
+
+        # Reciprocal rank fusion (k0=60, the standard).
+        scores: dict[int, float] = {}
+        for rank, cid in enumerate(vec_ids):
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (60 + rank)
+        for rank, cid in enumerate(bm_ids):
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (60 + rank)
+        ranked = sorted(scores, key=lambda c: -scores[c])
+
         tagset = set(tags or [])
         out: list[dict] = []
-        for r in rows:
+        for cid in ranked:
+            r = self.db.execute(
+                """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
+                          d.ext_id, d.title, d.kind, d.source_id, d.tokens_est AS doc_tokens
+                   FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.id = ?""",
+                (cid,)).fetchone()
+            if not r:
+                continue
             if kind and r["kind"] != kind:
                 continue
             if source and r["source_id"] != source:
@@ -274,10 +342,19 @@ class SqliteStore:
                     "SELECT tag FROM doc_tags WHERE doc_id = ?", (r["doc_id"],))}
                 if not (tagset & dtags):
                     continue
-            out.append(dict(r))
+            hit = dict(r)
+            hit["score"] = scores[cid]
+            out.append(hit)
             if len(out) >= limit:
                 break
         return out
+
+    def section_text(self, doc_id: int, heading_path: str) -> str:
+        """Small-to-big: all chunks of a doc sharing a heading path = the section."""
+        rows = self.db.execute(
+            """SELECT content FROM chunks WHERE doc_id = ? AND heading_path = ?
+               ORDER BY chunk_index""", (doc_id, heading_path)).fetchall()
+        return "\n\n".join(r["content"] for r in rows)
 
     def _set_tags(self, doc_id: int, tags: list[str]) -> None:
         self.db.execute("DELETE FROM doc_tags WHERE doc_id = ?", (doc_id,))
@@ -315,12 +392,31 @@ class SqliteStore:
             return [r["tag"] for r in self.db.execute(
                 "SELECT tag FROM doc_tags WHERE doc_id = ? ORDER BY tag", (doc_id,))]
 
-    def all_tags(self) -> list[tuple[str, int]]:
-        """Every tag + its doc count, for the filter sidebar / tag tree."""
+    def all_tags(self, limit: int = 40) -> list[tuple[str, int]]:
+        """Top tags by doc count, for the filter sidebar (capped — can be many)."""
         return [(r["tag"], r["c"]) for r in self.db.execute(
             """SELECT t.tag, COUNT(*) AS c FROM doc_tags t
                JOIN docs d ON d.id = t.doc_id WHERE d.source_id = ?
-               GROUP BY t.tag ORDER BY t.tag""", (CTX_SOURCE_ID,))]
+               GROUP BY t.tag ORDER BY c DESC, t.tag LIMIT ?""",
+            (CTX_SOURCE_ID, limit))]
+
+    def tags_by_facet(self, other_limit: int = 12) -> tuple[dict, list]:
+        """Group tags for the sidebar: namespaced (facet/value) into facets,
+        flat ones into 'other' (capped). Each facet entry = (full_tag, label, count)."""
+        rows = self.db.execute(
+            """SELECT t.tag, COUNT(*) AS c FROM doc_tags t
+               JOIN docs d ON d.id = t.doc_id WHERE d.source_id = ?
+               GROUP BY t.tag ORDER BY c DESC, t.tag""", (CTX_SOURCE_ID,)).fetchall()
+        facets: dict[str, list] = {}
+        other: list = []
+        for r in rows:
+            tag, c = r["tag"], r["c"]
+            if "/" in tag:
+                facet, _, label = tag.partition("/")
+                facets.setdefault(facet, []).append((tag, label, c))
+            else:
+                other.append((tag, c))
+        return facets, other[:other_limit]
 
     def create_collection(self, name: str, filter_dict: dict) -> None:
         """A collection = a named saved filter (kind/tag/source)."""
@@ -350,6 +446,23 @@ class SqliteStore:
             self.db.execute("DELETE FROM collections WHERE name = ?", (name,))
             self.db.commit()
 
+    def list_versions(self, ext_id: str) -> list[dict]:
+        """Previous content snapshots of a doc (newest first)."""
+        return [dict(r) for r in self.db.execute(
+            """SELECT v.id, v.title, v.ts, LENGTH(v.content) AS size
+               FROM doc_versions v JOIN docs d ON d.id = v.doc_id
+               WHERE d.ext_id = ? ORDER BY v.ts DESC""", (ext_id,))]
+
+    def restore_version(self, ext_id: str, version_id: int) -> bool:
+        """Restore a previous version — put() snapshots the current one first."""
+        row = self.db.execute(
+            """SELECT v.content FROM doc_versions v JOIN docs d ON d.id = v.doc_id
+               WHERE d.ext_id = ? AND v.id = ?""", (ext_id, version_id)).fetchone()
+        if not row:
+            return False
+        self.put(row["content"], ext_id=ext_id)
+        return True
+
     def _embed(self, doc_id: int, content: str, title: str) -> None:
         text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
         emb = next(iter(self.embedder.embed([text])))
@@ -366,10 +479,14 @@ def _row_to_doc(row: sqlite3.Row) -> StoredDoc:
     except IndexError:
         raw_tags = None
     tags = sorted(set(raw_tags.split(","))) if raw_tags else []
+    try:
+        origin = row["origin"]
+    except IndexError:
+        origin = None
     return StoredDoc(
         ext_id=row["ext_id"], title=row["title"] or "", content=row["content"],
         kind=row["kind"], status=row["status"], tokens_est=row["tokens_est"],
-        mtime=row["mtime"], tags=tags,
+        mtime=row["mtime"], tags=tags, origin=origin,
     )
 
 

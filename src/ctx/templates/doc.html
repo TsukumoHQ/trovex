@@ -4,6 +4,7 @@
 {% block title %}ctx — {{ doc.title }}{% endblock %}
 
 {% block head %}
+<style>{{ pygments_css | safe }}</style>
 <style>
   /* ── Doc reader ─────────────────────────────────────── */
   .reader {
@@ -137,6 +138,44 @@
   }
   .prose hr.md-hr { margin: var(--s-8) 0; border: none; border-top: 1px solid var(--border); }
 
+  /* Pygments-highlighted fenced code (mistune block_code) */
+  .prose .highlight {
+    margin: var(--s-4) 0; border: 1px solid var(--border);
+    border-radius: var(--radius); overflow-x: auto;
+  }
+  .prose .highlight pre {
+    margin: 0; padding: var(--s-4);
+    font-family: var(--font-mono); font-size: var(--t-13); line-height: 1.6;
+  }
+  /* GFM tables */
+  .prose table {
+    width: 100%; margin: var(--s-4) 0; border-collapse: collapse;
+    font-size: var(--t-13);
+  }
+  .prose th, .prose td {
+    padding: var(--s-2) var(--s-3); border: 1px solid var(--border);
+    text-align: left; vertical-align: top;
+  }
+  .prose th { background: var(--bg-elevated); color: var(--fg); font-weight: 600; }
+  .prose tbody tr:hover td { background: var(--bg-hover); }
+  /* GFM task lists */
+  .prose ul:has(> li > input[type="checkbox"]) { list-style: none; padding-left: var(--s-3); }
+  .prose li > input[type="checkbox"] { margin-right: var(--s-2); accent-color: var(--accent); }
+  /* Footnotes */
+  .prose .footnotes { margin-top: var(--s-8); border-top: 1px solid var(--border);
+    padding-top: var(--s-4); font-size: var(--t-12); color: var(--fg-muted); }
+
+  .doc-history { margin-top: var(--s-8); border-top: 1px solid var(--border); padding-top: var(--s-4); }
+  .doc-history summary { cursor: pointer; font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted); }
+  .doc-history summary:hover { color: var(--accent); }
+  .history-row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0;
+    font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted);
+    border-top: 1px solid var(--border); }
+  .history-row .restore { margin-left: auto; background: transparent; border: 1px solid var(--border);
+    color: var(--fg-subtle); border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer;
+    font-family: var(--font-mono); font-size: 11px; }
+  .history-row .restore:hover { color: var(--accent); border-color: var(--accent-line); }
+
   @media (max-width: 1024px) {
     .reader { grid-template-columns: minmax(0, 1fr); }
     .toc { display: none; }
@@ -169,6 +208,7 @@
           </button>
         </span>
         <span>~{{ "{:,}".format(doc.tokens_est) }} tok</span>
+        {% if doc.origin %}<span class="mono" style="color: var(--fg-subtle);" title="original source path">from {{ doc.origin }}</span>{% endif %}
         <button class="danger-btn" type="button"
                 data-delete="{{ doc.ext_id }}" aria-label="Delete this document">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -186,6 +226,11 @@
     </header>
 
     <div class="prose">{{ body_html | safe }}</div>
+
+    <details class="doc-history">
+      <summary>History</summary>
+      <div class="history-body" data-doc="{{ doc.ext_id }}">…</div>
+    </details>
   </article>
 
   {% if toc %}
@@ -211,7 +256,7 @@
   document.querySelectorAll('[data-delete]').forEach(function (btn) {
     btn.addEventListener('click', async function () {
       if (!confirm('Delete this doc? This cannot be undone.')) return;
-      const r = await fetch('/api/doc/' + btn.dataset.delete, { method: 'DELETE' });
+      const r = await fetch('/api/doc/' + btn.dataset.delete, { method: 'DELETE', headers: ctxWriteHeaders() });
       if (r.ok) { location.href = '/store'; }
       else { alert('Delete failed'); }
     });
@@ -223,7 +268,8 @@
     const docId = wrap.dataset.doc;
     async function send(body) {
       const r = await fetch('/api/doc/' + docId + '/tags', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, ctxWriteHeaders()),
         body: JSON.stringify(body),
       });
       if (r.ok) location.reload(); else alert('Tag update failed');
@@ -234,6 +280,41 @@
     const inp = wrap.querySelector('.tag-input');
     inp?.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && inp.value.trim()) { send({ add: inp.value.trim() }); }
+    });
+  })();
+
+  (function () {
+    const det = document.querySelector('.doc-history');
+    if (!det) return;
+    const body = det.querySelector('.history-body');
+    const docId = body.dataset.doc;
+    let loaded = false;
+    det.addEventListener('toggle', async function () {
+      if (!det.open || loaded) return;
+      loaded = true;
+      const vs = await (await fetch('/api/doc/' + docId + '/versions')).json();
+      if (!vs.length) { body.textContent = 'no previous versions'; return; }
+      body.innerHTML = '';
+      vs.forEach(function (v) {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+        row.innerHTML = '<span>' + new Date(v.ts * 1000).toLocaleString() +
+          '</span><span class="subtle">' + v.size + ' chars</span>';
+        const btn = document.createElement('button');
+        btn.className = 'restore'; btn.type = 'button'; btn.textContent = 'restore';
+        btn.addEventListener('click', async function () {
+          if (!confirm('Restore this version? The current content is snapshotted first.')) return;
+          const rr = await fetch('/api/doc/' + docId + '/restore', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, ctxWriteHeaders()),
+            body: JSON.stringify({ version_id: v.id }),
+          });
+          if (rr.ok) { location.reload(); }
+          else { alert(rr.status === 403 ? 'Set the write token in settings' : 'Restore failed'); }
+        });
+        row.appendChild(btn);
+        body.appendChild(row);
+      });
     });
   })();
 </script>

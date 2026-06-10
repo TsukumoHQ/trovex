@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     project_root: Path = Path.cwd()  # legacy, kept for back-compat
     data_dir: Path = Path.home() / ".ctx-data"
 
+    # Shared write token (env CTX_WRITE_TOKEN). Empty = open (no gate).
+    # Gates ctx_write / ctx_tag / ctx_delete + the /api write endpoints.
+    write_token: str = ""
+
     # Multi-source: file at sources_config_path takes precedence; otherwise
     # falls back to a single source built from project_root.
     sources_config_path: Path = Path.home() / ".ctx-data" / "sources.yaml"

@@ -8,15 +8,18 @@
   .store-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: var(--s-8); align-items: start; }
   .store-sidebar { position: sticky; top: calc(52px + var(--s-6)); }
   .side-section { margin-bottom: var(--s-6); }
-  .side-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: var(--t-11);
+  .side-label { display: flex; align-items: center; gap: 6px; text-transform: uppercase;
+    letter-spacing: 0.08em; font-size: var(--t-11);
     color: var(--fg-subtle); margin-bottom: var(--s-2); font-family: var(--font-mono); }
+  .side-label .icon { color: var(--fg-faint); }
   .side-link { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
     padding: 3px var(--s-2); border-radius: var(--radius-sm); color: var(--fg-muted);
     font-family: var(--font-mono); font-size: var(--t-12); }
   .side-link:hover { background: var(--bg-hover); color: var(--fg); }
   .side-link.active { background: var(--accent-soft); color: var(--accent); }
   .side-link .count { color: var(--fg-faint); font-size: var(--t-11); }
-  .side-btn { margin-top: var(--s-2); width: 100%; text-align: left; background: transparent;
+  .side-btn { display: flex; align-items: center; gap: 6px; margin-top: var(--s-2); width: 100%;
+    text-align: left; background: transparent;
     border: 1px dashed var(--border); color: var(--fg-subtle); border-radius: var(--radius-sm);
     padding: 4px var(--s-2); cursor: pointer; font-family: var(--font-mono); font-size: var(--t-11); }
   .side-btn:hover { color: var(--accent); border-color: var(--accent-line); }
@@ -45,7 +48,12 @@
   .doc-card-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between;
     padding-top: var(--s-3); border-top: 1px solid var(--border);
     font-family: var(--font-mono); font-size: var(--t-11); color: var(--fg-subtle); }
+  .doc-card-foot .icon { color: var(--fg-faint); }
+  .foot-item { display: inline-flex; align-items: center; gap: 4px; }
   .store-empty-icon { color: var(--fg-faint); margin-bottom: var(--s-3); }
+  .pager { display: flex; align-items: center; justify-content: center; gap: var(--s-4);
+    margin-top: var(--s-6); font-family: var(--font-mono); font-size: var(--t-12); }
+  .pager a { color: var(--accent); }
   @media (max-width: 880px) { .store-layout { grid-template-columns: 1fr; } .store-sidebar { position: static; } }
 </style>
 {% endblock %}
@@ -55,19 +63,30 @@
 {% endblock %}
 
 {% block content %}
+{% set facet_icons = {'type': 'i-tag', 'owner': 'i-user', 'domain': 'i-globe', 'kind': 'i-layers'} %}
 <div class="store-layout">
   <aside class="store-sidebar">
     <div class="side-section">
-      <div class="side-label">Kind</div>
+      <div class="side-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-layers"></use></svg> Kind</div>
       <a href="/store" class="side-link {% if not active_kind and not active_tag and not active_collection %}active{% endif %}">all</a>
       {% for k in ['record', 'note', 'reference'] %}
       <a href="/store?kind={{ k }}" class="side-link {% if active_kind == k %}active{% endif %}">{{ k }}</a>
       {% endfor %}
     </div>
-    {% if all_tags %}
+    {% for facet in ['type', 'owner', 'domain', 'kind'] if facets.get(facet) %}
     <div class="side-section">
-      <div class="side-label">Tags</div>
-      {% for t, c in all_tags %}
+      <div class="side-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#{{ facet_icons.get(facet, 'i-tag') }}"></use></svg> {{ facet }}</div>
+      {% for tag, label, c in facets[facet] %}
+      <a href="/store?tag={{ tag | urlencode }}" class="side-link {% if active_tag == tag %}active{% endif %}">
+        <span>{{ label }}</span><span class="count">{{ c }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    {% if other_tags %}
+    <div class="side-section">
+      <div class="side-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-hash"></use></svg> tags</div>
+      {% for t, c in other_tags %}
       <a href="/store?tag={{ t | urlencode }}" class="side-link {% if active_tag == t %}active{% endif %}">
         <span>{{ t }}</span><span class="count">{{ c }}</span>
       </a>
@@ -75,11 +94,11 @@
     </div>
     {% endif %}
     <div class="side-section">
-      <div class="side-label">Collections</div>
+      <div class="side-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bookmark"></use></svg> Collections</div>
       {% for col in collections %}
       <a href="/store?collection={{ col.name | urlencode }}" class="side-link {% if active_collection == col.name %}active{% endif %}">{{ col.name }}</a>
       {% endfor %}
-      <button class="side-btn" id="save-collection">+ save current filter</button>
+      <button class="side-btn" id="save-collection"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bookmark"></use></svg> save current filter</button>
     </div>
   </aside>
 
@@ -91,7 +110,7 @@
     </div>
     {% endif %}
 
-    <div class="section-head" style="margin-bottom: var(--s-5);">
+    <div class="section-head" style="margin-bottom: var(--s-4);">
       <div>
         <h1 style="margin-bottom: 2px;">Store</h1>
         <div class="subtle mono" style="font-size: var(--t-12);">
@@ -99,6 +118,26 @@
         </div>
       </div>
     </div>
+
+    <form action="/store" method="get" style="margin-bottom: var(--s-4);">
+      <div class="search-shell">
+        <span class="prefix" aria-hidden="true"><svg class="icon"><use href="#i-search"></use></svg></span>
+        <input type="search" name="q" value="{{ q }}" class="input search-input mono"
+               placeholder="filter this view — title &amp; text…" aria-label="Filter the store">
+        <div class="suffix"><span class="kbd">↵</span></div>
+      </div>
+      {% if active_kind %}<input type="hidden" name="kind" value="{{ active_kind }}">{% endif %}
+      {% if active_tag %}<input type="hidden" name="tag" value="{{ active_tag }}">{% endif %}
+    </form>
+    <div class="subtle mono store-hint" style="font-size: var(--t-11); margin-bottom: var(--s-3);">
+      quick filter (title + text) · for ranked semantic search →
+      <a href="/search{% if q %}?q={{ q | urlencode }}{% endif %}" style="color: var(--accent);">advanced search</a>
+    </div>
+    {% if q %}
+    <div class="subtle mono" style="font-size: var(--t-12); margin-bottom: var(--s-3);">
+      {{ total }} match{{ '' if total == 1 else 'es' }} for "{{ q }}" · <a href="/store{% if active_kind %}?kind={{ active_kind }}{% elif active_tag %}?tag={{ active_tag | urlencode }}{% endif %}" style="color: var(--accent);">clear</a>
+    </div>
+    {% endif %}
 
     {% if items %}
     <div class="store-grid">
@@ -116,8 +155,8 @@
         </div>
         {% endif %}
         <div class="doc-card-foot">
-          <span>{{ fresh_label(d.age_days) }}</span>
-          <span>~{{ "{:,}".format(d.tokens_est) }} tok</span>
+          <span class="foot-item"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"></use></svg>{{ fresh_label(d.age_days) }}</span>
+          <span class="foot-item"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-zap"></use></svg>~{{ "{:,}".format(d.tokens_est) }} tok</span>
         </div>
       </div>
       {% endfor %}
@@ -127,8 +166,17 @@
       <svg class="store-empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
       </svg>
-      <div class="empty-title mono">No docs match this filter</div>
+      <div class="empty-title mono">{% if q %}No results for "{{ q }}"{% else %}No docs match this filter{% endif %}</div>
       <div class="empty-hint"><span>Agents create them with the <code>ctx_write</code> MCP tool.</span></div>
+    </div>
+    {% endif %}
+
+    {% if pages > 1 %}
+    <div class="pager">
+      {% set qs = (('&q=' + (q | urlencode)) if q else '') ~ (('&tag=' + (active_tag | urlencode)) if active_tag else '') ~ (('&kind=' + active_kind) if active_kind else '') %}
+      {% if page > 1 %}<a href="/store?page={{ page - 1 }}{{ qs }}">← prev</a>{% else %}<span class="subtle">← prev</span>{% endif %}
+      <span class="subtle">page {{ page }} / {{ pages }}</span>
+      {% if page < pages %}<a href="/store?page={{ page + 1 }}{{ qs }}">next →</a>{% else %}<span class="subtle">next →</span>{% endif %}
     </div>
     {% endif %}
   </div>
@@ -140,7 +188,8 @@
     if (!name) return;
     const p = new URLSearchParams(location.search);
     const r = await fetch('/api/collections', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, ctxWriteHeaders()),
       body: JSON.stringify({ name: name, tag: p.get('tag') || '', kind: p.get('kind') || '' }),
     });
     if (r.ok) location.href = '/store?collection=' + encodeURIComponent(name);

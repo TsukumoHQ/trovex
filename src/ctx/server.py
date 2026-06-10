@@ -18,7 +18,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import insights as insights_mod
 from . import savings as savings_mod
-from .markdown import render_markdown
+from .markdown import PYGMENTS_CSS, render_markdown
 from .mcp_app import mcp
 from .state import get_state
 from .usage import UserHeaderMiddleware
@@ -66,6 +66,12 @@ def _snippet(content: str, n: int = 160) -> str:
     return text[:n] + ("…" if len(text) > n else "")
 
 
+def _write_authorized(request: Request) -> bool:
+    """Mirror the MCP write gate for the HTTP /api write endpoints."""
+    tok = get_state().settings.write_token
+    return (not tok) or (request.headers.get("x-ctx-write-token") == tok)
+
+
 def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     now = _now()
     out = []
@@ -97,12 +103,52 @@ def _avatar_color(name: str | None) -> str:
     return _AVATAR_PALETTE[h % len(_AVATAR_PALETTE)]
 
 
+def _highlight(text: str, terms: list[str]):
+    """Escape text, then wrap query terms in <mark> (case-insensitive). Returns
+    Markup so Jinja won't re-escape. Terms are alphanumeric, so matching the
+    already-escaped text never splits an HTML entity."""
+    import html as _html
+    import re as _re
+    from markupsafe import Markup
+    esc = _html.escape(text or "")
+    terms = [t for t in (terms or []) if t]
+    if not terms:
+        return Markup(esc)
+    pat = _re.compile(
+        "(" + "|".join(_re.escape(t) for t in sorted(terms, key=len, reverse=True)) + ")",
+        _re.IGNORECASE,
+    )
+    return Markup(pat.sub(lambda m: '<mark class="hl">' + m.group(0) + "</mark>", esc))
+
+
+def _sparkline(values: list[int], w: int = 100, h: int = 30, pad: int = 3) -> dict | None:
+    """Normalise a series into SVG point strings for a stretched (preserveAspectRatio=none) sparkline.
+
+    Returns {line, area, w, h} or None when there's nothing to draw. The line is a
+    polyline of the values; the area is the same closed back to the baseline for a fill.
+    """
+    if not values or max(values) <= 0:
+        return None
+    vmax = max(values)
+    inner = h - 2 * pad
+    n = len(values)
+    pts = []
+    for i, v in enumerate(values):
+        x = pad + (i * (w - 2 * pad) / (n - 1) if n > 1 else (w - 2 * pad) / 2)
+        y = h - pad - (v / vmax) * inner
+        pts.append((round(x, 1), round(y, 1)))
+    line = " ".join(f"{x},{y}" for x, y in pts)
+    area = f"{pad},{h - pad} {line} {round(pts[-1][0], 1)},{h - pad}"
+    return {"line": line, "area": area, "w": w, "h": h}
+
+
 def build_app() -> FastAPI:
     # docs_url=None frees the /docs path for our own browse page.
     app = FastAPI(title="ctx", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(UserHeaderMiddleware)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["avatar_color"] = _avatar_color
+    templates.env.filters["highlight"] = _highlight
 
     # Mount MCP HTTP transport at /mcp
     app.mount("/mcp", mcp.streamable_http_app())
@@ -132,6 +178,12 @@ def build_app() -> FastAPI:
         last_run_relative = (
             _relative_time(_now() - last_run["ts"]) if last_run else "never"
         )
+        # The store indexes on write — the reindex (index_runs) is retired, so
+        # surface the latest write instead of stale added/updated counts.
+        lw = db.execute(
+            "SELECT MAX(mtime) AS m FROM docs WHERE source_id = 'ctx'"
+        ).fetchone()
+        last_write_relative = _relative_time(_now() - lw["m"]) if lw and lw["m"] else "never"
 
         recent = _rows_with_age(db.execute(
             """SELECT path, title, mtime, status, tokens_est, size_bytes
@@ -170,6 +222,23 @@ def build_app() -> FastAPI:
             d["last_seen_label"] = _relative_time(_now() - d["last_seen"])
             by_user_rows.append(d)
         savings_totals = savings_mod.totals(db, since_7d)
+
+        # 7-day savings trend (sparkline) + honest week-over-week delta.
+        # daily_series buckets by UTC midnight, so 14d → ~15 buckets; take the
+        # last 7 as "this week" and the 7 before as "last week".
+        series14 = savings_mod.daily_series(db, _now() - 14 * 86400, _now())
+        savings_series = [d["saved"] for d in series14[-7:]]
+        saved_this = sum(savings_series)
+        saved_prev = sum(d["saved"] for d in series14[-14:-7]) if len(series14) >= 8 else 0
+        saved_delta_pct = ((saved_this - saved_prev) / saved_prev) if saved_prev else None
+        savings_spark = _sparkline(savings_series)
+
+        # Activity this week — writes touch mtime, so these are "written / updated",
+        # not net-new growth. Labelled as such in the UI (no fake +growth delta).
+        docs_written_7d = db.execute(
+            "SELECT COUNT(*) AS c FROM docs WHERE mtime >= ?", (since_7d,)
+        ).fetchone()["c"]
+
         recent_queries = [
             {**dict(r), "age_label": _relative_time(_now() - r["ts"])}
             for r in db.execute(
@@ -188,6 +257,7 @@ def build_app() -> FastAPI:
                 "total": total, "total_tokens": total_tokens, "avg_tokens": avg_tokens,
                 "by_status": by_status, "last_run": last_run,
                 "last_run_relative": last_run_relative,
+                "last_write_relative": last_write_relative,
                 "recent": recent, "attention": attention, "heaviest": heaviest,
                 "corpus_path": str(state.settings.project_root),
                 "by_user": by_user_rows,
@@ -195,17 +265,28 @@ def build_app() -> FastAPI:
                 "total_queries_7d": total_queries_7d,
                 "has_any_queries": total_queries_7d > 0 or len(by_user_rows) > 0,
                 "savings_totals": savings_totals,
+                "savings_spark": savings_spark,
+                "saved_delta_pct": saved_delta_pct,
+                "docs_written_7d": docs_written_7d,
                 "sources": sources,
             },
         )
 
     @app.get("/search", response_class=HTMLResponse)
-    async def search_html(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
-        return _render_search(request, templates, q, summary, partial=False)
+    async def search_html(request: Request, q: str = "", summary: bool = False,
+                          tag: list[str] = Query(default=[]), kind: str = "",
+                          sort: str = "relevance", page: int = 1) -> HTMLResponse:
+        # Dedicated search page over the ctx store (hybrid vector + BM25), not a
+        # redirect to /store — search is ctx's core verb and deserves its own surface.
+        return _render_search(request, templates, q, summary, partial=False,
+                              tags=tag, kind=kind, sort=sort, page=page)
 
     @app.get("/search/partial", response_class=HTMLResponse)
-    async def search_partial(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
-        return _render_search(request, templates, q, summary, partial=True)
+    async def search_partial(request: Request, q: str = "", summary: bool = False,
+                             tag: list[str] = Query(default=[]), kind: str = "",
+                             sort: str = "relevance", page: int = 1) -> HTMLResponse:
+        return _render_search(request, templates, q, summary, partial=True,
+                              tags=tag, kind=kind, sort=sort, page=page)
 
     @app.get("/docs")
     async def docs_page() -> RedirectResponse:
@@ -234,19 +315,24 @@ def build_app() -> FastAPI:
             return HTMLResponse("(not found)", status_code=404)
         body_html, toc = render_markdown(doc.content)
         return templates.TemplateResponse(
-            request, "doc.html", {"doc": doc, "body_html": body_html, "toc": toc}
+            request, "doc.html",
+            {"doc": doc, "body_html": body_html, "toc": toc, "pygments_css": PYGMENTS_CSS},
         )
 
     @app.delete("/api/doc/{ext_id}")
-    async def api_doc_delete(ext_id: str) -> JSONResponse:
+    async def api_doc_delete(ext_id: str, request: Request) -> JSONResponse:
         """Delete a ctx-owned doc. Updates go through ctx_write (same id)."""
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         ok = get_state().store.delete(ext_id)
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
 
     @app.get("/store", response_class=HTMLResponse)
     async def store_page(request: Request, tag: str = "", kind: str = "",
-                         collection: str = "") -> HTMLResponse:
-        """The ctx-owned doc store — what agents write, what humans read here."""
+                         collection: str = "", q: str = "", page: int = 1) -> HTMLResponse:
+        """The ctx-owned doc store — browse + quick title/text filter. Semantic
+        search lives on /search (this `q` is a lightweight view filter, paginated
+        like the rest of the browse)."""
         store = get_state().store
         now = _now()
         f_tag, f_kind = tag, kind
@@ -254,23 +340,33 @@ def build_app() -> FastAPI:
             cf = store.get_collection(collection) or {}
             f_tag = cf.get("tag", f_tag)
             f_kind = cf.get("kind", f_kind)
-        items = [
-            {
+        page = max(1, page)
+        per = 60
+
+        def card(d, snippet):
+            return {
                 "ext_id": d.ext_id, "title": d.title, "kind": d.kind,
                 "status": d.status, "tokens_est": d.tokens_est, "tags": d.tags,
-                "age_days": max(0.0, (now - d.mtime) / 86400),
-                "snippet": _snippet(d.content),
+                "age_days": max(0.0, (now - d.mtime) / 86400), "snippet": snippet,
             }
-            for d in store.list_docs(tag=f_tag or None, kind=f_kind or None)
-        ]
+
+        qf = q.strip() or None
+        total = store.count_docs(tag=f_tag or None, kind=f_kind or None, q=qf)
+        docs = store.list_docs(tag=f_tag or None, kind=f_kind or None, q=qf,
+                               limit=per, offset=(page - 1) * per)
+        items = [card(d, _snippet(d.content)) for d in docs]
+        pages = (total + per - 1) // per
+
+        facets, other_tags = store.tags_by_facet()
         return templates.TemplateResponse(
             request, "store.html",
             {
-                "items": items,
+                "items": items, "total": total,
                 "total_tokens": sum(i["tokens_est"] for i in items),
-                "all_tags": store.all_tags(),
+                "facets": facets, "other_tags": other_tags,
                 "collections": store.list_collections(),
                 "active_tag": tag, "active_kind": kind, "active_collection": collection,
+                "q": q, "page": page, "pages": pages,
             },
         )
 
@@ -280,6 +376,8 @@ def build_app() -> FastAPI:
 
     @app.post("/api/collections")
     async def api_collection_create(request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         body = await request.json()
         name = (body.get("name") or "").strip()
         if not name:
@@ -289,12 +387,28 @@ def build_app() -> FastAPI:
         return JSONResponse({"ok": True, "name": name, "filter": flt})
 
     @app.delete("/api/collections/{name}")
-    async def api_collection_delete(name: str) -> JSONResponse:
+    async def api_collection_delete(name: str, request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         get_state().store.delete_collection(name)
         return JSONResponse({"deleted": True})
 
+    @app.get("/api/doc/{ext_id}/versions")
+    async def api_doc_versions(ext_id: str) -> JSONResponse:
+        return JSONResponse(get_state().store.list_versions(ext_id))
+
+    @app.post("/api/doc/{ext_id}/restore")
+    async def api_doc_restore(ext_id: str, request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
+        body = await request.json()
+        ok = get_state().store.restore_version(ext_id, int(body.get("version_id", 0)))
+        return JSONResponse({"restored": ok}, status_code=200 if ok else 404)
+
     @app.post("/api/doc/{ext_id}/tags")
     async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         body = await request.json()
         tags = get_state().store.set_tags(
             ext_id,
@@ -324,6 +438,24 @@ def build_app() -> FastAPI:
             for r in results
         ])
 
+    @app.get("/api/map")
+    async def api_map(canonical_only: bool = True) -> JSONResponse:
+        """The 'map' of the store: titles + tags + status, no content. Cheap enough
+        to inject at session start so an agent *sees the territory* and knows what
+        it can ask ctx for — turning an unknown-unknown into a queryable target."""
+        store = get_state().store
+        docs = store.list_docs(limit=2000)
+        if canonical_only:
+            docs = [d for d in docs if d.status not in ("stale", "duplicate")]
+        return JSONResponse({
+            "count": len(docs),
+            "docs": [
+                {"id": d.ext_id, "title": d.title, "kind": d.kind,
+                 "status": d.status, "tags": d.tags}
+                for d in docs
+            ],
+        })
+
     @app.get("/api/stats")
     async def api_stats() -> JSONResponse:
         state = get_state()
@@ -351,6 +483,35 @@ def build_app() -> FastAPI:
     @app.get("/healthz", response_class=PlainTextResponse)
     async def healthz() -> str:
         return "ok"
+
+    @app.get("/settings", response_class=HTMLResponse)
+    async def settings_page(request: Request) -> HTMLResponse:
+        from . import backup as backup_mod
+        state = get_state()
+        db = state.searcher.db
+        db_path = state.settings.data_dir / "ctx.db"
+        return templates.TemplateResponse(request, "settings.html", {
+            "db_size": db_path.stat().st_size if db_path.exists() else 0,
+            "doc_count": db.execute(
+                "SELECT COUNT(*) AS c FROM docs WHERE source_id='ctx'").fetchone()["c"],
+            "chunk_count": db.execute("SELECT COUNT(*) AS c FROM chunks").fetchone()["c"],
+            "auth_on": bool(state.settings.write_token),
+            "backups": backup_mod.list_backups(state.settings.data_dir),
+        })
+
+    @app.get("/api/backups")
+    async def api_backups() -> JSONResponse:
+        from . import backup as backup_mod
+        return JSONResponse(backup_mod.list_backups(get_state().settings.data_dir))
+
+    @app.post("/api/backup")
+    async def api_backup(request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
+        from . import backup as backup_mod
+        state = get_state()
+        dest = backup_mod.make_backup(state.settings.data_dir / "ctx.db", state.settings.data_dir)
+        return JSONResponse({"ok": True, "file": dest.name})
 
     # ── Install page + hook downloads ────────────────────────────────
 
@@ -560,21 +721,91 @@ def build_app() -> FastAPI:
     return app
 
 
-def _render_search(request: Request, templates: Jinja2Templates, q: str, summary: bool, partial: bool) -> HTMLResponse:
+def _render_search(request: Request, templates: Jinja2Templates, q: str, summary: bool,
+                   partial: bool, *, tags: list[str] | None = None, kind: str = "",
+                   sort: str = "relevance", page: int = 1) -> HTMLResponse:
+    from urllib.parse import urlencode
+
     state = get_state()
-    db = state.searcher.db
-    total = db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+    store = state.store
+    total = store.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+    now = _now()
+    tags = [t for t in (tags or []) if t]
+    page = max(1, page)
+    per = 12
+
+    def _u(**over) -> str:
+        """Build a /search URL from current state with overrides (q/kind/sort/tags/page)."""
+        params: list[tuple[str, str]] = []
+        if over.get("q", q):
+            params.append(("q", over.get("q", q)))
+        if over.get("kind", kind):
+            params.append(("kind", over.get("kind", kind)))
+        ss = over.get("sort", sort)
+        if ss and ss != "relevance":
+            params.append(("sort", ss))
+        for t in over.get("tags", tags):
+            params.append(("tag", t))
+        pg = over.get("page", 1)
+        if pg and pg > 1:
+            params.append(("page", str(pg)))
+        return "/search?" + urlencode(params) if params else "/search"
 
     elapsed_ms = 0
-    results = []
-    summaries: dict[str, str] = {}
+    pool: list[dict[str, Any]] = []
+    facet_counts: dict[str, int] = {}
     if q.strip():
         t0 = time.perf_counter()
-        results = state.searcher.search(q, limit=10)
+        # Over-fetch chunks (filtered by kind + any-of tags), collapse to the
+        # best-scoring chunk per doc so one doc with many sections doesn't flood.
+        hits = store.search_chunks(q, limit=240, kind=kind or None, tags=tags or None)
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        if summary:
-            for r in results:
-                summaries[r.path] = state.searcher._extract_summary(r.absolute_path)
+        max_score = hits[0]["score"] if hits else 1.0  # ranked desc → first is max
+        seen: set[str] = set()
+        for h in hits:
+            ext_id = h["ext_id"]
+            if ext_id in seen:
+                continue
+            d = store.get(ext_id)
+            if not d:
+                continue
+            seen.add(ext_id)
+            pool.append({
+                "ext_id": ext_id,
+                "title": h["title"] or ext_id,
+                "kind": h["kind"],
+                "status": d.status,
+                "tags": d.tags,
+                "section": h["heading_path"],
+                "snippet": (h["content"] or "").strip()[:280],
+                "tokens_est": h["doc_tokens"],
+                "age_days": max(0.0, (now - d.mtime) / 86400),
+                "score": (h["score"] / max_score) if max_score else 0.0,
+            })
+            for t in d.tags:
+                facet_counts[t] = facet_counts.get(t, 0) + 1
+            if len(pool) >= 60:
+                break
+        if sort == "recent":
+            pool.sort(key=lambda r: r["age_days"])
+        elif sort == "tokens":
+            pool.sort(key=lambda r: r["tokens_est"], reverse=True)
+        # relevance = keep the fused-score order
+
+    total_results = len(pool)
+    pages = max(1, (total_results + per - 1) // per)
+    page = min(page, pages)
+    results = pool[(page - 1) * per: page * per]
+
+    # Facets: tags present in the result set (not already selected), by count.
+    facets = [
+        {"tag": t, "count": c, "url": _u(tags=tags + [t], page=1)}
+        for t, c in sorted(facet_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        if t not in tags
+    ][:12]
+    active_tags = [
+        {"tag": t, "url": _u(tags=[x for x in tags if x != t], page=1)} for t in tags
+    ]
 
     # Tokens from query (alphanumeric runs >= 2 chars) for inline highlighting.
     import re as _re
@@ -585,10 +816,17 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
 
     ctx_data = {
         "q": q, "summary": summary, "total": total,
-        "results": results, "summaries": summaries,
+        "results": results,
         "elapsed_ms": elapsed_ms,
         "example_queries": EXAMPLE_QUERIES,
         "highlight_terms": highlight_terms,
+        "tags": tags, "kind": kind, "sort": sort,
+        "facets": facets, "active_tags": active_tags,
+        "total_results": total_results, "page": page, "pages": pages,
+        "prev_url": _u(page=page - 1) if page > 1 else "",
+        "next_url": _u(page=page + 1) if page < pages else "",
+        "clear_url": _u(tags=[], kind="", page=1),
+        "has_filters": bool(tags or kind),
     }
     template_name = "_results.html" if partial else "search.html"
     return templates.TemplateResponse(request, template_name, ctx_data)

@@ -4,11 +4,9 @@
 {% block title %}ctx — overview{% endblock %}
 
 {% block topbar_meta %}
-  {% if last_run %}
-    <span class="dot" aria-hidden="true"></span>
-    <span>indexed {{ last_run_relative }}</span>
-    <span class="subtle">·</span>
-  {% endif %}
+  <span class="dot" aria-hidden="true"></span>
+  <span>last write {{ last_write_relative }}</span>
+  <span class="subtle">·</span>
   <span><span class="kbd">/</span> to search</span>
 {% endblock %}
 
@@ -54,14 +52,14 @@
     margin-left: auto;
     padding: var(--s-2) var(--s-4);
     background: var(--accent);
-    color: var(--bg) !important;
+    color: var(--on-accent) !important;
     border-radius: var(--radius-sm);
     font-weight: 500;
     font-family: var(--font-mono);
     font-size: var(--t-13);
     transition: all var(--duration);
   }
-  .banner-cta:hover { opacity: 0.85; color: var(--bg) !important; }
+  .banner-cta:hover { opacity: 0.85; color: var(--on-accent) !important; }
   .banner-dismiss {
     position: absolute;
     top: var(--s-2); right: var(--s-3);
@@ -88,25 +86,19 @@
 {# ── KPI tiles ─────────────────────────────────────────────────────── #}
 <div class="kpi-grid">
   <div class="kpi">
-    <div class="kpi-label">indexed docs</div>
+    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-file"></use></svg> docs</div>
     <div class="kpi-value">{{ "{:,}".format(total) }}</div>
-    {% if last_run %}
-      <div class="kpi-sub">
-        +{{ last_run.added }} added · ~{{ last_run.updated }} updated
-      </div>
-    {% endif %}
+    <div class="kpi-sub">{{ docs_written_7d | default(0) }} written · 7d</div>
   </div>
 
   <div class="kpi">
-    <div class="kpi-label">total tokens</div>
+    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-zap"></use></svg> total tokens</div>
     <div class="kpi-value">{{ number(total_tokens) }}</div>
-    <div class="kpi-sub">
-      avg {{ "{:,}".format(avg_tokens) }} / doc
-    </div>
+    <div class="kpi-sub">avg {{ "{:,}".format(avg_tokens) }} / doc</div>
   </div>
 
   <div class="kpi">
-    <div class="kpi-label">noise to triage</div>
+    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg> noise to triage</div>
     <div class="kpi-value">{{ (by_status.get('stale', 0) + by_status.get('duplicate', 0)) }}</div>
     <div class="kpi-sub">
       {{ by_status.get('stale', 0) }} stale · {{ by_status.get('duplicate', 0) }} dup
@@ -114,25 +106,62 @@
   </div>
 
   <div class="kpi {% if savings_totals.saved > 0 %}kpi-accent{% endif %}">
-    <div class="kpi-label">tokens saved · 7d</div>
+    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trend"></use></svg> tokens saved · 7d</div>
     <div class="kpi-value">{{ number(savings_totals.saved) }}</div>
-    <div class="kpi-sub">
+    <div class="kpi-sub kpi-sub-row">
+      {% if saved_delta_pct is defined and saved_delta_pct is not none %}
+        {% if saved_delta_pct >= 0 %}
+          <span class="delta delta-up" title="vs previous 7 days">▲ {{ "%.0f"|format(saved_delta_pct * 100) }}%</span>
+        {% else %}
+          <span class="delta delta-down" title="vs previous 7 days">▼ {{ "%.0f"|format(saved_delta_pct * -100) }}%</span>
+        {% endif %}
+      {% endif %}
       {% if savings_totals.queries > 0 %}
-        <a href="/savings" style="color: var(--accent);">
-          {{ "%.0f"|format(savings_totals.ratio * 100) }}% reduction →
-        </a>
+        <a href="/savings" class="kpi-link">{{ "%.0f"|format(savings_totals.ratio * 100) }}% reduction →</a>
       {% else %}
-        no data yet
+        <span class="subtle">no data yet</span>
       {% endif %}
     </div>
+    {% if savings_spark is defined and savings_spark %}
+    <svg class="kpi-spark" viewBox="0 0 {{ savings_spark.w }} {{ savings_spark.h }}"
+         preserveAspectRatio="none" aria-hidden="true">
+      <polygon class="kpi-spark-area" points="{{ savings_spark.area }}"></polygon>
+      <polyline class="kpi-spark-line" points="{{ savings_spark.line }}"></polyline>
+    </svg>
+    {% endif %}
   </div>
 </div>
 <style>
+  .kpi-label { display: flex; align-items: center; gap: 6px; }
+  .kpi-label .icon { color: var(--fg-faint); }
   .kpi-accent {
     border-color: var(--accent-line);
     background: linear-gradient(180deg, var(--accent-soft), var(--bg-card));
   }
   .kpi-accent .kpi-value { color: var(--accent); }
+  .kpi-accent .kpi-label .icon { color: var(--accent); }
+
+  .kpi-sub-row { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+  .delta { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .delta-up { color: var(--accent); }
+  .delta-down { color: var(--fg-subtle); }
+  .kpi-link { color: var(--accent); }
+  .kpi-link:hover { color: var(--accent); text-decoration: underline; }
+
+  .kpi-spark {
+    width: 100%; height: 30px;
+    margin-top: var(--s-3);
+    display: block;
+  }
+  .kpi-spark-area { fill: var(--accent-soft); stroke: none; }
+  .kpi-spark-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
 </style>
 
 {# ── Status distribution stacked bar ───────────────────────────────── #}
@@ -167,13 +196,13 @@
 
 {# ── Section: humans / activity ────────────────────────────────────── #}
 <div class="section-divider">
-  <span class="section-divider-label">Activity</span>
+  <span class="section-divider-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-activity"></use></svg> Activity</span>
   <span class="section-divider-meta mono">last 7d</span>
 </div>
 <div class="row-2col-narrow-wide">
   <div class="card">
     <div class="card-header">
-      <h3 style="margin: 0;">MCP usage</h3>
+      <h3 style="margin: 0;"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-users"></use></svg> MCP usage</h3>
       <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">
         {{ total_queries_7d }} queries
       </span>
@@ -208,7 +237,7 @@
 
   <div class="card">
     <div class="card-header">
-      <h3 style="margin: 0;">Recent queries</h3>
+      <h3 style="margin: 0;"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-message"></use></svg> Recent queries</h3>
       <a href="/usage" class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">view all →</a>
     </div>
     {% if recent_queries %}
@@ -237,13 +266,13 @@
 
 {# ── Section: corpus / content ─────────────────────────────────────── #}
 <div class="section-divider">
-  <span class="section-divider-label">Corpus</span>
+  <span class="section-divider-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-folder"></use></svg> Corpus</span>
   <span class="section-divider-meta mono">{{ total }} docs</span>
 </div>
 <div class="row-2col-wide-narrow">
   <div class="card">
     <div class="card-header">
-      <h3 style="margin: 0;">Recently updated</h3>
+      <h3 style="margin: 0;"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"></use></svg> Recently updated</h3>
       <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">{{ recent | length }} shown</span>
     </div>
     <div class="table-wrap" style="border: none; border-radius: 0;">
@@ -274,7 +303,7 @@
 
   <div class="card">
     <div class="card-header">
-      <h3 style="margin: 0;">Needs attention</h3>
+      <h3 style="margin: 0;"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg> Needs attention</h3>
       {% if attention %}
       <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">{{ attention | length }}</span>
       {% endif %}
@@ -291,7 +320,7 @@
       </ul>
     {% else %}
       <div class="card-body" style="text-align: center; padding: var(--s-6);">
-        <div class="attention-clean">✓</div>
+        <div class="attention-clean"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></div>
         <div class="subtle mono" style="font-size: var(--t-12);">clean — nothing to triage</div>
       </div>
     {% endif %}
@@ -369,14 +398,14 @@
     display: inline-flex; align-items: center; gap: 6px;
     padding: 6px 12px;
     background: var(--accent);
-    color: var(--bg) !important;
+    color: var(--on-accent) !important;
     border-radius: var(--radius-sm);
     font-family: var(--font-mono);
     font-size: var(--t-12);
     font-weight: 500;
     transition: opacity var(--duration);
   }
-  .connect-btn:hover { opacity: 0.85; color: var(--bg) !important; }
+  .connect-btn:hover { opacity: 0.85; color: var(--on-accent) !important; }
 
   /* ── Query feed ──────────────────────────────────────── */
   .query-feed { list-style: none; margin: 0; padding: 0; }
@@ -445,7 +474,7 @@
 {% if heaviest %}
 <div class="section">
   <div class="section-head">
-    <h3>Heaviest files</h3>
+    <h3><svg class="icon icon-sm" aria-hidden="true"><use href="#i-flame"></use></svg> Heaviest files</h3>
     <span class="subtle mono" style="font-size: var(--t-11);">by token estimate</span>
   </div>
   <div class="table-wrap">

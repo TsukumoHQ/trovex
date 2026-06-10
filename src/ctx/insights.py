@@ -280,9 +280,19 @@ def rerank_divergence(db, since: float) -> dict:
 
 def suggest_queries(db, prefix: str, limit: int = 6) -> list[dict]:
     """Autocomplete: past queries that begin with the prefix (case-insensitive),
-    grouped + ranked by count."""
+    grouped + ranked by count. Empty prefix → most recent distinct queries, so the
+    search box can show 'recent searches' the moment it's focused."""
     if not prefix.strip():
-        return []
+        rows = db.execute(
+            """SELECT LOWER(query) AS q, COUNT(*) AS n, MAX(ts) AS last_ts
+               FROM mcp_queries
+               WHERE query IS NOT NULL AND TRIM(query) != ''
+               GROUP BY LOWER(query)
+               ORDER BY last_ts DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
     rows = db.execute(
         """SELECT LOWER(query) AS q, COUNT(*) AS n, MAX(ts) AS last_ts
            FROM mcp_queries

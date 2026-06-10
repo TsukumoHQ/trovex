@@ -126,6 +126,26 @@ def test_extract_section():
     assert extract_section(doc, "Nonexistent") is None
 
 
+def test_delete_removes_doc_and_embedding(store):
+    eid = store.put("# temp doc\n\nbody")
+    assert store.get(eid) is not None
+    assert store.delete(eid) is True
+    assert store.get(eid) is None
+    # gone from the search index too (no ghost result)
+    from ctx.search import Searcher
+    searcher = Searcher(store.settings, embedder=BagEmbedder())
+    assert searcher.search("temp doc", limit=5, source_ids=["ctx"]) == []
+    # idempotent: deleting again reports not-found
+    assert store.delete(eid) is False
+
+
+def test_update_is_write_with_same_id(store):
+    eid = store.put("# v1\n\nfirst")
+    store.put("# v2\n\nsecond", ext_id=eid)  # "update" = write with same id
+    assert store.get(eid).content == "# v2\n\nsecond"
+    assert len(store.list_docs()) == 1
+
+
 def test_concurrent_puts_are_serialized(store):
     def write(i):
         return store.put(f"# Doc {i}\n\nbody {i}", ext_id=f"id-{i}")

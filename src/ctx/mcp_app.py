@@ -141,3 +141,17 @@ def ctx_read(query: str = "", doc_id: str = "", section: str = "") -> str:
         sec = extract_section(doc.content, section)
         return sec if sec is not None else f"(section '{section}' not found)"
     return doc.content
+
+
+@mcp.tool()
+def ctx_delete(doc_id: str) -> str:
+    """Delete a ctx-owned doc by id.
+
+    Updates do NOT go here — to change a doc, call `ctx_write` with its
+    existing doc_id (that overwrites in place). Use delete only to remove.
+
+    Args:
+        doc_id: Opaque id of the doc to remove.
+    """
+    state = get_state()
+    return "deleted" if state.store.delete(doc_id) else "(not found)"

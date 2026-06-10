@@ -231,6 +231,12 @@ def build_app() -> FastAPI:
             request, "doc.html", {"doc": doc, "body_html": body_html, "toc": toc}
         )
 
+    @app.delete("/api/doc/{ext_id}")
+    async def api_doc_delete(ext_id: str) -> JSONResponse:
+        """Delete a ctx-owned doc. Updates go through ctx_write (same id)."""
+        ok = get_state().store.delete(ext_id)
+        return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
+
     # ── JSON API ─────────────────────────────────────────────────────
 
     @app.get("/api/search")

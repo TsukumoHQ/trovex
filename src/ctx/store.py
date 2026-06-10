@@ -55,6 +55,8 @@ class Store(Protocol):
 
     def list_docs(self) -> list[StoredDoc]: ...
 
+    def delete(self, ext_id: str) -> bool: ...
+
 
 class SqliteStore:
     """Pôle A: ctx-owned docs as rows in the shared sqlite-vec DB."""
@@ -125,6 +127,19 @@ class SqliteStore:
             (CTX_SOURCE_ID,),
         ).fetchall()
         return [_row_to_doc(r) for r in rows if r["content"] is not None]
+
+    def delete(self, ext_id: str) -> bool:
+        """Remove a ctx-owned doc (row + its embedding). True if it existed."""
+        with self._lock:
+            row = self.db.execute(
+                "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
+            ).fetchone()
+            if not row:
+                return False
+            self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (row["id"],))
+            self.db.execute("DELETE FROM docs WHERE id = ?", (row["id"],))
+            self.db.commit()
+            return True
 
     def _embed(self, doc_id: int, content: str, title: str) -> None:
         text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]

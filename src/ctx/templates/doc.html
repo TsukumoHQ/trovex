@@ -42,6 +42,19 @@
   .copy-btn svg { width: 14px; height: 14px; }
   .copy-btn.copied { color: var(--accent); }
 
+  /* destructive action — visually separated (pushed right) and danger-colored */
+  .danger-btn {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 9px; min-height: 28px;
+    font-family: var(--font-mono); font-size: var(--t-11);
+    color: var(--stale); background: transparent;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    cursor: pointer; transition: border-color var(--duration), background var(--duration);
+  }
+  .danger-btn:hover { border-color: var(--stale); background: var(--stale-bg); }
+  .danger-btn svg { width: 13px; height: 13px; }
+
   /* TOC */
   .toc {
     position: sticky; top: calc(52px + var(--s-6));
@@ -144,6 +157,13 @@
           </button>
         </span>
         <span>~{{ "{:,}".format(doc.tokens_est) }} tok</span>
+        <button class="danger-btn" type="button"
+                data-delete="{{ doc.ext_id }}" aria-label="Delete this document">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+          </svg>
+          delete
+        </button>
       </div>
     </header>
 
@@ -167,6 +187,15 @@
         btn.classList.add('copied');
         setTimeout(function () { btn.classList.remove('copied'); }, 1200);
       });
+    });
+  });
+
+  document.querySelectorAll('[data-delete]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      if (!confirm('Delete this doc? This cannot be undone.')) return;
+      const r = await fetch('/api/doc/' + btn.dataset.delete, { method: 'DELETE' });
+      if (r.ok) { location.href = '/docs?source=ctx'; }
+      else { alert('Delete failed'); }
     });
   });
 </script>

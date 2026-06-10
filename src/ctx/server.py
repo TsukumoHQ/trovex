@@ -8,11 +8,17 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 from fastapi.templating import Jinja2Templates
 
 from . import insights as insights_mod
 from . import savings as savings_mod
+from .markdown import render_markdown
 from .mcp_app import mcp
 from .state import get_state
 from .usage import UserHeaderMiddleware
@@ -47,6 +53,17 @@ def _relative_time(seconds_ago: float) -> str:
     if seconds_ago < 86400:
         return f"{int(seconds_ago / 3600)}h ago"
     return f"{int(seconds_ago / 86400)}d ago"
+
+
+def _snippet(content: str, n: int = 160) -> str:
+    """A short plain-text preview of a doc body for the store cards."""
+    import re
+    text = re.sub(r"^---\n.*?\n---\n", "", content, flags=re.DOTALL)  # frontmatter
+    text = re.sub(r"```[\s\S]*?```", " ", text)                       # code blocks
+    text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)            # heading marks
+    text = re.sub(r"[`*_>]", "", text)                                # inline marks
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:n] + ("…" if len(text) > n else "")
 
 
 def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -190,21 +207,11 @@ def build_app() -> FastAPI:
     async def search_partial(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
         return _render_search(request, templates, q, summary, partial=True)
 
-    @app.get("/docs", response_class=HTMLResponse)
-    async def docs_page(
-        request: Request,
-        qpath: str = "",
-        status: str = "",
-        source: str = "",
-        sort: str = "recent",
-        limit: int = 100,
-    ) -> HTMLResponse:
-        ctx_data = _docs_query(qpath, status, sort, limit, source)
-        ctx_data["total"] = get_state().searcher.db.execute(
-            "SELECT COUNT(*) AS c FROM docs"
-        ).fetchone()["c"]
-        ctx_data.update(qpath=qpath, status=status, sort=sort, limit=limit, source=source)
-        return templates.TemplateResponse(request, "docs.html", ctx_data)
+    @app.get("/docs")
+    async def docs_page() -> RedirectResponse:
+        # /docs was the file-router table view; full-ctx made it redundant with
+        # /store (same docs, worse presentation). Redirect to the one surface.
+        return RedirectResponse("/store", status_code=308)
 
     @app.get("/docs/partial", response_class=HTMLResponse)
     async def docs_partial(
@@ -217,6 +224,84 @@ def build_app() -> FastAPI:
     ) -> HTMLResponse:
         ctx_data = _docs_query(qpath, status, sort, limit, source)
         return templates.TemplateResponse(request, "_docs_table.html", ctx_data)
+
+    @app.get("/doc/{ext_id}", response_class=HTMLResponse)
+    async def doc_view(request: Request, ext_id: str) -> HTMLResponse:
+        """Render a ctx-owned doc's content — how humans read what agents store
+        (no local file; the frontend is the human surface)."""
+        doc = get_state().store.get(ext_id)
+        if doc is None:
+            return HTMLResponse("(not found)", status_code=404)
+        body_html, toc = render_markdown(doc.content)
+        return templates.TemplateResponse(
+            request, "doc.html", {"doc": doc, "body_html": body_html, "toc": toc}
+        )
+
+    @app.delete("/api/doc/{ext_id}")
+    async def api_doc_delete(ext_id: str) -> JSONResponse:
+        """Delete a ctx-owned doc. Updates go through ctx_write (same id)."""
+        ok = get_state().store.delete(ext_id)
+        return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
+
+    @app.get("/store", response_class=HTMLResponse)
+    async def store_page(request: Request, tag: str = "", kind: str = "",
+                         collection: str = "") -> HTMLResponse:
+        """The ctx-owned doc store — what agents write, what humans read here."""
+        store = get_state().store
+        now = _now()
+        f_tag, f_kind = tag, kind
+        if collection:
+            cf = store.get_collection(collection) or {}
+            f_tag = cf.get("tag", f_tag)
+            f_kind = cf.get("kind", f_kind)
+        items = [
+            {
+                "ext_id": d.ext_id, "title": d.title, "kind": d.kind,
+                "status": d.status, "tokens_est": d.tokens_est, "tags": d.tags,
+                "age_days": max(0.0, (now - d.mtime) / 86400),
+                "snippet": _snippet(d.content),
+            }
+            for d in store.list_docs(tag=f_tag or None, kind=f_kind or None)
+        ]
+        return templates.TemplateResponse(
+            request, "store.html",
+            {
+                "items": items,
+                "total_tokens": sum(i["tokens_est"] for i in items),
+                "all_tags": store.all_tags(),
+                "collections": store.list_collections(),
+                "active_tag": tag, "active_kind": kind, "active_collection": collection,
+            },
+        )
+
+    @app.get("/api/collections")
+    async def api_collections() -> JSONResponse:
+        return JSONResponse(get_state().store.list_collections())
+
+    @app.post("/api/collections")
+    async def api_collection_create(request: Request) -> JSONResponse:
+        body = await request.json()
+        name = (body.get("name") or "").strip()
+        if not name:
+            return JSONResponse({"error": "name required"}, status_code=400)
+        flt = {k: v for k, v in (("tag", body.get("tag")), ("kind", body.get("kind"))) if v}
+        get_state().store.create_collection(name, flt)
+        return JSONResponse({"ok": True, "name": name, "filter": flt})
+
+    @app.delete("/api/collections/{name}")
+    async def api_collection_delete(name: str) -> JSONResponse:
+        get_state().store.delete_collection(name)
+        return JSONResponse({"deleted": True})
+
+    @app.post("/api/doc/{ext_id}/tags")
+    async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:
+        body = await request.json()
+        tags = get_state().store.set_tags(
+            ext_id,
+            add=[t.strip() for t in (body.get("add") or "").split(",") if t.strip()],
+            remove=[t.strip() for t in (body.get("remove") or "").split(",") if t.strip()],
+        )
+        return JSONResponse({"tags": tags})
 
     # ── JSON API ─────────────────────────────────────────────────────
 
@@ -279,12 +364,14 @@ def build_app() -> FastAPI:
 
     @app.get("/hooks/{name}", response_class=PlainTextResponse)
     async def hook_download(name: str) -> str:
-        if name not in {"ctx-baseline.sh", "ctx-ambient.sh"}:
+        if name not in {"ctx-md-guard.sh", "ctx-md-read-guard.sh"}:
             return ""
-        path = Path("/home/synxadmin/.claude/hooks") / name
-        if not path.exists():
-            return ""
-        return path.read_text()
+        repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"
+        for base in (Path("/home/synxadmin/.claude/hooks"), repo_hooks):
+            path = base / name
+            if path.exists():
+                return path.read_text()
+        return ""
 
     # ── Usage page ───────────────────────────────────────────────────
 

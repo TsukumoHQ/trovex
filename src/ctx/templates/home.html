@@ -80,7 +80,7 @@
   <div>
     <h1 style="margin-bottom: 2px;">Overview</h1>
     <div class="subtle mono" style="font-size: var(--t-12);">
-      synergix_prod · {{ corpus_path }}
+      the ctx store · indexed on write
     </div>
   </div>
 </div>
@@ -250,7 +250,7 @@
       <table class="t">
         <thead>
           <tr>
-            <th>path</th>
+            <th>doc</th>
             <th>status</th>
             <th style="text-align: right;">age</th>
             <th style="text-align: right;">tokens</th>
@@ -260,7 +260,7 @@
           {% for r in recent %}
           <tr>
             <td class="path">
-              <a href="/search?q={{ r.title | urlencode }}" title="{{ r.title }}">{{ r.path }}</a>
+              <a href="/doc/{{ r.path }}" title="{{ r.title }}">{{ r.title }}</a>
             </td>
             <td>{{ status_pill(r.status) }}</td>
             <td class="num">{{ fresh_label(r.age_days) }}</td>
@@ -284,7 +284,7 @@
         {% for r in attention %}
         <li class="attention-item">
           {{ status_pill(r.status) }}
-          <a href="/search?q={{ r.path | urlencode }}" class="attention-path mono">{{ r.path }}</a>
+          <a href="/doc/{{ r.path }}" class="attention-path mono" title="{{ r.title }}">{{ r.title }}</a>
           <span class="mono subtle attention-age">{{ fresh_label(r.age_days) }}</span>
         </li>
         {% endfor %}
@@ -463,7 +463,7 @@
         {% for r in heaviest %}
         <tr>
           <td class="path">
-            <a href="/search?q={{ r.title | urlencode }}">{{ r.path }}</a>
+            <a href="/doc/{{ r.path }}" title="{{ r.title }}">{{ r.title }}</a>
           </td>
           <td>{{ status_pill(r.status) }}</td>
           <td class="num">{{ fresh_label(r.age_days) }}</td>

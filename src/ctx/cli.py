@@ -117,6 +117,104 @@ def stats() -> None:
         )
 
 
+@app.command()
+def migrate(
+    source: str = typer.Option(None, "--source", help="Only this source id (else all file sources)."),
+    execute: bool = typer.Option(False, "--execute", help="Write to the store (default: dry-run)."),
+    chunk: int = typer.Option(100, help="Embedding batch size."),
+) -> None:
+    """Migrate file-backed docs into the ctx-owned store (full-ctx move).
+
+    Reads each indexed file doc and writes it into the store under a stable,
+    idempotent ext_id (re-runnable). Dry-run by default. After verifying,
+    remove the migrated source(s) from sources.yaml so they stop being scanned.
+    """
+    import hashlib
+
+    from .store import SqliteStore, _extract_title
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    sql = "SELECT source_id, path, absolute_path FROM docs WHERE source_id != 'ctx'"
+    params: list = []
+    if source:
+        sql += " AND source_id = ?"
+        params.append(source)
+    rows = store.db.execute(sql, params).fetchall()
+
+    mode = "EXECUTE" if execute else "dry-run"
+    console.print(f"[bold]Migrate -> store[/bold]  ({mode})  candidates: {len(rows)}")
+
+    by_src: dict[str, int] = {}
+    buf: list[dict] = []
+    migrated = skipped = 0
+
+    def flush() -> None:
+        if buf and execute:
+            store.put_batch(buf)
+        buf.clear()
+
+    for r in rows:
+        try:
+            content = Path(r["absolute_path"]).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            skipped += 1
+            continue
+        if not content.strip():
+            skipped += 1
+            continue
+        ext_id = "mig_" + hashlib.sha1(
+            f'{r["source_id"]}|{r["path"]}'.encode()
+        ).hexdigest()[:16]
+        kind = "note" if r["source_id"].startswith("vault") else "reference"
+        buf.append({
+            "content": content, "kind": kind, "ext_id": ext_id,
+            "title": _extract_title(content),
+        })
+        by_src[r["source_id"]] = by_src.get(r["source_id"], 0) + 1
+        migrated += 1
+        if len(buf) >= chunk:
+            flush()
+    flush()
+
+    for sid, n in sorted(by_src.items()):
+        console.print(f"  [cyan]{sid}[/cyan]: {n}")
+    verb = "Wrote" if execute else "Would write"
+    console.print(
+        f"[green]{verb} {migrated}[/green] docs to store · "
+        f"skipped(empty/unreadable)={skipped}"
+    )
+    if not execute:
+        console.print("[dim]Re-run with --execute to write, then drop the source(s) "
+                      "from sources.yaml.[/dim]")
+
+
+@app.command(name="backfill-chunks")
+def backfill_chunks(batch: int = typer.Option(200, help="Embedding batch size.")) -> None:
+    """(Re)chunk + embed every store-held doc into vec_chunks. Idempotent."""
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    docs = store.db.execute(
+        "SELECT id, content, title FROM docs WHERE content IS NOT NULL"
+    ).fetchall()
+    pairs: list = []
+    n = 0
+    for d in docs:
+        pairs.extend(store._insert_chunks(d["id"], d["content"], d["title"] or ""))
+        n += 1
+        if len(pairs) >= batch:
+            store._embed_chunks(pairs)
+            store.db.commit()
+            pairs = []
+    if pairs:
+        store._embed_chunks(pairs)
+        store.db.commit()
+    total = store.db.execute("SELECT COUNT(*) AS c FROM chunks").fetchone()["c"]
+    console.print(f"[green]Backfilled {n} docs -> {total} chunks[/green]")
+
+
 def open_db_for_read(settings: Settings):
     from .db import open_db
     return open_db(settings.data_dir / "ctx.db", settings.embed_dim)

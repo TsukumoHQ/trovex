@@ -1,8 +1,14 @@
 # =============================================================================
 # ctx — Host service (systemd) exposed via Traefik
-# ctx.prod.synergix.ch -> host:8770
+# ctx.prod.synergix.ch -> host:8770  (docker0 bridge gateway 172.17.0.1)
 #
 # Serves: SSR UI (/), JSON API (/api/*), MCP HTTP (/mcp/)
+#
+# Keep-alive 502 mitigation (same class as agent-relay SYN-1620): a host service
+# behind Traefik whose backend closes idle keep-alive connections (uvicorn
+# ~5s) before Traefik drops them from its pool will surface reuse-RSTs as 502s.
+# Bound Traefik's idle pool below the backend timeout + retry the reuse-RST.
+# Active SSE/MCP streams are in-use, not idle — unaffected.
 # =============================================================================
 
 http:
@@ -15,6 +21,7 @@ http:
       service: ctx-service
       middlewares:
         - ctx-headers
+        - ctx-retry
 
   middlewares:
     ctx-headers:
@@ -25,9 +32,25 @@ http:
           # MCP uses SSE — disable buffering
           X-Accel-Buffering: "no"
 
+    # Retry an idempotent request when the backend connection fails before any
+    # response (the keep-alive reuse RST above). 2 attempts = 1 retry.
+    ctx-retry:
+      retry:
+        attempts: 2
+        initialInterval: "100ms"
+
+  serversTransports:
+    # Drop idle pooled connections before uvicorn does, so Traefik never reuses
+    # a half-closed one. Must be shorter than the backend keep-alive (~5s).
+    ctx-transport:
+      forwardingTimeouts:
+        dialTimeout: "5s"
+        idleConnTimeout: "4s"
+
   services:
     ctx-service:
       loadBalancer:
+        serversTransport: ctx-transport
         servers:
           - url: "http://172.17.0.1:8770"
         responseForwarding:

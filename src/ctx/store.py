@@ -141,6 +141,58 @@ class SqliteStore:
             self.db.commit()
             return True
 
+    def put_batch(self, items: list[dict]) -> list[str]:
+        """Bulk insert/update + a single batched embed call. For migrations.
+
+        Each item: {content, kind?, ext_id?, title?}. Embeds all texts in one
+        go (the embedder batches internally) — far faster than per-doc put().
+        """
+        now = time.time()
+        to_embed: list[tuple[int, str]] = []
+        ext_ids: list[str] = []
+        with self._lock:
+            for it in items:
+                content = it["content"]
+                ext_id = it.get("ext_id") or uuid.uuid4().hex
+                title = it.get("title") or _extract_title(content)
+                kind = it.get("kind")
+                size = len(content.encode("utf-8"))
+                tok = len(content) // 4
+                existing = self.db.execute(
+                    "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
+                ).fetchone()
+                if existing:
+                    doc_id = existing["id"]
+                    self.db.execute(
+                        """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
+                               size_bytes=?, mtime=?, last_indexed=? WHERE id=?""",
+                        (content, title, kind, tok, size, now, now, doc_id),
+                    )
+                else:
+                    cur = self.db.execute(
+                        """INSERT INTO docs
+                               (source_id, path, absolute_path, content_hash,
+                                size_bytes, tokens_est, mtime, first_indexed,
+                                last_indexed, title, content, ext_id, kind)
+                           VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (CTX_SOURCE_ID, ext_id, size, tok, now, now, now,
+                         title, content, ext_id, kind),
+                    )
+                    doc_id = cur.lastrowid
+                ext_ids.append(ext_id)
+                text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
+                to_embed.append((doc_id, text))
+
+            embeddings = list(self.embedder.embed([t for _, t in to_embed]))
+            for (doc_id, _), emb in zip(to_embed, embeddings, strict=True):
+                self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
+                self.db.execute(
+                    "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)",
+                    (doc_id, sqlite_vec.serialize_float32(emb.tolist())),
+                )
+            self.db.commit()
+        return ext_ids
+
     def _embed(self, doc_id: int, content: str, title: str) -> None:
         text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
         emb = next(iter(self.embedder.embed([text])))

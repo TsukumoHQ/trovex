@@ -1,0 +1,92 @@
+{% extends "_base.html" %}
+{% set active = 'settings' %}
+{% block title %}ctx — settings{% endblock %}
+
+{% block head %}
+<style>
+  .token-row { display: flex; gap: var(--s-2); align-items: center; margin-top: var(--s-2); }
+  .token-row .input { flex: 1; }
+  .btn { padding: var(--s-2) var(--s-4); background: var(--accent); color: var(--bg);
+    border: none; border-radius: var(--radius-sm); font-family: var(--font-mono);
+    font-size: var(--t-12); cursor: pointer; font-weight: 500; }
+  .btn:hover { opacity: 0.85; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--fg-muted); }
+  .btn-ghost:hover { color: var(--accent); border-color: var(--accent-line); opacity: 1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: var(--s-5);">
+  <div>
+    <h1 style="margin-bottom: 2px;">Settings</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">store health · auth · backups</div>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">docs</div><div class="kpi-value">{{ "{:,}".format(doc_count) }}</div></div>
+  <div class="kpi"><div class="kpi-label">chunks</div><div class="kpi-value">{{ "{:,}".format(chunk_count) }}</div></div>
+  <div class="kpi"><div class="kpi-label">db size</div><div class="kpi-value">{{ (db_size / 1048576) | round(1) }}<span style="font-size: var(--t-16);"> MB</span></div></div>
+  <div class="kpi"><div class="kpi-label">write auth</div><div class="kpi-value">
+    {% if auth_on %}<span class="pill pill-canonical">on</span>{% else %}<span class="pill pill-stale">off</span>{% endif %}
+  </div></div>
+</div>
+
+<div class="card" style="margin-bottom: var(--s-6);">
+  <div class="card-header"><h3 style="margin: 0;">Write token</h3></div>
+  <div class="card-body">
+    <div class="subtle" style="font-size: var(--t-13); margin-bottom: var(--s-1);">
+      Paste the shared write token so this browser can delete / tag / back up.
+      Stored locally in this browser only — never sent anywhere but ctx.
+    </div>
+    <div class="token-row">
+      <input class="input mono" id="wt" type="password" placeholder="X-CTX-Write-Token" aria-label="Write token" />
+      <button class="btn" id="wt-save" type="button">Save</button>
+      <span class="subtle mono" id="wt-status" style="font-size: var(--t-12);"></span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 style="margin: 0;">Backups</h3>
+    <span class="subtle mono" style="margin-left: var(--s-3); font-size: var(--t-11);">last {{ backups | length }} · keeps 7</span>
+    <button class="btn btn-ghost" id="backup-now" type="button" style="margin-left: auto;">Backup now</button>
+  </div>
+  {% if backups %}
+  <div class="table-wrap" style="border: none; border-radius: 0;">
+    <table class="t">
+      <thead><tr><th>file</th><th style="text-align: right;">size</th></tr></thead>
+      <tbody>
+        {% for b in backups %}
+        <tr><td class="path mono">{{ b.name }}</td><td class="num">{{ (b.size_bytes / 1048576) | round(1) }} MB</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body subtle mono" style="font-size: var(--t-12);">no backups yet — click "Backup now"</div>
+  {% endif %}
+</div>
+
+<script>
+  (function () {
+    var wt = document.getElementById('wt');
+    var status = document.getElementById('wt-status');
+    if (localStorage.getItem('ctxWriteToken')) status.textContent = '✓ saved';
+    document.getElementById('wt-save').addEventListener('click', function () {
+      if (wt.value.trim()) {
+        localStorage.setItem('ctxWriteToken', wt.value.trim());
+        status.textContent = '✓ saved'; wt.value = '';
+      } else { localStorage.removeItem('ctxWriteToken'); status.textContent = 'cleared'; }
+    });
+    var bn = document.getElementById('backup-now');
+    bn.addEventListener('click', async function () {
+      bn.textContent = 'backing up…';
+      var r = await fetch('/api/backup', { method: 'POST', headers: ctxWriteHeaders() });
+      if (r.ok) { location.reload(); }
+      else { alert(r.status === 403 ? 'Set the write token first (above)' : 'Backup failed'); bn.textContent = 'Backup now'; }
+    });
+  })();
+</script>
+{% endblock %}

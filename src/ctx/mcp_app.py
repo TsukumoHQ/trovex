@@ -57,8 +57,30 @@ def ctx(q: str, summary: bool = False) -> str:
     from .rerank import maybe_rerank
     from .usage import log_query
 
+    from . import cache as _qcache
+
     state = get_state()
+    db = state.searcher.db
     t0 = _time.perf_counter()
+
+    # Exact-match query cache: a repeat against an unchanged corpus skips the
+    # candidate search + the LLM reranker (the cost driver). corpus_version is
+    # derived from the docs table, so any ctx_write/delete auto-invalidates.
+    # Token metrics are replayed so usage/savings dashboards stay accurate.
+    ver = _qcache.corpus_version(db)
+    cached = _qcache.get(db, q, summary, ver)
+    if cached is not None:
+        try:
+            log_query(
+                db, q, cached["n_results"], summary,
+                response_tokens_est=cached["resp_tokens"], elapsed_ms=0,
+                would_have_read_tokens=cached["whr"],
+                top_result_tokens=cached["top_tokens"],
+            )
+        except Exception:
+            pass
+        return cached["output"]
+
     # Fetch a wider candidate pool when reranking is possible.
     candidates = state.searcher.search(q, limit=20)
     pre_rerank_paths = [c.path for c in candidates]
@@ -67,12 +89,13 @@ def ctx(q: str, summary: bool = False) -> str:
     out = (state.searcher.format_with_summary(results) if summary
            else state.searcher.format_minimal(results))
     elapsed_ms = int((_time.perf_counter() - t0) * 1000)
+    would_have_read = sum(r.tokens_est for r in results[:3])
+    top_tokens = results[0].tokens_est if results else 0
+    resp_tokens = len(out) // 4
     try:
-        would_have_read = sum(r.tokens_est for r in results[:3])
-        top_tokens = results[0].tokens_est if results else 0
         log_query(
-            state.searcher.db, q, len(results), summary,
-            response_tokens_est=len(out) // 4, elapsed_ms=elapsed_ms,
+            db, q, len(results), summary,
+            response_tokens_est=resp_tokens, elapsed_ms=elapsed_ms,
             would_have_read_tokens=would_have_read,
             top_result_tokens=top_tokens,
             results=results,
@@ -90,11 +113,37 @@ def ctx(q: str, summary: bool = False) -> str:
         )
     except Exception:
         pass  # never let logging break the tool
+    try:
+        _qcache.put(db, q, summary, ver, out, len(results),
+                    would_have_read, top_tokens, resp_tokens)
+    except Exception:
+        pass  # cache is best-effort, never block the tool
     return out
 
 
+def _authorized() -> bool:
+    """Writes require the shared token (X-CTX-Write-Token) when one is configured.
+    Empty token = open (back-compat). Gates ctx_write / ctx_tag / ctx_delete."""
+    from .usage import current_write_token
+    tok = get_state().settings.write_token
+    return (not tok) or (current_write_token.get() == tok)
+
+
+_DENY = "(unauthorized — set the X-CTX-Write-Token header to the shared write token)"
+
+
+def _as_taglist(v) -> list[str]:
+    """Accept a list (the natural agent form) or a comma string (forgiving)."""
+    if not v:
+        return []
+    if isinstance(v, str):
+        v = v.split(",")
+    return [str(t).strip() for t in v if str(t).strip()]
+
+
 @mcp.tool()
-def ctx_write(content: str, kind: str = "", doc_id: str = "", tags: str = "") -> str:
+def ctx_write(content: str, kind: str = "", doc_id: str = "",
+              tags: list[str] | None = None, ticket: str = "") -> str:
     """Store a doc INSIDE ctx so every agent of every dev can read it.
 
     For records / memory / coordination notes (incidents, decisions, plans) —
@@ -108,30 +157,41 @@ def ctx_write(content: str, kind: str = "", doc_id: str = "", tags: str = "") ->
         kind: Lifecycle hint. "record" = event-anchored, never goes stale by
             age. Default "" = a normal living doc.
         doc_id: Omit to create; pass an existing id to overwrite that doc.
-        tags: Comma-separated tags (free or hierarchical "a/b/c") for organizing
-            + filtering. `kind/<kind>` is auto-added.
+        tags: List of tags (free or hierarchical "a/b/c"), e.g.
+            ["type/report", "owner/cto", "domain/accounting"]. `kind/<kind>`
+            is auto-added. A comma string is also accepted.
+        ticket: Optional work-item id (Linear "SYN-1389", GitHub "#123", …).
+            Stored as a `ticket/<id>` tag so the doc links back to its tracker
+            item — tracker-agnostic, no schema change. Find everything tied to
+            it via `ctx_search(tags=["ticket/<id>"])`.
     """
+    if not _authorized():
+        return _DENY
     state = get_state()
-    taglist = [t.strip() for t in tags.split(",") if t.strip()]
+    taglist = _as_taglist(tags)
+    if ticket.strip():
+        taglist.append(f"ticket/{ticket.strip()}")
     return state.store.put(
-        content, kind=kind or None, ext_id=doc_id or None, tags=taglist or None,
+        content, kind=kind or None, ext_id=doc_id or None,
+        tags=taglist or None,
     )
 
 
 @mcp.tool()
-def ctx_tag(doc_id: str, add: str = "", remove: str = "") -> str:
+def ctx_tag(doc_id: str, add: list[str] | None = None,
+            remove: list[str] | None = None) -> str:
     """Add/remove tags on a ctx-owned doc — returns the doc's new tag set.
 
     Args:
         doc_id: The doc to tag.
-        add: Comma-separated tags to add (free or hierarchical "a/b/c").
-        remove: Comma-separated tags to remove.
+        add: List of tags to add (free or hierarchical "a/b/c").
+        remove: List of tags to remove.
     """
+    if not _authorized():
+        return _DENY
     state = get_state()
     tags = state.store.set_tags(
-        doc_id,
-        add=[t.strip() for t in add.split(",") if t.strip()],
-        remove=[t.strip() for t in remove.split(",") if t.strip()],
+        doc_id, add=_as_taglist(add), remove=_as_taglist(remove),
     )
     return ", ".join(tags) if tags else "(no tags)"
 
@@ -166,13 +226,20 @@ def ctx_read(query: str = "", doc_id: str = "", section: str = "", full: bool = 
         return doc.content if doc else "(no results)"
     t0 = time.perf_counter()
     hits = state.store.search_chunks(query, limit=1)
-    out = _fmt_passage(hits[0]) if hits else "(no results)"
+    if hits:
+        h = hits[0]
+        # small-to-big: match the chunk, return its full parent section.
+        section = state.store.section_text(h["doc_id"], h["heading_path"]) or h["content"]
+        out = _fmt_passage({**h, "content": section})
+    else:
+        out = "(no results)"
     _log_retrieval(state, query, hits, out, t0)
     return out
 
 
 @mcp.tool()
-def ctx_search(query: str, k: int = 5, kind: str = "", tags: str = "") -> str:
+def ctx_search(query: str, k: int = 5, kind: str = "",
+               tags: list[str] | None = None) -> str:
     """Search the store — returns the top K relevant *passages* (not whole docs).
 
     The RAG entry point: chunk-level retrieval with metadata filters. Each result
@@ -182,13 +249,13 @@ def ctx_search(query: str, k: int = 5, kind: str = "", tags: str = "") -> str:
         query: Natural-language query.
         k: How many passages (default 5).
         kind: Filter by kind (e.g. "record").
-        tags: Comma-separated tags to filter by (any-match).
+        tags: List of tags to filter by (any-match). A comma string also works.
     """
     state = get_state()
     t0 = time.perf_counter()
     hits = state.store.search_chunks(
         query, limit=k, kind=kind or None,
-        tags=[t.strip() for t in tags.split(",") if t.strip()] or None,
+        tags=_as_taglist(tags) or None,
     )
     out = "\n\n———\n\n".join(_fmt_passage(h) for h in hits) if hits else "(no results)"
     _log_retrieval(state, query, hits, out, t0)
@@ -226,5 +293,7 @@ def ctx_delete(doc_id: str) -> str:
     Args:
         doc_id: Opaque id of the doc to remove.
     """
+    if not _authorized():
+        return _DENY
     state = get_state()
     return "deleted" if state.store.delete(doc_id) else "(not found)"

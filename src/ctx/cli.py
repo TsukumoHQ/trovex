@@ -215,6 +215,176 @@ def backfill_chunks(batch: int = typer.Option(200, help="Embedding batch size.")
     console.print(f"[green]Backfilled {n} docs -> {total} chunks[/green]")
 
 
+@app.command()
+def enrich() -> None:
+    """Re-derive tags + provenance + titles for migrated docs from the source files.
+
+    Reads the original sources (sources.yaml.bak), recomputes each migrated doc's
+    mig_ id, and sets: tags from its folder path, origin = source/path, and a
+    title from the filename when the doc had none.
+    """
+    import hashlib
+
+    import yaml
+
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    bak = settings.data_dir / "sources.yaml.bak"
+    if not bak.exists():
+        console.print("[red]no sources.yaml.bak — nothing to enrich from[/red]")
+        raise typer.Exit(1)
+    sources = (yaml.safe_load(bak.read_text()) or {}).get("sources", [])
+
+    enriched = retitled = 0
+    for src in sources:
+        sid = str(src.get("id", "")).strip()
+        root = Path(str(src["root"])).expanduser().resolve()
+        if not root.exists():
+            continue
+        for ext in ("md", "mdx", "markdown"):
+            for p in root.rglob(f"*.{ext}"):
+                try:
+                    rel = str(p.relative_to(root))
+                except ValueError:
+                    continue
+                ext_id = "mig_" + hashlib.sha1(f"{sid}|{rel}".encode()).hexdigest()[:16]
+                row = store.db.execute(
+                    "SELECT id, title, kind FROM docs WHERE ext_id = ?", (ext_id,)
+                ).fetchone()
+                if not row:
+                    continue
+                doc_id = row["id"]
+                folders = [f for f in Path(rel).parent.parts if f not in (".", "")]
+                tags = [sid, *folders]
+                if row["kind"]:
+                    tags.append(f"kind/{row['kind']}")
+                store._set_tags(doc_id, tags)
+                store.db.execute(
+                    "UPDATE docs SET origin = ? WHERE id = ?", (f"{sid}/{rel}", doc_id)
+                )
+                if not row["title"] or row["title"] == "Untitled":
+                    nice = p.stem.replace("_", " ").replace("-", " ").strip().title()
+                    store.db.execute(
+                        "UPDATE docs SET title = ? WHERE id = ?", (nice or rel, doc_id)
+                    )
+                    retitled += 1
+                enriched += 1
+    store.db.commit()
+    console.print(f"[green]Enriched {enriched} docs[/green] (retitled {retitled})")
+
+
+_FACET_TYPE = {
+    "reports": "report", "report": "report", "audit": "audit", "audits": "audit",
+    "decision": "decision", "decisions": "decision", "adr": "decision",
+    "spec": "spec", "specs": "spec", "self-learning": "self-learning",
+    "learnings": "self-learning", "incident": "incident", "incidents": "incident",
+    "runbook": "runbook", "runbooks": "runbook", "plan": "plan", "plans": "plan",
+    "log": "log", "logs": "log", "guide": "guide", "guides": "guide",
+}
+_FACET_DOMAIN = {
+    "accounting", "payroll", "auth", "infra", "iodd", "regulation", "kb", "zefix",
+    "ocr", "minio", "clients", "scripts", "banking", "debtors", "suppliers",
+    "outline", "freescout", "loki", "gitnexus", "supabase", "qdrant", "neo4j",
+    "security", "frontend", "backend", "data",
+}
+_FACET_OWNER = {"cto", "cos", "founder"}
+
+
+def _pick_query(content: str) -> str:
+    import re
+    text = re.sub(r"^---.*?---", "", content, flags=re.DOTALL)
+    for line in text.splitlines():
+        s = line.strip()
+        if s and not s.startswith(("#", "-", "*", "|", "`")) and len(s) > 40:
+            return s[:200]
+    return ""
+
+
+@app.command()
+def eval(n: int = 40, k: int = 5) -> None:  # noqa: A001
+    """Retrieval eval: sample docs, query with a sentence from each, measure recall.
+
+    recall@1 = top passage is from the right doc; recall@k = right doc in top k.
+    A sanity check so we stop flying blind on retrieval quality.
+    """
+    import random
+
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    docs = store.db.execute(
+        "SELECT ext_id, content, title FROM docs WHERE source_id='ctx' AND content IS NOT NULL"
+    ).fetchall()
+    sample = random.sample(docs, min(n, len(docs)))
+    hit1 = hitk = scored = 0
+    for d in sample:
+        q = _pick_query(d["content"]) or (d["title"] or "")
+        if not q:
+            continue
+        ids = [h["ext_id"] for h in store.search_chunks(q, limit=k)]
+        scored += 1
+        if ids and ids[0] == d["ext_id"]:
+            hit1 += 1
+        if d["ext_id"] in ids:
+            hitk += 1
+    if not scored:
+        console.print("[red]no scorable docs[/red]")
+        return
+    console.print(
+        f"[bold]Retrieval eval[/bold] (n={scored})  "
+        f"[green]recall@1 = {hit1/scored:.0%}[/green]  recall@{k} = {hitk/scored:.0%}"
+    )
+
+
+@app.command()
+def backup() -> None:
+    """Snapshot ctx.db into data_dir/backups/ (consistent online copy, keeps 14)."""
+    from .backup import make_backup
+    settings = Settings()
+    dest = make_backup(settings.data_dir / "ctx.db", settings.data_dir)
+    console.print(f"[green]Backed up[/green] -> {dest}")
+
+
+@app.command()
+def facet() -> None:
+    """Promote organic folder tags into faceted tags (type/ owner/ domain/).
+
+    Additive — keeps the originals. type/report, owner/backend-lead,
+    domain/accounting, etc. so the store can filter + group by facet.
+    """
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    rows = store.db.execute(
+        "SELECT id FROM docs WHERE source_id = 'ctx'"
+    ).fetchall()
+    added = 0
+    for r in rows:
+        doc_id = r["id"]
+        tags = [t["tag"] for t in store.db.execute(
+            "SELECT tag FROM doc_tags WHERE doc_id = ?", (doc_id,))]
+        facets: set[str] = set()
+        for t in tags:
+            if t in _FACET_TYPE:
+                facets.add(f"type/{_FACET_TYPE[t]}")
+            if t in _FACET_DOMAIN:
+                facets.add(f"domain/{t}")
+            if t.endswith("-lead") or t in _FACET_OWNER:
+                facets.add(f"owner/{t}")
+        for ft in facets:
+            cur = store.db.execute(
+                "INSERT OR IGNORE INTO doc_tags(doc_id, tag) VALUES (?, ?)",
+                (doc_id, ft),
+            )
+            added += cur.rowcount
+    store.db.commit()
+    console.print(f"[green]Added {added} facet tags[/green]")
+
+
 def open_db_for_read(settings: Settings):
     from .db import open_db
     return open_db(settings.data_dir / "ctx.db", settings.embed_dim)

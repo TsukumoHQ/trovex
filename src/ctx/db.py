@@ -131,7 +131,7 @@ def _migrate_add_ctx_store_columns(conn: sqlite3.Connection) -> None:
     if not exists:
         return
     cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
-    for col in ("content", "ext_id", "kind"):
+    for col in ("content", "ext_id", "kind", "origin"):
         if col not in cols:
             conn.execute(f"ALTER TABLE docs ADD COLUMN {col} TEXT")
     conn.commit()
@@ -159,6 +159,7 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             content TEXT,
             ext_id TEXT,
             kind TEXT,
+            origin TEXT,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
@@ -228,6 +229,10 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
             embedding float[{embed_dim}] distance_metric=cosine
         );
+        -- Keyword side of hybrid retrieval (BM25). chunk_id = chunks.id.
+        CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+            content, chunk_id UNINDEXED
+        );
 
         -- Tags (free + hierarchical 'a/b/c') for org + metadata filtering
         CREATE TABLE IF NOT EXISTS doc_tags (
@@ -250,6 +255,16 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
             PRIMARY KEY (collection_id, doc_id)
         );
+
+        -- Doc history: a snapshot of the previous content on every overwrite
+        CREATE TABLE IF NOT EXISTS doc_versions (
+            id INTEGER PRIMARY KEY,
+            doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            content TEXT NOT NULL,
+            title TEXT,
+            ts REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_versions_doc ON doc_versions(doc_id, ts DESC);
         """
     )
     conn.commit()

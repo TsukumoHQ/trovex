@@ -22,6 +22,9 @@ current_openai_key: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 current_rerank_model: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "ctx_rerank_model", default=None
 )
+current_write_token: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "ctx_write_token", default=None
+)
 
 
 class UserHeaderMiddleware(BaseHTTPMiddleware):
@@ -43,12 +46,15 @@ class UserHeaderMiddleware(BaseHTTPMiddleware):
         m = (request.headers.get("x-ctx-rerank-model") or "").strip()
         m_token = current_rerank_model.set(m if m.startswith("gpt-") else None)
 
+        w_token = current_write_token.set(request.headers.get("x-ctx-write-token"))
+
         try:
             response = await call_next(request)
         finally:
             current_user.reset(u_token)
             current_openai_key.reset(k_token)
             current_rerank_model.reset(m_token)
+            current_write_token.reset(w_token)
         return response
 
 

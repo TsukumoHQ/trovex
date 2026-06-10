@@ -212,7 +212,7 @@
   document.querySelectorAll('[data-delete]').forEach(function (btn) {
     btn.addEventListener('click', async function () {
       if (!confirm('Delete this doc? This cannot be undone.')) return;
-      const r = await fetch('/api/doc/' + btn.dataset.delete, { method: 'DELETE' });
+      const r = await fetch('/api/doc/' + btn.dataset.delete, { method: 'DELETE', headers: ctxWriteHeaders() });
       if (r.ok) { location.href = '/store'; }
       else { alert('Delete failed'); }
     });
@@ -224,7 +224,8 @@
     const docId = wrap.dataset.doc;
     async function send(body) {
       const r = await fetch('/api/doc/' + docId + '/tags', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, ctxWriteHeaders()),
         body: JSON.stringify(body),
       });
       if (r.ok) location.reload(); else alert('Tag update failed');

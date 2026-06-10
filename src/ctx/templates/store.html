@@ -150,7 +150,8 @@
     if (!name) return;
     const p = new URLSearchParams(location.search);
     const r = await fetch('/api/collections', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, ctxWriteHeaders()),
       body: JSON.stringify({ name: name, tag: p.get('tag') || '', kind: p.get('kind') || '' }),
     });
     if (r.ok) location.href = '/store?collection=' + encodeURIComponent(name);

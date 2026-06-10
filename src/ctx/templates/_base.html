@@ -508,6 +508,7 @@
       <a href="/usage"   class="{% if active == 'usage'    %}active{% endif %}">usage</a>
       <a href="/savings" class="{% if active == 'savings'  %}active{% endif %}">savings</a>
       <a href="/insights" class="{% if active == 'insights' %}active{% endif %}">insights</a>
+      <a href="/settings" class="{% if active == 'settings' %}active{% endif %}">settings</a>
       <a href="/install" class="install-nav {% if active == 'install'  %}active{% endif %}">install</a>
     </nav>
     <div class="topbar-spacer"></div>
@@ -519,6 +520,14 @@
 <main>
 {% block content %}{% endblock %}
 </main>
+<script>
+  // Shared write token for UI write actions (delete / tag / collection / backup).
+  // Set once on /settings; kept in localStorage and sent as X-CTX-Write-Token.
+  window.ctxWriteHeaders = function () {
+    var t = localStorage.getItem('ctxWriteToken');
+    return t ? { 'X-CTX-Write-Token': t } : {};
+  };
+</script>
 <script>
   (function () {
     // Global "/" focuses search input if present, "g s" go to search, "g o" overview, "g d" docs.

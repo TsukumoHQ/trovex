@@ -293,6 +293,15 @@ _FACET_OWNER = {"cto", "cos", "founder"}
 
 
 @app.command()
+def backup() -> None:
+    """Snapshot ctx.db into data_dir/backups/ (consistent online copy, keeps 14)."""
+    from .backup import make_backup
+    settings = Settings()
+    dest = make_backup(settings.data_dir / "ctx.db", settings.data_dir)
+    console.print(f"[green]Backed up[/green] -> {dest}")
+
+
+@app.command()
 def facet() -> None:
     """Promote organic folder tags into faceted tags (type/ owner/ domain/).
 

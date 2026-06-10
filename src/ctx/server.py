@@ -367,6 +367,35 @@ def build_app() -> FastAPI:
     async def healthz() -> str:
         return "ok"
 
+    @app.get("/settings", response_class=HTMLResponse)
+    async def settings_page(request: Request) -> HTMLResponse:
+        from . import backup as backup_mod
+        state = get_state()
+        db = state.searcher.db
+        db_path = state.settings.data_dir / "ctx.db"
+        return templates.TemplateResponse(request, "settings.html", {
+            "db_size": db_path.stat().st_size if db_path.exists() else 0,
+            "doc_count": db.execute(
+                "SELECT COUNT(*) AS c FROM docs WHERE source_id='ctx'").fetchone()["c"],
+            "chunk_count": db.execute("SELECT COUNT(*) AS c FROM chunks").fetchone()["c"],
+            "auth_on": bool(state.settings.write_token),
+            "backups": backup_mod.list_backups(state.settings.data_dir),
+        })
+
+    @app.get("/api/backups")
+    async def api_backups() -> JSONResponse:
+        from . import backup as backup_mod
+        return JSONResponse(backup_mod.list_backups(get_state().settings.data_dir))
+
+    @app.post("/api/backup")
+    async def api_backup(request: Request) -> JSONResponse:
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
+        from . import backup as backup_mod
+        state = get_state()
+        dest = backup_mod.make_backup(state.settings.data_dir / "ctx.db", state.settings.data_dir)
+        return JSONResponse({"ok": True, "file": dest.name})
+
     # ── Install page + hook downloads ────────────────────────────────
 
     @app.get("/install", response_class=HTMLResponse)

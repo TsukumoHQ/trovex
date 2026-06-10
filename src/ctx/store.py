@@ -13,12 +13,13 @@ backed by the same sqlite-vec DB the rest of ctx uses.
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 import sqlite_vec
@@ -43,6 +44,7 @@ class StoredDoc:
     status: str
     tokens_est: int
     mtime: float
+    tags: list[str] = field(default_factory=list)
 
 
 class Store(Protocol):
@@ -50,7 +52,7 @@ class Store(Protocol):
 
     def put(self, content: str, *, kind: str | None = None,
             ext_id: str | None = None, title: str | None = None,
-            author: str | None = None) -> str: ...
+            author: str | None = None, tags: list[str] | None = None) -> str: ...
 
     def get(self, ext_id: str) -> StoredDoc | None: ...
 
@@ -74,7 +76,7 @@ class SqliteStore:
 
     def put(self, content: str, *, kind: str | None = None,
             ext_id: str | None = None, title: str | None = None,
-            author: str | None = None) -> str:
+            author: str | None = None, tags: list[str] | None = None) -> str:
         """Create or replace a ctx-owned doc; return its opaque ext_id."""
         ext_id = ext_id or uuid.uuid4().hex
         title = title or _extract_title(content)
@@ -109,24 +111,39 @@ class SqliteStore:
 
             self._embed(doc_id, content, title)
             self._embed_chunks(self._insert_chunks(doc_id, content, title))
+            self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
             self.db.commit()
         return ext_id
 
     def get(self, ext_id: str) -> StoredDoc | None:
         row = self.db.execute(
-            """SELECT ext_id, title, content, kind, status, tokens_est, mtime
-               FROM docs WHERE ext_id = ?""",
+            """SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,
+                      d.mtime, GROUP_CONCAT(t.tag) AS tags
+               FROM docs d LEFT JOIN doc_tags t ON t.doc_id = d.id
+               WHERE d.ext_id = ? GROUP BY d.id""",
             (ext_id,),
         ).fetchone()
         if not row or row["content"] is None:
             return None
         return _row_to_doc(row)
 
-    def list_docs(self) -> list[StoredDoc]:
+    def list_docs(self, *, tag: str | None = None, kind: str | None = None,
+                  limit: int = 500) -> list[StoredDoc]:
+        where = ["d.source_id = ?"]
+        params: list = [CTX_SOURCE_ID]
+        if tag:
+            where.append("d.id IN (SELECT doc_id FROM doc_tags WHERE tag = ?)")
+            params.append(tag)
+        if kind:
+            where.append("d.kind = ?")
+            params.append(kind)
         rows = self.db.execute(
-            """SELECT ext_id, title, content, kind, status, tokens_est, mtime
-               FROM docs WHERE source_id = ? ORDER BY mtime DESC""",
-            (CTX_SOURCE_ID,),
+            f"""SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,
+                       d.mtime, GROUP_CONCAT(t.tag) AS tags
+                FROM docs d LEFT JOIN doc_tags t ON t.doc_id = d.id
+                WHERE {" AND ".join(where)}
+                GROUP BY d.id ORDER BY d.mtime DESC LIMIT ?""",
+            (*params, limit),
         ).fetchall()
         return [_row_to_doc(r) for r in rows if r["content"] is not None]
 
@@ -228,22 +245,109 @@ class SqliteStore:
                 (cid, sqlite_vec.serialize_float32(emb.tolist())),
             )
 
-    def search_chunks(self, query: str, limit: int = 5) -> list[dict]:
-        """Chunk-level retrieval: top chunks + their parent-doc context."""
+    def search_chunks(self, query: str, limit: int = 5, *, kind: str | None = None,
+                      source: str | None = None, tags: list[str] | None = None) -> list[dict]:
+        """Chunk-level retrieval + metadata filters (post-filtered for robustness)."""
         if not query.strip():
             return []
         qemb = next(iter(self.embedder.embed([query])))
         rows = self.db.execute(
-            """SELECT c.heading_path, c.content, c.tokens_est,
-                      d.ext_id, d.title, d.kind, v.distance
+            """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
+                      d.ext_id, d.title, d.kind, d.source_id, v.distance
                FROM vec_chunks v
                JOIN chunks c ON c.id = v.rowid
                JOIN docs d ON d.id = c.doc_id
                WHERE v.embedding MATCH ? AND k = ?
                ORDER BY v.distance""",
-            (sqlite_vec.serialize_float32(qemb.tolist()), limit),
+            (sqlite_vec.serialize_float32(qemb.tolist()), max(limit * 5, 20)),
         ).fetchall()
-        return [dict(r) for r in rows]
+        tagset = set(tags or [])
+        out: list[dict] = []
+        for r in rows:
+            if kind and r["kind"] != kind:
+                continue
+            if source and r["source_id"] != source:
+                continue
+            if tagset:
+                dtags = {t["tag"] for t in self.db.execute(
+                    "SELECT tag FROM doc_tags WHERE doc_id = ?", (r["doc_id"],))}
+                if not (tagset & dtags):
+                    continue
+            out.append(dict(r))
+            if len(out) >= limit:
+                break
+        return out
+
+    def _set_tags(self, doc_id: int, tags: list[str]) -> None:
+        self.db.execute("DELETE FROM doc_tags WHERE doc_id = ?", (doc_id,))
+        for raw in tags:
+            tag = raw.strip().strip("/").lower()
+            if tag:
+                self.db.execute(
+                    "INSERT OR IGNORE INTO doc_tags(doc_id, tag) VALUES (?, ?)",
+                    (doc_id, tag),
+                )
+
+    def set_tags(self, ext_id: str, add: list[str] | None = None,
+                 remove: list[str] | None = None) -> list[str]:
+        """Add/remove tags on a doc (ctx_tag tool + reader UI). Returns new set."""
+        with self._lock:
+            row = self.db.execute(
+                "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
+            ).fetchone()
+            if not row:
+                return []
+            doc_id = row["id"]
+            for raw in (remove or []):
+                self.db.execute(
+                    "DELETE FROM doc_tags WHERE doc_id = ? AND tag = ?",
+                    (doc_id, raw.strip().strip("/").lower()),
+                )
+            for raw in (add or []):
+                tag = raw.strip().strip("/").lower()
+                if tag:
+                    self.db.execute(
+                        "INSERT OR IGNORE INTO doc_tags(doc_id, tag) VALUES (?, ?)",
+                        (doc_id, tag),
+                    )
+            self.db.commit()
+            return [r["tag"] for r in self.db.execute(
+                "SELECT tag FROM doc_tags WHERE doc_id = ? ORDER BY tag", (doc_id,))]
+
+    def all_tags(self) -> list[tuple[str, int]]:
+        """Every tag + its doc count, for the filter sidebar / tag tree."""
+        return [(r["tag"], r["c"]) for r in self.db.execute(
+            """SELECT t.tag, COUNT(*) AS c FROM doc_tags t
+               JOIN docs d ON d.id = t.doc_id WHERE d.source_id = ?
+               GROUP BY t.tag ORDER BY t.tag""", (CTX_SOURCE_ID,))]
+
+    def create_collection(self, name: str, filter_dict: dict) -> None:
+        """A collection = a named saved filter (kind/tag/source)."""
+        with self._lock:
+            self.db.execute(
+                """INSERT OR REPLACE INTO collections(name, kind, filter_json, created)
+                   VALUES (?, 'filter', ?, ?)""",
+                (name.strip(), json.dumps(filter_dict), time.time()),
+            )
+            self.db.commit()
+
+    def list_collections(self) -> list[dict]:
+        return [
+            {"name": r["name"], "filter": json.loads(r["filter_json"] or "{}")}
+            for r in self.db.execute(
+                "SELECT name, filter_json FROM collections ORDER BY name")
+        ]
+
+    def get_collection(self, name: str) -> dict | None:
+        r = self.db.execute(
+            "SELECT filter_json FROM collections WHERE name = ?", (name,)
+        ).fetchone()
+        return json.loads(r["filter_json"] or "{}") if r else None
+
+    def delete_collection(self, name: str) -> None:
+        with self._lock:
+            self.db.execute("DELETE FROM collections WHERE name = ?", (name,))
+            self.db.commit()
 
     def _embed(self, doc_id: int, content: str, title: str) -> None:
         text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
@@ -256,10 +360,15 @@ class SqliteStore:
 
 
 def _row_to_doc(row: sqlite3.Row) -> StoredDoc:
+    try:
+        raw_tags = row["tags"]
+    except IndexError:
+        raw_tags = None
+    tags = sorted(set(raw_tags.split(","))) if raw_tags else []
     return StoredDoc(
         ext_id=row["ext_id"], title=row["title"] or "", content=row["content"],
         kind=row["kind"], status=row["status"], tokens_est=row["tokens_est"],
-        mtime=row["mtime"],
+        mtime=row["mtime"], tags=tags,
     )
 
 

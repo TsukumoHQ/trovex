@@ -55,6 +55,18 @@
   .danger-btn:hover { border-color: var(--stale); background: var(--stale-bg); }
   .danger-btn svg { width: 13px; height: 13px; }
 
+  .doc-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-3); align-items: center; }
+  .tagx { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono);
+    font-size: 11px; padding: 2px 4px 2px 8px; border-radius: 999px;
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--fg-muted); }
+  .tagx button { background: none; border: none; color: var(--fg-subtle); cursor: pointer;
+    font-size: 13px; line-height: 1; padding: 0 2px; }
+  .tagx button:hover { color: var(--stale); }
+  .tag-input { background: transparent; border: 1px dashed var(--border); border-radius: 999px;
+    color: var(--fg); font-family: var(--font-mono); font-size: 11px; padding: 2px 10px;
+    width: 70px; transition: width var(--duration), border-color var(--duration); }
+  .tag-input:focus { border-color: var(--accent-line); width: 130px; }
+
   /* TOC */
   .toc {
     position: sticky; top: calc(52px + var(--s-6));
@@ -165,6 +177,12 @@
           delete
         </button>
       </div>
+      <div class="doc-tags" data-doc="{{ doc.ext_id }}">
+        {% for t in doc.tags %}
+        <span class="tagx" data-tag="{{ t }}">{{ t }}<button type="button" aria-label="Remove tag {{ t }}">×</button></span>
+        {% endfor %}
+        <input class="tag-input" type="text" placeholder="+ tag" aria-label="Add a tag" />
+      </div>
     </header>
 
     <div class="prose">{{ body_html | safe }}</div>
@@ -198,5 +216,25 @@
       else { alert('Delete failed'); }
     });
   });
+
+  (function () {
+    const wrap = document.querySelector('.doc-tags');
+    if (!wrap) return;
+    const docId = wrap.dataset.doc;
+    async function send(body) {
+      const r = await fetch('/api/doc/' + docId + '/tags', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (r.ok) location.reload(); else alert('Tag update failed');
+    }
+    wrap.querySelectorAll('.tagx button').forEach(function (b) {
+      b.addEventListener('click', function () { send({ remove: b.parentElement.dataset.tag }); });
+    });
+    const inp = wrap.querySelector('.tag-input');
+    inp?.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && inp.value.trim()) { send({ add: inp.value.trim() }); }
+    });
+  })();
 </script>
 {% endblock %}

@@ -189,6 +189,32 @@ def migrate(
                       "from sources.yaml.[/dim]")
 
 
+@app.command(name="backfill-chunks")
+def backfill_chunks(batch: int = typer.Option(200, help="Embedding batch size.")) -> None:
+    """(Re)chunk + embed every store-held doc into vec_chunks. Idempotent."""
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    docs = store.db.execute(
+        "SELECT id, content, title FROM docs WHERE content IS NOT NULL"
+    ).fetchall()
+    pairs: list = []
+    n = 0
+    for d in docs:
+        pairs.extend(store._insert_chunks(d["id"], d["content"], d["title"] or ""))
+        n += 1
+        if len(pairs) >= batch:
+            store._embed_chunks(pairs)
+            store.db.commit()
+            pairs = []
+    if pairs:
+        store._embed_chunks(pairs)
+        store.db.commit()
+    total = store.db.execute("SELECT COUNT(*) AS c FROM chunks").fetchone()["c"]
+    console.print(f"[green]Backfilled {n} docs -> {total} chunks[/green]")
+
+
 def open_db_for_read(settings: Settings):
     from .db import open_db
     return open_db(settings.data_dir / "ctx.db", settings.embed_dim)

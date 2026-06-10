@@ -249,22 +249,64 @@ def build_app() -> FastAPI:
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
 
     @app.get("/store", response_class=HTMLResponse)
-    async def store_page(request: Request) -> HTMLResponse:
+    async def store_page(request: Request, tag: str = "", kind: str = "",
+                         collection: str = "") -> HTMLResponse:
         """The ctx-owned doc store — what agents write, what humans read here."""
+        store = get_state().store
         now = _now()
+        f_tag, f_kind = tag, kind
+        if collection:
+            cf = store.get_collection(collection) or {}
+            f_tag = cf.get("tag", f_tag)
+            f_kind = cf.get("kind", f_kind)
         items = [
             {
                 "ext_id": d.ext_id, "title": d.title, "kind": d.kind,
-                "status": d.status, "tokens_est": d.tokens_est,
+                "status": d.status, "tokens_est": d.tokens_est, "tags": d.tags,
                 "age_days": max(0.0, (now - d.mtime) / 86400),
                 "snippet": _snippet(d.content),
             }
-            for d in get_state().store.list_docs()
+            for d in store.list_docs(tag=f_tag or None, kind=f_kind or None)
         ]
-        total_tokens = sum(i["tokens_est"] for i in items)
         return templates.TemplateResponse(
-            request, "store.html", {"items": items, "total_tokens": total_tokens}
+            request, "store.html",
+            {
+                "items": items,
+                "total_tokens": sum(i["tokens_est"] for i in items),
+                "all_tags": store.all_tags(),
+                "collections": store.list_collections(),
+                "active_tag": tag, "active_kind": kind, "active_collection": collection,
+            },
         )
+
+    @app.get("/api/collections")
+    async def api_collections() -> JSONResponse:
+        return JSONResponse(get_state().store.list_collections())
+
+    @app.post("/api/collections")
+    async def api_collection_create(request: Request) -> JSONResponse:
+        body = await request.json()
+        name = (body.get("name") or "").strip()
+        if not name:
+            return JSONResponse({"error": "name required"}, status_code=400)
+        flt = {k: v for k, v in (("tag", body.get("tag")), ("kind", body.get("kind"))) if v}
+        get_state().store.create_collection(name, flt)
+        return JSONResponse({"ok": True, "name": name, "filter": flt})
+
+    @app.delete("/api/collections/{name}")
+    async def api_collection_delete(name: str) -> JSONResponse:
+        get_state().store.delete_collection(name)
+        return JSONResponse({"deleted": True})
+
+    @app.post("/api/doc/{ext_id}/tags")
+    async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:
+        body = await request.json()
+        tags = get_state().store.set_tags(
+            ext_id,
+            add=[t.strip() for t in (body.get("add") or "").split(",") if t.strip()],
+            remove=[t.strip() for t in (body.get("remove") or "").split(",") if t.strip()],
+        )
+        return JSONResponse({"tags": tags})
 
     # ── JSON API ─────────────────────────────────────────────────────
 

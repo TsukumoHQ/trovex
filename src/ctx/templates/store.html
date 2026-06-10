@@ -5,37 +5,48 @@
 
 {% block head %}
 <style>
-  .store-grid {
-    display: grid; gap: var(--s-4);
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  }
-  .doc-card {
-    display: flex; flex-direction: column; gap: var(--s-3);
-    padding: var(--s-4); min-height: 132px;
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius);
-    transition: border-color var(--duration), transform var(--duration);
-  }
+  .store-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: var(--s-8); align-items: start; }
+  .store-sidebar { position: sticky; top: calc(52px + var(--s-6)); }
+  .side-section { margin-bottom: var(--s-6); }
+  .side-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: var(--t-11);
+    color: var(--fg-subtle); margin-bottom: var(--s-2); font-family: var(--font-mono); }
+  .side-link { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+    padding: 3px var(--s-2); border-radius: var(--radius-sm); color: var(--fg-muted);
+    font-family: var(--font-mono); font-size: var(--t-12); }
+  .side-link:hover { background: var(--bg-hover); color: var(--fg); }
+  .side-link.active { background: var(--accent-soft); color: var(--accent); }
+  .side-link .count { color: var(--fg-faint); font-size: var(--t-11); }
+  .side-btn { margin-top: var(--s-2); width: 100%; text-align: left; background: transparent;
+    border: 1px dashed var(--border); color: var(--fg-subtle); border-radius: var(--radius-sm);
+    padding: 4px var(--s-2); cursor: pointer; font-family: var(--font-mono); font-size: var(--t-11); }
+  .side-btn:hover { color: var(--accent); border-color: var(--accent-line); }
+
+  .filter-banner { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-4);
+    padding: var(--s-2) var(--s-3); background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted); }
+  .filter-banner a { color: var(--accent); margin-left: auto; }
+
+  .store-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .doc-card { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); min-height: 132px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    transition: border-color var(--duration), transform var(--duration); }
   .doc-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
-  .doc-card-title {
-    font-size: var(--t-16); font-weight: 600; color: var(--fg);
-    letter-spacing: -0.01em;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .doc-card:hover .doc-card-title { color: var(--accent); }
+  .doc-card-title { font-size: var(--t-16); font-weight: 600; color: var(--fg); letter-spacing: -0.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-card-title:hover { color: var(--accent); }
   .doc-card-badges { display: flex; flex-wrap: wrap; gap: var(--s-2); }
-  .doc-card-snippet {
-    color: var(--fg-muted); font-size: var(--t-13); line-height: 1.6;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .doc-card-foot {
-    margin-top: auto;
-    display: flex; align-items: center; justify-content: space-between;
+  .doc-card-snippet { color: var(--fg-muted); font-size: var(--t-13); line-height: 1.6;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .doc-card-snippet:hover { color: var(--fg-muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-family: var(--font-mono); font-size: 10px; padding: 1px 6px; border-radius: 999px;
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--fg-muted); }
+  .chip:hover { color: var(--accent); border-color: var(--accent-line); }
+  .doc-card-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between;
     padding-top: var(--s-3); border-top: 1px solid var(--border);
-    font-family: var(--font-mono); font-size: var(--t-11); color: var(--fg-subtle);
-  }
+    font-family: var(--font-mono); font-size: var(--t-11); color: var(--fg-subtle); }
   .store-empty-icon { color: var(--fg-faint); margin-bottom: var(--s-3); }
+  @media (max-width: 880px) { .store-layout { grid-template-columns: 1fr; } .store-sidebar { position: static; } }
 </style>
 {% endblock %}
 
@@ -44,42 +55,96 @@
 {% endblock %}
 
 {% block content %}
-<div class="section-head" style="margin-bottom: var(--s-5);">
-  <div>
-    <h1 style="margin-bottom: 2px;">Store</h1>
-    <div class="subtle mono" style="font-size: var(--t-12);">
-      ctx-owned docs — written by agents via <code>ctx_write</code>, read by everyone
+<div class="store-layout">
+  <aside class="store-sidebar">
+    <div class="side-section">
+      <div class="side-label">Kind</div>
+      <a href="/store" class="side-link {% if not active_kind and not active_tag and not active_collection %}active{% endif %}">all</a>
+      {% for k in ['record', 'note', 'reference'] %}
+      <a href="/store?kind={{ k }}" class="side-link {% if active_kind == k %}active{% endif %}">{{ k }}</a>
+      {% endfor %}
     </div>
+    {% if all_tags %}
+    <div class="side-section">
+      <div class="side-label">Tags</div>
+      {% for t, c in all_tags %}
+      <a href="/store?tag={{ t | urlencode }}" class="side-link {% if active_tag == t %}active{% endif %}">
+        <span>{{ t }}</span><span class="count">{{ c }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="side-section">
+      <div class="side-label">Collections</div>
+      {% for col in collections %}
+      <a href="/store?collection={{ col.name | urlencode }}" class="side-link {% if active_collection == col.name %}active{% endif %}">{{ col.name }}</a>
+      {% endfor %}
+      <button class="side-btn" id="save-collection">+ save current filter</button>
+    </div>
+  </aside>
+
+  <div class="store-main">
+    {% if active_tag or active_kind or active_collection %}
+    <div class="filter-banner">
+      <span>Filtered{% if active_collection %} · collection <b>{{ active_collection }}</b>{% endif %}{% if active_kind %} · kind <b>{{ active_kind }}</b>{% endif %}{% if active_tag %} · tag <b>{{ active_tag }}</b>{% endif %}</span>
+      <a href="/store">clear</a>
+    </div>
+    {% endif %}
+
+    <div class="section-head" style="margin-bottom: var(--s-5);">
+      <div>
+        <h1 style="margin-bottom: 2px;">Store</h1>
+        <div class="subtle mono" style="font-size: var(--t-12);">
+          ctx-owned docs — written by agents via <code>ctx_write</code>, read by everyone
+        </div>
+      </div>
+    </div>
+
+    {% if items %}
+    <div class="store-grid">
+      {% for d in items %}
+      <div class="doc-card">
+        <a class="doc-card-title" href="/doc/{{ d.ext_id }}">{{ d.title }}</a>
+        <div class="doc-card-badges">
+          {% if d.kind %}<span class="pill pill-plan">{{ d.kind }}</span>{% endif %}
+          {{ status_pill(d.status) }}
+        </div>
+        {% if d.snippet %}<a class="doc-card-snippet" href="/doc/{{ d.ext_id }}">{{ d.snippet }}</a>{% endif %}
+        {% if d.tags %}
+        <div class="chips">
+          {% for t in d.tags %}<a class="chip" href="/store?tag={{ t | urlencode }}">{{ t }}</a>{% endfor %}
+        </div>
+        {% endif %}
+        <div class="doc-card-foot">
+          <span>{{ fresh_label(d.age_days) }}</span>
+          <span>~{{ "{:,}".format(d.tokens_est) }} tok</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <svg class="store-empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      <div class="empty-title mono">No docs match this filter</div>
+      <div class="empty-hint"><span>Agents create them with the <code>ctx_write</code> MCP tool.</span></div>
+    </div>
+    {% endif %}
   </div>
 </div>
 
-{% if items %}
-<div class="store-grid">
-  {% for d in items %}
-  <a class="doc-card" href="/doc/{{ d.ext_id }}">
-    <div class="doc-card-title">{{ d.title }}</div>
-    <div class="doc-card-badges">
-      {% if d.kind %}<span class="pill pill-plan">{{ d.kind }}</span>{% endif %}
-      {{ status_pill(d.status) }}
-    </div>
-    {% if d.snippet %}<div class="doc-card-snippet">{{ d.snippet }}</div>{% endif %}
-    <div class="doc-card-foot">
-      <span>{{ fresh_label(d.age_days) }}</span>
-      <span>~{{ "{:,}".format(d.tokens_est) }} tok</span>
-    </div>
-  </a>
-  {% endfor %}
-</div>
-{% else %}
-<div class="empty">
-  <svg class="store-empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-  </svg>
-  <div class="empty-title mono">No ctx-owned docs yet</div>
-  <div class="empty-hint">
-    <span>Agents create them with the <code>ctx_write</code> MCP tool —</span>
-    <span>incidents, decisions, memory, shared plans.</span>
-  </div>
-</div>
-{% endif %}
+<script>
+  document.getElementById('save-collection')?.addEventListener('click', async function () {
+    const name = prompt('Collection name for the current filter?');
+    if (!name) return;
+    const p = new URLSearchParams(location.search);
+    const r = await fetch('/api/collections', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, tag: p.get('tag') || '', kind: p.get('kind') || '' }),
+    });
+    if (r.ok) location.href = '/store?collection=' + encodeURIComponent(name);
+    else alert('Save failed');
+  });
+</script>
 {% endblock %}

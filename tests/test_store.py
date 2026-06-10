@@ -126,6 +126,35 @@ def test_extract_section():
     assert extract_section(doc, "Nonexistent") is None
 
 
+def test_collections_save_list_get_delete(store):
+    store.put("# A", kind="record", tags=["x"])
+    store.create_collection("recs", {"kind": "record", "tag": "x"})
+    cols = {c["name"]: c["filter"] for c in store.list_collections()}
+    assert cols["recs"] == {"kind": "record", "tag": "x"}
+    assert store.get_collection("recs") == {"kind": "record", "tag": "x"}
+    store.delete_collection("recs")
+    assert store.get_collection("recs") is None
+
+
+def test_tags_write_auto_filter_and_edit(store):
+    a = store.put("# A\n\nalpha content", kind="record", tags=["auth", "team/sec"])
+    store.put("# B\n\nbeta content", kind="note", tags=["billing"])
+    da = store.get(a)
+    assert "auth" in da.tags and "team/sec" in da.tags and "kind/record" in da.tags
+    # filter list by tag
+    assert [d.ext_id for d in store.list_docs(tag="auth")] == [a]
+    # add/remove
+    store.set_tags(a, add=["urgent"], remove=["auth"])
+    da2 = store.get(a)
+    assert "urgent" in da2.tags and "auth" not in da2.tags
+    # all_tags reflects counts
+    tags = dict(store.all_tags())
+    assert tags.get("billing") == 1 and tags.get("urgent") == 1
+    # tag-filtered chunk search excludes the now-untagged doc
+    hits = store.search_chunks("alpha content", limit=5, tags=["billing"])
+    assert all(h["ext_id"] != a for h in hits)
+
+
 def test_chunk_indexing_and_search(store):
     store.put(
         "# Auth\n\n## JWT\n\njwt token signature validation\n\n"

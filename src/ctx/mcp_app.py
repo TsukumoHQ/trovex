@@ -93,7 +93,7 @@ def ctx(q: str, summary: bool = False) -> str:
 
 
 @mcp.tool()
-def ctx_write(content: str, kind: str = "", doc_id: str = "") -> str:
+def ctx_write(content: str, kind: str = "", doc_id: str = "", tags: str = "") -> str:
     """Store a doc INSIDE ctx so every agent of every dev can read it.
 
     For records / memory / coordination notes (incidents, decisions, plans) —
@@ -107,40 +107,92 @@ def ctx_write(content: str, kind: str = "", doc_id: str = "") -> str:
         kind: Lifecycle hint. "record" = event-anchored, never goes stale by
             age. Default "" = a normal living doc.
         doc_id: Omit to create; pass an existing id to overwrite that doc.
+        tags: Comma-separated tags (free or hierarchical "a/b/c") for organizing
+            + filtering. `kind/<kind>` is auto-added.
     """
     state = get_state()
-    return state.store.put(content, kind=kind or None, ext_id=doc_id or None)
+    taglist = [t.strip() for t in tags.split(",") if t.strip()]
+    return state.store.put(
+        content, kind=kind or None, ext_id=doc_id or None, tags=taglist or None,
+    )
 
 
 @mcp.tool()
-def ctx_read(query: str = "", doc_id: str = "", section: str = "") -> str:
-    """Read a ctx-owned doc — returns its CONTENT (not a pointer).
-
-    Pass `doc_id` for a direct fetch, or `query` to semantically route to the
-    single best ctx doc and return it. Use this before re-deriving anything an
-    agent may already have written — it spends tokens only on the one right doc.
+def ctx_tag(doc_id: str, add: str = "", remove: str = "") -> str:
+    """Add/remove tags on a ctx-owned doc — returns the doc's new tag set.
 
     Args:
-        query: Natural-language query; returns the best-matching ctx doc's body.
-        doc_id: Opaque id from a prior `ctx_write`; returns that exact doc.
-        section: Optional heading; return only that section, not the whole body.
+        doc_id: The doc to tag.
+        add: Comma-separated tags to add (free or hierarchical "a/b/c").
+        remove: Comma-separated tags to remove.
+    """
+    state = get_state()
+    tags = state.store.set_tags(
+        doc_id,
+        add=[t.strip() for t in add.split(",") if t.strip()],
+        remove=[t.strip() for t in remove.split(",") if t.strip()],
+    )
+    return ", ".join(tags) if tags else "(no tags)"
+
+
+@mcp.tool()
+def ctx_read(query: str = "", doc_id: str = "", section: str = "", full: bool = False) -> str:
+    """Read a ctx-owned doc — by default returns the most relevant *passage*.
+
+    Token-minimal by design: a query returns the single best chunk (with its
+    heading breadcrumb), not the whole doc. Set full=true for the whole doc.
+
+    Args:
+        query: Natural-language query → the best-matching passage.
+        doc_id: Opaque id → that exact doc (whole, or just `section`).
+        section: With doc_id, return only that heading's section.
+        full: With query, return the whole best-matching doc instead of a passage.
     """
     state = get_state()
     if doc_id:
         doc = state.store.get(doc_id)
-    elif query.strip():
-        results = state.searcher.search(query, limit=1, source_ids=[CTX_SOURCE_ID])
-        # For ctx-owned docs, SearchResult.path holds the ext_id.
-        doc = state.store.get(results[0].path) if results else None
-    else:
+        if doc is None:
+            return "(not found)"
+        if section:
+            sec = extract_section(doc.content, section)
+            return sec if sec is not None else f"(section '{section}' not found)"
+        return doc.content
+    if not query.strip():
         return "(provide query or doc_id)"
+    if full:
+        results = state.searcher.search(query, limit=1, source_ids=[CTX_SOURCE_ID])
+        doc = state.store.get(results[0].path) if results else None
+        return doc.content if doc else "(no results)"
+    hits = state.store.search_chunks(query, limit=1)
+    return _fmt_passage(hits[0]) if hits else "(no results)"
 
-    if doc is None:
-        return "(not found)"
-    if section:
-        sec = extract_section(doc.content, section)
-        return sec if sec is not None else f"(section '{section}' not found)"
-    return doc.content
+
+@mcp.tool()
+def ctx_search(query: str, k: int = 5, kind: str = "", tags: str = "") -> str:
+    """Search the store — returns the top K relevant *passages* (not whole docs).
+
+    The RAG entry point: chunk-level retrieval with metadata filters. Each result
+    is a passage with its heading breadcrumb + source doc id.
+
+    Args:
+        query: Natural-language query.
+        k: How many passages (default 5).
+        kind: Filter by kind (e.g. "record").
+        tags: Comma-separated tags to filter by (any-match).
+    """
+    state = get_state()
+    hits = state.store.search_chunks(
+        query, limit=k, kind=kind or None,
+        tags=[t.strip() for t in tags.split(",") if t.strip()] or None,
+    )
+    if not hits:
+        return "(no results)"
+    return "\n\n———\n\n".join(_fmt_passage(h) for h in hits)
+
+
+def _fmt_passage(h: dict) -> str:
+    bc = f"{h['title']} > {h['heading_path']}" if h.get("heading_path") else h["title"]
+    return f"{bc}\n\n{h['content']}\n\n— ctx:{h['ext_id']}"
 
 
 @mcp.tool()

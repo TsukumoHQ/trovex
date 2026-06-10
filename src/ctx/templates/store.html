@@ -46,6 +46,9 @@
     padding-top: var(--s-3); border-top: 1px solid var(--border);
     font-family: var(--font-mono); font-size: var(--t-11); color: var(--fg-subtle); }
   .store-empty-icon { color: var(--fg-faint); margin-bottom: var(--s-3); }
+  .pager { display: flex; align-items: center; justify-content: center; gap: var(--s-4);
+    margin-top: var(--s-6); font-family: var(--font-mono); font-size: var(--t-12); }
+  .pager a { color: var(--accent); }
   @media (max-width: 880px) { .store-layout { grid-template-columns: 1fr; } .store-sidebar { position: static; } }
 </style>
 {% endblock %}
@@ -101,7 +104,7 @@
     </div>
     {% endif %}
 
-    <div class="section-head" style="margin-bottom: var(--s-5);">
+    <div class="section-head" style="margin-bottom: var(--s-4);">
       <div>
         <h1 style="margin-bottom: 2px;">Store</h1>
         <div class="subtle mono" style="font-size: var(--t-12);">
@@ -109,6 +112,18 @@
         </div>
       </div>
     </div>
+
+    <form action="/store" method="get" style="margin-bottom: var(--s-4);">
+      <input type="search" name="q" value="{{ q }}" class="input mono"
+             placeholder="search the store — semantic + keyword…" aria-label="Search the store">
+      {% if active_kind %}<input type="hidden" name="kind" value="{{ active_kind }}">{% endif %}
+      {% if active_tag %}<input type="hidden" name="tag" value="{{ active_tag }}">{% endif %}
+    </form>
+    {% if q %}
+    <div class="subtle mono" style="font-size: var(--t-12); margin-bottom: var(--s-3);">
+      {{ total }} result{{ '' if total == 1 else 's' }} for "{{ q }}" · <a href="/store" style="color: var(--accent);">clear</a>
+    </div>
+    {% endif %}
 
     {% if items %}
     <div class="store-grid">
@@ -137,8 +152,17 @@
       <svg class="store-empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
       </svg>
-      <div class="empty-title mono">No docs match this filter</div>
+      <div class="empty-title mono">{% if q %}No results for "{{ q }}"{% else %}No docs match this filter{% endif %}</div>
       <div class="empty-hint"><span>Agents create them with the <code>ctx_write</code> MCP tool.</span></div>
+    </div>
+    {% endif %}
+
+    {% if not q and pages > 1 %}
+    <div class="pager">
+      {% set qs = (('&tag=' + active_tag) if active_tag else '') ~ (('&kind=' + active_kind) if active_kind else '') %}
+      {% if page > 1 %}<a href="/store?page={{ page - 1 }}{{ qs }}">← prev</a>{% else %}<span class="subtle">← prev</span>{% endif %}
+      <span class="subtle">page {{ page }} / {{ pages }}</span>
+      {% if page < pages %}<a href="/store?page={{ page + 1 }}{{ qs }}">next →</a>{% else %}<span class="subtle">next →</span>{% endif %}
     </div>
     {% endif %}
   </div>

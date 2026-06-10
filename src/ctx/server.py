@@ -205,9 +205,11 @@ def build_app() -> FastAPI:
             },
         )
 
-    @app.get("/search", response_class=HTMLResponse)
-    async def search_html(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
-        return _render_search(request, templates, q, summary, partial=False)
+    @app.get("/search")
+    async def search_html(q: str = "") -> RedirectResponse:
+        # The router search page showed mig_ ids; the store search is the real one.
+        from urllib.parse import quote
+        return RedirectResponse("/store?q=" + quote(q), status_code=308)
 
     @app.get("/search/partial", response_class=HTMLResponse)
     async def search_partial(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
@@ -253,8 +255,8 @@ def build_app() -> FastAPI:
 
     @app.get("/store", response_class=HTMLResponse)
     async def store_page(request: Request, tag: str = "", kind: str = "",
-                         collection: str = "") -> HTMLResponse:
-        """The ctx-owned doc store — what agents write, what humans read here."""
+                         collection: str = "", q: str = "", page: int = 1) -> HTMLResponse:
+        """The ctx-owned doc store — browse, filter, or semantic-search."""
         store = get_state().store
         now = _now()
         f_tag, f_kind = tag, kind
@@ -262,24 +264,41 @@ def build_app() -> FastAPI:
             cf = store.get_collection(collection) or {}
             f_tag = cf.get("tag", f_tag)
             f_kind = cf.get("kind", f_kind)
-        items = [
-            {
+        page = max(1, page)
+        per = 60
+
+        def card(d, snippet):
+            return {
                 "ext_id": d.ext_id, "title": d.title, "kind": d.kind,
                 "status": d.status, "tokens_est": d.tokens_est, "tags": d.tags,
-                "age_days": max(0.0, (now - d.mtime) / 86400),
-                "snippet": _snippet(d.content),
+                "age_days": max(0.0, (now - d.mtime) / 86400), "snippet": snippet,
             }
-            for d in store.list_docs(tag=f_tag or None, kind=f_kind or None)
-        ]
+
+        if q.strip():
+            hits = store.search_chunks(
+                q, limit=40, kind=f_kind or None, tags=[f_tag] if f_tag else None)
+            seen: dict = {}
+            for h in hits:
+                seen.setdefault(h["ext_id"], h["content"][:160])
+            items = [card(d, seen[e]) for e in seen if (d := store.get(e))]
+            total, pages = len(items), 1
+        else:
+            total = store.count_docs(tag=f_tag or None, kind=f_kind or None)
+            docs = store.list_docs(tag=f_tag or None, kind=f_kind or None,
+                                   limit=per, offset=(page - 1) * per)
+            items = [card(d, _snippet(d.content)) for d in docs]
+            pages = (total + per - 1) // per
+
         facets, other_tags = store.tags_by_facet()
         return templates.TemplateResponse(
             request, "store.html",
             {
-                "items": items,
+                "items": items, "total": total,
                 "total_tokens": sum(i["tokens_est"] for i in items),
                 "facets": facets, "other_tags": other_tags,
                 "collections": store.list_collections(),
                 "active_tag": tag, "active_kind": kind, "active_collection": collection,
+                "q": q, "page": page, "pages": pages,
             },
         )
 

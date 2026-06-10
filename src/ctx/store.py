@@ -138,7 +138,7 @@ class SqliteStore:
         return _row_to_doc(row)
 
     def list_docs(self, *, tag: str | None = None, kind: str | None = None,
-                  limit: int = 500) -> list[StoredDoc]:
+                  limit: int = 60, offset: int = 0) -> list[StoredDoc]:
         where = ["d.source_id = ?"]
         params: list = [CTX_SOURCE_ID]
         if tag:
@@ -152,10 +152,23 @@ class SqliteStore:
                        d.mtime, GROUP_CONCAT(t.tag) AS tags
                 FROM docs d LEFT JOIN doc_tags t ON t.doc_id = d.id
                 WHERE {" AND ".join(where)}
-                GROUP BY d.id ORDER BY d.mtime DESC LIMIT ?""",
-            (*params, limit),
+                GROUP BY d.id ORDER BY d.mtime DESC LIMIT ? OFFSET ?""",
+            (*params, limit, offset),
         ).fetchall()
         return [_row_to_doc(r) for r in rows if r["content"] is not None]
+
+    def count_docs(self, *, tag: str | None = None, kind: str | None = None) -> int:
+        where = ["source_id = ?"]
+        params: list = [CTX_SOURCE_ID]
+        if tag:
+            where.append("id IN (SELECT doc_id FROM doc_tags WHERE tag = ?)")
+            params.append(tag)
+        if kind:
+            where.append("kind = ?")
+            params.append(kind)
+        return self.db.execute(
+            f"SELECT COUNT(*) AS c FROM docs WHERE {' AND '.join(where)}", params
+        ).fetchone()["c"]
 
     def delete(self, ext_id: str) -> bool:
         """Remove a ctx-owned doc (row + its embedding). True if it existed."""

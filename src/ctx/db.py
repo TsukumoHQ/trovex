@@ -131,7 +131,7 @@ def _migrate_add_ctx_store_columns(conn: sqlite3.Connection) -> None:
     if not exists:
         return
     cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
-    for col in ("content", "ext_id", "kind"):
+    for col in ("content", "ext_id", "kind", "origin"):
         if col not in cols:
             conn.execute(f"ALTER TABLE docs ADD COLUMN {col} TEXT")
     conn.commit()
@@ -159,6 +159,7 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             content TEXT,
             ext_id TEXT,
             kind TEXT,
+            origin TEXT,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);

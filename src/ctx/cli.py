@@ -215,6 +215,66 @@ def backfill_chunks(batch: int = typer.Option(200, help="Embedding batch size.")
     console.print(f"[green]Backfilled {n} docs -> {total} chunks[/green]")
 
 
+@app.command()
+def enrich() -> None:
+    """Re-derive tags + provenance + titles for migrated docs from the source files.
+
+    Reads the original sources (sources.yaml.bak), recomputes each migrated doc's
+    mig_ id, and sets: tags from its folder path, origin = source/path, and a
+    title from the filename when the doc had none.
+    """
+    import hashlib
+
+    import yaml
+
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    bak = settings.data_dir / "sources.yaml.bak"
+    if not bak.exists():
+        console.print("[red]no sources.yaml.bak — nothing to enrich from[/red]")
+        raise typer.Exit(1)
+    sources = (yaml.safe_load(bak.read_text()) or {}).get("sources", [])
+
+    enriched = retitled = 0
+    for src in sources:
+        sid = str(src.get("id", "")).strip()
+        root = Path(str(src["root"])).expanduser().resolve()
+        if not root.exists():
+            continue
+        for ext in ("md", "mdx", "markdown"):
+            for p in root.rglob(f"*.{ext}"):
+                try:
+                    rel = str(p.relative_to(root))
+                except ValueError:
+                    continue
+                ext_id = "mig_" + hashlib.sha1(f"{sid}|{rel}".encode()).hexdigest()[:16]
+                row = store.db.execute(
+                    "SELECT id, title, kind FROM docs WHERE ext_id = ?", (ext_id,)
+                ).fetchone()
+                if not row:
+                    continue
+                doc_id = row["id"]
+                folders = [f for f in Path(rel).parent.parts if f not in (".", "")]
+                tags = [sid, *folders]
+                if row["kind"]:
+                    tags.append(f"kind/{row['kind']}")
+                store._set_tags(doc_id, tags)
+                store.db.execute(
+                    "UPDATE docs SET origin = ? WHERE id = ?", (f"{sid}/{rel}", doc_id)
+                )
+                if not row["title"] or row["title"] == "Untitled":
+                    nice = p.stem.replace("_", " ").replace("-", " ").strip().title()
+                    store.db.execute(
+                        "UPDATE docs SET title = ? WHERE id = ?", (nice or rel, doc_id)
+                    )
+                    retitled += 1
+                enriched += 1
+    store.db.commit()
+    console.print(f"[green]Enriched {enriched} docs[/green] (retitled {retitled})")
+
+
 def open_db_for_read(settings: Settings):
     from .db import open_db
     return open_db(settings.data_dir / "ctx.db", settings.embed_dim)

@@ -45,6 +45,7 @@ class StoredDoc:
     tokens_est: int
     mtime: float
     tags: list[str] = field(default_factory=list)
+    origin: str | None = None
 
 
 class Store(Protocol):
@@ -118,7 +119,7 @@ class SqliteStore:
     def get(self, ext_id: str) -> StoredDoc | None:
         row = self.db.execute(
             """SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,
-                      d.mtime, GROUP_CONCAT(t.tag) AS tags
+                      d.mtime, d.origin, GROUP_CONCAT(t.tag) AS tags
                FROM docs d LEFT JOIN doc_tags t ON t.doc_id = d.id
                WHERE d.ext_id = ? GROUP BY d.id""",
             (ext_id,),
@@ -315,12 +316,13 @@ class SqliteStore:
             return [r["tag"] for r in self.db.execute(
                 "SELECT tag FROM doc_tags WHERE doc_id = ? ORDER BY tag", (doc_id,))]
 
-    def all_tags(self) -> list[tuple[str, int]]:
-        """Every tag + its doc count, for the filter sidebar / tag tree."""
+    def all_tags(self, limit: int = 40) -> list[tuple[str, int]]:
+        """Top tags by doc count, for the filter sidebar (capped — can be many)."""
         return [(r["tag"], r["c"]) for r in self.db.execute(
             """SELECT t.tag, COUNT(*) AS c FROM doc_tags t
                JOIN docs d ON d.id = t.doc_id WHERE d.source_id = ?
-               GROUP BY t.tag ORDER BY t.tag""", (CTX_SOURCE_ID,))]
+               GROUP BY t.tag ORDER BY c DESC, t.tag LIMIT ?""",
+            (CTX_SOURCE_ID, limit))]
 
     def create_collection(self, name: str, filter_dict: dict) -> None:
         """A collection = a named saved filter (kind/tag/source)."""
@@ -366,10 +368,14 @@ def _row_to_doc(row: sqlite3.Row) -> StoredDoc:
     except IndexError:
         raw_tags = None
     tags = sorted(set(raw_tags.split(","))) if raw_tags else []
+    try:
+        origin = row["origin"]
+    except IndexError:
+        origin = None
     return StoredDoc(
         ext_id=row["ext_id"], title=row["title"] or "", content=row["content"],
         kind=row["kind"], status=row["status"], tokens_est=row["tokens_est"],
-        mtime=row["mtime"], tags=tags,
+        mtime=row["mtime"], tags=tags, origin=origin,
     )
 
 

@@ -169,6 +169,7 @@
           </button>
         </span>
         <span>~{{ "{:,}".format(doc.tokens_est) }} tok</span>
+        {% if doc.origin %}<span class="mono" style="color: var(--fg-subtle);" title="original source path">from {{ doc.origin }}</span>{% endif %}
         <button class="danger-btn" type="button"
                 data-delete="{{ doc.ext_id }}" aria-label="Delete this document">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

@@ -104,8 +104,18 @@ def _authorized() -> bool:
 _DENY = "(unauthorized — set the X-CTX-Write-Token header to the shared write token)"
 
 
+def _as_taglist(v) -> list[str]:
+    """Accept a list (the natural agent form) or a comma string (forgiving)."""
+    if not v:
+        return []
+    if isinstance(v, str):
+        v = v.split(",")
+    return [str(t).strip() for t in v if str(t).strip()]
+
+
 @mcp.tool()
-def ctx_write(content: str, kind: str = "", doc_id: str = "", tags: str = "") -> str:
+def ctx_write(content: str, kind: str = "", doc_id: str = "",
+              tags: list[str] | None = None) -> str:
     """Store a doc INSIDE ctx so every agent of every dev can read it.
 
     For records / memory / coordination notes (incidents, decisions, plans) —
@@ -119,34 +129,34 @@ def ctx_write(content: str, kind: str = "", doc_id: str = "", tags: str = "") ->
         kind: Lifecycle hint. "record" = event-anchored, never goes stale by
             age. Default "" = a normal living doc.
         doc_id: Omit to create; pass an existing id to overwrite that doc.
-        tags: Comma-separated tags (free or hierarchical "a/b/c") for organizing
-            + filtering. `kind/<kind>` is auto-added.
+        tags: List of tags (free or hierarchical "a/b/c"), e.g.
+            ["type/report", "owner/cto", "domain/accounting"]. `kind/<kind>`
+            is auto-added. A comma string is also accepted.
     """
     if not _authorized():
         return _DENY
     state = get_state()
-    taglist = [t.strip() for t in tags.split(",") if t.strip()]
     return state.store.put(
-        content, kind=kind or None, ext_id=doc_id or None, tags=taglist or None,
+        content, kind=kind or None, ext_id=doc_id or None,
+        tags=_as_taglist(tags) or None,
     )
 
 
 @mcp.tool()
-def ctx_tag(doc_id: str, add: str = "", remove: str = "") -> str:
+def ctx_tag(doc_id: str, add: list[str] | None = None,
+            remove: list[str] | None = None) -> str:
     """Add/remove tags on a ctx-owned doc — returns the doc's new tag set.
 
     Args:
         doc_id: The doc to tag.
-        add: Comma-separated tags to add (free or hierarchical "a/b/c").
-        remove: Comma-separated tags to remove.
+        add: List of tags to add (free or hierarchical "a/b/c").
+        remove: List of tags to remove.
     """
     if not _authorized():
         return _DENY
     state = get_state()
     tags = state.store.set_tags(
-        doc_id,
-        add=[t.strip() for t in add.split(",") if t.strip()],
-        remove=[t.strip() for t in remove.split(",") if t.strip()],
+        doc_id, add=_as_taglist(add), remove=_as_taglist(remove),
     )
     return ", ".join(tags) if tags else "(no tags)"
 
@@ -193,7 +203,8 @@ def ctx_read(query: str = "", doc_id: str = "", section: str = "", full: bool = 
 
 
 @mcp.tool()
-def ctx_search(query: str, k: int = 5, kind: str = "", tags: str = "") -> str:
+def ctx_search(query: str, k: int = 5, kind: str = "",
+               tags: list[str] | None = None) -> str:
     """Search the store — returns the top K relevant *passages* (not whole docs).
 
     The RAG entry point: chunk-level retrieval with metadata filters. Each result
@@ -203,13 +214,13 @@ def ctx_search(query: str, k: int = 5, kind: str = "", tags: str = "") -> str:
         query: Natural-language query.
         k: How many passages (default 5).
         kind: Filter by kind (e.g. "record").
-        tags: Comma-separated tags to filter by (any-match).
+        tags: List of tags to filter by (any-match). A comma string also works.
     """
     state = get_state()
     t0 = time.perf_counter()
     hits = state.store.search_chunks(
         query, limit=k, kind=kind or None,
-        tags=[t.strip() for t in tags.split(",") if t.strip()] or None,
+        tags=_as_taglist(tags) or None,
     )
     out = "\n\n———\n\n".join(_fmt_passage(h) for h in hits) if hits else "(no results)"
     _log_retrieval(state, query, hits, out, t0)

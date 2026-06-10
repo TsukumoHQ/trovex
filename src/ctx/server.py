@@ -8,7 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 from fastapi.templating import Jinja2Templates
 
 from . import insights as insights_mod
@@ -202,21 +207,11 @@ def build_app() -> FastAPI:
     async def search_partial(request: Request, q: str = "", summary: bool = False) -> HTMLResponse:
         return _render_search(request, templates, q, summary, partial=True)
 
-    @app.get("/docs", response_class=HTMLResponse)
-    async def docs_page(
-        request: Request,
-        qpath: str = "",
-        status: str = "",
-        source: str = "",
-        sort: str = "recent",
-        limit: int = 100,
-    ) -> HTMLResponse:
-        ctx_data = _docs_query(qpath, status, sort, limit, source)
-        ctx_data["total"] = get_state().searcher.db.execute(
-            "SELECT COUNT(*) AS c FROM docs"
-        ).fetchone()["c"]
-        ctx_data.update(qpath=qpath, status=status, sort=sort, limit=limit, source=source)
-        return templates.TemplateResponse(request, "docs.html", ctx_data)
+    @app.get("/docs")
+    async def docs_page() -> RedirectResponse:
+        # /docs was the file-router table view; full-ctx made it redundant with
+        # /store (same docs, worse presentation). Redirect to the one surface.
+        return RedirectResponse("/store", status_code=308)
 
     @app.get("/docs/partial", response_class=HTMLResponse)
     async def docs_partial(

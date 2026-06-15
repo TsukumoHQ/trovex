@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { track, trackLandingView } from './analytics'
+import { track, trackLandingView, trackRequestAccessClick, trackWaitlistSubmitted } from './analytics'
 
 const REPO = 'https://github.com/Synergix-lab/trovex'
 // TODO(human): swap to the real consulting contact (private email / Cal.com booking / form).
@@ -75,34 +75,6 @@ function useInView(ref: React.RefObject<HTMLElement | null>, threshold = 0.3) {
   return on
 }
 
-function Cmd({ text, location }: { text: string; location: string }) {
-  const [done, setDone] = useState(false)
-  const command = text.includes('index') ? 'index' : text.includes('serve') ? 'serve' : 'other'
-  return (
-    <span className="cmd">
-      <span className="p">$</span>
-      <code>{text}</code>
-      <button onClick={() => {
-        track('command_copied', { command, location })
-        navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500) })
-      }} aria-label="Copy command">
-        {done ? 'copied' : 'copy'}
-      </button>
-    </span>
-  )
-}
-
-/* analytics: a Get-trovex button is both a CTA and an outbound GitHub click. */
-function getTrovexClick(location: string) {
-  track('cta_clicked', { cta_id: 'get-trovex', location })
-  track('github_clicked', { location })
-}
-
-const Github = (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.2-1.5 6.2-6.7A5.2 5.2 0 0 0 19 4.8 4.9 4.9 0 0 0 18.9 1S17.7.6 15 2.5a13.4 13.4 0 0 0-7 0C5.3.6 4.1 1 4.1 1A4.9 4.9 0 0 0 4 4.8 5.2 5.2 0 0 0 2.7 8.4c0 5.2 3.2 6.4 6.2 6.7A3.4 3.4 0 0 0 8 17.7V22" />
-  </svg>
-)
 const Chrome = ({ url }: { url: string }) => (
   <div className="win-chrome">
     <div className="dots"><i /><i /><i /></div>
@@ -266,6 +238,64 @@ const FEATURES = [
   { no: '03', kicker: 'Share', title: 'Keep what one agent learns', body: 'One agent figures something out and saves it once. Every other agent, and your teammates, read it back instead of working it out again.', shot: <StoreShot />, flip: false },
 ]
 
+/* ── Waitlist: the private-beta conversion. First-party capture via /api/waitlist. ── */
+function WaitlistForm({ location = 'waitlist' }: { location?: string }) {
+  const [email, setEmail] = useState('')
+  const [company, setCompany] = useState('') // honeypot — humans never see this
+  const [state, setState] = useState<'idle' | 'submitting' | 'ok' | 'soon' | 'error'>('idle')
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (state === 'submitting') return
+    setState('submitting')
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, company }),
+      })
+      if (res.ok) { setState('ok'); trackWaitlistSubmitted(location); return }
+      setState(res.status === 503 ? 'soon' : 'error')
+    } catch {
+      setState('error')
+    }
+  }
+
+  if (state === 'ok') {
+    return (
+      <div className="wl-done" role="status">
+        <p className="wl-done-t">You're on the list.</p>
+        <p className="wl-done-s">We'll email you when your spot opens — one note, no spam, no list-selling.</p>
+      </div>
+    )
+  }
+
+  return (
+    <form className="wl-form" onSubmit={onSubmit} noValidate>
+      <input
+        className="wl-input" type="email" required value={email} placeholder="you@company.com"
+        autoComplete="email" aria-label="Email address"
+        onChange={(e) => setEmail(e.target.value)}
+        onFocus={() => trackRequestAccessClick(location)}
+      />
+      {/* honeypot: off-screen, bots fill it, humans don't */}
+      <input
+        className="wl-hp" tabIndex={-1} autoComplete="off" aria-hidden="true"
+        value={company} onChange={(e) => setCompany(e.target.value)}
+      />
+      <button className="btn btn-primary" type="submit" disabled={state === 'submitting'}>
+        {state === 'submitting' ? 'sending…' : 'Request beta access'}
+      </button>
+      {state === 'soon' && (
+        <p className="wl-msg">The beta list isn't open for sign-ups just yet — check back in a few days.</p>
+      )}
+      {state === 'error' && (
+        <p className="wl-msg wl-err">Something went wrong. Give it another try in a moment.</p>
+      )}
+    </form>
+  )
+}
+
 export default function App() {
   useReveal()
   useEffect(() => { trackLandingView() }, [])
@@ -280,7 +310,7 @@ export default function App() {
           <span className="sp" />
           <a className="lk hide" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'nav' })}>Product</a>
           <a className="lk" href={REPO} target="_blank" rel="noreferrer" onClick={() => track('github_clicked', { location: 'nav' })}>GitHub</a>
-          <a className="btn btn-primary nav-cta" href={REPO} target="_blank" rel="noreferrer" onClick={() => getTrovexClick('nav')}>Get trovex</a>
+          <a className="btn btn-primary nav-cta" href="#waitlist" onClick={() => trackRequestAccessClick('nav')}>Request access</a>
         </div>
       </nav>
 
@@ -296,9 +326,8 @@ export default function App() {
               <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
             </p>
             <div className="hero-cta">
-              <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer" onClick={() => getTrovexClick('hero')}>{Github} Get trovex</a>
+              <a className="btn btn-primary" href="#waitlist" onClick={() => trackRequestAccessClick('hero')}>Request beta access</a>
             </div>
-            <Cmd text="uv run trovex index /path/to/repo" location="hero" />
             <a className="hero-see" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'hero' })}>see it work ↓</a>
           </div>
           <HeroWindow />
@@ -358,16 +387,13 @@ export default function App() {
           </div>
         </section>
 
-        {/* CTA */}
-        <section className="section">
+        {/* Waitlist — the private-beta conversion */}
+        <section className="section" id="waitlist">
           <div className="wrap">
             <div className="cta reveal">
-              <h2>Give your agents one source of truth.</h2>
-              <p>Point trovex at your repo. Your agents stop guessing in about a minute.</p>
-              <div className="hero-cta">
-                <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer" onClick={() => getTrovexClick('cta')}>{Github} Get trovex</a>
-              </div>
-              <Cmd text="uv run trovex index /path/to/repo" location="cta" />
+              <h2>Request beta access.</h2>
+              <p>trovex is in a private beta. Leave your email and we'll send an invite as spots open.</p>
+              <WaitlistForm location="cta" />
               <p className="cta-note">No cloud, no API keys. Your docs never leave your machine.</p>
             </div>
           </div>

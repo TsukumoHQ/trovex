@@ -5,7 +5,7 @@ description = "Trovex — token-efficient routing for agent-generated .md docs. 
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "Synergix"}]
-license = {text = "Proprietary"}
+license = "AGPL-3.0-or-later"
 
 dependencies = [
     "fastapi>=0.115",

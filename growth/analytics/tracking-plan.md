@@ -82,11 +82,16 @@ raising their hand). The activation rows happen on the user's machine and stay o
 
 ### 3.2 Comparison pages (`web/public/vs/*`)
 
-The `/vs/` pages are **static HTML**, so they can't import `analytics.ts`. They carry the
-**Plausible auto-pageview** snippet, which gives their reach broken down by referrer/UTM
-natively (enough to power experiment #5 — does AI-engine traffic convert better on a
-comparison page than on home). **Fast-follow:** add a small inline `github_clicked`
-(`location=vs-<page>`) to each page's GitHub CTA for a cleaner per-page conversion rate.
+The `/vs/` pages are **static HTML**, so they can't import `analytics.ts`. Each carries:
+- the **Plausible auto-pageview** snippet → reach broken down by referrer/UTM natively;
+- a shared **`/vs/track.js`** (delegated click listener) that fires `github_clicked`
+  and `compare_clicked` with `location=vs-<page-slug>`, so each comparison page has a
+  clean per-page conversion rate (powers experiment #5). No cookies/identifiers; no-op
+  without an analytics script.
+
+All 7 pages (`vs/`, `claude-md`, `repomix`, `context-hub`, `cursor-memory`, `mem0`,
+`vector-db-rag`) are wired. **Blog** (`growth/blog/*.md`) is markdown source, not deployed
+HTML — nothing to instrument until those pages render on the site.
 
 ## 4. Property schema
 

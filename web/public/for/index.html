@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/for/" />
+  <title>Add trovex to your MCP client — Claude Code, Cursor, Windsurf, Cline</title>
+  <meta name="description" content="Set up guides for connecting trovex to your AI coding client as a local HTTP MCP server: Claude Code, Cursor, Windsurf, Cline — and any MCP client. One canonical doc per query, about 60% fewer tokens." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/for/" />
+  <meta property="og:title" content="Add trovex to your MCP client" />
+  <meta property="og:description" content="Set up guides for Claude Code, Cursor, Windsurf, Cline — and any MCP client." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Add trovex to your MCP client" />
+  <meta name="twitter:description" content="Set up guides for Claude Code, Cursor, Windsurf, Cline." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "For your MCP client", "item": "https://trovex.dev/for/" }
+        ]
+      },
+      {
+        "@type": "ItemList",
+        "name": "Add trovex to your MCP client",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex for Claude Code", "url": "https://trovex.dev/for/claude-code/" },
+          { "@type": "ListItem", "position": 2, "name": "trovex for Cursor", "url": "https://trovex.dev/for/cursor/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex for Windsurf", "url": "https://trovex.dev/for/windsurf/" },
+          { "@type": "ListItem", "position": 4, "name": "trovex for Cline", "url": "https://trovex.dev/for/cline/" }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/for/">For your client</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / For your client
+    </nav>
+
+    <h1>Add trovex to <span class="ac">your MCP client</span></h1>
+    <p class="deck">trovex runs as a local HTTP MCP server (<code>http://localhost:8765/mcp</code>). Any MCP-compatible client can connect to it — here's the exact config for the common ones.</p>
+
+    <div class="verdict">
+      <div class="l">Same two commands, every client</div>
+      <p>Index your repo, start the server, then point your client at it.</p>
+      <pre style="margin-top:12px;overflow-x:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;"><code>$ uv run trovex index /path/to/repo
+$ uv run trovex serve   # MCP at http://localhost:8765/mcp</code></pre>
+    </div>
+
+    <div class="related" style="margin-top:36px;">
+      <div class="l">Pick your client</div>
+      <ul>
+        <li><a href="/for/claude-code/"><strong>trovex for Claude Code</strong></a> — one command: <code>claude mcp add --transport http</code>.</li>
+        <li><a href="/for/cursor/"><strong>trovex for Cursor</strong></a> — add it to <code>.cursor/mcp.json</code>, toggle on in Settings → MCP.</li>
+        <li><a href="/for/windsurf/"><strong>trovex for Windsurf</strong></a> — <code>serverUrl</code> in <code>~/.codeium/windsurf/mcp_config.json</code>, refresh in Cascade.</li>
+        <li><a href="/for/cline/"><strong>trovex for Cline</strong></a> — add a remote streamable-HTTP server in the MCP Servers panel.</li>
+      </ul>
+    </div>
+
+    <p class="lead-answer">Using a different client? Any spec-compliant MCP client that supports HTTP / streamable-HTTP servers can connect to <code>http://localhost:8765/mcp</code> — the config shape is the same idea, just the field name and file location change.</p>
+
+    <div class="cta">
+      <h2>One canonical answer per query, in any client.</h2>
+      <p>Point trovex at your repo and connect your agent in about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/answers/">Read the answers</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

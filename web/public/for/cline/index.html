@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/for/cline/" />
+  <title>trovex for Cline — add a remote MCP server, ~60% fewer tokens</title>
+  <meta name="description" content="Add trovex to Cline as a remote streamable-HTTP MCP server. Run trovex serve, open the MCP Servers panel, add trovex at http://localhost:8765/mcp. Your agent gets one canonical doc per query instead of rereading the repo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/for/cline/" />
+  <meta property="og:title" content="trovex for Cline" />
+  <meta property="og:description" content="Add trovex to Cline as a remote streamable-HTTP MCP server. One canonical doc per query, ~60% fewer tokens." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for Cline" />
+  <meta name="twitter:description" content="Add trovex to Cline as a remote streamable-HTTP MCP server." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "For your MCP client", "item": "https://trovex.dev/for/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex for Cline", "item": "https://trovex.dev/for/cline/" }
+        ]
+      },
+      {
+        "@type": "HowTo",
+        "name": "Add trovex to Cline",
+        "description": "Connect trovex (a local HTTP MCP server) to Cline as a remote streamable-HTTP server.",
+        "step": [
+          { "@type": "HowToStep", "name": "Index your repo", "text": "Run `uv run trovex index /path/to/repo`." },
+          { "@type": "HowToStep", "name": "Start the server", "text": "Run `uv run trovex serve`. trovex serves MCP at http://localhost:8765/mcp." },
+          { "@type": "HowToStep", "name": "Open the MCP Servers panel", "text": "In Cline, open the MCP Servers icon and edit the configuration (cline_mcp_settings.json)." },
+          { "@type": "HowToStep", "name": "Add trovex", "text": "Add a trovex entry with type streamableHttp and the URL, then enable it." }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/for/">For your client</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/for/">For your client</a> / Cline
+    </nav>
+
+    <h1>trovex for <span class="ac">Cline</span></h1>
+    <p class="deck">Cline (the VS Code agent) manages MCP servers from its MCP Servers panel and <code>cline_mcp_settings.json</code>. Add trovex as a remote streamable-HTTP server and the agent gets one canonical doc per query — about 60% fewer tokens.</p>
+
+    <div class="verdict">
+      <div class="l">The config</div>
+      <p>Start trovex, then add it to <code>cline_mcp_settings.json</code> (via the MCP Servers panel → Configure) as a remote server:</p>
+      <pre style="margin-top:12px;overflow-x:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;"><code>{
+  "mcpServers": {
+    "trovex": {
+      "type": "streamableHttp",
+      "url": "http://localhost:8765/mcp"
+    }
+  }
+}</code></pre>
+    </div>
+
+    <h2>Setup, step by step</h2>
+    <ol>
+      <li><strong>Index your repo.</strong><div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex index /path/to/repo</div></li>
+      <li><strong>Start trovex.</strong> It serves MCP over HTTP at <code>http://localhost:8765/mcp</code>.<div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex serve</div></li>
+      <li><strong>Open the MCP Servers panel</strong> in Cline, switch to the <em>Remote Servers</em> tab (or edit <code>cline_mcp_settings.json</code> directly) and add the snippet above.</li>
+      <li><strong>Enable it.</strong> trovex appears in the server list with its <code>trovex</code> tool ready for the agent.</li>
+    </ol>
+    <p class="note">Cline's remote-server field names have changed across releases. If trovex doesn't connect, check Cline's current <a href="https://docs.cline.bot/mcp/configuring-mcp-servers" target="_blank" rel="noreferrer">MCP docs</a> for the exact transport key your version expects.</p>
+
+    <h2>Why Cline users want it</h2>
+    <p class="lead-answer">Cline reads files directly, which is exactly the pattern that burns tokens when project knowledge is spread across many markdown docs. trovex hands Cline the one canonical doc that answers a query — section-level, with a freshness marker — so it stops opening several files to find the current one. About <strong>60% fewer tokens per lookup</strong>, plus a shared write path so what Cline learns is saved once and read back later.</p>
+
+    <div class="related">
+      <div class="l">trovex for other clients</div>
+      <ul>
+        <li><a href="/for/claude-code/">trovex for Claude Code</a></li>
+        <li><a href="/for/cursor/">trovex for Cursor</a></li>
+        <li><a href="/for/windsurf/">trovex for Windsurf</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Give Cline one source of truth.</h2>
+      <p>Index your repo, start trovex, add the remote server — about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/for/">For your client</a>
+      <a href="/answers/">Answers</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix</small>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="trovex — the canonical doc store for your coding agents. About 60% fewer tokens per lookup.">
+  <defs>
+    <linearGradient id="scrim" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0a0e17" stop-opacity="0.98"/>
+      <stop offset="0.55" stop-color="#0a0e17" stop-opacity="0.88"/>
+      <stop offset="1" stop-color="#0a0e17" stop-opacity="0.35"/>
+    </linearGradient>
+    <linearGradient id="vscrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a0e17" stop-opacity="0.55"/>
+      <stop offset="0.35" stop-color="#0a0e17" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0a0e17" stop-opacity="0.55"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#0a0e17"/>
+  <image href="og-backdrop.png" x="0" y="0" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="1200" height="630" fill="url(#scrim)"/>
+  <rect width="1200" height="630" fill="url(#vscrim)"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#22c55e"/>
+  <g font-family="'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif">
+    <text x="80" y="150" font-size="34" font-weight="600" fill="#9aa6b8" letter-spacing="0.08em">trovex</text>
+    <text x="80" y="300" font-size="76" font-weight="700" fill="#e6edf3">The canonical doc store</text>
+    <text x="80" y="392" font-size="76" font-weight="700" fill="#e6edf3">for your <tspan fill="#22c55e">coding agents</tspan>.</text>
+    <text x="80" y="470" font-size="34" font-weight="400" fill="#9aa6b8">One source of truth. Same answers, about</text>
+    <text x="80" y="516" font-size="34" font-weight="400" fill="#9aa6b8"><tspan fill="#e6edf3" font-weight="600">60% fewer tokens</tspan> per lookup.</text>
+  </g>
+  <g font-family="'Fira Code','SF Mono',ui-monospace,monospace">
+    <text x="80" y="582" font-size="26" fill="#6b7689">$ uv run trovex serve</text>
+  </g>
+</svg>

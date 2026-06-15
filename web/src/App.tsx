@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { track, trackLandingView, trackRequestAccessClick, trackWaitlistSubmitted, getAttribution } from './analytics'
 
-const REPO = 'https://github.com/Synergix-lab/trovex'
-// TODO(human): swap to the real consulting contact (private email / Cal.com booking / form).
-// Points at the repo for now so the link works; this is the OSS->consulting funnel entry.
-const CONSULT_URL = REPO
+// During the private beta everything funnels to the in-page waitlist — the repo is
+// private, so no public GitHub link can ship without 404ing for visitors.
+// TODO(human): when a real consulting contact exists (email / booking / form), point this at it.
+const CONSULT_URL = '#waitlist'
 const reduceMotion =
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -290,16 +290,10 @@ function WaitlistForm({ location = 'waitlist' }: { location?: string }) {
         {state === 'submitting' ? 'sending…' : 'Request beta access'}
       </button>
       {state === 'soon' && (
-        <p className="wl-msg">
-          The beta list isn't open for sign-ups just yet — check back in a few days, or{' '}
-          <a href={CONSULT_URL} target="_blank" rel="noreferrer" onClick={() => track('consult_clicked', { location: 'waitlist-fallback' })}>reach out</a> if you want in sooner.
-        </p>
+        <p className="wl-msg">The beta list isn't open for sign-ups just yet — check back in a few days.</p>
       )}
       {state === 'error' && (
-        <p className="wl-msg wl-err">
-          Something went wrong on our end. Give it another try in a moment — if it keeps failing,{' '}
-          <a href={CONSULT_URL} target="_blank" rel="noreferrer" onClick={() => track('consult_clicked', { location: 'waitlist-fallback' })}>reach out</a> and we'll add you by hand.
-        </p>
+        <p className="wl-msg wl-err">Something went wrong on our end. Please try again in a moment.</p>
       )}
     </form>
   )
@@ -430,7 +424,7 @@ export default function App() {
           <div className="wrap">
             <p className="consult">
               Rolling agents out across a team? We consult on doing it well at scale.{' '}
-              <a href={CONSULT_URL} target="_blank" rel="noreferrer" onClick={() => track('consult_clicked', { location: 'consult-band' })}>Let's talk →</a>
+              <a href={CONSULT_URL} onClick={() => track('consult_clicked', { location: 'consult-band' })}>Let's talk →</a>
             </p>
           </div>
         </section>

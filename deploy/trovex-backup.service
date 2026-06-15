@@ -1,0 +1,11 @@
+[Unit]
+Description=trovex — daily SQLite backup (the store is the sole corpus)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=synxadmin
+Group=synxadmin
+WorkingDirectory=/home/synxadmin/Exposemd
+Environment=TROVEX_DATA_DIR=/home/synxadmin/.trovex-data
+ExecStart=/home/synxadmin/Exposemd/.venv/bin/trovex backup

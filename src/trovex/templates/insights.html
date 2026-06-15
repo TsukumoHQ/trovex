@@ -1,0 +1,859 @@
+{% extends "_base.html" %}
+{% from "_partials.html" import avatar, status_pill, fresh_label, number %}
+{% set active = 'insights' %}
+{% block title %}trovex — insights{% endblock %}
+
+{% block topbar_meta %}
+  <span class="mono">{{ heatmap.total }} queries · last {{ days }}d</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: var(--s-5);">
+  <div>
+    <h1 style="margin-bottom: 2px;">Insights</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      query patterns, corpus blind spots, retrieval health
+    </div>
+  </div>
+  <div class="filter-pills" style="margin-left: auto; padding: 2px; background: var(--bg-card); border-radius: var(--radius-sm);">
+    {% for d in [1, 7, 14, 30, 90] %}
+      <a href="/insights?days={{ d }}" class="filter-pill {% if d == days %}active{% endif %}">{{ d }}d</a>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── LLM rerank stats ─────────────────────────────────── #}
+{% if rerank.reranked_queries > 0 %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">
+      <span class="byok-inline-glyph" aria-hidden="true">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </span>
+      LLM rerank · BYOK
+    </span>
+    <span class="section-divider-meta mono">last {{ days }}d</span>
+  </div>
+
+  <div class="rerank-hero">
+    <div class="rerank-hero-main">
+      <div class="rerank-hero-eyebrow mono">RERANKED · LAST {{ days }}D</div>
+      <div class="rerank-hero-number mono">
+        {{ "{:,}".format(rerank.reranked_queries) }}
+        <span class="rerank-hero-unit">queries</span>
+      </div>
+      <div class="rerank-coverage">
+        <div class="rerank-coverage-bar" aria-label="Coverage">
+          <div class="rerank-coverage-fill" style="width: {{ rerank.coverage_pct | round(1) }}%;"></div>
+        </div>
+        <span class="rerank-coverage-label mono">
+          <b>{{ "%.0f"|format(rerank.coverage_pct) }}%</b> coverage
+          {% if rerank.total_queries - rerank.reranked_queries > 0 %}
+          <span class="cell-faint">· {{ rerank.total_queries - rerank.reranked_queries }} vector-only fallback</span>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    <div class="rerank-hero-side">
+      <div class="rerank-hero-cost-label mono">total spend on caller keys</div>
+      <div class="rerank-hero-cost mono">
+        <span class="rerank-hero-cost-currency">$</span>{{ "%.2f"|format(rerank.total_cost_usd) }}
+      </div>
+      <div class="rerank-hero-cost-sub mono">
+        avg ${{ "%.4f"|format(rerank.total_cost_usd / rerank.reranked_queries) }} / query
+      </div>
+    </div>
+  </div>
+
+  {# ── Divergence panel — does the LLM actually disagree? ── #}
+  {% if divergence.total > 0 %}
+  <div class="divergence-card">
+    <div class="divergence-head">
+      <div>
+        <div class="divergence-eyebrow mono">DOES THE LLM EARN ITS TOKENS?</div>
+        <div class="divergence-question mono">
+          rerank changed top-1 on <b class="divergence-pct">{{ "%.0f"|format(divergence.changed_pct) }}%</b>
+          of queries
+        </div>
+      </div>
+      <div class="divergence-verdict divergence-verdict-{{ divergence.verdict_class }}">
+        <span class="divergence-verdict-dot" aria-hidden="true"></span>
+        {{ divergence.verdict }}
+      </div>
+    </div>
+
+    <div class="divergence-body">
+      <div class="divergence-stats">
+        <div class="divergence-stat">
+          <div class="divergence-stat-label mono">divergent</div>
+          <div class="divergence-stat-value mono">{{ divergence.changed }}<span class="cell-faint mono" style="font-size: var(--t-13);"> / {{ divergence.total }}</span></div>
+        </div>
+        <div class="divergence-stat">
+          <div class="divergence-stat-label mono">avg lift</div>
+          <div class="divergence-stat-value mono">
+            {{ "+%.1f"|format(divergence.avg_lift) }}
+            <span class="cell-faint mono" style="font-size: var(--t-12);">positions</span>
+          </div>
+        </div>
+        <div class="divergence-stat">
+          <div class="divergence-stat-label mono">top-5 overlap</div>
+          <div class="divergence-stat-value mono">
+            {{ "%.1f"|format(divergence.avg_top5_overlap) }}<span class="cell-faint mono" style="font-size: var(--t-13);">/5</span>
+          </div>
+        </div>
+      </div>
+
+      {# Lift distribution histogram: where did the LLM pick its top-1 from? #}
+      {% set max_lift = (divergence.lift_distribution | max) or 1 %}
+      <div class="lift-histogram">
+        <div class="lift-histogram-title mono">where post-rerank top-1 came from in the vector ranking</div>
+        <div class="lift-bars">
+          {% for v in divergence.lift_distribution %}
+          <div class="lift-bar-wrap">
+            <div class="lift-bar
+              {% if loop.index0 == 0 %}lift-bar-confirm{% endif %}"
+              style="height: {{ (v / max_lift * 100) | round(1) }}%;"
+              title="pos {{ loop.index0 }}: {{ v }} queries"></div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="lift-axis mono">
+          <span class="cell-faint">pos 0</span>
+          <span class="cell-faint" style="margin-left: auto;">pos 19</span>
+        </div>
+        <div class="lift-legend mono">
+          <span><span class="lift-legend-dot lift-legend-dot-confirm"></span>vector top-1 confirmed</span>
+          <span><span class="lift-legend-dot lift-legend-dot-changed"></span>LLM promoted lower result</span>
+        </div>
+      </div>
+    </div>
+
+    {% if divergence.top_disagreements %}
+    <details class="divergence-disagreements">
+      <summary>
+        <span class="mono" style="color: var(--fg-muted); font-size: var(--t-12);">
+          Top disagreements — queries where LLM bypassed the vector top-1 the hardest
+        </span>
+        <span class="chevron">▾</span>
+      </summary>
+      <ul class="query-feed" style="margin: 0;">
+        {% for d in divergence.top_disagreements %}
+        <li class="query-feed-item">
+          <span class="mono" style="color: #a78bfa; font-weight: 600; min-width: 38px; text-align: center; font-size: var(--t-12);">+{{ d.top1_lift }}</span>
+          <div class="query-feed-body">
+            <div class="query-feed-line mono">
+              <span class="query-feed-user">{{ d.user }}</span>
+              <span class="query-feed-arrow">→</span><span class="query-feed-q">{{ d.query }}</span>
+            </div>
+            <div class="query-feed-meta mono">
+              <span class="cell-faint">vector top-1 was:</span>
+              <span style="color: var(--fg-muted);">{{ d.pre_top1_path }}</span>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if rerank.by_model %}
+  <div class="rerank-models">
+    {% set total_calls = rerank.by_model | sum(attribute='queries') or 1 %}
+    {% for m in rerank.by_model %}
+    {% set share = (m.queries / total_calls * 100) %}
+    <div class="rerank-model-card">
+      <div class="rerank-model-head">
+        <span class="rerank-model-name mono">{{ m.model }}</span>
+        {% if loop.index == 1 %}
+        <span class="rerank-model-default mono">default</span>
+        {% endif %}
+        <span class="rerank-model-share mono">{{ "%.0f"|format(share) }}%</span>
+      </div>
+      <div class="rerank-model-bar">
+        <div class="rerank-model-bar-fill" style="width: {{ share | round(1) }}%;"></div>
+      </div>
+      <div class="rerank-model-stats mono">
+        <span><b>{{ m.queries }}</b> calls</span>
+        <span class="cell-faint">·</span>
+        <span><b>{{ m.avg_ms }}</b>ms</span>
+        <span class="cell-faint">·</span>
+        <span><b>{{ "{:,}".format(m.tokens_in) }}</b>↓<span class="cell-faint">in</span></span>
+        <span class="cell-faint">·</span>
+        <span><b>{{ "{:,}".format(m.tokens_out) }}</b>↑<span class="cell-faint">out</span></span>
+        <span class="rerank-model-cost mono">${{ "%.3f"|format(m.cost_usd) }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+<style>
+  /* Inline BYOK glyph in section label */
+  .byok-inline-glyph {
+    display: inline-flex; align-items: center;
+    color: #a78bfa;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+
+  /* Hero card — purple-accent themed (BYOK convention from install) */
+  .rerank-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: var(--s-5);
+    background: var(--bg-card);
+    border: 1px solid rgba(167, 139, 250, 0.30);
+    border-radius: var(--radius);
+    padding: var(--s-5);
+    margin-bottom: var(--s-4);
+    position: relative;
+    overflow: hidden;
+  }
+  .rerank-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(167,139,250,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .rerank-hero-eyebrow {
+    color: #a78bfa;
+    font-size: var(--t-11);
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    margin-bottom: var(--s-2);
+  }
+  .rerank-hero-number {
+    font-size: 42px;
+    font-weight: 500;
+    color: var(--fg);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .rerank-hero-unit {
+    color: var(--fg-muted);
+    font-size: var(--t-13);
+    font-weight: 400;
+    margin-left: var(--s-2);
+  }
+  .rerank-coverage {
+    margin-top: var(--s-3);
+    display: flex; align-items: center; gap: var(--s-3);
+  }
+  .rerank-coverage-bar {
+    flex: 1; max-width: 260px;
+    height: 6px;
+    background: var(--bg-input);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .rerank-coverage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(167,139,250,0.4), #a78bfa);
+    border-radius: 999px;
+    transition: width 400ms var(--ease);
+  }
+  .rerank-coverage-label {
+    font-size: var(--t-12);
+    color: var(--fg-muted);
+  }
+  .rerank-coverage-label b {
+    color: #a78bfa;
+    font-weight: 600;
+    font-size: var(--t-14);
+  }
+
+  .rerank-hero-side {
+    padding-left: var(--s-5);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    justify-content: center;
+  }
+  .rerank-hero-cost-label {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: var(--s-2);
+  }
+  .rerank-hero-cost {
+    font-size: 30px;
+    font-weight: 500;
+    color: var(--fg);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .rerank-hero-cost-currency {
+    color: var(--fg-muted);
+    font-weight: 400;
+    margin-right: 2px;
+  }
+  .rerank-hero-cost-sub {
+    margin-top: var(--s-2);
+    color: var(--fg-muted);
+    font-size: var(--t-12);
+  }
+
+  /* Per-model cards */
+  .rerank-models {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: var(--s-3);
+  }
+  .rerank-model-card {
+    padding: var(--s-3) var(--s-4);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color var(--duration);
+  }
+  .rerank-model-card:hover { border-color: var(--border-strong); }
+  .rerank-model-head {
+    display: flex; align-items: center; gap: var(--s-2);
+    margin-bottom: var(--s-2);
+  }
+  .rerank-model-name {
+    color: var(--fg);
+    font-weight: 500;
+    font-size: var(--t-13);
+  }
+  .rerank-model-default {
+    padding: 1px 6px;
+    background: rgba(167,139,250,0.12);
+    color: #a78bfa;
+    border: 1px solid rgba(167,139,250,0.25);
+    border-radius: 999px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .rerank-model-share {
+    margin-left: auto;
+    color: var(--fg-muted);
+    font-size: var(--t-12);
+    font-variant-numeric: tabular-nums;
+  }
+  .rerank-model-bar {
+    height: 3px;
+    background: var(--bg-input);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: var(--s-2);
+  }
+  .rerank-model-bar-fill {
+    height: 100%;
+    background: #a78bfa;
+    border-radius: 999px;
+    transition: width 400ms var(--ease);
+  }
+  .rerank-model-stats {
+    display: flex; flex-wrap: wrap;
+    gap: 6px;
+    font-size: var(--t-11);
+    color: var(--fg-muted);
+    align-items: baseline;
+  }
+  .rerank-model-stats b {
+    color: var(--fg);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .rerank-model-cost {
+    margin-left: auto;
+    color: #a78bfa;
+    font-weight: 500;
+    font-size: var(--t-12);
+  }
+
+  @media (max-width: 720px) {
+    .rerank-hero { grid-template-columns: 1fr; padding: var(--s-4); }
+    .rerank-hero-side {
+      padding-left: 0; padding-top: var(--s-4);
+      border-left: none; border-top: 1px solid var(--border);
+    }
+    .rerank-hero-number { font-size: 32px; }
+    .rerank-hero-cost { font-size: 24px; }
+    .rerank-models { grid-template-columns: 1fr; }
+  }
+
+  /* ── Divergence panel ─────────────────────────────────── */
+  .divergence-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--s-5);
+    margin-bottom: var(--s-4);
+  }
+  .divergence-head {
+    display: flex; align-items: flex-start; gap: var(--s-4);
+    margin-bottom: var(--s-4);
+  }
+  .divergence-eyebrow {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    font-weight: 500;
+    letter-spacing: 0.10em;
+    margin-bottom: var(--s-2);
+  }
+  .divergence-question {
+    font-size: var(--t-16);
+    color: var(--fg);
+    line-height: 1.5;
+  }
+  .divergence-pct {
+    color: #a78bfa;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .divergence-verdict {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .divergence-verdict-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .divergence-verdict-good {
+    background: var(--canonical-bg); color: var(--canonical);
+    border: 1px solid var(--accent-line);
+  }
+  .divergence-verdict-good .divergence-verdict-dot { background: var(--canonical); box-shadow: 0 0 6px var(--canonical); }
+  .divergence-verdict-warn {
+    background: var(--stale-bg); color: var(--stale);
+    border: 1px solid rgba(239, 68, 68, 0.30);
+  }
+  .divergence-verdict-warn .divergence-verdict-dot { background: var(--stale); }
+  .divergence-verdict-ambiguous {
+    background: var(--duplicate-bg); color: var(--duplicate);
+    border: 1px solid rgba(245, 158, 11, 0.30);
+  }
+  .divergence-verdict-ambiguous .divergence-verdict-dot { background: var(--duplicate); }
+  .divergence-verdict-muted {
+    background: var(--bg-input); color: var(--fg-muted);
+    border: 1px solid var(--border);
+  }
+  .divergence-verdict-muted .divergence-verdict-dot { background: var(--fg-subtle); }
+
+  .divergence-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: var(--s-5);
+    align-items: start;
+  }
+  .divergence-stats {
+    display: flex; flex-direction: column;
+    gap: var(--s-3);
+  }
+  .divergence-stat {}
+  .divergence-stat-label {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .divergence-stat-value {
+    font-size: var(--t-22);
+    color: var(--fg);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lift-histogram {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--s-3) var(--s-4);
+  }
+  .lift-histogram-title {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    margin-bottom: var(--s-2);
+  }
+  .lift-bars {
+    display: flex; align-items: flex-end;
+    gap: 3px;
+    height: 80px;
+  }
+  .lift-bar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .lift-bar {
+    width: 100%;
+    background: #a78bfa;
+    border-radius: 2px 2px 0 0;
+    min-height: 1px;
+    transition: background var(--duration);
+  }
+  .lift-bar:hover { background: #c4a8ff; }
+  .lift-bar-confirm { background: var(--fg-subtle); }
+  .lift-bar-confirm:hover { background: var(--fg-muted); }
+  .lift-axis {
+    display: flex;
+    margin-top: 4px;
+    font-size: 10px;
+  }
+  .lift-legend {
+    display: flex; gap: var(--s-4);
+    margin-top: var(--s-2);
+    font-size: var(--t-11);
+    color: var(--fg-muted);
+    flex-wrap: wrap;
+  }
+  .lift-legend-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .lift-legend-dot-confirm { background: var(--fg-subtle); }
+  .lift-legend-dot-changed { background: #a78bfa; }
+
+  .divergence-disagreements {
+    margin-top: var(--s-4);
+    border-top: 1px solid var(--border);
+    padding-top: var(--s-3);
+  }
+  .divergence-disagreements > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--s-2) 0;
+    user-select: none;
+  }
+  .divergence-disagreements > summary::-webkit-details-marker { display: none; }
+  .divergence-disagreements[open] > summary { margin-bottom: var(--s-2); }
+  .divergence-disagreements[open] > summary .chevron { transform: rotate(180deg); }
+  .divergence-disagreements .chevron {
+    color: var(--fg-subtle);
+    transition: transform var(--duration);
+  }
+
+  @media (max-width: 720px) {
+    .divergence-head { flex-direction: column; gap: var(--s-3); }
+    .divergence-verdict { margin-left: 0; }
+    .divergence-body { grid-template-columns: 1fr; }
+  }
+</style>
+{% endif %}
+
+{# ── Heatmap ──────────────────────────────────────────── #}
+{% if heatmap.total > 0 %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">When trovex is used</span>
+    <span class="section-divider-meta mono">UTC · 7d × 24h</span>
+  </div>
+  <div class="card heatmap-card">
+    <div class="heatmap" role="img" aria-label="Activity heatmap">
+      <div class="heatmap-hour-row">
+        <div class="heatmap-day-label"></div>
+        {% for h in range(0, 24, 3) %}
+        <div class="heatmap-hour-tick mono" style="grid-column: {{ h + 2 }} / span 3;">{{ "%02d"|format(h) }}</div>
+        {% endfor %}
+      </div>
+      {% set days_lbl = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] %}
+      {% for day_i in range(7) %}
+        <div class="heatmap-row">
+          <div class="heatmap-day-label mono">{{ days_lbl[day_i] }}</div>
+          {% for hour in range(24) %}
+            {% set v = heatmap.matrix[day_i][hour] %}
+            {% set intensity = (v / heatmap.max) if heatmap.max > 0 else 0 %}
+            <div class="heatmap-cell"
+                 style="background: rgba(34, 197, 94, {{ (intensity * 0.85) | round(2) }});"
+                 title="{{ days_lbl[day_i] }} {{ '%02d'|format(hour) }}:00 · {{ v }} queries">
+              {% if v > 0 %}<span class="sr-only">{{ v }}</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="heatmap-legend mono">
+      <span class="subtle">less</span>
+      <span class="heatmap-legend-swatch" style="background: rgba(34,197,94,0.04);"></span>
+      <span class="heatmap-legend-swatch" style="background: rgba(34,197,94,0.20);"></span>
+      <span class="heatmap-legend-swatch" style="background: rgba(34,197,94,0.45);"></span>
+      <span class="heatmap-legend-swatch" style="background: rgba(34,197,94,0.85);"></span>
+      <span class="subtle">more</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Top queries + Repeated ───────────────────────────── #}
+<div class="row-2col-equal">
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">Top queries</h3>
+      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">by volume</span>
+    </div>
+    {% if top_q %}
+    <ol class="rank-list">
+      {% for q in top_q %}
+      <li class="rank-item">
+        <span class="rank-num mono">{{ loop.index }}</span>
+        <a href="/usage?days={{ days }}" class="rank-text mono" title="{{ q.q }}">{{ q.q }}</a>
+        <span class="rank-meta mono">
+          <b>{{ q.n }}×</b>
+          {% if q.users > 1 %}<span class="cell-faint">· {{ q.users }} users</span>{% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="card-body subtle mono" style="font-size: var(--t-12); padding: var(--s-5);">no queries yet</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 style="margin: 0;">Repeated queries</h3>
+      <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">retrieval might be off</span>
+    </div>
+    {% if repeated %}
+    <ol class="rank-list">
+      {% for r in repeated %}
+      <li class="rank-item">
+        {{ avatar(r.user, 20) }}
+        <span class="rank-text mono" style="flex: 1;" title="{{ r.q }}">{{ r.q }}</span>
+        <span class="rank-meta mono">
+          <b style="color: var(--duplicate);">{{ r.times }}×</b>
+          <span class="cell-faint">{{ r.span_label }}</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="card-body subtle mono" style="font-size: var(--t-12); padding: var(--s-5);">none — clean</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Failed queries (corpus blind spots) ──────────────── #}
+{% if failed %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Corpus blind spots</span>
+    <span class="section-divider-meta mono">no good match (score &lt; 0.30)</span>
+  </div>
+  <div class="card">
+    <ul class="query-feed">
+      {% for f in failed %}
+      <li class="query-feed-item">
+        {{ avatar(f.user, 22) }}
+        <div class="query-feed-body">
+          <div class="query-feed-line mono">
+            <span class="query-feed-user">{{ f.user }}</span>
+            <span class="query-feed-arrow">→</span><span class="query-feed-q">{{ f.query }}</span>
+          </div>
+        </div>
+        <div class="query-feed-meta mono">
+          {% if f.n_results == 0 %}
+            <span style="color: var(--stale);"><b>0</b> results</span>
+          {% else %}
+            <span class="cell-faint">best {{ "%.2f"|format(f.best_score) }}</span>
+          {% endif %}
+          <span class="cell-faint">{{ f.age_label }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+{# ── Hot docs (most returned) ─────────────────────────── #}
+{% if most_returned %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Hot docs</span>
+    <span class="section-divider-meta mono">most frequently returned</span>
+  </div>
+  <div class="card">
+    <div class="table-wrap" style="border: none; border-radius: 0;">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>path</th>
+            <th style="text-align: right;">appearances</th>
+            <th style="text-align: right;">top-1</th>
+            <th style="width: 120px;">share as top-1</th>
+            <th style="text-align: right;">avg score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in most_returned %}
+          <tr>
+            <td class="path">
+              <a href="/search?q={{ p.path | urlencode }}">{{ p.path }}</a>
+            </td>
+            <td class="num">{{ p.appearances }}</td>
+            <td class="num"><b>{{ p.top1 }}</b></td>
+            <td>
+              <div class="user-ratio-bar" style="display: inline-block; width: 80px;">
+                <span class="user-ratio-fill" style="width: {{ (p.top1 / p.appearances * 100) | round(1) }}%;"></span>
+              </div>
+              <span class="mono cell-faint" style="font-size: var(--t-11);">{{ "%.0f"|format(p.top1 / p.appearances * 100) }}%</span>
+            </td>
+            <td class="num cell-faint">{{ "%.3f"|format(p.avg_score) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Dead docs (cleanup candidates) ───────────────────── #}
+{% if dead %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Cold docs</span>
+    <span class="section-divider-meta mono">never surfaced in last {{ days }}d · cleanup candidates</span>
+  </div>
+  <div class="card">
+    <div class="table-wrap" style="border: none; border-radius: 0;">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>path</th>
+            <th>title</th>
+            <th>status</th>
+            <th style="text-align: right;">tokens</th>
+            <th style="text-align: right;">age</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in dead %}
+          <tr>
+            <td class="path">
+              <a href="/search?q={{ d.title | urlencode }}">{{ d.path }}</a>
+            </td>
+            <td class="cell-faint" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ d.title }}</td>
+            <td>{{ status_pill(d.status) }}</td>
+            <td class="num">{{ "{:,}".format(d.tokens_est) }}</td>
+            <td class="num cell-faint">{{ fresh_label(d.age_days) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<style>
+  .row-2col-equal {
+    display: grid;
+    gap: var(--s-4);
+    grid-template-columns: 1fr 1fr;
+    margin-top: var(--s-6);
+  }
+  @media (max-width: 880px) {
+    .row-2col-equal { grid-template-columns: 1fr; }
+  }
+
+  /* ── Rank lists (top queries, repeated) ──────────────── */
+  .rank-list { list-style: none; margin: 0; padding: 0; counter-reset: rank; }
+  .rank-item {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-2) var(--s-4);
+    border-top: 1px solid var(--border);
+    transition: background var(--duration);
+  }
+  .rank-item:first-child { border-top: none; }
+  .rank-item:hover { background: var(--bg-hover); }
+  .rank-num {
+    width: 22px; flex-shrink: 0;
+    color: var(--fg-faint);
+    font-size: var(--t-11);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .rank-text {
+    flex: 1; min-width: 0;
+    font-size: var(--t-12);
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rank-text:hover { color: var(--accent); }
+  .rank-meta {
+    font-size: var(--t-11);
+    color: var(--fg-muted);
+    flex-shrink: 0;
+    display: inline-flex; gap: 6px;
+  }
+  .rank-meta b { color: var(--fg); font-weight: 500; }
+
+  /* ── Heatmap ─────────────────────────────────────────── */
+  .heatmap-card { padding: var(--s-5); }
+  .heatmap {
+    display: grid;
+    gap: 3px;
+  }
+  .heatmap-hour-row, .heatmap-row {
+    display: grid;
+    grid-template-columns: 32px repeat(24, 1fr);
+    gap: 3px;
+    align-items: center;
+  }
+  .heatmap-hour-row { margin-bottom: var(--s-2); }
+  .heatmap-hour-tick {
+    font-size: 10px;
+    color: var(--fg-subtle);
+  }
+  .heatmap-day-label {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    text-align: right;
+    padding-right: var(--s-2);
+  }
+  .heatmap-cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    transition: transform var(--duration);
+  }
+  .heatmap-cell:hover { transform: scale(1.15); border-color: var(--accent); }
+  .heatmap-legend {
+    margin-top: var(--s-3);
+    display: flex; align-items: center; gap: 4px;
+    justify-content: flex-end;
+    font-size: var(--t-11);
+  }
+  .heatmap-legend-swatch {
+    width: 12px; height: 12px; border-radius: 2px;
+    border: 1px solid var(--border);
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+  /* Reuse from savings */
+  .user-ratio-bar { display: inline-block; width: 80px; height: 4px;
+    background: var(--bg-input); border-radius: 999px; overflow: hidden;
+    vertical-align: middle; margin-right: 6px; }
+  .user-ratio-fill { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+  .filter-pills { display: inline-flex; gap: 2px; }
+  .filter-pill { display: inline-flex; padding: 4px 10px;
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-muted); border-radius: 3px;
+    transition: all var(--duration); }
+  .filter-pill:hover { color: var(--fg); background: var(--bg-hover); }
+  .filter-pill.active { color: var(--bg); background: var(--accent); }
+  .filter-pill.active:hover { color: var(--bg); }
+</style>
+{% endblock %}

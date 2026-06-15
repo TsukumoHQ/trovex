@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ctx.markdown import render_markdown
+from trovex.markdown import render_markdown
 
 
 def test_raw_html_is_escaped_not_executed():

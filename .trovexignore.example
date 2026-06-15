@@ -1,0 +1,20 @@
+# .trovexignore — paths that stay REAL files on disk (trovex never proxies them).
+#
+# The only reason to keep a .md on disk is a file-native consumer: a docs build,
+# repo tooling that reads markdown, or a human who insists on their editor.
+# Everything else lives only in trovex (frontend for humans, trovex_read for agents).
+#
+# One glob per line; matched against both repo-relative and absolute paths.
+
+# Repo conventions that must remain on-disk files
+README.md
+CHANGELOG.md
+LICENSE.md
+REFONTE.md
+
+# Agent harness files the tooling reads directly
+**/CLAUDE.md
+**/AGENTS.md
+
+# Anything a build/site generator consumes
+docs/site/**

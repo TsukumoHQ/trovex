@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ctx.chunking import chunk_markdown
+from trovex.chunking import chunk_markdown
 
 
 def test_headings_become_chunks_with_breadcrumb():

@@ -1,0 +1,358 @@
+{% extends "_base.html" %}
+{% from "_partials.html" import avatar %}
+{% set active = 'usage' %}
+{% block title %}trovex — usage{% endblock %}
+
+{% block topbar_meta %}
+  <span class="mono">{{ total_queries }} queries · {{ unique_users }} users</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: var(--s-5);">
+  <div>
+    <h1 style="margin-bottom: 2px;">MCP usage</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      who queries trovex, with what, when
+    </div>
+  </div>
+</div>
+
+{# ── Summary tiles ────────────────────────────────────── #}
+<div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+  <div class="kpi">
+    <div class="kpi-label">queries</div>
+    <div class="kpi-value">{{ "{:,}".format(total_queries) }}</div>
+    <div class="kpi-sub">last {{ days }}d</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">tokens served</div>
+    <div class="kpi-value">{{ "{:,}".format(total_tokens) }}</div>
+    <div class="kpi-sub">via trovex() tool</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">active users</div>
+    <div class="kpi-value">{{ unique_users }}</div>
+    <div class="kpi-sub">distinct handles</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">avg latency</div>
+    <div class="kpi-value mono" style="font-size: var(--t-22);">{{ avg_elapsed }}ms</div>
+    <div class="kpi-sub">embed + search</div>
+  </div>
+</div>
+
+{# ── Filter bar ──────────────────────────────────────── #}
+<form action="/usage" method="get" autocomplete="off" class="filter-bar">
+  <div class="filter-group">
+    <span class="filter-label">user</span>
+    <select name="user" class="input mono filter-select" onchange="this.form.submit()" aria-label="Filter by user">
+      <option value="">all</option>
+      {% for u in users %}
+      <option value="{{ u }}" {% if u == user %}selected{% endif %}>{{ u }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">window</span>
+    <div class="filter-pills">
+      {% for d in [1, 7, 14, 30] %}
+        <a href="/usage?days={{ d }}{% if user %}&user={{ user }}{% endif %}"
+           class="filter-pill {% if d == days %}active{% endif %}">{{ d }}d</a>
+      {% endfor %}
+    </div>
+  </div>
+</form>
+
+{# ── Per-user lanes ──────────────────────────────────── #}
+{% if per_user %}
+<div class="section" style="margin-top: var(--s-6);">
+  <h3 style="margin-bottom: var(--s-3);">Activity per user</h3>
+  <div class="user-lanes">
+    {% for u in per_user %}
+    <div class="user-lane" data-user="{{ u.user }}">
+      <div class="user-lane-head">
+        {{ avatar(u.user, 32) }}
+        <div class="user-lane-info">
+          <div class="user-lane-name">{{ u.user }}</div>
+          <div class="user-lane-meta">
+            {{ u.queries }} queries · {{ "{:,}".format(u.resp_tokens) }} tokens ·
+            <span class="cell-faint">{{ u.last_seen_label }}</span>
+          </div>
+        </div>
+        <a href="/usage?user={{ u.user | urlencode }}&days={{ days }}" class="user-lane-link mono">filter →</a>
+      </div>
+      {% if u.sparkline %}
+      <div class="sparkline" role="img" aria-label="Activity over {{ days }} days">
+        {% set spmax = u.sparkline | max %}
+        {% for v in u.sparkline %}
+        <div class="sparkline-bar"
+             style="height: {% if spmax > 0 %}{{ (v / spmax * 100) | round(1) }}{% else %}0{% endif %}%;"
+             title="{{ v }} queries"></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Activity feed grouped by time ───────────────────── #}
+<div class="section">
+  <div class="section-head">
+    <h3 style="margin: 0;">Activity feed</h3>
+    <span class="subtle mono" style="font-size: var(--t-11);">
+      {{ total_queries }} {% if total_queries == 1 %}event{% else %}events{% endif %}
+    </span>
+  </div>
+
+  {% if total_queries == 0 %}
+  <div class="empty">
+    <div class="empty-title mono">no queries{% if user %} for {{ user }}{% endif %} in last {{ days }}d</div>
+    <div class="subtle mono" style="font-size: var(--t-12); margin-top: var(--s-2);">
+      have any devs run the install yet? <a href="/install" style="color: var(--accent);">→ /install</a>
+    </div>
+  </div>
+  {% else %}
+    {% for bucket_name, rows in buckets.items() %}
+      {% if rows %}
+      <div class="feed-bucket">
+        <div class="feed-bucket-head">
+          <span class="feed-bucket-label">{{ bucket_name }}</span>
+          <span class="feed-bucket-count mono">{{ rows | length }}</span>
+        </div>
+        <ol class="feed-list">
+          {% for r in rows %}
+          <li class="feed-item">
+            <div class="feed-item-time mono">{{ r.time_label }}</div>
+            <div class="feed-item-user">{{ avatar(r.user, 22) }}</div>
+            <div class="feed-item-body">
+              <div class="feed-item-query mono">
+                <span class="feed-item-user-name">{{ r.user }}</span>
+                <span class="feed-item-arrow">→</span>
+                <span class="feed-item-q">{{ r.query }}</span>
+              </div>
+              <div class="feed-item-meta mono">
+                {{ r.n_results }} results{% if r.summary %} +summary{% endif %} ·
+                {{ "{:,}".format(r.response_tokens_est) }} tokens ·
+                {{ r.elapsed_ms }}ms ·
+                <span class="cell-faint">{{ r.age_label }}</span>
+              </div>
+            </div>
+            <button class="feed-copy" type="button"
+                    onclick="trovexCopy(this, '{{ r.query | escape | replace("'", "\\'") }}')"
+                    title="copy query">
+              <span class="feed-copy-icon">⧉</span>
+            </button>
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+</div>
+
+<style>
+  /* ── Filter bar ──────────────────────────────────────── */
+  .filter-bar {
+    display: flex;
+    gap: var(--s-5);
+    align-items: center;
+    margin: var(--s-5) 0 var(--s-2);
+    padding: var(--s-3) var(--s-4);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    flex-wrap: wrap;
+  }
+  .filter-group { display: inline-flex; align-items: center; gap: var(--s-2); }
+  .filter-label {
+    color: var(--fg-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .filter-select {
+    width: auto;
+    padding: 4px 8px;
+    font-size: var(--t-12);
+    background: var(--bg-input);
+  }
+  .filter-pills { display: inline-flex; gap: 2px; padding: 2px; background: var(--bg-input); border-radius: var(--radius-sm); }
+  .filter-pill {
+    display: inline-flex;
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    color: var(--fg-muted);
+    border-radius: 3px;
+    transition: all var(--duration);
+  }
+  .filter-pill:hover { color: var(--fg); background: var(--bg-hover); }
+  .filter-pill.active {
+    color: var(--bg);
+    background: var(--accent);
+  }
+  .filter-pill.active:hover { color: var(--bg); }
+
+  /* ── User lanes ──────────────────────────────────────── */
+  .user-lanes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--s-3);
+  }
+  .user-lane {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--s-4);
+    transition: border-color var(--duration);
+  }
+  .user-lane:hover { border-color: var(--border-strong); }
+  .user-lane-head {
+    display: flex; align-items: center; gap: var(--s-3);
+    margin-bottom: var(--s-3);
+  }
+  .user-lane-info { flex: 1; min-width: 0; }
+  .user-lane-name {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: var(--t-14);
+    color: var(--fg);
+  }
+  .user-lane-meta {
+    color: var(--fg-muted);
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    margin-top: 2px;
+  }
+  .user-lane-link {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    transition: all var(--duration);
+  }
+  .user-lane-link:hover {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .sparkline {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 28px;
+    padding-top: 2px;
+  }
+  .sparkline-bar {
+    flex: 1;
+    min-height: 1px;
+    background: var(--accent-line);
+    border-radius: 1px 1px 0 0;
+    transition: background var(--duration);
+  }
+  .sparkline-bar:hover { background: var(--accent); }
+
+  /* ── Feed ────────────────────────────────────────────── */
+  .feed-bucket { margin-bottom: var(--s-5); }
+  .feed-bucket-head {
+    display: flex; align-items: center; gap: var(--s-2);
+    padding: var(--s-2) 0;
+    margin-bottom: var(--s-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .feed-bucket-label {
+    color: var(--fg-muted);
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+  }
+  .feed-bucket-count {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    padding: 1px 6px;
+    background: var(--bg-input);
+    border-radius: 999px;
+  }
+
+  .feed-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .feed-item {
+    display: grid;
+    grid-template-columns: 52px 22px 1fr auto;
+    gap: var(--s-3);
+    align-items: flex-start;
+    padding: var(--s-3) var(--s-3);
+    border-radius: var(--radius-sm);
+    transition: background var(--duration);
+  }
+  .feed-item:hover { background: var(--bg-card); }
+  .feed-item:hover .feed-copy { opacity: 1; }
+  .feed-item-time {
+    color: var(--fg-subtle);
+    font-size: var(--t-12);
+    padding-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .feed-item-user { padding-top: 1px; }
+  .feed-item-body { min-width: 0; }
+  .feed-item-query {
+    font-size: var(--t-13);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .feed-item-user-name {
+    color: var(--fg-muted);
+    font-weight: 500;
+  }
+  .feed-item-arrow {
+    color: var(--fg-faint);
+    margin: 0 6px;
+  }
+  .feed-item-q {
+    color: var(--fg);
+  }
+  .feed-item-meta {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    margin-top: 2px;
+  }
+  .feed-copy {
+    opacity: 0;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--t-12);
+    transition: all var(--duration);
+  }
+  .feed-copy:hover { color: var(--accent); border-color: var(--accent-line); }
+  .feed-copy[data-copied="1"] { opacity: 1; color: var(--accent); border-color: var(--accent-line); }
+  .feed-copy[data-copied="1"] .feed-copy-icon::before { content: '✓ '; }
+
+  @media (max-width: 640px) {
+    .feed-item { grid-template-columns: 40px 22px 1fr; }
+    .feed-copy { display: none; }
+    .user-lanes { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  window.trovexCopy = function (btn, text) {
+    navigator.clipboard.writeText(text).then(function () {
+      btn.dataset.copied = '1';
+      setTimeout(function () { delete btn.dataset.copied; }, 1500);
+    });
+  };
+</script>
+{% endblock %}

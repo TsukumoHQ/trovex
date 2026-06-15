@@ -234,7 +234,7 @@ function StoreShot() {
 
 const FEATURES = [
   { no: '01', kicker: 'Find', title: 'Serve one canonical answer', body: 'Your agent asks in plain language and gets back the one current doc, down to the line. The stale and duplicate copies never reach its context.', shot: <SearchShot />, flip: false },
-  { no: '02', kicker: 'Read', title: 'Hand back only the section that matters', body: 'An agent needs two paragraphs, not the whole file. Trovex serves just the section that answers, so a short answer costs short-answer tokens.', shot: <DocShot />, flip: true },
+  { no: '02', kicker: 'Read', title: 'Hand back only the section that matters', body: 'An agent needs two paragraphs, not the whole file. trovex serves just the section that answers, so a short answer costs short-answer tokens.', shot: <DocShot />, flip: true },
   { no: '03', kicker: 'Share', title: 'Keep what one agent learns', body: 'One agent figures something out and saves it once. Every other agent, and your teammates, read it back instead of working it out again.', shot: <StoreShot />, flip: false },
 ]
 
@@ -395,11 +395,11 @@ export default function App() {
             <div className="faq reveal">
               <div className="faq-item">
                 <p className="faq-q">Why not just a CLAUDE.md or AGENTS.md?</p>
-                <p className="faq-a">Those are one static file. They go stale, don't scale past a handful of topics, and can't route a question to the right doc or section. Trovex keeps many docs canonical and serves the one that answers.</p>
+                <p className="faq-a">Those are one static file. They go stale, don't scale past a handful of topics, and can't route a question to the right doc or section. trovex keeps many docs canonical and serves the one that answers.</p>
               </div>
               <div className="faq-item">
                 <p className="faq-q">My context window is huge. Why bother?</p>
-                <p className="faq-a">The cost compounds: every session, every agent, every teammate. And a big window isn't a current one. Trovex serves the right doc, cheaply, every time.</p>
+                <p className="faq-a">The cost compounds: every session, every agent, every teammate. And a big window isn't a current one. trovex serves the right doc, cheaply, every time.</p>
               </div>
               <div className="faq-item">
                 <p className="faq-q">Is it another service to run?</p>

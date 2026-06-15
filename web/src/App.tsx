@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 const REPO = 'https://github.com/Synergix-lab/trovex'
+// TODO(human): swap to the real consulting contact (private email / Cal.com booking / form).
+// Points at the repo for now so the link works; this is the OSS->consulting funnel entry.
+const CONSULT_URL = REPO
 const reduceMotion =
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -354,6 +357,16 @@ export default function App() {
               <Cmd text="uv run trovex index /path/to/repo" />
               <p className="cta-note">No cloud, no API keys. Your docs never leave your machine.</p>
             </div>
+          </div>
+        </section>
+
+        {/* Consulting — quiet, earned, team-lead intent. Not a sales pitch. */}
+        <section className="consult-band">
+          <div className="wrap">
+            <p className="consult">
+              Rolling agents out across a team? We consult on doing it well at scale.{' '}
+              <a href={CONSULT_URL} target="_blank" rel="noreferrer">Let's talk →</a>
+            </p>
           </div>
         </section>
 

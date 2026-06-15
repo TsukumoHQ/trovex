@@ -290,10 +290,16 @@ function WaitlistForm({ location = 'waitlist' }: { location?: string }) {
         {state === 'submitting' ? 'sending…' : 'Request beta access'}
       </button>
       {state === 'soon' && (
-        <p className="wl-msg">The beta list isn't open for sign-ups just yet — check back in a few days.</p>
+        <p className="wl-msg">
+          The beta list isn't open for sign-ups just yet — check back in a few days, or{' '}
+          <a href={CONSULT_URL} target="_blank" rel="noreferrer" onClick={() => track('consult_clicked', { location: 'waitlist-fallback' })}>reach out</a> if you want in sooner.
+        </p>
       )}
       {state === 'error' && (
-        <p className="wl-msg wl-err">Something went wrong. Give it another try in a moment.</p>
+        <p className="wl-msg wl-err">
+          Something went wrong on our end. Give it another try in a moment — if it keeps failing,{' '}
+          <a href={CONSULT_URL} target="_blank" rel="noreferrer" onClick={() => track('consult_clicked', { location: 'waitlist-fallback' })}>reach out</a> and we'll add you by hand.
+        </p>
       )}
     </form>
   )

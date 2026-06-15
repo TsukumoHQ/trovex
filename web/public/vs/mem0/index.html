@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/mem0/" />
+  <title>trovex vs mem0 — canonical repo docs vs an agent memory layer</title>
+  <meta name="description" content="mem0 is a persistent memory layer that remembers facts and conversation across sessions. trovex serves your coding agents the one canonical doc from your repo that answers a query, with a freshness marker. Different jobs — here's how they compare and when each fits." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/mem0/" />
+  <meta property="og:title" content="trovex vs mem0" />
+  <meta property="og:description" content="An agent memory layer for facts across sessions vs canonical repo docs with a freshness marker. Different jobs." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs mem0" />
+  <meta name="twitter:description" content="Agent memory layer vs canonical repo docs." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs mem0", "item": "https://trovex.dev/vs/mem0/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and mem0?",
+            "acceptedAnswer": { "@type": "Answer", "text": "mem0 is a general memory layer that remembers facts, preferences, and conversation history for an agent or app across sessions, usually via an API and an LLM extraction step. trovex is narrower and source-of-truth focused: it indexes your repo's markdown and serves the one canonical doc that answers a query, with a freshness marker, locally over MCP. mem0 remembers what was said; trovex serves what is currently true in your docs." }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use trovex and mem0 together?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes — they solve different problems. Use mem0 for cross-session conversational and user memory; use trovex for canonical project documentation, where freshness and one-answer routing matter and you want it local with no API keys. They are complementary, not substitutes." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is trovex a general agent memory framework?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. trovex is deliberately scoped to canonical docs for coding agents: index a repo's markdown, route a query to the one current doc, mark stale and duplicate copies, and let agents write records back. It is not a general-purpose memory store for arbitrary facts or chat history the way mem0 is." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Comparisons</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs mem0
+    </nav>
+
+    <h1>trovex vs <span class="ac">mem0</span></h1>
+    <p class="deck">mem0 remembers what was said across sessions. trovex serves what's currently true in your repo's docs. Different jobs — here's how they line up.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>mem0 is a general <strong>memory layer</strong> — it remembers facts, preferences, and conversation history for an agent or app across sessions, usually via an API plus an LLM extraction step. trovex is narrower and <strong>source-of-truth focused</strong>: it indexes your repo's markdown and serves the one canonical doc that answers a query, with a freshness marker, locally over MCP, for about <strong>60% fewer tokens per lookup</strong>. mem0 remembers what was said; trovex serves what is currently true in your docs. They're complementary.</p>
+    </div>
+
+    <h2>What is mem0?</h2>
+    <p class="lead-answer">mem0 is an open-source memory layer for AI agents and apps. It stores and retrieves long-term memories — user preferences, facts, prior conversation — combining vector search with entity/graph linking, exposed through an API and SDKs, with hosted and self-hosted options. It's a strong, widely-adopted way to give an existing agent persistent memory of its interactions.</p>
+
+    <h2>Where do the two differ?</h2>
+    <ul>
+      <li><strong>What's stored.</strong> mem0 remembers interaction history and extracted facts; trovex serves your authored docs (the repo's markdown), not chat memory.</li>
+      <li><strong>Freshness vs accumulation.</strong> trovex marks a doc canonical, stale, or duplicate so the agent reads the current one. General memory tends to accumulate, which is useful for recall but doesn't tell an agent which version is now authoritative.</li>
+      <li><strong>Local and turnkey.</strong> trovex runs on your machine with no API keys and no LLM extraction step — index markdown, serve over MCP. mem0's extraction and (optionally) hosted storage trade some locality for general memory power.</li>
+    </ul>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>mem0 vs trovex</caption>
+        <thead><tr><th scope="col">Capability</th><th scope="col">mem0</th><th scope="col" class="trovex">trovex</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">Primary job</td><td>Remember facts / conversation across sessions</td><td>Serve the canonical repo doc that answers</td></tr>
+          <tr><td class="feat">Source of data</td><td>Agent interactions, extracted facts</td><td>Your repo's markdown</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">— accumulates</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">One answer vs recall set</td><td>Retrieves relevant memories</td><td><span class="yes">✓</span> one canonical doc, section-level</td></tr>
+          <tr><td class="feat">Runs fully local, no keys</td><td class="partial">~ self-host or hosted; LLM extraction</td><td><span class="yes">✓</span> SQLite + ONNX, no cloud</td></tr>
+          <tr><td class="feat">Interface</td><td>API / SDKs</td><td><span class="yes">✓</span> MCP server + CLI</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When is mem0 the right choice?</h2>
+    <p class="lead-answer">When you need an agent or app to remember its users and conversations over time — preferences, prior decisions, personalization — across many kinds of content, with a managed option. That's mem0's strength. Reach for <a href="/">trovex</a> when the job is your project's <em>documentation</em>: routing a query to the one current doc, skipping stale copies, and keeping a fleet of coding agents on a single source of truth, locally. Many setups can use both.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item"><p class="faq-q">What is the difference between trovex and mem0?</p><p class="faq-a">mem0 is a general memory layer that remembers facts, preferences, and conversation history across sessions, usually via an API and an LLM extraction step. trovex indexes your repo's markdown and serves the one canonical doc that answers a query, with a freshness marker, locally over MCP. mem0 remembers what was said; trovex serves what is currently true in your docs.</p></div>
+      <div class="faq-item"><p class="faq-q">Can I use trovex and mem0 together?</p><p class="faq-a">Yes — they solve different problems. Use mem0 for cross-session conversational and user memory; use trovex for canonical project documentation, where freshness and one-answer routing matter and you want it local with no API keys.</p></div>
+      <div class="faq-item"><p class="faq-q">Is trovex a general agent memory framework?</p><p class="faq-a">No. trovex is scoped to canonical docs for coding agents: index a repo's markdown, route a query to the one current doc, mark stale and duplicate copies, and let agents write records back. It is not a general-purpose store for arbitrary facts or chat history.</p></div>
+    </section>
+
+    <div class="cta">
+      <h2>Serve your agents canonical docs, locally.</h2>
+      <p>Point trovex at your repo for one current answer per query.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/cursor-memory/">trovex vs Cursor memory</a></li>
+        <li><a href="/vs/vector-db-rag/">trovex vs a vector-DB RAG setup</a></li>
+        <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a></li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

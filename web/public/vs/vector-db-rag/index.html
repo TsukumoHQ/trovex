@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/vector-db-rag/" />
+  <title>trovex vs a vector-DB RAG setup — turnkey canonical answers vs a pipeline you build</title>
+  <meta name="description" content="Rolling your own RAG over a vector database (Pinecone, pgvector, Chroma) gives you top-k chunks and a pipeline to maintain. trovex is a turnkey local MCP server that returns one canonical doc with a freshness marker — no chunk-ranking, no infra to run. Here's the comparison." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/vector-db-rag/" />
+  <meta property="og:title" content="trovex vs a vector-DB RAG setup" />
+  <meta property="og:description" content="Top-k chunks and a pipeline you build vs a turnkey local server that returns one canonical doc with a freshness marker." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs a vector-DB RAG setup" />
+  <meta name="twitter:description" content="Turnkey canonical answers vs a RAG pipeline you build." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs a vector-DB RAG setup", "item": "https://trovex.dev/vs/vector-db-rag/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and a vector-DB RAG setup?",
+            "acceptedAnswer": { "@type": "Answer", "text": "A vector-DB RAG setup is a pipeline you build: chunk your docs, embed them, store them in a vector database like Pinecone, pgvector, or Chroma, and at query time retrieve the top-k most similar chunks for the model to read. trovex is a turnkey local tool that returns one canonical doc with a freshness marker over MCP — no chunking strategy to tune, no ranking for the agent to do, and no separate infrastructure to run. RAG gives you candidate chunks; trovex gives you the current answer." }
+          },
+          {
+            "@type": "Question",
+            "name": "Why not just build RAG over a vector database?",
+            "acceptedAnswer": { "@type": "Answer", "text": "You can, and for custom or large-scale retrieval it may be the right call. But a raw RAG setup returns the top-k similar chunks without telling the agent which is current, often includes near-duplicates, and leaves you to build and maintain chunking, retrieval, ranking, and the MCP wiring. trovex packages the opinionated version for repo docs: one canonical answer, a freshness marker, section-level reads, and a shared write path, running locally with no API keys." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does trovex use embeddings and vectors?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes — trovex embeds your markdown with ONNX and stores vectors in SQLite locally. The difference is what it does with them: instead of returning a ranked list of chunks, it resolves a query to the one canonical doc and serves the section that answers, with a freshness marker, so you get an answer rather than a retrieval set to sift." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Comparisons</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs vector-DB RAG
+    </nav>
+
+    <h1>trovex vs <span class="ac">a vector-DB RAG setup</span></h1>
+    <p class="deck">Rolling your own RAG gives you top-k chunks and a pipeline to maintain. trovex is the turnkey version for repo docs: one canonical answer, locally, over MCP.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>A vector-DB RAG setup is a <strong>pipeline you build</strong>: chunk your docs, embed them, store them in Pinecone / pgvector / Chroma, and retrieve the top-k similar chunks at query time. trovex is a <strong>turnkey local tool</strong> that returns one canonical doc with a freshness marker over MCP — no chunking to tune, no ranking for the agent to do, no separate infra to run, about <strong>60% fewer tokens per lookup</strong>. RAG gives you candidate chunks; trovex gives you the current answer.</p>
+    </div>
+
+    <h2>What does a vector-DB RAG setup involve?</h2>
+    <p class="lead-answer">Several moving parts you own: a chunking strategy, an embedding model, a vector database (Pinecone, pgvector, Chroma, and so on), a retrieval step that returns the top-k most similar chunks, usually a re-ranker, and the glue that feeds it to your agent — increasingly an MCP server you also write. It's flexible and powerful for custom or heterogeneous retrieval, but it's infrastructure you build and maintain.</p>
+
+    <h2>Where does raw RAG fall short for repo docs?</h2>
+    <ul>
+      <li><strong>Chunks, not answers.</strong> Top-k similar chunks still leave the agent to read, rank, and decide which is authoritative.</li>
+      <li><strong>No freshness.</strong> Similarity doesn't know which copy is current; a stale or duplicate chunk can rank high.</li>
+      <li><strong>You build and run it.</strong> Chunking, retrieval, ranking, the vector store, and the MCP wiring are all yours to maintain — and often a hosted DB with API keys.</li>
+    </ul>
+
+    <h2>How is trovex different?</h2>
+    <p class="lead-answer"><a href="/">trovex</a> is the opinionated, turnkey version for a repo's markdown. It still uses embeddings and vectors — ONNX embeddings in a local SQLite store — but instead of returning a ranked list, it resolves a query to the <strong>one canonical doc</strong>, serves the section that answers, marks stale and duplicate copies, and lets agents write records back. You install it and point it at your repo; there's no pipeline to assemble and no cloud DB or keys.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>Vector-DB RAG vs trovex</caption>
+        <thead><tr><th scope="col">Capability</th><th scope="col">Vector-DB RAG (DIY)</th><th scope="col" class="trovex">trovex</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">What a query returns</td><td>Top-k similar chunks</td><td><span class="yes">✓</span> one canonical doc, section-level</td></tr>
+          <tr><td class="feat">Setup</td><td class="no">— build chunking + DB + retrieval + MCP</td><td><span class="yes">✓</span> install, point at repo</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">— similarity only</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">Agent sifts &amp; ranks</td><td class="no">— yes</td><td><span class="yes">✓</span> no — one answer</td></tr>
+          <tr><td class="feat">Write-back / shared memory</td><td class="partial">~ build it yourself</td><td><span class="yes">✓</span> shared write path</td></tr>
+          <tr><td class="feat">Runs locally, no keys</td><td class="partial">~ often hosted DB + keys</td><td><span class="yes">✓</span> SQLite + ONNX</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When is a custom RAG stack the right choice?</h2>
+    <p class="lead-answer">When you need control RAG gives you: heterogeneous sources beyond markdown, very large or specialized corpora, custom ranking, or an existing vector-DB investment you want to extend. Building it yourself is the right call there. trovex is the better fit when the job is your project's docs and you'd rather have the opinionated, local, one-answer behavior out of the box than assemble and maintain the pipeline.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item"><p class="faq-q">What is the difference between trovex and a vector-DB RAG setup?</p><p class="faq-a">A vector-DB RAG setup is a pipeline you build: chunk, embed, store in a vector DB, retrieve the top-k similar chunks. trovex is a turnkey local tool that returns one canonical doc with a freshness marker over MCP — no chunking to tune, no ranking for the agent, no separate infra. RAG gives you candidate chunks; trovex gives you the current answer.</p></div>
+      <div class="faq-item"><p class="faq-q">Why not just build RAG over a vector database?</p><p class="faq-a">You can, and for custom or large-scale retrieval it may be right. But raw RAG returns top-k similar chunks without telling the agent which is current, often includes near-duplicates, and leaves you to maintain chunking, retrieval, ranking, and MCP wiring. trovex packages the opinionated version for repo docs, locally, with no API keys.</p></div>
+      <div class="faq-item"><p class="faq-q">Does trovex use embeddings and vectors?</p><p class="faq-a">Yes — it embeds your markdown with ONNX and stores vectors in SQLite locally. The difference is what it does with them: instead of a ranked list of chunks, it resolves a query to the one canonical doc and serves the section that answers, with a freshness marker.</p></div>
+    </section>
+
+    <div class="cta">
+      <h2>Skip the pipeline. Get the answer.</h2>
+      <p>Install trovex, point it at your repo, and serve one canonical answer per query.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a></li>
+        <li><a href="/vs/mem0/">trovex vs mem0</a></li>
+        <li><a href="/vs/cursor-memory/">trovex vs Cursor memory</a></li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

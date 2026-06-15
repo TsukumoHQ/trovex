@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/cursor-memory/" />
+  <title>trovex vs Cursor memory — portable canonical docs vs editor-locked rules</title>
+  <meta name="description" content="Cursor's memory (Rules, Memories, community Memory Bank) keeps project context inside Cursor, per project. trovex serves canonical repo docs over MCP to any client — Claude Code, Cursor, Windsurf, Cline — with a freshness marker. Here's the honest comparison." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/cursor-memory/" />
+  <meta property="og:title" content="trovex vs Cursor memory" />
+  <meta property="og:description" content="Editor-locked, per-project rules vs portable canonical repo docs with a freshness marker, over MCP to any client." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs Cursor memory" />
+  <meta name="twitter:description" content="Editor-locked rules vs portable canonical docs." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs Cursor memory", "item": "https://trovex.dev/vs/cursor-memory/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and Cursor's memory?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Cursor's memory features (Rules, Memories, and the community Memory Bank pattern) keep project context inside Cursor, scoped to a project. trovex is editor-independent: it serves canonical docs from your repo over the Model Context Protocol to any client — Claude Code, Cursor, Windsurf, Cline — with a freshness marker, so the same source of truth follows you across tools instead of living in one editor." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Cursor's memory work across projects and other editors?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Generally no. Cursor's memory is scoped per project and lives inside Cursor, so an insight saved in one repo does not surface in another, and opening Claude Code or another agent loses that context. trovex stores docs in your repo and serves them over MCP, so any MCP client and any teammate read the same canonical content." }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use trovex alongside Cursor's rules?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes. Keep a short set of Cursor rules for editor-specific behavior, and use trovex for the project's documentation — the many markdown files that go stale and need routing to the one current answer. trovex also adds a freshness marker and a shared write path that static rules don't have." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Comparisons</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs Cursor memory
+    </nav>
+
+    <h1>trovex vs <span class="ac">Cursor memory</span></h1>
+    <p class="deck">Cursor's memory keeps project context inside Cursor. trovex serves canonical repo docs to any MCP client. Here's the honest comparison.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Cursor's memory features — Rules, the Memories experiment, and the community Memory Bank pattern — keep project context <strong>inside Cursor</strong>, scoped to a project. That's convenient if you live in Cursor. trovex is <strong>editor-independent</strong>: it serves canonical docs from your repo over MCP to any client (Claude Code, Cursor, Windsurf, Cline), with a freshness marker, for about <strong>60% fewer tokens per lookup</strong> — so one source of truth follows you across tools and teammates instead of living in one editor.</p>
+    </div>
+
+    <h2>How does Cursor's memory work?</h2>
+    <p class="lead-answer">Cursor offers <em>Rules</em> — static text you maintain that loads into every conversation in a project — and has experimented with a <em>Memories</em> feature that stored project-level facts from chats (its availability has changed across versions). The community <em>Memory Bank</em> is a documentation-driven pattern layered on top. All of these are scoped to a project and live within Cursor.</p>
+    <p class="note">Cursor's built-in memory features have changed between releases — check Cursor's current docs for exactly what's available in your version.</p>
+
+    <h2>Where does that fall short?</h2>
+    <ul>
+      <li><strong>Editor-locked.</strong> Context saved in Cursor doesn't travel. Open Claude Code or another agent and it's gone.</li>
+      <li><strong>Per-project, no cross-repo truth.</strong> An insight saved in one repo doesn't surface in another, and teammates don't share it.</li>
+      <li><strong>Static rules go stale.</strong> Hand-maintained rules are one more copy to keep current, with no freshness signal and no routing to the right doc.</li>
+    </ul>
+
+    <h2>How is trovex different?</h2>
+    <p class="lead-answer"><a href="/">trovex</a> stores the source of truth in your repo and serves it over the Model Context Protocol, so any MCP client and any teammate read the same canonical docs. It routes a query to the one current doc (with a canonical / stale / duplicate marker), serves the section that answers, and lets agents write records back — a shared source of truth that isn't tied to one editor. It runs locally: SQLite + ONNX, no cloud or keys.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>Cursor memory vs trovex</caption>
+        <thead><tr><th scope="col">Capability</th><th scope="col">Cursor memory / rules</th><th scope="col" class="trovex">trovex</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">Works across editors / clients</td><td class="no">— Cursor only</td><td><span class="yes">✓</span> any MCP client</td></tr>
+          <tr><td class="feat">Shared across teammates</td><td class="no">— individual / per-project</td><td><span class="yes">✓</span> one store, all read it</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">— static rules</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">Routes a query to the right doc</td><td class="partial">~ rules load wholesale</td><td><span class="yes">✓</span> one canonical answer</td></tr>
+          <tr><td class="feat">Write-back from agents</td><td class="partial">~ manual / limited</td><td><span class="yes">✓</span> shared write path</td></tr>
+          <tr><td class="feat">Runs locally, no keys</td><td><span class="yes">✓</span> in-editor</td><td><span class="yes">✓</span> SQLite + ONNX</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When is Cursor's memory the right choice?</h2>
+    <p class="lead-answer">If you work entirely inside Cursor and want zero setup, its rules and memory are the path of least resistance — keep a short rules file and you're done. Reach for trovex when you use more than one agent or client, when teammates need the same current docs, or when project knowledge spans many markdown files that drift and need routing to the one canonical answer. They layer fine: Cursor rules for editor behavior, trovex for the docs.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item"><p class="faq-q">What is the difference between trovex and Cursor's memory?</p><p class="faq-a">Cursor's memory features (Rules, Memories, the community Memory Bank) keep project context inside Cursor, scoped to a project. trovex is editor-independent: it serves canonical repo docs over MCP to any client — Claude Code, Cursor, Windsurf, Cline — with a freshness marker, so the same source of truth follows you across tools.</p></div>
+      <div class="faq-item"><p class="faq-q">Does Cursor's memory work across projects and other editors?</p><p class="faq-a">Generally no. It's scoped per project and lives inside Cursor, so an insight saved in one repo doesn't surface in another, and opening another agent loses that context. trovex stores docs in your repo and serves them over MCP, so any MCP client and teammate read the same canonical content.</p></div>
+      <div class="faq-item"><p class="faq-q">Can I use trovex alongside Cursor's rules?</p><p class="faq-a">Yes. Keep a short set of Cursor rules for editor-specific behavior, and use trovex for the project's documentation — the many markdown files that go stale and need routing to the one current answer, with a freshness marker and a shared write path static rules don't have.</p></div>
+    </section>
+
+    <div class="cta">
+      <h2>One source of truth, in any client.</h2>
+      <p>Point trovex at your repo and read the same canonical docs everywhere.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/for/cursor/">trovex for Cursor</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/mem0/">trovex vs mem0</a></li>
+        <li><a href="/vs/vector-db-rag/">trovex vs a vector-DB RAG setup</a></li>
+        <li><a href="/vs/claude-md/">trovex vs CLAUDE.md / AGENTS.md</a></li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

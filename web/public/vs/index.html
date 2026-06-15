@@ -41,7 +41,10 @@
         "itemListElement": [
           { "@type": "ListItem", "position": 1, "name": "trovex vs CLAUDE.md / AGENTS.md", "url": "https://trovex.dev/vs/claude-md/" },
           { "@type": "ListItem", "position": 2, "name": "trovex vs repomix / files-to-prompt", "url": "https://trovex.dev/vs/repomix/" },
-          { "@type": "ListItem", "position": 3, "name": "trovex vs context-hub (CTX)", "url": "https://trovex.dev/vs/context-hub/" }
+          { "@type": "ListItem", "position": 3, "name": "trovex vs context-hub (CTX)", "url": "https://trovex.dev/vs/context-hub/" },
+          { "@type": "ListItem", "position": 4, "name": "trovex vs mem0", "url": "https://trovex.dev/vs/mem0/" },
+          { "@type": "ListItem", "position": 5, "name": "trovex vs Cursor memory", "url": "https://trovex.dev/vs/cursor-memory/" },
+          { "@type": "ListItem", "position": 6, "name": "trovex vs a vector-DB RAG setup", "url": "https://trovex.dev/vs/vector-db-rag/" }
         ]
       }
     ]
@@ -80,6 +83,9 @@
         <li><a href="/vs/claude-md/"><strong>trovex vs CLAUDE.md / AGENTS.md</strong></a> — a static instructions file is great for a few stable rules; here's where it stops scaling and how trovex routes a query to the right current doc.</li>
         <li><a href="/vs/repomix/"><strong>trovex vs repomix / files-to-prompt</strong></a> — packing the whole repo into a prompt is great for one-shot questions; here's why it gets expensive on repeated lookups and how trovex retrieves instead.</li>
         <li><a href="/vs/context-hub/"><strong>trovex vs context-hub (CTX)</strong></a> — chunk-retrieval servers return a ranked list to sift; here's what changes when the answer is one canonical doc with a freshness marker and a write path.</li>
+        <li><a href="/vs/mem0/"><strong>trovex vs mem0</strong></a> — mem0 remembers facts and conversation across sessions; trovex serves what's currently true in your repo's docs. Different jobs, often complementary.</li>
+        <li><a href="/vs/cursor-memory/"><strong>trovex vs Cursor memory</strong></a> — Cursor's rules and memory live inside one editor; trovex serves canonical docs to any MCP client and every teammate.</li>
+        <li><a href="/vs/vector-db-rag/"><strong>trovex vs a vector-DB RAG setup</strong></a> — rolling your own RAG gives you top-k chunks and a pipeline to maintain; trovex is the turnkey, local, one-answer version for repo docs.</li>
       </ul>
     </div>
 

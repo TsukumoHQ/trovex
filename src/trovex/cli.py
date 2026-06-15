@@ -47,12 +47,24 @@ def index(
                 f"={s['unchanged']} -{s['removed']}"
             )
 
+    # Honest empty-state: don't send a first-run user to a query that can't match.
+    indexed = stats["added"] + stats["updated"] + stats["unchanged"]
+    if indexed == 0:
+        console.print(
+            "\n[yellow]No markdown to index here.[/yellow] Point trovex at a repo "
+            "with [cyan].md[/cyan] docs: [cyan]uv run trovex index /path/to/repo[/cyan]"
+        )
+        return
+
     # Point first-run users straight at the aha: the savings number on query 1.
-    console.print("\n[bold]Next[/bold] — see the tokens saved on your first query:")
-    console.print('  [cyan]uv run trovex search "how do we deploy?"[/cyan]')
+    console.print("\n[bold]Next[/bold] — ask a question, see the tokens saved:")
     console.print(
-        "[dim]Then wire it into your agent: [/dim][cyan]uv run trovex serve[/cyan]"
-        "[dim]  (MCP at /mcp, savings dashboard at http://localhost:8765/savings)[/dim]"
+        '  [cyan]uv run trovex search "how do we deploy?"[/cyan]'
+        "  [dim](use a real question about your repo)[/dim]"
+    )
+    console.print(
+        "[dim]Then wire it into your agent — [/dim][cyan]uv run trovex serve[/cyan]"
+        "[dim] — and savings add up on the dashboard at http://localhost:8765/savings[/dim]"
     )
 
 
@@ -69,6 +81,12 @@ def search(
     results = searcher.search(query, limit=limit)
     output = searcher.format_with_summary(results) if summary else searcher.format_minimal(results)
     console.print(output)
+    if not results:
+        console.print(
+            "[dim]No match. Try different words, or re-run [/dim]"
+            "[cyan]uv run trovex index <repo>[/cyan][dim] if your docs changed.[/dim]"
+        )
+        return
     if savings:
         s = searcher.savings_estimate(results)
         if s and s["saved"] > 0:

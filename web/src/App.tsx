@@ -343,6 +343,24 @@ export default function App() {
           </div>
         </section>
 
+        {/* Trust — honest signals, no logos/testimonials (none yet) */}
+        <section className="section trust reveal">
+          <div className="wrap trust-grid">
+            <div className="trust-card">
+              <div className="trust-h">Runs on your machine</div>
+              <p>Indexing and embeddings run locally in SQLite and ONNX. No cloud, no API keys — your code and docs never leave your machine.</p>
+            </div>
+            <div className="trust-card">
+              <div className="trust-h">Open source, AGPL-3.0</div>
+              <p>Read the code, run it yourself, fork it. Nothing hidden, no lock-in. The CLI is MIT.</p>
+            </div>
+            <div className="trust-card">
+              <div className="trust-h">~60% fewer tokens, measured</div>
+              <p>Counted, not marketing: trovex serves the one canonical doc instead of the top few candidates your agent would otherwise read, and shows you the difference.</p>
+            </div>
+          </div>
+        </section>
+
         {/* Product tour — numbered features, each a real shot */}
         <div id="tour">
           {FEATURES.map((f) => (

@@ -39,10 +39,10 @@ Humans read trovex-owned docs at `/doc/{id}` (rendered reader). To make agents r
 ## Quick start (dev)
 
 ```bash
-uv sync
-uv run trovex index /path/to/repo
-uv run trovex search "how do we deploy?"  # prints the tokens saved on this query
-uv run trovex serve                       # MCP at /mcp, savings dashboard at /savings
+uv sync                                   # install trovex and its deps
+uv run trovex index /path/to/repo         # index your repo's markdown (~1 min)
+uv run trovex search "how do we deploy?"  # ask a question — prints the tokens saved
+uv run trovex serve                       # wire into your agent: MCP at /mcp, dashboard at /savings
 ```
 
 The `search` step is the fast way to see the point: it returns the one canonical

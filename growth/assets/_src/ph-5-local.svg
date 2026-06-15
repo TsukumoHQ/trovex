@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1270" height="760" viewBox="0 0 1270 760" role="img" aria-label="Runs on your machine. SQLite plus on-device embeddings. No cloud, no API keys. AGPL core, MIT CLI.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1270" height="760" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1270" height="6" fill="#22c55e"/>
+  <text class="mono" x="64" y="70" font-size="26" fill="#7c8798">trovex</text>
+
+  <text class="sans" x="64" y="170" font-size="56" font-weight="700" fill="#e6edf3">runs on <tspan fill="#22c55e">your machine</tspan>.</text>
+
+  <!-- four trust chips -->
+  <g class="sans">
+    <rect x="64" y="250" width="560" height="130" rx="14" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+    <circle cx="112" cy="315" r="7" fill="#22c55e"/>
+    <text x="140" y="306" font-size="30" font-weight="600" fill="#e6edf3">local-first</text>
+    <text x="140" y="344" font-size="23" font-weight="400" fill="#9aa6b8">SQLite for vectors · on-device embeddings</text>
+
+    <rect x="646" y="250" width="560" height="130" rx="14" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+    <circle cx="694" cy="315" r="7" fill="#22c55e"/>
+    <text x="722" y="306" font-size="30" font-weight="600" fill="#e6edf3">no cloud, no keys</text>
+    <text x="722" y="344" font-size="23" font-weight="400" fill="#9aa6b8">your code never leaves your box</text>
+
+    <rect x="64" y="404" width="560" height="130" rx="14" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+    <circle cx="112" cy="469" r="7" fill="#22c55e"/>
+    <text x="140" y="460" font-size="30" font-weight="600" fill="#e6edf3">open source</text>
+    <text x="140" y="498" font-size="23" font-weight="400" fill="#9aa6b8">AGPL core · MIT CLI · self-hostable</text>
+
+    <rect x="646" y="404" width="560" height="130" rx="14" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+    <circle cx="694" cy="469" r="7" fill="#22c55e"/>
+    <text x="722" y="460" font-size="30" font-weight="600" fill="#e6edf3">MCP + CLI</text>
+    <text x="722" y="498" font-size="23" font-weight="400" fill="#9aa6b8">works with your existing agent setup</text>
+  </g>
+
+  <!-- command -->
+  <rect x="64" y="588" width="1142" height="72" rx="12" fill="#0d1119" stroke="#22c55e" stroke-opacity="0.4" stroke-width="2"/>
+  <text class="mono" x="92" y="634" font-size="28" fill="#22c55e">$ <tspan fill="#cdd6e2">uv run trovex index .  &amp;&amp;  trovex serve</tspan></text>
+  <text class="mono" x="1178" y="634" font-size="24" fill="#7c8798" text-anchor="end">trovex.dev</text>
+</svg>

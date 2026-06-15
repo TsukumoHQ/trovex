@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1270" height="760" viewBox="0 0 1270 760" role="img" aria-label="The savings view. Would have read about 720 tokens, actual read about 280. About 60 percent fewer tokens, same answers on doc lookups. Check the number on your own repo.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1270" height="760" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1270" height="6" fill="#22c55e"/>
+  <text class="mono" x="64" y="70" font-size="26" fill="#7c8798">trovex</text>
+
+  <text class="sans" x="64" y="150" font-size="46" font-weight="700" fill="#e6edf3">the savings view <tspan font-size="30" font-weight="400" fill="#7c8798">— check it on your own repo</tspan></text>
+
+  <!-- panel -->
+  <rect x="64" y="210" width="1142" height="420" rx="16" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+  <text class="mono" x="100" y="278" font-size="26" fill="#9aa6b8" letter-spacing="0.04em">per doc-lookup · representative run</text>
+
+  <!-- bar 1 -->
+  <text class="sans" x="100" y="350" font-size="26" fill="#cdd6e2">would have read</text>
+  <rect x="100" y="370" width="860" height="46" rx="8" fill="#1a212c"/>
+  <text class="mono" x="1170" y="404" font-size="30" font-weight="600" fill="#cdd6e2" text-anchor="end">~720</text>
+
+  <!-- bar 2 -->
+  <text class="sans" x="100" y="476" font-size="26" fill="#cdd6e2">actual read <tspan fill="#7c8798">(top-1)</tspan></text>
+  <rect x="100" y="496" width="334" height="46" rx="8" fill="#22c55e"/>
+  <text class="mono" x="1170" y="530" font-size="30" font-weight="600" fill="#22c55e" text-anchor="end">~280</text>
+
+  <text class="sans" x="100" y="600" font-size="34" font-weight="700" fill="#22c55e">~60% fewer tokens<tspan font-size="26" font-weight="400" fill="#9aa6b8">, same answers</tspan></text>
+
+  <text class="sans" x="64" y="700" font-size="24" fill="#7c8798">numbers are illustrative of the mechanism — the tool shows yours from a real run.</text>
+</svg>

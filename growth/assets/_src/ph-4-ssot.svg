@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1270" height="760" viewBox="0 0 1270 760" role="img" aria-label="One source of truth across your agents and your team. Multiple agents and a teammate read and write through one trovex store, so nobody re-derives the same doc.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1270" height="760" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1270" height="6" fill="#22c55e"/>
+  <text class="mono" x="64" y="70" font-size="26" fill="#7c8798">trovex</text>
+
+  <text class="sans" x="64" y="150" font-size="46" font-weight="700" fill="#e6edf3">one source of truth</text>
+  <text class="sans" x="64" y="196" font-size="28" font-weight="400" fill="#7c8798">across your agents and your team — nobody re-derives</text>
+
+  <!-- left clients -->
+  <g class="sans" font-size="22" font-weight="600" fill="#cdd6e2">
+    <rect x="80" y="280" width="230" height="58" rx="10" fill="#11161f" stroke="#2a3342" stroke-width="1.5"/><text x="195" y="316" text-anchor="middle">coding agent A</text>
+    <rect x="80" y="372" width="230" height="58" rx="10" fill="#11161f" stroke="#2a3342" stroke-width="1.5"/><text x="195" y="408" text-anchor="middle">coding agent B</text>
+    <rect x="80" y="464" width="230" height="58" rx="10" fill="#11161f" stroke="#2a3342" stroke-width="1.5"/><text x="195" y="500" text-anchor="middle">teammate / CI</text>
+  </g>
+
+  <!-- connectors to store -->
+  <g stroke="#22c55e" stroke-width="2" fill="none" stroke-opacity="0.7">
+    <path d="M310 309 C470 309 470 380 560 380"/>
+    <path d="M310 401 C460 401 470 390 560 390"/>
+    <path d="M310 493 C470 493 470 400 560 400"/>
+  </g>
+
+  <!-- central store -->
+  <rect x="560" y="300" width="320" height="180" rx="16" fill="#0e1a13" stroke="#22c55e" stroke-width="2.5"/>
+  <text class="sans" x="720" y="372" font-size="34" font-weight="700" fill="#22c55e" text-anchor="middle">trovex store</text>
+  <text class="sans" x="720" y="412" font-size="22" font-weight="400" fill="#9aa6b8" text-anchor="middle">one canonical doc</text>
+  <text class="sans" x="720" y="440" font-size="22" font-weight="400" fill="#9aa6b8" text-anchor="middle">path:line + freshness</text>
+
+  <!-- read/write arrows out -->
+  <path d="M880 360 L980 360" stroke="#22c55e" stroke-width="2"/>
+  <path d="M974 353 L986 360 L974 367 Z" fill="#22c55e"/>
+  <text class="mono" x="1000" y="366" font-size="22" fill="#cdd6e2">read: one answer</text>
+  <path d="M980 420 L880 420" stroke="#7c8798" stroke-width="2" stroke-dasharray="5 5"/>
+  <path d="M886 413 L874 420 L886 427 Z" fill="#7c8798"/>
+  <text class="mono" x="1000" y="426" font-size="22" fill="#9aa6b8">write: update once</text>
+
+  <text class="sans" x="64" y="660" font-size="26" font-weight="400" fill="#7c8798">read the same canonical doc, write updates once — <tspan fill="#cdd6e2">no drift, no re-derivation</tspan></text>
+</svg>

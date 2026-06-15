@@ -247,9 +247,9 @@ function StoreShot() {
 }
 
 const FEATURES = [
-  { no: '01', kicker: 'Find', title: 'Serve one canonical answer', body: 'Your agent asks in plain language. Trovex returns the single current doc, with its line, and skips the stale and duplicate copies entirely.', shot: <SearchShot />, flip: false },
-  { no: '02', kicker: 'Read', title: 'Hand back only the section that matters', body: 'No more loading a whole file for two paragraphs. Trovex serves the relevant section, so a short answer costs short-answer tokens.', shot: <DocShot />, flip: true },
-  { no: '03', kicker: 'Share', title: 'Keep what one agent learns', body: 'When an agent works something out, it saves it once. The next agent, and your teammates, read it instead of re-deriving it.', shot: <StoreShot />, flip: false },
+  { no: '01', kicker: 'Find', title: 'Serve one canonical answer', body: 'Your agent asks in plain language and gets back the one current doc, down to the line. The stale and duplicate copies never reach its context.', shot: <SearchShot />, flip: false },
+  { no: '02', kicker: 'Read', title: 'Hand back only the section that matters', body: 'An agent needs two paragraphs, not the whole file. Trovex serves just the section that answers, so a short answer costs short-answer tokens.', shot: <DocShot />, flip: true },
+  { no: '03', kicker: 'Share', title: 'Keep what one agent learns', body: 'One agent figures something out and saves it once. Every other agent, and your teammates, read it back instead of working it out again.', shot: <StoreShot />, flip: false },
 ]
 
 export default function App() {
@@ -275,8 +275,9 @@ export default function App() {
           <div className="wrap">
             <h1>Trovex is the canonical doc store<br />for your <span className="ac">coding agents</span>.</h1>
             <p className="deck">
-              It keeps one current copy of every doc and hands your agents the right one, instead of
-              letting them reread the whole repo to guess. About <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b> per lookup.
+              Your agents reread the repo every session to work out which doc is current. Trovex keeps
+              one canonical copy and hands them the right one. Same answers, about{' '}
+              <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
             </p>
             <div className="hero-cta">
               <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">{Github} Get Trovex</a>
@@ -285,6 +286,16 @@ export default function App() {
             <Cmd text="uv run trovex serve" />
           </div>
           <HeroWindow />
+        </section>
+
+        {/* Compatibility — real proof, not fake logos */}
+        <section className="compat">
+          <div className="wrap">
+            <div className="lab">Works with</div>
+            <div className="row">
+              <span>Claude Code</span><span>Cursor</span><span>Windsurf</span><span>Zed</span><span>any MCP client</span>
+            </div>
+          </div>
         </section>
 
         {/* Product tour — numbered features, each a real shot */}
@@ -303,6 +314,34 @@ export default function App() {
           ))}
         </div>
 
+        {/* FAQ — objection handling */}
+        <section className="section" id="faq">
+          <div className="wrap">
+            <div className="sec-head reveal">
+              <div className="kicker">Questions</div>
+              <h2>Honest answers</h2>
+            </div>
+            <div className="faq reveal">
+              <div className="faq-item">
+                <p className="faq-q">Why not just a CLAUDE.md or AGENTS.md?</p>
+                <p className="faq-a">Those are one static file. They go stale, don't scale past a handful of topics, and can't route a question to the right doc or section. Trovex keeps many docs canonical and serves the one that answers.</p>
+              </div>
+              <div className="faq-item">
+                <p className="faq-q">My context window is huge. Why bother?</p>
+                <p className="faq-a">The cost compounds: every session, every agent, every teammate. And a big window isn't a current one. Trovex serves the right doc, cheaply, every time.</p>
+              </div>
+              <div className="faq-item">
+                <p className="faq-q">Is it another service to run?</p>
+                <p className="faq-a">One local process. Run <code>trovex serve</code>, point your agent at it, and you're set in about a minute. No cloud, no keys.</p>
+              </div>
+              <div className="faq-item">
+                <p className="faq-q">Does my code leave my machine?</p>
+                <p className="faq-a">No. Indexing and embeddings run locally in SQLite and ONNX. Nothing is sent anywhere.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* CTA */}
         <section className="section">
           <div className="wrap">
@@ -317,6 +356,7 @@ export default function App() {
             </div>
           </div>
         </section>
+
       </main>
 
       <footer className="footer">

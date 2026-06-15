@@ -381,7 +381,7 @@ export default function App() {
             <a href="/vs/">Compare</a>
             <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
           </nav>
-          <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+          <small>© 2026 trovex · one source of truth for your agents' docs</small>
         </div>
       </footer>
     </>

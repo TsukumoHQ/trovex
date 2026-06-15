@@ -60,13 +60,21 @@ number stays low, keep your current setup. trovex earns its place on doc-heavy r
 real agent traffic, and on teams where several agents and people work the same docs. Run the
 [self-audit](../growth/content/lead-magnet-token-audit.md) if you're not sure.
 
+## Is trovex open source? Can I get the code?
+
+Yes, it's open-source-licensed (core AGPL-3.0, CLI MIT), and it will open to the public.
+Right now it's in private beta, so access to the code is gated while we work with a small
+group of early testers. The license isn't changing; the doors just open in stages.
+[Request access at trovex.dev](https://trovex.dev) and we'll get you in.
+
 ## Is it free? What's the license?
 
-Yes. The core is AGPL-3.0, the CLI is MIT. You can self-host and modify it freely. If you
-run a modified version as a network service, AGPL asks you to share your changes.
+Yes. The core is AGPL-3.0, the CLI is MIT. During the private beta, access is by request at
+[trovex.dev](https://trovex.dev); once you're in, you can self-host and modify it freely. If
+you run a modified version as a network service, AGPL asks you to share your changes.
 
 ## I'm rolling agents out across a team. Can you help?
 
 That's the consulting side. trovex is the free tool; helping teams run agents well at scale
 (including embedding or hosting a modified trovex privately, without the AGPL copyleft
-obligations) is the paid work. [Working with a team? Let's talk.](https://github.com/Synergix-lab/trovex)
+obligations) is the paid work. [Working with a team? Let's talk.](https://trovex.dev)

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="820" viewBox="0 0 1280 820" role="img" aria-label="trovex demo. Run trovex index on your repo, then trovex search a question, and it prints about 440 tokens saved this query: one canonical doc at about 280 tokens instead of the top 3 at about 720, 61 percent less.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1280" height="820" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1280" height="6" fill="#22c55e"/>
+
+  <!-- heading -->
+  <text class="sans" x="72" y="92" font-size="40" font-weight="700" fill="#e6edf3">install → first query → <tspan fill="#22c55e">the number</tspan></text>
+  <text class="sans" x="72" y="132" font-size="24" font-weight="400" fill="#7c8798">the aha is a real figure from your own repo, in about a minute</text>
+
+  <!-- terminal window -->
+  <rect x="72" y="172" width="1136" height="500" rx="14" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+  <rect x="72" y="172" width="1136" height="48" rx="14" fill="#11161f"/>
+  <rect x="72" y="200" width="1136" height="20" fill="#11161f"/>
+  <circle cx="100" cy="196" r="7" fill="#2a3342"/>
+  <circle cx="124" cy="196" r="7" fill="#2a3342"/>
+  <circle cx="148" cy="196" r="7" fill="#2a3342"/>
+  <text class="mono" x="640" y="202" font-size="20" fill="#5a6577" text-anchor="middle">trovex — ~/my-repo</text>
+
+  <g class="mono" font-size="23">
+    <!-- index -->
+    <text x="104" y="272"><tspan fill="#22c55e">$</tspan> <tspan fill="#e6edf3">uv run trovex index ./my-repo</tspan></text>
+    <text x="104" y="308" fill="#7c8798">  indexing markdown… done (~1 min)</text>
+    <text x="104" y="340" fill="#7c8798">  total tokens indexed: 248,910</text>
+    <text x="104" y="372" fill="#5a6577">  next — ask a question, see the tokens saved:</text>
+
+    <!-- search -->
+    <text x="104" y="430"><tspan fill="#22c55e">$</tspan> <tspan fill="#e6edf3">uv run trovex search "how does auth work?"</tspan></text>
+    <text x="104" y="470"><tspan fill="#e6edf3">  api/v2.md:42-58</tspan>   <tspan fill="#22c55e">● fresh 2d</tspan>   <tspan fill="#7c8798">~280tok</tspan></text>
+
+    <!-- savings line (the aha) -->
+    <text x="104" y="520" font-size="26"><tspan fill="#22c55e" font-weight="600">  ≈ 440 tokens saved this query</tspan></text>
+    <text x="104" y="554" fill="#7c8798" font-size="21">  · read 1 canonical doc (~280 tok) instead of the top 3 (~720 tok)</text>
+    <text x="104" y="582" fill="#7c8798" font-size="21">  · 61% less · estimate</text>
+
+    <!-- serve -->
+    <text x="104" y="636"><tspan fill="#22c55e">$</tspan> <tspan fill="#e6edf3">uv run trovex serve</tspan>   <tspan fill="#5a6577"># MCP at /mcp · dashboard at /savings</tspan></text>
+  </g>
+
+  <!-- footer -->
+  <text class="sans" x="72" y="730" font-size="24" fill="#9aa6b8">one canonical section, not six files — <tspan fill="#e6edf3" font-weight="600">~60% fewer tokens per lookup</tspan>, same answer.</text>
+  <text class="mono" x="72" y="772" font-size="22" fill="#7c8798">trovex.dev · now in private beta</text>
+</svg>

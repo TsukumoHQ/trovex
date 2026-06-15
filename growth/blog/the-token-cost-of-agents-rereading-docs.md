@@ -3,7 +3,7 @@ title: "The token cost of coding agents rereading your docs"
 description: "Coding agents reread your .md files every session to guess which one is canonical. Here's the math on what that costs, and how serving one current doc cuts doc-lookup tokens by about 60%."
 slug: the-token-cost-of-agents-rereading-docs
 date: 2026-06-15
-author: Synergix
+author: trovex
 canonical_url: https://trovex.dev/blog/the-token-cost-of-agents-rereading-docs
 tags: [ai-coding-agents, tokens, context, mcp, developer-tools]
 category: token-economics

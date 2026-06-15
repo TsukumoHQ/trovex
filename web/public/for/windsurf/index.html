@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/for/windsurf/" />
+  <title>trovex for Windsurf — add it to mcp_config.json, ~60% fewer tokens</title>
+  <meta name="description" content="Add trovex to Windsurf as an HTTP MCP server via ~/.codeium/windsurf/mcp_config.json. Run trovex serve, point Windsurf at http://localhost:8765/mcp with serverUrl, refresh in Cascade. One canonical doc per query instead of rereading the repo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/for/windsurf/" />
+  <meta property="og:title" content="trovex for Windsurf" />
+  <meta property="og:description" content="Add trovex to Windsurf via mcp_config.json. One canonical doc per query, ~60% fewer tokens." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for Windsurf" />
+  <meta name="twitter:description" content="Add trovex to Windsurf via mcp_config.json." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "For your MCP client", "item": "https://trovex.dev/for/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex for Windsurf", "item": "https://trovex.dev/for/windsurf/" }
+        ]
+      },
+      {
+        "@type": "HowTo",
+        "name": "Add trovex to Windsurf",
+        "description": "Connect trovex (a local HTTP MCP server) to Windsurf via mcp_config.json.",
+        "step": [
+          { "@type": "HowToStep", "name": "Index your repo", "text": "Run `uv run trovex index /path/to/repo`." },
+          { "@type": "HowToStep", "name": "Start the server", "text": "Run `uv run trovex serve`. trovex serves MCP at http://localhost:8765/mcp." },
+          { "@type": "HowToStep", "name": "Edit mcp_config.json", "text": "Add a trovex entry with serverUrl to ~/.codeium/windsurf/mcp_config.json." },
+          { "@type": "HowToStep", "name": "Refresh in Cascade", "text": "Open Cascade → MCP / Plugins and refresh; the trovex tool becomes available." }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/for/">For your client</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/for/">For your client</a> / Windsurf
+    </nav>
+
+    <h1>trovex for <span class="ac">Windsurf</span></h1>
+    <p class="deck">Windsurf keeps MCP servers in <code>~/.codeium/windsurf/mcp_config.json</code> and manages them from Cascade. Add trovex and the agent gets one canonical doc per query — about 60% fewer tokens.</p>
+
+    <div class="verdict">
+      <div class="l">The config</div>
+      <p>Start trovex, then add it to <code>~/.codeium/windsurf/mcp_config.json</code> using <code>serverUrl</code> for the streamable HTTP endpoint:</p>
+      <pre style="margin-top:12px;overflow-x:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;"><code>{
+  "mcpServers": {
+    "trovex": { "serverUrl": "http://localhost:8765/mcp" }
+  }
+}</code></pre>
+    </div>
+
+    <h2>Setup, step by step</h2>
+    <ol>
+      <li><strong>Index your repo.</strong><div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex index /path/to/repo</div></li>
+      <li><strong>Start trovex.</strong> It serves MCP over HTTP at <code>http://localhost:8765/mcp</code>.<div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex serve</div></li>
+      <li><strong>Edit</strong> <code>~/.codeium/windsurf/mcp_config.json</code> (on Windows, <code>%USERPROFILE%\.codeium\windsurf\mcp_config.json</code>) — the snippet above.</li>
+      <li><strong>Refresh.</strong> Open <em>Cascade → MCP / Plugins</em> and refresh. The <code>trovex</code> tool is now available.</li>
+    </ol>
+    <p class="note">Older Windsurf builds connect to HTTP servers through the <code>mcp-remote</code> bridge instead of <code>serverUrl</code>. If trovex doesn't appear, check Windsurf's current <a href="https://docs.windsurf.com/windsurf/cascade/mcp" target="_blank" rel="noreferrer">MCP docs</a> for the format your version expects.</p>
+
+    <h2>Why Windsurf users want it</h2>
+    <p class="lead-answer">Cascade is strong at navigating code, but for project knowledge spread across many markdown files it still rereads to find the current one. trovex serves the single canonical doc that answers, with a freshness marker, so Cascade reads the right section instead of a stale copy — about <strong>60% fewer tokens per lookup</strong>, with a shared write path so context carries across sessions.</p>
+
+    <div class="related">
+      <div class="l">trovex for other clients</div>
+      <ul>
+        <li><a href="/for/claude-code/">trovex for Claude Code</a></li>
+        <li><a href="/for/cursor/">trovex for Cursor</a></li>
+        <li><a href="/for/cline/">trovex for Cline</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Give Windsurf one source of truth.</h2>
+      <p>Index your repo, start trovex, edit <code>mcp_config.json</code> — about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/for/">For your client</a>
+      <a href="/answers/">Answers</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix</small>
+    </div>
+  </footer>
+</body>
+</html>

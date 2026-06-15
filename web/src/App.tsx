@@ -265,7 +265,8 @@ function WaitlistForm({ location = 'waitlist' }: { location?: string }) {
     return (
       <div className="wl-done" role="status">
         <p className="wl-done-t">You're on the list.</p>
-        <p className="wl-done-s">We'll email you when your spot opens — one note, no spam, no list-selling.</p>
+        <p className="wl-done-s">We're letting people in as spots open and we'll email your invite then — one note, no spam, no list-selling. We won't promise a date; the beta is small on purpose.</p>
+        <p className="wl-done-s">While you wait, <a href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'waitlist-done' })}>see how it works ↓</a></p>
       </div>
     )
   }

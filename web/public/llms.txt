@@ -37,9 +37,14 @@
 - [trovex for Cline](https://trovex.dev/for/cline/): a remote streamable-HTTP server in `cline_mcp_settings.json`.
 - [All clients](https://trovex.dev/for/)
 
+## Access
+- Status: private beta. The repository is currently private; access is by invitation.
+- Request access: https://trovex.dev/#waitlist (the install commands below work once you're in the beta).
+
 ## Links
-- [Repository](https://github.com/Synergix-lab/trovex): source (core AGPL-3.0, CLIs MIT).
+- [Request beta access](https://trovex.dev/#waitlist): the private-beta waitlist.
 - [Website](https://trovex.dev): the landing page.
+- [Repository](https://github.com/Synergix-lab/trovex): source (private during the beta; core AGPL-3.0, CLIs MIT).
 - [llms-full.txt](https://trovex.dev/llms-full.txt): the full extractable content in one file.
 
 ## Facts
@@ -47,4 +52,5 @@
 - Interface: Model Context Protocol (MCP) server (local, streamable-HTTP at http://localhost:8765/mcp) + CLI.
 - Works with: Claude Code, Cursor, Windsurf, Cline, Zed, and any MCP client.
 - License: core AGPL-3.0, CLIs MIT.
-- Install: `uv run trovex index /path/to/repo` then `uv run trovex serve`.
+- Access: private beta — request at https://trovex.dev/#waitlist.
+- Install (once in the beta): `uv run trovex index /path/to/repo` then `uv run trovex serve`.

@@ -46,3 +46,12 @@ Deployed at `trovex.prod.synergix.ch` via Traefik. See `docker/` for the image.
 Trovex is licensed under the **GNU AGPL-3.0-or-later** (see [`LICENSE`](LICENSE)).
 You can self-host and modify it freely; if you run a modified version as a network
 service, AGPL requires you to share your changes.
+
+## Working with a team?
+
+trovex is free to run yourself. If your team is rolling out coding agents at scale —
+and wants hands-on help doing it well, or to embed/host a modified trovex privately
+without the AGPL's copyleft obligations — that's what the consulting is for.
+[Reach out](https://github.com/Synergix-lab/trovex).
+<!-- TODO(human): replace the link above with the real consulting contact (private email / booking / form). -->
+

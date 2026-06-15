@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { track, trackLandingView, trackRequestAccessClick, trackWaitlistSubmitted } from './analytics'
+import { track, trackLandingView, trackRequestAccessClick, trackWaitlistSubmitted, getAttribution } from './analytics'
 
 const REPO = 'https://github.com/Synergix-lab/trovex'
 // TODO(human): swap to the real consulting contact (private email / Cal.com booking / form).
@@ -252,7 +252,9 @@ function WaitlistForm({ location = 'waitlist' }: { location?: string }) {
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, company }),
+        // attribution = closed-enum source props (no PII); lets the endpoint store
+        // signups-by-source. The email is the only PII and is handled server-side.
+        body: JSON.stringify({ email, company, ...getAttribution() }),
       })
       if (res.ok) { setState('ok'); trackWaitlistSubmitted(location); return }
       setState(res.status === 503 ? 'soon' : 'error')

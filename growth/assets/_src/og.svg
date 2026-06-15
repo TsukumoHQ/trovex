@@ -24,6 +24,6 @@
     <text x="80" y="516" font-size="34" font-weight="400" fill="#9aa6b8"><tspan fill="#e6edf3" font-weight="600">60% fewer tokens</tspan> per lookup.</text>
   </g>
   <g font-family="'Fira Code','SF Mono',ui-monospace,monospace">
-    <text x="80" y="582" font-size="26" fill="#6b7689">$ uv run trovex serve</text>
+    <text x="80" y="582" font-size="26" fill="#6b7689">trovex.dev · now in private beta</text>
   </g>
 </svg>

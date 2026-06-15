@@ -309,7 +309,6 @@ export default function App() {
           <a className="brand" href="/">trovex</a>
           <span className="sp" />
           <a className="lk hide" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'nav' })}>Product</a>
-          <a className="lk" href={REPO} target="_blank" rel="noreferrer" onClick={() => track('github_clicked', { location: 'nav' })}>GitHub</a>
           <a className="btn btn-primary nav-cta" href="#waitlist" onClick={() => trackRequestAccessClick('nav')}>Request access</a>
         </div>
       </nav>
@@ -420,7 +419,6 @@ export default function App() {
             <a href="/vs/" onClick={() => track('compare_clicked', { location: 'footer' })}>Compare</a>
             <a href="/answers/" onClick={() => track('answers_clicked', { location: 'footer' })}>Answers</a>
             <a href="/for/" onClick={() => track('setup_clicked', { location: 'footer' })}>Setup</a>
-            <a href={REPO} target="_blank" rel="noreferrer" onClick={() => track('github_clicked', { location: 'footer' })}>GitHub</a>
           </nav>
           <small>© 2026 trovex · one source of truth for your agents' docs</small>
         </div>

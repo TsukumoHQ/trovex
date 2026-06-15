@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/" />
+  <title>trovex answers — token cost &amp; canonical context for coding agents</title>
+  <meta name="description" content="Direct answers to what developers ask about AI coding agents and token cost: how to stop agents rereading docs, how to cut context cost, what canonical context means, and how to keep multiple agents on one source of truth." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/" />
+  <meta property="og:title" content="trovex answers — token cost & canonical context for coding agents" />
+  <meta property="og:description" content="Direct answers about AI coding agents, token cost, and canonical context." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex answers" />
+  <meta name="twitter:description" content="Direct answers about AI coding agents, token cost, and canonical context." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" }
+        ]
+      },
+      {
+        "@type": "ItemList",
+        "name": "trovex answers",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "How do I stop my AI coding agent from rereading the same files every session?", "url": "https://trovex.dev/answers/stop-agent-rereading-docs/" },
+          { "@type": "ListItem", "position": 2, "name": "How do I reduce the token cost of giving a coding agent context?", "url": "https://trovex.dev/answers/reduce-agent-token-costs/" },
+          { "@type": "ListItem", "position": 3, "name": "What is canonical context for coding agents?", "url": "https://trovex.dev/answers/canonical-context-for-agents/" },
+          { "@type": "ListItem", "position": 4, "name": "Does a bigger context window make rereading docs cheaper?", "url": "https://trovex.dev/answers/bigger-context-window-rereading/" },
+          { "@type": "ListItem", "position": 5, "name": "How do I keep multiple AI agents working from the same docs?", "url": "https://trovex.dev/answers/shared-source-of-truth-multiple-agents/" }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / Answers
+    </nav>
+
+    <h1>trovex <span class="ac">answers</span></h1>
+    <p class="deck">Direct answers to what developers actually ask about AI coding agents, token cost, and keeping docs canonical.</p>
+
+    <div class="related" style="margin-top:36px;">
+      <div class="l">Questions</div>
+      <ul>
+        <li><a href="/answers/stop-agent-rereading-docs/"><strong>How do I stop my AI coding agent from rereading the same files every session?</strong></a> — give it one canonical answer per query instead of raw files to sift.</li>
+        <li><a href="/answers/reduce-agent-token-costs/"><strong>How do I reduce the token cost of giving a coding agent context?</strong></a> — cut the repeated retrieval, not the one-time prompt.</li>
+        <li><a href="/answers/canonical-context-for-agents/"><strong>What is canonical context for coding agents?</strong></a> — the single current, authoritative doc that answers a query.</li>
+        <li><a href="/answers/bigger-context-window-rereading/"><strong>Does a bigger context window make rereading docs cheaper?</strong></a> — no; it raises the ceiling, not the efficiency.</li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/"><strong>How do I keep multiple AI agents working from the same docs?</strong></a> — one shared read-and-write point, no drift.</li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>One canonical answer per query.</h2>
+      <p>Point trovex at your repo. Your agents stop rereading it in about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/vs/">Compare trovex</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

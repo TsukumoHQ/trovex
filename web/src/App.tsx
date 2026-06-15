@@ -392,6 +392,7 @@ export default function App() {
           <nav className="lks">
             <a href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'footer' })}>Product</a>
             <a href="/vs/" onClick={() => track('compare_clicked', { location: 'footer' })}>Compare</a>
+            <a href="/answers/" onClick={() => track('answers_clicked', { location: 'footer' })}>Answers</a>
             <a href={REPO} target="_blank" rel="noreferrer" onClick={() => track('github_clicked', { location: 'footer' })}>GitHub</a>
           </nav>
           <small>© 2026 trovex · one source of truth for your agents' docs</small>

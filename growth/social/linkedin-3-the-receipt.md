@@ -28,9 +28,10 @@ Two things I took from it:
 2. The fix was boring in the best way: return the one current doc (with a freshness marker),
    not a pile of candidates. No bigger model, no bigger window.
 
-The tool that produces this receipt (trovex) is open source and runs locally. If you run
-agents daily, measuring this is worth an afternoon even if you never adopt anything — you'll
-probably be annoyed by what you find too.
+The tool that produces this receipt (trovex) runs locally, and it's in a small private beta
+right now. If you run agents daily, this is the kind of waste worth measuring on your own repo
+— request access in the comments and you can run the receipt yourself. You'll probably be
+annoyed by what you find too.
 
 (If it's a whole team's worth of agents quietly doing this, that's the scale where it stops
 being an afternoon and starts being worth a conversation — which is part of what I do.)
@@ -39,7 +40,8 @@ being an afternoon and starts being worth a conversation — which is part of wh
 
 ## Posting notes
 - The SCREENSHOT carries this post — make it legible, real numbers only, no mockup-as-real.
-- Link (repo / trovex.dev) → first comment.
+- Link → trovex.dev beta (UTM) first comment, NOT the repo (private during beta):
+  `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist`
 - Keep it short on LinkedIn; the image + the number do the work.
 
 ## Self-audit

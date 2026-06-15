@@ -59,16 +59,19 @@ to guess the canonical doc      path:line + freshness marker
 Caption: `the fix wasn't a bigger model. it was returning one current answer, not a pile.`
 
 ## Variant D — the "measure your own" receipt (utility, conversion-friendly)
-*Use: invites the reader to generate THEIR receipt — best for activation.*
+*Use: invites the reader to generate THEIR receipt — best for activation. Private-beta phase:
+gate it behind beta access (the public-OSS install-command version returns at public launch).*
 
 ```
 want your own receipt?
-  uv run trovex index <your repo>
-  …run your agent a day…
-  trovex shows would-have-read vs actual.
-most people are surprised by the number. ~60% is what i saw on lookups.
+  trovex is in private beta — request access.
+  point it at your repo, run your agent a day,
+  and it shows would-have-read vs actual.
+~60% is what i saw on lookups. yours will differ — that's the point.
 ```
-Caption: `i'm not asking you to trust my ~60%. measure your own — it's an afternoon.`
+Caption: `i'm not asking you to trust my ~60%. get beta access and measure your own.`
+Link with it: `https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist`
+(swap `utm_source=linkedin` on LinkedIn).
 
 ---
 

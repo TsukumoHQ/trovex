@@ -9,8 +9,7 @@
 
 ## Post
 
-I shipped a small open-source tool this week, and the reason it exists is a number that
-annoyed me.
+I've been building a small tool, and the reason it exists is a number that annoyed me.
 
 When you run AI coding agents on a real repo, a surprising share of their tokens goes to one
 dumb task: rereading `.md` files to figure out which one is actually current. Runbooks, ADRs,
@@ -29,16 +28,18 @@ The honest version: this isn't magic, it's retrieval done with some care (route 
 instead of dumping the repo). But the cost it removes is real, and it compounds — every
 session, every agent, every teammate.
 
-It's free and open source. If your team is running agents across a bunch of repos and the
-token bill (and the drift between everyone's docs) is starting to hurt, that messier
-version is exactly the kind of thing I help teams sort out. Happy to compare notes either way.
+It's in a small private beta right now. If your team is running agents across a bunch of repos
+and the token bill (and the drift between everyone's docs) is starting to hurt, request access
+in the comments — that messier version is exactly the kind of thing I help teams sort out.
 
 ---
 
 ## Posting notes
-- Link to repo (github.com/Synergix-lab/trovex) + trovex.dev → **first comment**, not body.
+- Link → trovex.dev beta (UTM) in **first comment**, not body:
+  `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist`
+  Do NOT link the github repo — it's private during the beta.
 - Best window: weekday morning; reply to early comments fast (reach is reply-weighted).
-- No hashtag spam; 2-3 relevant tags max if any (#opensource #aiagents).
+- No hashtag spam; 2-3 relevant tags max if any (#aiagents #devtools).
 - Consulting line is the LAST paragraph only — never reorder it earlier.
 
 ## Self-audit

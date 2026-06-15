@@ -93,19 +93,11 @@ cloud and no API keys. You can still self-host it behind your own proxy if you w
 instance; see `docker/` in the repo. The default just doesn't make you opt into the cloud to
 answer "which doc is current."
 
-## Try it
+## Request beta access
 
-```bash
-uv run trovex index /path/to/your/repo
-uv run trovex serve
-```
-
-Nothing leaves your machine. See the [quickstart](../../docs/quickstart.md) for wiring it
-into your agent, and the [FAQ](../../docs/faq.md) for where local-first does and doesn't fit.
-
-It's open source: core under AGPL-3.0, CLI under MIT.
-[github.com/Synergix-lab/trovex](https://github.com/Synergix-lab/trovex) ·
-[trovex.dev](https://trovex.dev).
+trovex is in private beta. [Request access at trovex.dev](https://trovex.dev) and we'll get
+you set up locally, so nothing leaves your machine. It's licensed AGPL-3.0 (core) and MIT
+(CLI), and opens up more widely after the beta.
 
 If you're running agents across a team and weighing local versus a shared index, that's the
 kind of trade-off we help teams think through. Happy to talk.

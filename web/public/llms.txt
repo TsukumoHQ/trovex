@@ -1,0 +1,29 @@
+# trovex
+
+> trovex is the canonical doc store for AI coding agents. It indexes a repo's
+> markdown and serves an agent the single current doc that answers a query — a
+> path:line pointer with a freshness marker — instead of letting it reread the
+> repo to guess which file is canonical. Same answers, about 60% fewer tokens
+> per doc lookup. Open source, local-first (SQLite + ONNX), runs on your
+> machine. Ships as an MCP server and a CLI.
+
+## What it does
+- Serves one canonical answer per query (with freshness: canonical / stale / duplicate), not a pile of candidate chunks to sift.
+- Section-level reads: hands back the paragraph that answers, not the whole file, so a short answer costs short-answer tokens.
+- Shared write path: one agent records what it learns once; every other agent and your teammates read it back — single source of truth by construction.
+- Local-first: indexing and embeddings run on your machine in SQLite + ONNX. No cloud, no API keys, your code never leaves your machine.
+
+## Who it's for
+- Solo developers and small teams (1–20) running AI coding agents on real, doc-heavy repos.
+- Anyone whose agents reread the same .md files every session and burn tokens guessing which doc is current.
+
+## Links
+- Repository: https://github.com/Synergix-lab/trovex
+- Website: https://trovex.dev
+
+## Facts
+- Category: context / memory infrastructure for AI coding agents.
+- Interface: Model Context Protocol (MCP) server + CLI.
+- Works with: Claude Code, Cursor, Windsurf, Zed, and any MCP client.
+- License: core AGPL-3.0, CLIs MIT.
+- Install: `uv run trovex index /path/to/repo` then `uv run trovex serve`.

@@ -16,6 +16,12 @@
 {% elif not results %}
   <div class="empty">
     <svg class="icon icon-lg" aria-hidden="true" style="color: var(--fg-subtle);"><use href="#i-search"></use></svg>
+    {% if total == 0 %}
+    <div class="empty-title mono" style="margin-top: var(--s-3);">nothing indexed yet</div>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      run <code>trovex index &lt;repo&gt;</code> to point trovex at your markdown, then search
+    </div>
+    {% else %}
     <div class="empty-title mono" style="margin-top: var(--s-3);">no results for "{{ q }}"</div>
     {% if has_filters %}
     <div class="subtle mono" style="font-size: var(--t-12);">
@@ -28,6 +34,7 @@
     <div class="subtle mono" style="font-size: var(--t-12);">
       try shorter or different keywords · semantic matching prefers short concepts
     </div>
+    {% endif %}
     {% endif %}
   </div>
 {% else %}

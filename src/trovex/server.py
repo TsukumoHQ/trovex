@@ -312,7 +312,22 @@ def build_app() -> FastAPI:
         (no local file; the frontend is the human surface)."""
         doc = get_state().store.get(ext_id)
         if doc is None:
-            return HTMLResponse("(not found)", status_code=404)
+            from html import escape
+            return HTMLResponse(
+                "<!doctype html><html lang=en><head><meta charset=utf-8>"
+                "<title>doc not found · trovex</title>"
+                "<meta name=viewport content='width=device-width, initial-scale=1'>"
+                "<style>body{background:#0b0d0e;color:#e6e6e6;font:15px/1.6 ui-monospace,"
+                "Menlo,monospace;display:grid;place-items:center;min-height:100vh;margin:0;"
+                "text-align:center}a{color:#22c55e}.c{max-width:34rem;padding:2rem}"
+                ".m{color:#8a9199}code{color:#e6e6e6}</style></head><body><div class=c>"
+                "<h1 style='font-size:1.25rem;margin:0 0 .5rem'>doc not found</h1>"
+                f"<p class=m>No trovex doc with id <code>{escape(ext_id)}</code>. "
+                "It may have been deleted, or the link is stale.</p>"
+                "<p><a href='/search'>search the store</a> · "
+                "<a href='/store'>browse all docs</a></p></div></body></html>",
+                status_code=404,
+            )
         body_html, toc = render_markdown(doc.content)
         return templates.TemplateResponse(
             request, "doc.html",

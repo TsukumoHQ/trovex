@@ -24,3 +24,5 @@ fastembed_cache/
 .env
 .env.local
 *.local.yaml
+
+.worktrees/

@@ -33,6 +33,7 @@ export type EventName =
   | 'consult_clicked'
   | 'compare_clicked'
   | 'answers_clicked'
+  | 'setup_clicked'
 
 type Props = Record<string, string>
 

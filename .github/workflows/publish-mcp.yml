@@ -1,0 +1,59 @@
+name: Publish to PyPI + MCP Registry
+
+# Credentialed, non-interactive publish path for the MCP Official Registry.
+# Triggered by a version tag (e.g. v0.11.0). A human pushes the tag = the go signal.
+# Uses GitHub Actions OIDC (id-token) so no interactive mcp-publisher login is needed,
+# and Trusted Publishing for PyPI so no long-lived PyPI token is stored.
+#
+# PREREQUISITES (one-time, a human with org rights does these — see growth/launch/mcp-publish-runbook.md):
+#   1. Configure PyPI Trusted Publishing for project "trovex" pointing at this repo + this workflow.
+#   2. Confirm the package builds an installable wheel (`uvx trovex` must work post-publish).
+#   3. Ensure the package long-description/README contains the marker line:
+#        mcp-name: io.github.synergix-lab/trovex
+#      (the MCP registry checks this to verify you own the listed package.)
+#   4. Keep server.json `version` in sync with the tag.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write   # required for both PyPI Trusted Publishing and MCP OIDC
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Publish to PyPI (Trusted Publishing, no token)
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
+            | tar xz mcp-publisher
+          ./mcp-publisher --help >/dev/null
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish ./server.json
+
+      - name: Confirm listing
+        run: |
+          echo "Published. Verify at:"
+          echo "https://registry.modelcontextprotocol.io/v0/servers?search=trovex"

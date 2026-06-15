@@ -1,0 +1,141 @@
+# trovex — full reference for LLMs
+
+> trovex is the canonical doc store for AI coding agents. It indexes a repo's markdown and
+> serves an agent the single current doc that answers a query — a `path:line` pointer with a
+> freshness marker — instead of letting it reread the repo to guess which file is canonical.
+> Same answers, about 60% fewer tokens per doc lookup. Open source, local-first
+> (SQLite + ONNX), runs on your machine. Ships as an MCP server and a CLI.
+
+- Website: https://trovex.dev
+- Repository: https://github.com/Synergix-lab/trovex
+- License: core AGPL-3.0, CLIs MIT
+- Category: context / memory infrastructure for AI coding agents
+- Interface: Model Context Protocol (MCP) server (local, streamable-HTTP at http://localhost:8765/mcp) + CLI
+
+---
+
+## What trovex does
+
+- **Serves one canonical answer per query.** For a question, trovex returns the single current
+  doc that answers it (down to the section), with a freshness marker — canonical, stale, or
+  duplicate — not a pile of candidate chunks for the agent to sift.
+- **Section-level reads.** It hands back the paragraph that answers, not the whole file, so a
+  short answer costs short-answer tokens.
+- **Shared write path.** One agent records what it learns once (an incident, a decision, a fix);
+  every other agent and your teammates read it back — a single source of truth by construction,
+  with nothing to sync.
+- **Local-first.** Indexing and embeddings run on your machine in SQLite + ONNX. No cloud, no
+  API keys, your code never leaves your machine.
+
+The only performance number trovex claims is about **60% fewer tokens per doc lookup** — one
+canonical answer versus reading the top few stale candidate files. It's pre-launch and open
+source; there are no customer counts or ratings to cite.
+
+## Who it's for
+
+- Solo developers and small teams (1–20) running AI coding agents on real, doc-heavy repos.
+- Anyone whose agents reread the same `.md` files every session and burn tokens guessing which
+  doc is current.
+- Teams who want several agents (and teammates) working from one current source of truth.
+
+## Install and run
+
+```
+uv run trovex index /path/to/repo   # index your markdown
+uv run trovex serve                 # serve MCP at http://localhost:8765/mcp, UI at /
+```
+
+## Connect your MCP client
+
+trovex is a local streamable-HTTP MCP server at `http://localhost:8765/mcp`. Any spec-compliant
+MCP client that supports HTTP servers can connect.
+
+- **Claude Code:** `claude mcp add --transport http trovex http://localhost:8765/mcp`, or add
+  `{ "mcpServers": { "trovex": { "type": "http", "url": "http://localhost:8765/mcp" } } }` to
+  `.mcp.json`. Verify with `/mcp`.
+- **Cursor:** add `{ "mcpServers": { "trovex": { "url": "http://localhost:8765/mcp" } } }` to
+  `.cursor/mcp.json`, enable in Settings → MCP.
+- **Windsurf:** add `{ "mcpServers": { "trovex": { "serverUrl": "http://localhost:8765/mcp" } } }`
+  to `~/.codeium/windsurf/mcp_config.json`, refresh in Cascade.
+- **Cline:** add `{ "mcpServers": { "trovex": { "type": "streamableHttp", "url": "http://localhost:8765/mcp" } } }`
+  via the MCP Servers panel (`cline_mcp_settings.json`).
+
+(Client field names move between versions — check the client's current MCP docs if it doesn't connect.)
+
+---
+
+## How trovex compares
+
+### trovex vs CLAUDE.md / AGENTS.md
+CLAUDE.md and AGENTS.md are one static markdown file the agent loads in full every session.
+They're great for a short, stable set of project rules. They go stale, don't scale past a
+handful of topics, and can't route a question to the right doc or section. trovex indexes many
+docs and serves the one current doc that answers a query, with a freshness marker. Keep a small
+CLAUDE.md for rules; let trovex carry the corpus.
+
+### trovex vs repomix / files-to-prompt
+repomix and files-to-prompt pack your repo (or a subset) into one big prompt — the right tool
+for a one-shot question about a whole codebase. For repeated, targeted lookups they flood the
+context window on every prompt, which is the opposite of token-efficient. trovex retrieves the
+one current doc that answers, so a short answer costs short-answer tokens.
+
+### trovex vs context-hub (CTX) / chunk-retrieval servers
+RAG-style context servers return a ranked list of candidate chunks and leave the agent to sift,
+rank, and judge which to trust — with no freshness signal and usually no write-back. trovex
+returns one canonical doc with a canonical/stale/duplicate marker, and lets agents write back
+what they learn so the fleet shares one source of truth.
+
+---
+
+## Answers to common questions
+
+### How do I stop my AI coding agent from rereading the same files every session?
+Give the agent a single canonical answer per query instead of raw files to sift. Index your
+repo's markdown once, then serve the one current doc that answers a question — a `path:line`
+pointer with a freshness marker — rather than letting it reread files to guess which is
+canonical. That cuts the cost to about 60% fewer tokens per lookup, because the agent reads one
+current section instead of the top few stale candidates. trovex does this as a local MCP server.
+
+### How do I reduce the token cost of giving a coding agent context?
+Cut the repeated retrieval, not the one-time prompt. Most of a coding agent's context cost is
+paying again and again to reread the same docs to find which is current. Route each query to the
+single canonical doc that answers it, read at the section level, and skip stale and duplicate
+copies. Together that's about 60% fewer tokens per doc lookup.
+
+### What is canonical context for coding agents?
+Canonical context is the single current, authoritative document that answers a coding agent's
+question — served with a freshness marker, instead of a pile of candidate files the agent has to
+sift. Canonical means the one doc that is the source of truth for a topic, as opposed to stale or
+duplicate copies. The benefit is lower token cost (about 60% fewer per lookup) and more reliable
+answers, because the agent is not reasoning over outdated copies.
+
+### Does a bigger context window make rereading docs cheaper?
+No. A bigger context window raises the ceiling on how much you can load, not the efficiency of
+loading it. You still pay for every token, on every session, across every agent — so rereading
+the same docs is exactly as expensive per token, you can just do more of it. A bigger window is
+also not a more current one. The durable fix is to load less but the right thing: one canonical
+doc per query, about 60% fewer tokens per lookup.
+
+### How do I keep multiple AI agents working from the same docs?
+Give every agent one shared point to both read and write, instead of separate copies each
+maintains. When one agent records what it learns through a single store, every other agent and
+teammate reads that record back instead of re-deriving it. With one point of passage for reads
+and writes there are no copies to drift and nothing to sync — a single source of truth by
+construction. trovex implements this with a shared write path.
+
+---
+
+## FAQ
+
+**Why not just a CLAUDE.md or AGENTS.md?** Those are one static file. They go stale, don't scale
+past a handful of topics, and can't route a question to the right doc or section. trovex keeps
+many docs canonical and serves the one that answers.
+
+**My context window is huge. Why bother?** The cost compounds: every session, every agent, every
+teammate. And a big window isn't a current one. trovex serves the right doc, cheaply, every time.
+
+**Is it another service to run?** One local process. Run `trovex serve`, point your agent at it,
+and you're set in about a minute. No cloud, no keys.
+
+**Does my code leave my machine?** No. Indexing and embeddings run locally in SQLite and ONNX.
+Nothing is sent anywhere.

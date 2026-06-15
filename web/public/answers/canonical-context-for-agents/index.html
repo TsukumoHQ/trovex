@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/canonical-context-for-agents/" />
+  <title>What is canonical context for coding agents?</title>
+  <meta name="description" content="Canonical context is the single current, authoritative document that answers an agent's question — served with a freshness marker instead of a pile of candidate files. It's the opposite of dumping the repo or letting an agent guess which doc is the source of truth." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/canonical-context-for-agents/" />
+  <meta property="og:title" content="What is canonical context for coding agents?" />
+  <meta property="og:description" content="The single current, authoritative doc that answers an agent's question — with a freshness marker, not a pile of files." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="What is canonical context for coding agents?" />
+  <meta name="twitter:description" content="The single current, authoritative doc that answers an agent's question." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "What is canonical context for coding agents?", "item": "https://trovex.dev/answers/canonical-context-for-agents/" }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "mainEntity": {
+          "@type": "Question",
+          "name": "What is canonical context for coding agents?",
+          "text": "I keep seeing the phrase canonical context in the context of AI coding agents. What does it mean?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/canonical-context-for-agents/",
+            "text": "Canonical context is the single current, authoritative document that answers a coding agent's question — served with a freshness marker, instead of a pile of candidate files the agent has to sift. Canonical means the one doc that is the source of truth for a topic, as opposed to stale or duplicate copies. Providing canonical context means an agent gets one current answer per query (often a path:line pointer to the exact section) rather than rereading the repo or receiving a ranked list of chunks to judge. The benefit is lower token cost — about 60% fewer tokens per lookup — and more reliable answers, because the agent is not reasoning over outdated copies. Tools such as trovex serve canonical context as a local MCP server."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / What is canonical context?
+    </nav>
+
+    <h1>What is canonical context for coding agents?</h1>
+
+    <div class="verdict">
+      <div class="l">Definition</div>
+      <p><strong>Canonical context</strong> is the single current, authoritative document that answers a coding agent's question — served with a freshness marker, instead of a pile of candidate files the agent has to sift. <em>Canonical</em> means the one doc that is the source of truth for a topic, as opposed to stale or duplicate copies.</p>
+    </div>
+
+    <h2>What makes context "canonical" rather than just relevant?</h2>
+    <p class="lead-answer">Relevance is similarity; canonical is authority plus freshness. A similarity search can return five files that all mention "deploy rollback" — including an old postmortem and a duplicate wiki page. Canonical context picks the <em>one</em> that is current and authoritative and labels the rest stale or duplicate, so the agent reads the right doc, not the most textually similar one.</p>
+
+    <h2>Why does it matter for an agent?</h2>
+    <p class="lead-answer">Two reasons: cost and correctness. Serving one current section instead of the top few candidates is about <strong>60% fewer tokens per lookup</strong>. And an agent that reads the canonical doc isn't quietly reasoning over an outdated copy — fewer confidently-wrong answers from stale instructions.</p>
+
+    <h2>How is canonical context delivered?</h2>
+    <p class="lead-answer">By indexing your docs and routing each query to the source of truth, with a freshness signal attached. <a href="/">trovex</a> is an open-source, local-first MCP server that does this: it returns the canonical doc as a <code>path:line</code> pointer with a canonical / stale / duplicate marker, serves the section that answers, and lets agents write canonical records back so the whole fleet shares one source of truth. It runs on your machine — SQLite + ONNX, no cloud or keys.</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/stop-agent-rereading-docs/">How do I stop my agent rereading the same files every session?</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Serve your agents canonical context.</h2>
+      <p>One current answer per query, with a freshness marker — in about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix</small>
+    </div>
+  </footer>
+</body>
+</html>

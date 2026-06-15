@@ -276,10 +276,11 @@ export default function App() {
         {/* Hero — category statement */}
         <section className="hero">
           <div className="wrap">
-            <h1>trovex is the canonical doc store<br />for your <span className="ac">coding agents</span>.</h1>
+            <h1>Stop your <span className="ac">coding agents</span><br />rereading the repo.</h1>
             <p className="deck">
-              Your agents reread the repo every session to work out which doc is current. trovex keeps
-              one canonical copy and hands them the right one. Same answers, about{' '}
+              trovex is the canonical doc store for your coding agents. It serves each one the single
+              current doc that answers a query, with a freshness marker, instead of rereading the repo
+              to guess. Same answers, about{' '}
               <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
             </p>
             <div className="hero-cta">

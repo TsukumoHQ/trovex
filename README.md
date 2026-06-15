@@ -50,9 +50,9 @@ doc and prints how many tokens that saved versus reading the top few candidates.
 Once it's wired into your agent over MCP, the same numbers accumulate on the
 savings dashboard at `http://localhost:8765/savings`.
 
-## Production
+## Self-hosting
 
-Deployed at `trovex.prod.synergix.ch` via Traefik. See `docker/` for the image.
+Run it behind your own reverse proxy. See `docker/` for a container image.
 
 ## License
 

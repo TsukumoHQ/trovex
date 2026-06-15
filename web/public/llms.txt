@@ -17,13 +17,34 @@
 - Solo developers and small teams (1–20) running AI coding agents on real, doc-heavy repos.
 - Anyone whose agents reread the same .md files every session and burn tokens guessing which doc is current.
 
+## Comparisons
+- [trovex vs CLAUDE.md / AGENTS.md](https://trovex.dev/vs/claude-md/): a static instructions file vs one canonical doc routed per query.
+- [trovex vs repomix / files-to-prompt](https://trovex.dev/vs/repomix/): packing the whole repo into a prompt vs retrieving the one answer.
+- [trovex vs context-hub (CTX)](https://trovex.dev/vs/context-hub/): a ranked list of candidate chunks vs one canonical doc with a freshness marker.
+- [All comparisons](https://trovex.dev/vs/)
+
+## Answers
+- [How do I stop my coding agent rereading the same files every session?](https://trovex.dev/answers/stop-agent-rereading-docs/): serve one canonical answer per query instead of raw files to sift.
+- [How do I reduce the token cost of giving a coding agent context?](https://trovex.dev/answers/reduce-agent-token-costs/): cut the repeated retrieval, not the one-time prompt.
+- [What is canonical context for coding agents?](https://trovex.dev/answers/canonical-context-for-agents/): the single current, authoritative doc that answers a query.
+- [Does a bigger context window make rereading docs cheaper?](https://trovex.dev/answers/bigger-context-window-rereading/): no — it raises the ceiling, not the efficiency.
+- [How do I keep multiple agents working from the same docs?](https://trovex.dev/answers/shared-source-of-truth-multiple-agents/): one shared read-and-write point, no drift.
+
+## Setup (per MCP client)
+- [trovex for Claude Code](https://trovex.dev/for/claude-code/): `claude mcp add --transport http trovex http://localhost:8765/mcp`.
+- [trovex for Cursor](https://trovex.dev/for/cursor/): add it to `.cursor/mcp.json`, enable in Settings → MCP.
+- [trovex for Windsurf](https://trovex.dev/for/windsurf/): `serverUrl` in `~/.codeium/windsurf/mcp_config.json`.
+- [trovex for Cline](https://trovex.dev/for/cline/): a remote streamable-HTTP server in `cline_mcp_settings.json`.
+- [All clients](https://trovex.dev/for/)
+
 ## Links
-- Repository: https://github.com/Synergix-lab/trovex
-- Website: https://trovex.dev
+- [Repository](https://github.com/Synergix-lab/trovex): source (core AGPL-3.0, CLIs MIT).
+- [Website](https://trovex.dev): the landing page.
+- [llms-full.txt](https://trovex.dev/llms-full.txt): the full extractable content in one file.
 
 ## Facts
 - Category: context / memory infrastructure for AI coding agents.
-- Interface: Model Context Protocol (MCP) server + CLI.
-- Works with: Claude Code, Cursor, Windsurf, Zed, and any MCP client.
+- Interface: Model Context Protocol (MCP) server (local, streamable-HTTP at http://localhost:8765/mcp) + CLI.
+- Works with: Claude Code, Cursor, Windsurf, Cline, Zed, and any MCP client.
 - License: core AGPL-3.0, CLIs MIT.
 - Install: `uv run trovex index /path/to/repo` then `uv run trovex serve`.

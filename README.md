@@ -16,6 +16,12 @@ truth instead of re-deriving it.
 About **60% fewer tokens** on doc lookups, same context quality. Runs locally: vectors
 in SQLite, embeddings via ONNX, no cloud or API keys.
 
+## Private beta
+
+trovex is in private beta. The repo is gated while we work with a small group of early
+testers. [Request access at trovex.dev](https://trovex.dev) and we'll get you set up.
+Early testers get hands-on onboarding and a direct say in the roadmap.
+
 ## MCP tools
 
 - `trovex(q)` — route to the right on-disk `.md` (returns pointers; the v0.8 router).
@@ -36,7 +42,9 @@ Humans read trovex-owned docs at `/doc/{id}` (rendered reader). To make agents r
 - sqlite-vec (vector search in SQLite)
 - Jinja2 + HTMX (UI, no build step)
 
-## Quick start (dev)
+## Quick start (once you have access)
+
+Once you're in the beta and have cloned the repo:
 
 ```bash
 uv sync                                   # install trovex and its deps

@@ -1,0 +1,48 @@
+# trovex.dev
+# We want coding agents and AI search engines to read and cite trovex.
+# robots.txt is the real access lever for AI crawlers; llms.txt is advisory.
+# Explicit Allow blocks below also signal consent to the AI-training opt-out
+# bots (Google-Extended, Applebot-Extended) — we opt IN.
+
+User-agent: *
+Allow: /
+
+# AI answer/search engines (these power citations in ChatGPT/Perplexity/Claude)
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Traditional search (Bing also feeds ChatGPT Search)
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+Sitemap: https://trovex.dev/sitemap.xml

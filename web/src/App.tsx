@@ -378,6 +378,7 @@ export default function App() {
           <span className="sp" />
           <nav className="lks">
             <a href="#tour">Product</a>
+            <a href="/vs/">Compare</a>
             <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
           </nav>
           <small>© 2026 Synergix · one source of truth for your agents' docs</small>

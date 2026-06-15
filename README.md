@@ -1,13 +1,20 @@
 # trovex
 
-Token-efficient routing for agent-generated `.md` docs.
+**One source of truth for your coding agents' docs. Same answers, about 60% fewer tokens.**
 
-Agents (Claude Code, etc.) burn thousands of tokens reading `.md` files trying
-to figure out which one is canonical. `trovex` indexes a repo's markdown corpus,
-exposes a single MCP tool `trovex(q)` that returns minimal pointers (path:line +
-freshness marker), and lets agents read only the relevant file.
+Your coding agents (Claude Code, Cursor, Windsurf, Zed, any MCP client) reread the
+repo every session to work out which `.md` is current, then answer from a guess. You
+pay for that on every session, every agent, every teammate.
 
-**Target**: -60% tokens spent on `.md` reads, same context quality.
+trovex indexes your repo's markdown and exposes one MCP tool. Your agent asks a
+question; trovex returns the single current doc that answers it as a `path:line`
+pointer with a freshness marker (canonical / stale / duplicate), and serves just the
+section that answers instead of the whole file. Agents also write what they learn
+back through one shared point, so every agent and teammate reads the same source of
+truth instead of re-deriving it.
+
+About **60% fewer tokens** on doc lookups, same context quality. Runs locally: vectors
+in SQLite, embeddings via ONNX, no cloud or API keys.
 
 ## MCP tools
 
@@ -49,7 +56,7 @@ Deployed at `trovex.prod.synergix.ch` via Traefik. See `docker/` for the image.
 
 ## License
 
-Trovex is licensed under the **GNU AGPL-3.0-or-later** (see [`LICENSE`](LICENSE)).
+trovex is licensed under the **GNU AGPL-3.0-or-later** (see [`LICENSE`](LICENSE)).
 You can self-host and modify it freely; if you run a modified version as a network
 service, AGPL requires you to share your changes.
 

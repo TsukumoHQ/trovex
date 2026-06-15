@@ -88,6 +88,29 @@ class Searcher:
         results.sort(key=lambda x: -x.score)
         return results[:limit]
 
+    def savings_estimate(self, results: list[SearchResult]) -> dict | None:
+        """Per-query token-savings estimate, same model as the savings dashboard.
+
+        Without trovex an agent reads the top ~3 candidate docs to triage; with
+        trovex it reads the 1 canonical doc. saved = top-3 tokens - top-1 tokens
+        - the pointer response. Returns None when there's nothing to compare.
+        """
+        if not results:
+            return None
+        top = results[:3]
+        would_have_read = sum(r.tokens_est for r in top)
+        actual_read = top[0].tokens_est
+        response = max(1, len(self.format_minimal(results)) // 4)
+        saved = max(0, would_have_read - actual_read - response)
+        return {
+            "would_have_read": would_have_read,
+            "actual_read": actual_read,
+            "response": response,
+            "saved": saved,
+            "ratio": saved / would_have_read if would_have_read else 0.0,
+            "compared": len(top),
+        }
+
     def format_minimal(self, results: list[SearchResult]) -> str:
         if not results:
             return "(no results)"

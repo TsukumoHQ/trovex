@@ -34,8 +34,14 @@ Humans read trovex-owned docs at `/doc/{id}` (rendered reader). To make agents r
 ```bash
 uv sync
 uv run trovex index /path/to/repo
-uv run trovex serve  # MCP at /mcp, UI at /
+uv run trovex search "how do we deploy?"  # prints the tokens saved on this query
+uv run trovex serve                       # MCP at /mcp, savings dashboard at /savings
 ```
+
+The `search` step is the fast way to see the point: it returns the one canonical
+doc and prints how many tokens that saved versus reading the top few candidates.
+Once it's wired into your agent over MCP, the same numbers accumulate on the
+savings dashboard at `http://localhost:8765/savings`.
 
 ## Production
 

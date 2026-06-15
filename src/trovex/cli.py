@@ -47,12 +47,21 @@ def index(
                 f"={s['unchanged']} -{s['removed']}"
             )
 
+    # Point first-run users straight at the aha: the savings number on query 1.
+    console.print("\n[bold]Next[/bold] — see the tokens saved on your first query:")
+    console.print('  [cyan]uv run trovex search "how do we deploy?"[/cyan]')
+    console.print(
+        "[dim]Then wire it into your agent: [/dim][cyan]uv run trovex serve[/cyan]"
+        "[dim]  (MCP at /mcp, savings dashboard at http://localhost:8765/savings)[/dim]"
+    )
+
 
 @app.command()
 def search(
     query: str = typer.Argument(..., help="Query string"),
     limit: int = typer.Option(5, "-n", "--limit"),
     summary: bool = typer.Option(False, "--summary", help="Include 50-word summaries"),
+    savings: bool = typer.Option(True, "--savings/--no-savings", help="Show the per-query token-savings estimate."),
 ) -> None:
     """Search the index for relevant docs."""
     settings = Settings()
@@ -60,6 +69,14 @@ def search(
     results = searcher.search(query, limit=limit)
     output = searcher.format_with_summary(results) if summary else searcher.format_minimal(results)
     console.print(output)
+    if savings:
+        s = searcher.savings_estimate(results)
+        if s and s["saved"] > 0:
+            console.print(
+                f"\n[green]≈ {s['saved']:,} tokens saved[/green] this query  "
+                f"[dim]· read 1 canonical doc (~{s['actual_read']:,} tok) instead of "
+                f"the top {s['compared']} (~{s['would_have_read']:,} tok) · {s['ratio']:.0%} less · estimate[/dim]"
+            )
 
 
 @app.command()

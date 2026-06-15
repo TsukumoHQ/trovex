@@ -1,7 +1,11 @@
 /**
  * trovex private-beta waitlist capture (first-party, no third-party SaaS).
  *
- * POST /api/waitlist  { email, company }   ("company" is a honeypot — must be empty)
+ * POST /api/waitlist  { email, company, ...attribution }
+ *   - "company" is a honeypot — must be empty
+ *   - attribution = closed-enum source props (geo_source, channel, utm_*, referrer host)
+ *     from web/src/analytics.ts getAttribution(); NO PII. Stored with the signup so we
+ *     can read signups-by-source. The email is the only PII.
  *
  * Storage is env-gated so no secret lives in the repo and nothing is captured until
  * the operator wires a backend in Vercel. In priority order:
@@ -17,6 +21,21 @@
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Closed allowlist of source-attribution fields (no PII). Anything else is dropped;
+// each value is coerced to a short string so a crafted body can't bloat storage.
+const ATTRIBUTION_KEYS = [
+  'geo_source', 'channel', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'referrer',
+]
+function pickAttribution(body) {
+  const out = {}
+  for (const k of ATTRIBUTION_KEYS) {
+    if (body[k] == null) continue
+    const v = String(body[k]).trim().slice(0, 64)
+    if (v) out[k] = v
+  }
+  return out
+}
 
 function readJson(req) {
   // Vercel may pre-parse req.body; otherwise read the stream. Cap the size.
@@ -34,12 +53,13 @@ function readJson(req) {
   })
 }
 
-async function storeKV(email) {
+async function storeKV(email, attribution) {
   const url = process.env.WAITLIST_KV_REST_API_URL || process.env.KV_REST_API_URL
   const token = process.env.WAITLIST_KV_REST_API_TOKEN || process.env.KV_REST_API_TOKEN
   if (!url || !token) return false
-  // SADD keeps the list de-duplicated; value carries a timestamp for ordering.
-  const member = `${Date.now()}|${email}`
+  // SADD keeps the list de-duplicated; the member is a JSON record carrying the
+  // timestamp, email, and source attribution (no PII beyond the volunteered email).
+  const member = JSON.stringify({ ts: Date.now(), email, ...attribution })
   const res = await fetch(`${url}/sadd/trovex_waitlist/${encodeURIComponent(member)}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -47,10 +67,13 @@ async function storeKV(email) {
   return res.ok
 }
 
-async function storeGitHubIssue(email) {
+async function storeGitHubIssue(email, attribution) {
   const token = process.env.WAITLIST_GITHUB_TOKEN
   const repo = process.env.WAITLIST_GITHUB_REPO // "owner/repo"
   if (!token || !repo) return false
+  const attrLines = Object.entries(attribution)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('\n')
   const res = await fetch(`https://api.github.com/repos/${repo}/issues`, {
     method: 'POST',
     headers: {
@@ -60,7 +83,7 @@ async function storeGitHubIssue(email) {
     },
     body: JSON.stringify({
       title: 'waitlist signup',
-      body: `email: ${email}`,
+      body: `email: ${email}${attrLines ? `\n\nsource:\n${attrLines}` : ''}`,
       labels: ['waitlist'],
     }),
   })
@@ -84,8 +107,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'invalid_email' })
   }
 
+  const attribution = pickAttribution(body)
+
   try {
-    const stored = (await storeKV(email)) || (await storeGitHubIssue(email))
+    const stored = (await storeKV(email, attribution)) || (await storeGitHubIssue(email, attribution))
     if (!stored) {
       // No backend wired yet — be honest, don't claim a save.
       return res.status(503).json({ ok: false, error: 'not_configured' })

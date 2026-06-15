@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1270" height="760" viewBox="0 0 1270 760" role="img" aria-label="One current doc, not a repo reread. Without trovex an agent reads six markdown files, tokens climbing. With trovex it gets one path and line with a canonical fresh marker.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1270" height="760" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1270" height="6" fill="#22c55e"/>
+  <text class="mono" x="64" y="70" font-size="26" fill="#7c8798">trovex</text>
+
+  <!-- hook line -->
+  <text class="sans" x="64" y="150" font-size="48" font-weight="700" fill="#e6edf3">one current doc, <tspan fill="#22c55e">not a repo reread.</tspan></text>
+
+  <line x1="635" y1="210" x2="635" y2="690" stroke="#1c2430" stroke-width="2"/>
+
+  <!-- LEFT: without -->
+  <text class="sans" x="64" y="250" font-size="24" font-weight="700" fill="#8b97a8" letter-spacing="0.05em">WITHOUT trovex</text>
+  <g class="mono" font-size="20" fill="#8b97a8">
+    <g>
+      <rect x="64" y="288" width="300" height="40" rx="7" fill="#10151e" stroke="#262f3d"/><text x="82" y="314">README.md</text>
+      <rect x="64" y="340" width="300" height="40" rx="7" fill="#10151e" stroke="#262f3d"/><text x="82" y="366">docs/architecture.md</text>
+      <rect x="64" y="392" width="300" height="40" rx="7" fill="#10151e" stroke="#262f3d"/><text x="82" y="418">api/v1.md</text>
+      <rect x="64" y="444" width="300" height="40" rx="7" fill="#10151e" stroke="#262f3d"/><text x="82" y="470">api/v2.md</text>
+      <rect x="64" y="496" width="300" height="40" rx="7" fill="#10151e" stroke="#262f3d"/><text x="82" y="522">CONTRIBUTING.md</text>
+      <rect x="64" y="548" width="300" height="40" rx="7" fill="#10151e" stroke="#262f3d"/><text x="82" y="574">CHANGELOG.md</text>
+    </g>
+  </g>
+  <text class="sans" x="410" y="430" font-size="26" font-weight="600" fill="#e0b341">reads 6 files</text>
+  <text class="sans" x="410" y="466" font-size="22" font-weight="400" fill="#9aa6b8">to guess which</text>
+  <text class="sans" x="410" y="494" font-size="22" font-weight="400" fill="#9aa6b8">is canonical</text>
+  <text class="mono" x="64" y="640" font-size="24" font-weight="600" fill="#cdd6e2">tokens ↑  ~720 / lookup</text>
+
+  <!-- RIGHT: with -->
+  <text class="sans" x="690" y="250" font-size="24" font-weight="700" fill="#22c55e" letter-spacing="0.05em">WITH trovex</text>
+  <rect x="690" y="300" width="180" height="48" rx="10" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
+  <text class="sans" x="780" y="331" font-size="22" font-weight="700" fill="#22c55e" text-anchor="middle">trovex</text>
+  <path d="M780 348 L780 388" stroke="#22c55e" stroke-width="2"/>
+  <path d="M774 382 L780 392 L786 382 Z" fill="#22c55e"/>
+  <rect x="690" y="400" width="500" height="150" rx="12" fill="#0e1a13" stroke="#22c55e" stroke-width="2"/>
+  <text class="mono" x="714" y="448" font-size="26" font-weight="600" fill="#e6edf3">api/v2.md<tspan fill="#22c55e">:42-58</tspan></text>
+  <g>
+    <circle cx="724" cy="486" r="6" fill="#22c55e"/>
+    <text class="sans" x="740" y="492" font-size="20" fill="#cdd6e2">canonical · fresh, updated 2h ago</text>
+  </g>
+  <text class="sans" x="714" y="528" font-size="20" fill="#9aa6b8">one section, not six files</text>
+  <text class="mono" x="690" y="640" font-size="24" font-weight="600" fill="#22c55e">tokens ↓  ~280 / lookup</text>
+</svg>

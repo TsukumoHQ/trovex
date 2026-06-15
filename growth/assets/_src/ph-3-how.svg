@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1270" height="760" viewBox="0 0 1270 760" role="img" aria-label="How it works in three steps. Index your repo. Your agent asks trovex a query. It gets one doc plus a freshness marker.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1270" height="760" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1270" height="6" fill="#22c55e"/>
+  <text class="mono" x="64" y="70" font-size="26" fill="#7c8798">trovex</text>
+
+  <text class="sans" x="64" y="150" font-size="46" font-weight="700" fill="#e6edf3">how it works</text>
+
+  <!-- step 1 -->
+  <rect x="64" y="250" width="350" height="300" rx="16" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+  <circle cx="104" cy="300" r="22" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
+  <text class="sans" x="104" y="308" font-size="24" font-weight="700" fill="#22c55e" text-anchor="middle">1</text>
+  <text class="sans" x="148" y="308" font-size="28" font-weight="700" fill="#e6edf3">index your repo</text>
+  <rect x="92" y="350" width="294" height="56" rx="8" fill="#0a0e17" stroke="#1c2430"/>
+  <text class="mono" x="112" y="386" font-size="22" fill="#22c55e">$ <tspan fill="#cdd6e2">trovex index .</tspan></text>
+  <text class="sans" x="92" y="450" font-size="22" fill="#9aa6b8">reads your .md once,</text>
+  <text class="sans" x="92" y="480" font-size="22" fill="#9aa6b8">on-device embeddings,</text>
+  <text class="sans" x="92" y="510" font-size="22" fill="#9aa6b8">into local SQLite.</text>
+
+  <!-- arrow -->
+  <path d="M430 400 L450 400" stroke="#3a4456" stroke-width="3"/>
+  <path d="M444 393 L456 400 L444 407 Z" fill="#3a4456"/>
+
+  <!-- step 2 -->
+  <rect x="460" y="250" width="350" height="300" rx="16" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+  <circle cx="500" cy="300" r="22" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
+  <text class="sans" x="500" y="308" font-size="24" font-weight="700" fill="#22c55e" text-anchor="middle">2</text>
+  <text class="sans" x="544" y="308" font-size="28" font-weight="700" fill="#e6edf3">agent asks</text>
+  <rect x="488" y="350" width="294" height="56" rx="8" fill="#0a0e17" stroke="#1c2430"/>
+  <text class="mono" x="506" y="386" font-size="18" fill="#cdd6e2">trovex(<tspan fill="#22c55e">"how does auth work?"</tspan>)</text>
+  <text class="sans" x="488" y="450" font-size="22" fill="#9aa6b8">over MCP or CLI,</text>
+  <text class="sans" x="488" y="480" font-size="22" fill="#9aa6b8">no API keys,</text>
+  <text class="sans" x="488" y="510" font-size="22" fill="#9aa6b8">runs on your machine.</text>
+
+  <!-- arrow -->
+  <path d="M826 400 L846 400" stroke="#3a4456" stroke-width="3"/>
+  <path d="M840 393 L852 400 L840 407 Z" fill="#3a4456"/>
+
+  <!-- step 3 -->
+  <rect x="856" y="250" width="350" height="300" rx="16" fill="#0e1a13" stroke="#22c55e" stroke-width="2"/>
+  <circle cx="896" cy="300" r="22" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
+  <text class="sans" x="896" y="308" font-size="24" font-weight="700" fill="#22c55e" text-anchor="middle">3</text>
+  <text class="sans" x="940" y="308" font-size="28" font-weight="700" fill="#e6edf3">gets one doc</text>
+  <rect x="884" y="350" width="294" height="100" rx="8" fill="#0a0e17" stroke="#22c55e" stroke-opacity="0.4"/>
+  <text class="mono" x="904" y="388" font-size="22" fill="#e6edf3">api/v2.md<tspan fill="#22c55e">:42-58</tspan></text>
+  <text class="sans" x="904" y="424" font-size="20" fill="#22c55e">● canonical · fresh</text>
+  <text class="sans" x="884" y="494" font-size="22" fill="#9aa6b8">one current section</text>
+  <text class="sans" x="884" y="524" font-size="22" fill="#9aa6b8">+ freshness marker.</text>
+
+  <text class="sans" x="64" y="650" font-size="28" font-weight="400" fill="#7c8798">one section instead of six files · <tspan fill="#22c55e" font-weight="600">~60% fewer tokens per lookup</tspan></text>
+</svg>

@@ -34,6 +34,7 @@ export type EventName =
   | 'compare_clicked'
   | 'answers_clicked'
   | 'setup_clicked'
+  | 'section_viewed'
 
 type Props = Record<string, string>
 
@@ -146,4 +147,38 @@ export function track(event: EventName, props: Props = {}): void {
 /** Call once on mount: the landing_view event carrying GEO/channel attribution. */
 export function trackLandingView(): void {
   track('landing_view')
+}
+
+/**
+ * Scroll-depth: fire `section_viewed` once per landing section as it scrolls in.
+ * Keys off each `<section>`'s id or first class token (a stable, closed-ish name),
+ * so it needs no markup change in App.tsx (cro-lead owns that file). Powers the
+ * scroll-depth / hero-pass / FAQ experiments (#7, #10 in the experiment backlog).
+ * No-op if IntersectionObserver is unavailable. Returns a cleanup function.
+ */
+export function trackSectionViews(): () => void {
+  if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
+    return () => {}
+  }
+  const sections = Array.from(document.querySelectorAll('main section'))
+  const seen = new Set<string>()
+  const nameOf = (el: Element): string => {
+    const raw = el.id || (el.className || '').toString().split(/\s+/)[0] || 'unknown'
+    return raw.toLowerCase().slice(0, 32)
+  }
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue
+        const name = nameOf(e.target)
+        if (seen.has(name)) continue
+        seen.add(name)
+        track('section_viewed', { section: name })
+        io.unobserve(e.target)
+      }
+    },
+    { threshold: 0.4 },
+  )
+  sections.forEach((s) => io.observe(s))
+  return () => io.disconnect()
 }

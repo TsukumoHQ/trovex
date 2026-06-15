@@ -22,6 +22,26 @@
       href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!--
+      Privacy-respecting analytics (Plausible): cookieless, no consent banner, no PII.
+      Served first-party via /js/script.js + /api/event (see vercel.json rewrites) so
+      ad-blockers don't drop our dev audience. Plausible auto-skips localhost.
+      Swap-out point: replace this block to change provider — web/src/analytics.ts is
+      provider-agnostic and no-ops until window.plausible exists.
+    -->
+    <script
+      defer
+      data-domain="trovex.dev"
+      data-api="/api/event"
+      src="/js/script.js"
+    ></script>
+    <script>
+      window.plausible =
+        window.plausible ||
+        function () {
+          ;(window.plausible.q = window.plausible.q || []).push(arguments)
+        }
+    </script>
   </head>
   <body>
     <div id="root"></div>

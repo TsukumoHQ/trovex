@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { track, trackLandingView } from './analytics'
 
 const REPO = 'https://github.com/Synergix-lab/trovex'
 const reduceMotion =
@@ -71,17 +72,27 @@ function useInView(ref: React.RefObject<HTMLElement | null>, threshold = 0.3) {
   return on
 }
 
-function Cmd({ text }: { text: string }) {
+function Cmd({ text, location }: { text: string; location: string }) {
   const [done, setDone] = useState(false)
+  const command = text.includes('index') ? 'index' : text.includes('serve') ? 'serve' : 'other'
   return (
     <span className="cmd">
       <span className="p">$</span>
       <code>{text}</code>
-      <button onClick={() => navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500) })} aria-label="Copy command">
+      <button onClick={() => {
+        track('command_copied', { command, location })
+        navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500) })
+      }} aria-label="Copy command">
         {done ? 'copied' : 'copy'}
       </button>
     </span>
   )
+}
+
+/* analytics: a Get-Trovex button is both a CTA and an outbound GitHub click. */
+function getTrovexClick(location: string) {
+  track('cta_clicked', { cta_id: 'get-trovex', location })
+  track('github_clicked', { location })
 }
 
 const Github = (
@@ -254,6 +265,7 @@ const FEATURES = [
 
 export default function App() {
   useReveal()
+  useEffect(() => { trackLandingView() }, [])
   return (
     <>
       <div className="stage-glow" />
@@ -263,9 +275,9 @@ export default function App() {
         <div className="nav-in">
           <a className="brand" href="/">trovex</a>
           <span className="sp" />
-          <a className="lk hide" href="#tour">Product</a>
-          <a className="lk" href={REPO} target="_blank" rel="noreferrer">GitHub</a>
-          <a className="btn btn-primary nav-cta" href={REPO} target="_blank" rel="noreferrer">Get Trovex</a>
+          <a className="lk hide" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'nav' })}>Product</a>
+          <a className="lk" href={REPO} target="_blank" rel="noreferrer" onClick={() => track('github_clicked', { location: 'nav' })}>GitHub</a>
+          <a className="btn btn-primary nav-cta" href={REPO} target="_blank" rel="noreferrer" onClick={() => getTrovexClick('nav')}>Get Trovex</a>
         </div>
       </nav>
 
@@ -280,10 +292,10 @@ export default function App() {
               <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
             </p>
             <div className="hero-cta">
-              <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">{Github} Get Trovex</a>
-              <a className="btn btn-ghost" href="#tour">See it work</a>
+              <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer" onClick={() => getTrovexClick('hero')}>{Github} Get Trovex</a>
+              <a className="btn btn-ghost" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'hero' })}>See it work</a>
             </div>
-            <Cmd text="uv run trovex serve" />
+            <Cmd text="uv run trovex serve" location="hero" />
           </div>
           <HeroWindow />
         </section>
@@ -349,9 +361,9 @@ export default function App() {
               <h2>Give your agents one source of truth.</h2>
               <p>Point Trovex at your repo. Your agents stop guessing in about a minute.</p>
               <div className="hero-cta">
-                <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">{Github} Get Trovex</a>
+                <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer" onClick={() => getTrovexClick('cta')}>{Github} Get Trovex</a>
               </div>
-              <Cmd text="uv run trovex index /path/to/repo" />
+              <Cmd text="uv run trovex index /path/to/repo" location="cta" />
               <p className="cta-note">No cloud, no API keys. Your docs never leave your machine.</p>
             </div>
           </div>
@@ -364,8 +376,8 @@ export default function App() {
           <a className="brand" href="/">trovex</a>
           <span className="sp" />
           <nav className="lks">
-            <a href="#tour">Product</a>
-            <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
+            <a href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'footer' })}>Product</a>
+            <a href={REPO} target="_blank" rel="noreferrer" onClick={() => track('github_clicked', { location: 'footer' })}>GitHub</a>
           </nav>
           <small>© 2026 Synergix · one source of truth for your agents' docs</small>
         </div>

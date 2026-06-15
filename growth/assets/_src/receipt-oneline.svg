@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="My coding agents stopped rereading the repo. About 60 percent fewer tokens on doc lookups, same answers. trovex.dev">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1080" height="1080" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1080" height="8" fill="#22c55e"/>
+
+  <text class="mono" x="80" y="150" font-size="32" fill="#7c8798">trovex · receipt</text>
+
+  <g class="sans" fill="#e6edf3" font-weight="700" font-size="72">
+    <text x="80" y="430">my coding agents</text>
+    <text x="80" y="520">stopped rereading</text>
+    <text x="80" y="610">the repo.</text>
+  </g>
+
+  <text class="sans" x="80" y="730" font-size="38" font-weight="400" fill="#9aa6b8"><tspan fill="#22c55e" font-weight="600">~60% fewer tokens</tspan> on doc lookups.</text>
+  <text class="sans" x="80" y="784" font-size="38" font-weight="400" fill="#9aa6b8">same answers.</text>
+
+  <line x1="80" y1="934" x2="1000" y2="934" stroke="#1c2430" stroke-width="2"/>
+  <text class="mono" x="80" y="994" font-size="30" fill="#7c8798">trovex.dev</text>
+  <text class="mono" x="1000" y="994" font-size="26" fill="#5a6577" text-anchor="end">$ uv run trovex serve</text>
+</svg>

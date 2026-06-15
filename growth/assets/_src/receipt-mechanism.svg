@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="trovex receipt. Before: rereads several markdown files to guess, about 720 tokens. After: one canonical section by path and line, about 280 tokens. About 60 percent fewer tokens, same answer on doc lookups. trovex.dev">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1080" height="1080" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1080" height="8" fill="#22c55e"/>
+
+  <!-- header -->
+  <text class="mono" x="80" y="150" font-size="34" fill="#7c8798">trovex · receipt</text>
+  <line x1="80" y1="184" x2="1000" y2="184" stroke="#1c2430" stroke-width="2"/>
+
+  <!-- BEFORE row -->
+  <text class="sans" x="80" y="282" font-size="30" font-weight="700" fill="#8b97a8" letter-spacing="0.06em">BEFORE</text>
+  <text class="sans" x="80" y="324" font-size="25" font-weight="400" fill="#7c8798">rereads several .md to guess which is current</text>
+  <rect x="80" y="352" width="640" height="38" rx="6" fill="#1a212c"/>
+  <text class="mono" x="1000" y="382" font-size="30" font-weight="600" fill="#cdd6e2" text-anchor="end">~720 tokens</text>
+
+  <!-- AFTER row -->
+  <text class="sans" x="80" y="492" font-size="30" font-weight="700" fill="#22c55e" letter-spacing="0.06em">AFTER</text>
+  <text class="sans" x="80" y="534" font-size="25" font-weight="400" fill="#9aa6b8">one canonical section — path:line + freshness</text>
+  <rect x="80" y="562" width="250" height="38" rx="6" fill="#22c55e"/>
+  <text class="mono" x="1000" y="592" font-size="30" font-weight="600" fill="#22c55e" text-anchor="end">~280 tokens</text>
+
+  <!-- headline number -->
+  <text class="sans" x="80" y="762" font-size="92" font-weight="700" fill="#e6edf3">~60%<tspan dx="24" font-size="52" font-weight="600" fill="#22c55e">fewer tokens</tspan></text>
+  <text class="sans" x="80" y="820" font-size="32" font-weight="400" fill="#9aa6b8">same answer, on doc lookups</text>
+
+  <!-- footer -->
+  <line x1="80" y1="934" x2="1000" y2="934" stroke="#1c2430" stroke-width="2"/>
+  <text class="mono" x="80" y="994" font-size="30" fill="#7c8798">trovex.dev</text>
+  <text class="sans" x="1000" y="994" font-size="25" fill="#5a6577" text-anchor="end">one source of truth for your agents</text>
+</svg>

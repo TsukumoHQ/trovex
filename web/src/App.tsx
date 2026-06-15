@@ -379,6 +379,7 @@ export default function App() {
           <nav className="lks">
             <a href="#tour">Product</a>
             <a href="/vs/">Compare</a>
+            <a href="/answers/">Answers</a>
             <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
           </nav>
           <small>© 2026 trovex · one source of truth for your agents' docs</small>

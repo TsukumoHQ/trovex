@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/shared-source-of-truth-multiple-agents/" />
+  <title>How do I keep multiple AI agents working from the same docs?</title>
+  <meta name="description" content="Give every agent one shared read-and-write point instead of separate copies. When one agent records what it learns through a single store, the others read it back instead of re-deriving it — a single source of truth by construction, no syncing." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/shared-source-of-truth-multiple-agents/" />
+  <meta property="og:title" content="How do I keep multiple AI agents working from the same docs?" />
+  <meta property="og:description" content="One shared read-and-write point instead of separate copies — a single source of truth by construction, no syncing." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Keep multiple AI agents on the same docs" />
+  <meta name="twitter:description" content="One shared read-and-write point — a single source of truth by construction." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Keep multiple agents on the same docs", "item": "https://trovex.dev/answers/shared-source-of-truth-multiple-agents/" }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I keep multiple AI agents working from the same docs?",
+          "text": "I run several AI coding agents (and a couple of teammates do too) on the same repo. How do I keep them all working from the same, current docs instead of drifting copies?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/shared-source-of-truth-multiple-agents/",
+            "text": "Give every agent one shared point to both read and write, instead of separate copies each maintains on its own. When one agent records what it learns — an incident, a decision, a fix that worked — through a single store, every other agent and teammate reads that same record back instead of re-deriving it. Because there is one point of passage for reads and writes, there are no copies to drift and nothing to sync: it is a single source of truth by construction. trovex implements this as a local MCP server with a shared write path, so a fleet of agents and the people around them all see the same canonical, current docs."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Same docs for multiple agents
+    </nav>
+
+    <h1>How do I keep multiple AI agents working from the same docs?</h1>
+
+    <div class="verdict">
+      <div class="l">Direct answer</div>
+      <p>Give every agent <strong>one shared point to both read and write</strong>, instead of separate copies each maintains. When one agent records what it learns through a single store, every other agent and teammate reads that record back instead of re-deriving it. With one point of passage for reads and writes there are no copies to drift and nothing to sync — a <strong>single source of truth by construction</strong>.</p>
+    </div>
+
+    <h2>Why do agents drift apart?</h2>
+    <p class="lead-answer">Because each one builds its own private context. Agent A figures out the rollback steps; Agent B, in another session, re-derives them from scratch; a teammate's agent reads an older doc and contradicts both. There's no shared memory, so the same work is repeated and the answers diverge. Static files like a hand-maintained CLAUDE.md don't fix this — they're one more copy to keep current by hand.</p>
+
+    <h2>What does a shared source of truth need?</h2>
+    <ul>
+      <li><strong>One read path.</strong> Every agent asks the same store and gets the same canonical answer, with a freshness marker.</li>
+      <li><strong>One write path.</strong> When an agent learns something, it records it once, in the same store the others read.</li>
+      <li><strong>No sync step.</strong> Because reads and writes pass through one point, there are no copies to reconcile.</li>
+    </ul>
+
+    <h2>How trovex does it</h2>
+    <p class="lead-answer"><a href="/">trovex</a> is an open-source, local-first MCP server with exactly this shared write path. Agents record incidents, decisions, and notes through it, and every other agent — and your teammates — read them back as canonical, current docs. It runs on your machine (SQLite + ONNX, no cloud or keys). Keeping a fleet of agents working from one source of truth at scale is also where many teams want a hand — see <a href="/">trovex.dev</a>.</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/stop-agent-rereading-docs/">How do I stop my agent rereading the same files every session?</a></li>
+        <li><a href="/vs/claude-md/">trovex vs CLAUDE.md / AGENTS.md</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>One source of truth for your whole fleet.</h2>
+      <p>Point trovex at your repo and let every agent read and write through one store.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix</small>
+    </div>
+  </footer>
+</body>
+</html>

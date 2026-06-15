@@ -45,6 +45,101 @@
       href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Structured data: entity graph mirrors visible content. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://trovex.dev/#organization",
+          "name": "Synergix",
+          "url": "https://trovex.dev/",
+          "logo": "https://trovex.dev/favicon.svg",
+          "sameAs": [
+            "https://github.com/Synergix-lab/trovex"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://trovex.dev/#website",
+          "url": "https://trovex.dev/",
+          "name": "trovex",
+          "description": "The canonical doc store for your coding agents. One source of truth, about 60% fewer tokens per lookup.",
+          "publisher": { "@id": "https://trovex.dev/#organization" },
+          "inLanguage": "en"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://trovex.dev/#software",
+          "name": "trovex",
+          "url": "https://trovex.dev/",
+          "applicationCategory": "DeveloperApplication",
+          "applicationSubCategory": "Context / memory infrastructure for AI coding agents (MCP server + CLI)",
+          "operatingSystem": "macOS, Linux, Windows",
+          "softwareVersion": "0.11.0",
+          "softwareRequirements": "Python >= 3.11",
+          "downloadUrl": "https://github.com/Synergix-lab/trovex",
+          "installUrl": "https://github.com/Synergix-lab/trovex",
+          "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+          "isAccessibleForFree": true,
+          "description": "trovex indexes a repo's markdown and serves AI coding agents the single current doc that answers a query (a path:line pointer with a freshness marker) instead of letting them reread the repo to guess which file is canonical. Same answers, about 60% fewer tokens per lookup. Local-first: vectors in SQLite, ONNX embeddings, no cloud or API keys.",
+          "featureList": [
+            "Serves one canonical answer per query with freshness markers (canonical / stale / duplicate), not a pile of candidate chunks",
+            "Section-level reads: returns the paragraph that answers, not the whole file",
+            "Shared write path: one agent records what it learns, every agent and teammate reads it back (single source of truth)",
+            "Local-first: vectors in SQLite, ONNX embeddings, no cloud or API keys"
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "author": { "@id": "https://trovex.dev/#organization" },
+          "publisher": { "@id": "https://trovex.dev/#organization" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://trovex.dev/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Why not just a CLAUDE.md or AGENTS.md?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Those are one static file. They go stale, don't scale past a handful of topics, and can't route a question to the right doc or section. Trovex keeps many docs canonical and serves the one that answers."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "My context window is huge. Why bother?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The cost compounds: every session, every agent, every teammate. And a big window isn't a current one. Trovex serves the right doc, cheaply, every time."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is it another service to run?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "One local process. Run trovex serve, point your agent at it, and you're set in about a minute. No cloud, no keys."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does my code leave my machine?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. Indexing and embeddings run locally in SQLite and ONNX. Nothing is sent anywhere."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

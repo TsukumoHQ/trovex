@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/claude-md/" />
+  <title>trovex vs CLAUDE.md / AGENTS.md — when a static instructions file stops scaling</title>
+  <meta name="description" content="CLAUDE.md and AGENTS.md are one static instructions file your agent auto-loads. They're great for a short, stable set of project rules — but they go stale, don't scale past a handful of topics, and can't route a question to the right doc. Here's how trovex compares." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/claude-md/" />
+  <meta property="og:title" content="trovex vs CLAUDE.md / AGENTS.md" />
+  <meta property="og:description" content="A static instructions file is great for a few stable rules. Here's where it stops scaling — and how trovex serves one canonical, current doc per query instead." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs CLAUDE.md / AGENTS.md" />
+  <meta name="twitter:description" content="When a static instructions file stops scaling, and how trovex compares." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs CLAUDE.md / AGENTS.md", "item": "https://trovex.dev/vs/claude-md/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and CLAUDE.md?",
+            "acceptedAnswer": { "@type": "Answer", "text": "CLAUDE.md is one static markdown file your agent loads in full every session. trovex indexes many docs and serves the single current one that answers a given query, with a freshness marker, instead of loading everything up front. CLAUDE.md is a fixed blob; trovex routes a question to the right doc and section." }
+          },
+          {
+            "@type": "Question",
+            "name": "Should I replace my CLAUDE.md with trovex?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Not necessarily. Keep a short CLAUDE.md or AGENTS.md for a handful of stable, always-relevant rules (build commands, conventions). Add trovex when your real knowledge lives across many markdown files that go stale and don't fit in one blob. They work well together." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does CLAUDE.md scale to a large set of docs?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Not well. A single file has to be loaded whole, so every topic you add costs tokens on every session, and it can't route a question to the right doc or signal which copy is current. trovex serves one canonical answer per query, so cost scales with the question, not the size of the corpus." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Comparisons</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs CLAUDE.md
+    </nav>
+
+    <h1>trovex vs <span class="ac">CLAUDE.md / AGENTS.md</span></h1>
+    <p class="deck">A static instructions file is the right tool for a few stable rules. Here's where it stops scaling — and what trovex does instead.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>CLAUDE.md and AGENTS.md are one static markdown file your agent loads in full every session. They're great for a short, stable set of project rules. They go stale, don't scale past a handful of topics, and can't route a question to the right doc or section. trovex indexes many docs and serves the single current one that answers a query — a <code>path:line</code> pointer with a freshness marker — for about <strong>60% fewer tokens per lookup</strong>. The two work well together: keep a small CLAUDE.md, let trovex carry the corpus.</p>
+    </div>
+
+    <h2>What are CLAUDE.md and AGENTS.md?</h2>
+    <p class="lead-answer">They are convention files an AI coding agent reads at the start of a session — <code>CLAUDE.md</code> for Claude Code, <code>AGENTS.md</code> as the cross-tool equivalent picked up by editors like Cursor and others. You write your project's rules and context into one markdown file, and the agent loads the whole thing into its context window. For a tight, rarely-changing set of instructions — build commands, code style, "always run the tests" — that's a clean, zero-infrastructure fit.</p>
+
+    <h2>Where does a single static file stop working?</h2>
+    <p class="lead-answer">When your real knowledge outgrows one file. A static blob has three structural limits:</p>
+    <ul>
+      <li><strong>It goes stale.</strong> The file is a copy. When the underlying runbook, ADR, or README changes, the blob doesn't, and nothing flags the drift. Your agent reads confident, outdated instructions.</li>
+      <li><strong>It doesn't scale.</strong> One file is loaded whole, so every topic you add costs tokens on every session for every agent — whether or not the question needed it.</li>
+      <li><strong>It can't route.</strong> There's no "which doc answers this?" step. The agent gets the same fixed text for every query and still has to go reread the repo to find specifics.</li>
+    </ul>
+
+    <h2>How is trovex different?</h2>
+    <p class="lead-answer">trovex indexes your repo's markdown and answers a query with the <strong>one canonical doc</strong> that addresses it, down to the section — not a fixed blob, and not a pile of files to sift. Each result carries a freshness marker (canonical / stale / duplicate), so the stale and duplicate copies never reach the agent's context. An agent that learns something writes it back through one shared point, so every other agent and teammate reads the same source of truth. Cost scales with the question, not the size of your docs.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>CLAUDE.md / AGENTS.md vs trovex, feature by feature</caption>
+        <thead>
+          <tr><th scope="col">Capability</th><th scope="col">CLAUDE.md / AGENTS.md</th><th scope="col" class="trovex">trovex</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="feat">Setup</td><td>Write one file <span class="yes">✓ zero infra</span></td><td>One local process, ~1-minute install</td></tr>
+          <tr><td class="feat">Routes a query to the right doc</td><td class="no">— fixed text for every query</td><td><span class="yes">✓</span> one canonical answer per query</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">— no staleness signal</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">Section-level reads</td><td class="no">— whole file, every time</td><td><span class="yes">✓</span> serves the section that answers</td></tr>
+          <tr><td class="feat">Scales to many docs</td><td class="no">— one blob, loaded whole</td><td><span class="yes">✓</span> cost scales with the question</td></tr>
+          <tr><td class="feat">Shared write-back (SSOT)</td><td class="no">— hand-edited</td><td><span class="yes">✓</span> agents record once, all read it</td></tr>
+          <tr><td class="feat">Tokens per lookup</td><td>Full file each session</td><td><span class="yes">~60% fewer</span> vs rereading the top stale files</td></tr>
+          <tr><td class="feat">Runs locally, no keys</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span> SQLite + ONNX, no cloud</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When is CLAUDE.md the right choice?</h2>
+    <p class="lead-answer">When your context fits in a page and rarely changes. A small project, a fixed set of conventions, a solo repo with three docs — a static file is simpler and you should use it. trovex earns its place when knowledge lives across many markdown files that drift, when several agents or teammates need the same current answer, or when you're paying tokens to reread the repo every session to figure out which doc is canonical. Most teams end up with both: a short CLAUDE.md for rules, trovex for the corpus.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">What is the difference between trovex and CLAUDE.md?</p>
+        <p class="faq-a">CLAUDE.md is one static markdown file your agent loads in full every session. trovex indexes many docs and serves the single current one that answers a given query, with a freshness marker, instead of loading everything up front. CLAUDE.md is a fixed blob; trovex routes a question to the right doc and section.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Should I replace my CLAUDE.md with trovex?</p>
+        <p class="faq-a">Not necessarily. Keep a short CLAUDE.md or AGENTS.md for a handful of stable, always-relevant rules (build commands, conventions). Add trovex when your real knowledge lives across many markdown files that go stale and don't fit in one blob. They work well together.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does CLAUDE.md scale to a large set of docs?</p>
+        <p class="faq-a">Not well. A single file has to be loaded whole, so every topic you add costs tokens on every session, and it can't route a question to the right doc or signal which copy is current. trovex serves one canonical answer per query, so cost scales with the question, not the size of the corpus.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Give your agents one current answer per query.</h2>
+      <p>Point trovex at your repo. Your agents stop rereading it in about a minute.</p>
+      <div class="cmd mono">$ uv run trovex index /path/to/repo</div>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/repomix/">trovex vs repomix / files-to-prompt</a> — packing the whole repo into a prompt vs serving one answer</li>
+        <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a> — a ranked list of chunks vs one canonical doc</li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

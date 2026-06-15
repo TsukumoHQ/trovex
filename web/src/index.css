@@ -328,6 +328,12 @@ a { color: inherit; text-decoration: none; }
 .faq-a code { font-family: var(--font-mono); font-size: 13px; color: var(--fg); background: var(--bg-input); padding: 1px 6px; border-radius: 4px; }
 
 
+/* consulting band — quiet, earned */
+.consult-band { padding: clamp(28px, 4vw, 44px) 0 0; }
+.consult { text-align: center; margin: 0; font-size: 15px; color: var(--fg-subtle); }
+.consult a { color: var(--fg-muted); border-bottom: 1px solid var(--border-strong); padding-bottom: 1px; transition: color .15s, border-color .15s; }
+.consult a:hover { color: var(--accent); border-color: var(--accent); }
+
 /* footer */
 .footer { border-top: 1px solid var(--border); padding: 40px 0 64px; margin-top: clamp(72px, 10vw, 120px); }
 .footer-in { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }

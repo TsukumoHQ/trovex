@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="trovex — now in private beta. One canonical doc for your coding agents, about 60% fewer tokens. Request access at trovex.dev.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+    <linearGradient id="scrim" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0a0e17" stop-opacity="0.98"/>
+      <stop offset="0.55" stop-color="#0a0e17" stop-opacity="0.88"/>
+      <stop offset="1" stop-color="#0a0e17" stop-opacity="0.35"/>
+    </linearGradient>
+    <linearGradient id="vscrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a0e17" stop-opacity="0.5"/>
+      <stop offset="0.35" stop-color="#0a0e17" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0a0e17" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#0a0e17"/>
+  <image href="og-backdrop.png" x="0" y="0" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="1200" height="630" fill="url(#scrim)"/>
+  <rect width="1200" height="630" fill="url(#vscrim)"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#22c55e"/>
+
+  <!-- private beta pill -->
+  <g>
+    <rect x="80" y="116" width="250" height="48" rx="24" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
+    <circle cx="108" cy="140" r="6" fill="#22c55e"/>
+    <text class="mono" x="126" y="148" font-size="22" fill="#cdd6e2">private beta</text>
+  </g>
+
+  <g class="sans">
+    <text x="80" y="290" font-size="74" font-weight="700" fill="#e6edf3">One canonical doc for</text>
+    <text x="80" y="378" font-size="74" font-weight="700" fill="#e6edf3">your <tspan fill="#22c55e">coding agents</tspan>.</text>
+    <text x="80" y="452" font-size="32" font-weight="400" fill="#9aa6b8">Same answers, about <tspan fill="#e6edf3" font-weight="600">60% fewer tokens</tspan> per lookup.</text>
+  </g>
+
+  <!-- CTA -->
+  <g>
+    <rect x="80" y="500" width="340" height="64" rx="12" fill="#22c55e"/>
+    <text class="sans" x="250" y="541" font-size="28" font-weight="700" fill="#06210f" text-anchor="middle">request beta access</text>
+    <text class="mono" x="446" y="541" font-size="26" fill="#7c8798">trovex.dev</text>
+  </g>
+</svg>

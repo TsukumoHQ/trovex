@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="trovex is in private beta. Request access at trovex.dev. One canonical doc for your coding agents, about 60% fewer tokens.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1080" height="1080" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1080" height="8" fill="#22c55e"/>
+
+  <!-- wordmark + pill -->
+  <g transform="translate(80,110)">
+    <circle cx="16" cy="0" r="15" fill="none" stroke="#22c55e" stroke-opacity="0.32" stroke-width="2.5"/>
+    <circle cx="16" cy="0" r="8" fill="#22c55e"/>
+    <text class="mono" x="48" y="9" font-size="32" font-weight="600" fill="#e6edf3">trovex</text>
+  </g>
+  <g>
+    <rect x="80" y="180" width="250" height="50" rx="25" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
+    <circle cx="110" cy="205" r="6" fill="#22c55e"/>
+    <text class="mono" x="128" y="213" font-size="22" fill="#cdd6e2">private beta</text>
+  </g>
+
+  <text class="sans" x="80" y="430" font-size="100" font-weight="700" fill="#e6edf3">request</text>
+  <text class="sans" x="80" y="540" font-size="100" font-weight="700" fill="#22c55e">access.</text>
+
+  <text class="sans" x="80" y="640" font-size="36" font-weight="400" fill="#9aa6b8">one canonical doc for your coding agents —</text>
+  <text class="sans" x="80" y="690" font-size="36" font-weight="400" fill="#9aa6b8">same answers, <tspan fill="#e6edf3" font-weight="600">~60% fewer tokens</tspan> per lookup.</text>
+
+  <!-- CTA -->
+  <rect x="80" y="790" width="430" height="80" rx="14" fill="#22c55e"/>
+  <text class="mono" x="295" y="841" font-size="30" font-weight="600" fill="#06210f" text-anchor="middle">trovex.dev</text>
+
+  <line x1="80" y1="960" x2="1000" y2="960" stroke="#1c2430" stroke-width="2"/>
+  <text class="sans" x="80" y="1014" font-size="25" fill="#7c8798">local-first · open core · runs on your machine</text>
+</svg>

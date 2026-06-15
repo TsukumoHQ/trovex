@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="96" viewBox="0 0 360 96" role="img" aria-label="trovex">
+  <defs>
+    <style>.mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }</style>
+  </defs>
+  <!-- mark -->
+  <g transform="translate(24,24)">
+    <circle cx="24" cy="24" r="22" fill="none" stroke="#22c55e" stroke-opacity="0.32" stroke-width="3"/>
+    <circle cx="24" cy="24" r="11.5" fill="#22c55e"/>
+  </g>
+  <!-- wordmark -->
+  <text class="mono" x="92" y="62" font-size="46" font-weight="600" letter-spacing="0.01em" fill="#e6edf3">trovex</text>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="Want your own receipt? Run uv run trovex index your repo, run your agent for a day, then trovex search shows would-have-read versus actual. About 60 percent is what I measured on lookups. Measure yours. trovex.dev">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1080" height="1080" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1080" height="8" fill="#22c55e"/>
+
+  <text class="mono" x="80" y="150" font-size="32" fill="#7c8798">trovex · receipt</text>
+
+  <text class="sans" x="80" y="280" font-size="58" font-weight="700" fill="#e6edf3">want your own receipt?</text>
+
+  <!-- terminal block -->
+  <rect x="80" y="340" width="920" height="300" rx="14" fill="#0d1119" stroke="#1c2430" stroke-width="2"/>
+  <g class="mono" font-size="29">
+    <text x="116" y="410" fill="#22c55e">$ <tspan fill="#cdd6e2">uv run trovex index .</tspan></text>
+    <text x="116" y="464" fill="#5a6577"># run your agent for a day</text>
+    <text x="116" y="540" fill="#22c55e">$ <tspan fill="#cdd6e2">trovex search "..."</tspan></text>
+    <text x="116" y="594" fill="#5a6577"># shows would-have-read vs actual</text>
+  </g>
+
+  <text class="sans" x="80" y="740" font-size="36" font-weight="400" fill="#9aa6b8"><tspan fill="#22c55e" font-weight="600">~60%</tspan> is what i measured on lookups.</text>
+  <text class="sans" x="80" y="792" font-size="36" font-weight="400" fill="#9aa6b8">don't trust my number — measure yours.</text>
+
+  <line x1="80" y1="934" x2="1000" y2="934" stroke="#1c2430" stroke-width="2"/>
+  <text class="mono" x="80" y="994" font-size="30" fill="#7c8798">trovex.dev</text>
+  <text class="sans" x="1000" y="994" font-size="25" fill="#5a6577" text-anchor="end">open source · runs on your machine</text>
+</svg>

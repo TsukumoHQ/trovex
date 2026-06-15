@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="growth/assets/brand/readme-hero.png" alt="trovex — one canonical doc for your coding agents. Same answers, about 60% fewer tokens." width="100%">
+</p>
+
 # trovex
 
 **One source of truth for your coding agents' docs. Same answers, about 60% fewer tokens.**

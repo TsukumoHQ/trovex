@@ -114,21 +114,12 @@ second session that should remember the first, or a teammate. That's where re-de
 drift cost real time, and where keeping things consistent by hand stops scaling. If that's
 your situation, the shared write path is the point, not a footnote.
 
-## Try it
+## Request beta access
 
-```bash
-uv run trovex index /path/to/your/repo
-uv run trovex serve
-```
-
-Have one agent write a record (`trovex_write`), then have another ask the question it
-answers. The second one should get the answer back instead of working it out again. See the
-[quickstart](../../docs/quickstart.md) for wiring, and the
-[FAQ](../../docs/faq.md) for where this fits.
-
-It's open source: core under AGPL-3.0, CLI under MIT.
-[github.com/Synergix-lab/trovex](https://github.com/Synergix-lab/trovex) ·
-[trovex.dev](https://trovex.dev).
+trovex is in private beta. [Request access at trovex.dev](https://trovex.dev) and we'll get
+you set up. Then have one agent write a record (`trovex_write`) and another ask the question
+it answers, and watch the second one get the answer back instead of working it out again.
+It's licensed AGPL-3.0 (core) and MIT (CLI), and opens up more widely after the beta.
 
 If you're rolling agents out across a team and the drift-and-re-derivation tax is real,
 that's the kind of thing we help teams fix. Happy to talk.

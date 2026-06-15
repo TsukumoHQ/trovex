@@ -134,7 +134,8 @@ your code never leaves the machine.
 
 ## How do I measure this on my own repo?
 
-Don't trust the ~60%. Reproduce it.
+Don't trust the ~60%. Reproduce it. trovex is in private beta right now, so this runs once
+you have access (it's a one-minute local setup):
 
 ```bash
 uv sync
@@ -175,15 +176,11 @@ own existence.
 No. Indexing and embeddings run locally in SQLite and ONNX. Nothing is sent
 anywhere.
 
-## Try it
+## Request beta access
 
-```bash
-uv run trovex index /path/to/your/repo
-```
-
-It's open source: core under AGPL-3.0, CLI under MIT. Repo and docs:
-[github.com/Synergix-lab/trovex](https://github.com/Synergix-lab/trovex) ·
-[trovex.dev](https://trovex.dev).
+trovex is in private beta. [Request access at trovex.dev](https://trovex.dev) and we'll get
+you set up on your own repo, so you can run the numbers above yourself. It's licensed
+AGPL-3.0 (core) and MIT (CLI), and opens up more widely after the beta.
 
 If you're running agents across a team and the doc-rereading tax is a daily line
 item, that's the kind of thing we help teams fix. Happy to talk.

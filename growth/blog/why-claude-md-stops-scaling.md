@@ -82,20 +82,11 @@ doing its job; leave it. If it's scrolled into a sprawling knowledge dump where 
 sections are irrelevant to any given task and you're not sure which parts are still true,
 that's the signal. The file outgrew the format.
 
-## Try it
+## Request beta access
 
-```bash
-uv run trovex index /path/to/your/repo
-uv run trovex serve
-```
-
-Keep your `CLAUDE.md` small; point trovex at the rest. See the
-[quickstart](../../docs/quickstart.md) for wiring and the [FAQ](../../docs/faq.md) for how
-the two fit together.
-
-It's open source: core under AGPL-3.0, CLI under MIT.
-[github.com/Synergix-lab/trovex](https://github.com/Synergix-lab/trovex) ·
-[trovex.dev](https://trovex.dev).
+trovex is in private beta. [Request access at trovex.dev](https://trovex.dev) and we'll get
+you set up, so you can keep your `CLAUDE.md` small and let trovex carry the rest. It's
+licensed AGPL-3.0 (core) and MIT (CLI), and opens up more widely after the beta.
 
 If your team's CLAUDE.md has turned into an unmaintainable knowledge base, untangling that is
 the kind of thing we help teams with. Happy to talk.

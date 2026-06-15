@@ -40,3 +40,12 @@ uv run trovex serve  # MCP at /mcp, UI at /
 ## Production
 
 Deployed at `trovex.prod.synergix.ch` via Traefik. See `docker/` for the image.
+
+## License
+
+Trovex is licensed under the **GNU AGPL-3.0-or-later** (see [`LICENSE`](LICENSE)).
+You can self-host and modify it freely; if you run a modified version as a network
+service, AGPL requires you to share your changes.
+
+Need it under different terms, or want help running agents well across your team?
+**Rolling agents out at scale is what we do — [get in touch](https://trovex.dev).**

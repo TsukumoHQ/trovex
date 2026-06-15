@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="trovex">
+  <rect width="180" height="180" rx="40" fill="#0a0e17"/>
+  <circle cx="90" cy="90" r="58" fill="none" stroke="#22c55e" stroke-opacity="0.32" stroke-width="8"/>
+  <circle cx="90" cy="90" r="30" fill="#22c55e"/>
+</svg>

@@ -26,3 +26,7 @@ fastembed_cache/
 *.local.yaml
 
 .worktrees/
+.env.*
+*.env
+secrets/
+*.key

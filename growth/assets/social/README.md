@@ -25,9 +25,8 @@ All 1080×1080 (square = best reshare on X / LinkedIn / Slack / Discord).
 - Representative illustrations, not a specific customer's receipt. For a real post, prefer a
   screenshot of the user's own savings dashboard when available (see the variants spec).
 
-## Superseded (pending removal)
-`receipt-weekly-card.png`, `receipt-before-after-card.png`, `receipt-hero-card.png` were an
-earlier gpt-image-1 pass (#38). They render the accent in **gold/tan, not the brand green
-`#22c55e`** (the image model ignored the hex), so they're off-brand. Flagged to cmo + social-lead
-for removal in favor of the crisp green set above. Kept for now to avoid deleting peer work
-without sign-off.
+## Note on accent color
+An earlier gpt-image-1 pass (#38) rendered these cards with a **gold/tan accent instead of brand
+green `#22c55e`** — image models ignore an exact hex. Those cards were removed (cmo-approved) in
+favor of the crisp green set above. Lesson: never let an image model render the brand color or text;
+composite both as SVG and rasterize with `resvg`. See memory `imagegen-brand-color-rule`.

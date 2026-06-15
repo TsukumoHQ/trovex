@@ -1,0 +1,19 @@
+[Unit]
+Description=trovex reindex — pull synergix_prod and reindex .md docs
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=synxadmin
+Group=synxadmin
+WorkingDirectory=/home/synxadmin/Exposemd
+EnvironmentFile=-/home/synxadmin/.trovex-data/env
+Environment=PATH=/home/synxadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=TROVEX_DATA_DIR=/home/synxadmin/.trovex-data
+Environment=FASTEMBED_CACHE_PATH=/home/synxadmin/.trovex-data/fastembed_cache
+Environment=HF_HOME=/home/synxadmin/.trovex-data/hf_cache
+ExecStartPre=-/usr/bin/git -C /home/synxadmin/synergix_prod fetch --quiet
+ExecStartPre=-/usr/bin/git -C /home/synxadmin/synergix_prod reset --hard origin/main
+ExecStartPre=-/usr/bin/git -C /home/synxadmin/obsidian/synergix-prod pull --quiet --rebase
+ExecStartPre=-/usr/bin/git -C /home/synxadmin/obsidian/synergix-dev pull --quiet --rebase
+ExecStart=/home/synxadmin/Exposemd/.venv/bin/trovex index

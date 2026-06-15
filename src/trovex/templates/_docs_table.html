@@ -1,0 +1,39 @@
+{% from "_partials.html" import status_pill, fresh_label, source_pill %}
+{% if rows %}
+<div class="table-wrap">
+  <table class="t">
+    <thead>
+      <tr>
+        <th>source</th>
+        <th>path</th>
+        <th>title</th>
+        <th>status</th>
+        <th style="text-align: right;">age</th>
+        <th style="text-align: right;">tokens</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ source_pill(r.source_id) }}</td>
+        <td class="path">
+          {% if r.source_id == 'trovex' %}
+          <a href="/doc/{{ r.path }}" title="view trovex-owned doc">{{ r.path[:12] }}…</a>
+          {% else %}
+          <a href="/search?q={{ r.title | urlencode }}" title="search this">{{ r.path }}</a>
+          {% endif %}
+        </td>
+        <td class="cell-faint" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis;">{{ r.title }}</td>
+        <td>{{ status_pill(r.status) }}</td>
+        <td class="num">{{ fresh_label(r.age_days) }}</td>
+        <td class="num">{{ "{:,}".format(r.tokens_est) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <div class="empty-title mono">no docs match these filters</div>
+</div>
+{% endif %}

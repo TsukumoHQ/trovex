@@ -18,7 +18,7 @@ data/
 *.db-shm
 *.db-wal
 fastembed_cache/
-.ctx-cache/
+.trovex-cache/
 
 # Local config
 .env

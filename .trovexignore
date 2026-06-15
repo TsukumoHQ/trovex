@@ -1,0 +1,20 @@
+# .trovexignore — files the trovex hooks leave alone (read/write raw on disk).
+# Everything else .md routes through trovex (trovex_search/trovex_read, trovex_write).
+# One glob per line; matched against repo-relative and absolute paths.
+
+# Repo + meta files you legitimately read/write directly
+README.md
+CHANGELOG.md
+LICENSE.md
+LICENSE
+REFONTE.md
+source.md
+*.example
+
+# Agent harness files the tooling reads directly
+**/CLAUDE.md
+**/AGENTS.md
+.claude/**
+
+# Build / site generators that consume markdown from disk
+docs/site/**

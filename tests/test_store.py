@@ -1,4 +1,4 @@
-"""v0.9 — ctx-owned store: write/read roundtrip, semantic routing, lifecycle.
+"""v0.9 — trovex-owned store: write/read roundtrip, semantic routing, lifecycle.
 
 Hermetic: a deterministic bag-of-words embedder (no OpenAI / no model download).
 """
@@ -13,11 +13,11 @@ import time
 import numpy as np
 import pytest
 
-from ctx.config import Settings, Source
-from ctx.indexer import Indexer
-from ctx.search import Searcher
-from ctx.status import compute_status
-from ctx.store import SqliteStore, extract_section
+from trovex.config import Settings, Source
+from trovex.indexer import Indexer
+from trovex.search import Searcher
+from trovex.status import compute_status
+from trovex.store import SqliteStore, extract_section
 
 DIM = 384
 
@@ -77,14 +77,14 @@ def test_get_unknown_returns_none(store):
 
 
 def test_read_by_query_routes_to_right_doc(settings, store):
-    """ctx_read's query path: search restricted to source_id='ctx' returns the
+    """trovex_read's query path: search restricted to source_id='trovex' returns the
     matching doc's ext_id, which the Store resolves to content."""
     auth = store.put("# Auth incident\n\njwt token signature validation failed")
     deploy = store.put("# Deploy rollback\n\nthe kubernetes pod crash looped")
 
     searcher = Searcher(settings, embedder=BagEmbedder())
-    results = searcher.search("jwt token signature", limit=1, source_ids=["ctx"])
-    assert results, "expected a ctx-owned match"
+    results = searcher.search("jwt token signature", limit=1, source_ids=["trovex"])
+    assert results, "expected a trovex-owned match"
     assert results[0].path == auth  # SearchResult.path holds the ext_id
     assert results[0].path != deploy
 
@@ -104,8 +104,8 @@ def test_record_not_stale_by_age(settings, store):
     assert store.get(living).status == "stale"
 
 
-def test_indexer_does_not_purge_ctx_docs(settings, store, tmp_path):
-    """The filesystem indexer must never delete ctx-owned docs (they have no
+def test_indexer_does_not_purge_trovex_docs(settings, store, tmp_path):
+    """The filesystem indexer must never delete trovex-owned docs (they have no
     file on disk). It only touches the source it scans."""
     ext_id = store.put("# Survives reindex", kind="record")
 
@@ -193,9 +193,9 @@ def test_delete_removes_doc_and_embedding(store):
     assert store.delete(eid) is True
     assert store.get(eid) is None
     # gone from the search index too (no ghost result)
-    from ctx.search import Searcher
+    from trovex.search import Searcher
     searcher = Searcher(store.settings, embedder=BagEmbedder())
-    assert searcher.search("temp doc", limit=5, source_ids=["ctx"]) == []
+    assert searcher.search("temp doc", limit=5, source_ids=["trovex"]) == []
     # idempotent: deleting again reports not-found
     assert store.delete(eid) is False
 

@@ -1,9 +1,0 @@
-[Unit]
-Description=ctx daily backup timer
-
-[Timer]
-OnCalendar=daily
-Persistent=true
-
-[Install]
-WantedBy=timers.target

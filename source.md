@@ -1,6 +1,6 @@
-# Sources & références — pipeline RAG / chunking de ctx
+# Sources & références — pipeline RAG / chunking de trovex
 
-> Inventaire de ce qui est **réellement implémenté** dans ctx, avec une référence-ancre
+> Inventaire de ce qui est **réellement implémenté** dans trovex, avec une référence-ancre
 > par technique. Voir la note finale : une bibliographie *exhaustive et causale* est
 > volontairement hors de portée (folklore d'ingénierie + churn des preprints).
 
@@ -8,10 +8,10 @@
 
 ## 1. Pipeline RAG
 
-Implémenté dans `src/ctx/store.py` (`search_chunks`), `src/ctx/rerank.py`,
-`src/ctx/embedder.py`, `src/ctx/db.py`.
+Implémenté dans `src/trovex/store.py` (`search_chunks`), `src/trovex/rerank.py`,
+`src/trovex/embedder.py`, `src/trovex/db.py`.
 
-| # | Technique | Ce que fait ctx | Fichier | Ancre |
+| # | Technique | Ce que fait trovex | Fichier | Ancre |
 |---|-----------|-----------------|---------|-------|
 | 1 | Embeddings denses | OpenAI `text-embedding-3-large` (3072-d) ; fallback local `fastembed` | `embedder.py` | doc fournisseur |
 | 2 | Index vectoriel ANN | `sqlite-vec` (table `vec0`, distance cosine, `MATCH … k=`) | `db.py`, `store.py` | lib `sqlite-vec` |
@@ -20,7 +20,7 @@ Implémenté dans `src/ctx/store.py` (`search_chunks`), `src/ctx/rerank.py`,
 | 5 | Filtrage métadonnées | post-fusion : `kind` / `source` / `tags` | `store.py` | — |
 | 6 | Small-to-big | récupère le chunk précis, expansion possible à la section entière via `section_text(doc_id, heading_path)` | `store.py` | LlamaIndex / LangChain (folklore) |
 | 7 | Rerank LLM listwise | top-20 candidats → réordonnés par `gpt-5.4-mini`, sortie JSON `{order:[…]}`, BYOK, best-effort (jamais bloquant) | `rerank.py` | RankGPT (listwise LLM rerank) |
-| 8 | Ranking status-aware | marqueurs ★ canonical / ◯ plan / ✗ stale / ⚠ duplicate injectés dans le prompt du reranker | `rerank.py` | **spécifique ctx** |
+| 8 | Ranking status-aware | marqueurs ★ canonical / ◯ plan / ✗ stale / ⚠ duplicate injectés dans le prompt du reranker | `rerank.py` | **spécifique trovex** |
 
 **Réglages empiriques** (pas dérivés d'un théorème) : `k0 = 60` (RRF, le « standard »),
 pool = `max(limit*6, 30)`, top-20 au reranker, `RERANK_TIMEOUT_SEC = 8`.
@@ -29,9 +29,9 @@ pool = `max(limit*6, 30)`, top-20 au reranker, `RERANK_TIMEOUT_SEC = 8`.
 
 ## 2. Stratégie de chunking
 
-Implémenté dans `src/ctx/chunking.py`.
+Implémenté dans `src/trovex/chunking.py`.
 
-| # | Technique | Ce que fait ctx | Ancre |
+| # | Technique | Ce que fait trovex | Ancre |
 |---|-----------|-----------------|-------|
 | 9 | Chunking **structure-aware** (markdown) | split sur les headings (pas de fenêtre fixe) ; breadcrumb de heading conservé par chunk | [2603.24556](https://arxiv.org/abs/2603.24556), [2606.00881](https://arxiv.org/abs/2606.00881) |
 | 10 | **Prefix-fusion** du breadcrumb | on embed `"titre > h1 > h2\n\nbody"` (contextual chunk headers) — gain principal | [2510.24402](https://arxiv.org/abs/2510.24402) ; cousin : Anthropic *Contextual Retrieval* |
@@ -63,7 +63,7 @@ Littérature de fond sur le problème : un agent ne lit que ce qu'il sait cherch
 - **[2509.02401](https://arxiv.org/html/2509.02401v1)** — *Towards Agents That Know When They Don't Know* : l'incertitude comme signal de contrôle, et ses limites.
 - **[2604.27283](https://arxiv.org/html/2604.27283)** — *Learning When to Remember: Risk-Sensitive Bandits for Abstention-Aware Memory Retrieval in Coding Agents* : l'injection inconditionnelle a un coût de faux positifs → pénaliser l'injection à tort plus fort que l'oubli.
 
-**Conséquence pour ctx** : quand l'agent est *confiant et faux*, aucun signal d'incertitude
+**Conséquence pour trovex** : quand l'agent est *confiant et faux*, aucun signal d'incertitude
 ne se déclenche → la récupération auto-déclenchée échoue précisément sur l'inconnu inconnu.
 D'où le design : injection **externe et inconditionnelle** d'une **carte légère** (titres + tags,
 pas le contenu — cf. coût des faux positifs ci-dessus). Endpoint : `/api/map`.

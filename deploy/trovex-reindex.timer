@@ -1,0 +1,11 @@
+[Unit]
+Description=Run trovex reindex every 10 minutes
+Requires=trovex-reindex.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+AccuracySec=30sec
+
+[Install]
+WantedBy=timers.target

@@ -70,10 +70,12 @@
 > candidates to sift.
 
 **5/ the before/after (the receipt)**
-> before: agent reads 3 files (~2,400 tokens) to guess the canonical deploy doc.
+> before: agent reads the top few candidate files (~720 tokens) to guess the
+> canonical deploy doc.
 > after: trovex serves the one current section (~280 tokens). same answer.
-> that's the ~60% line on the dashboard — it shows would-have-read vs actual.
-> [attach receipt screenshot here]
+> that's the ~60% fewer tokens on this lookup — the dashboard averages it across
+> every lookup (would-have-read vs actual).
+> [attach receipt screenshot here · use your own real numbers, don't invent them]
 
 **6/ section-level reads, not whole files**
 > it serves the two paragraphs that answer the query, not the entire file. the

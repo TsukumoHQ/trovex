@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-label="trovex labels every candidate doc: canonical is served, stale is demoted, duplicate is deduplicated. The agent gets the one canonical answer.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1200" height="760" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#22c55e"/>
+
+  <text class="sans" x="64" y="92" font-size="44" font-weight="700" fill="#e6edf3">one freshness marker per doc</text>
+  <text class="sans" x="64" y="134" font-size="24" font-weight="400" fill="#7c8798">trovex labels every candidate, then serves the one that's current</text>
+
+  <!-- candidate cards -->
+  <!-- canonical -->
+  <rect x="64" y="190" width="640" height="92" rx="12" fill="#0e1a13" stroke="#22c55e" stroke-width="2"/>
+  <text class="sans" x="96" y="248" font-size="34" fill="#22c55e">★</text>
+  <text class="mono" x="140" y="238" font-size="24" fill="#e6edf3">api/v2.md:42-58</text>
+  <text class="sans" x="140" y="266" font-size="19" fill="#9aa6b8">canonical · current, answers the query</text>
+  <text class="sans" x="688" y="244" font-size="22" font-weight="700" fill="#22c55e" text-anchor="end">served →</text>
+
+  <!-- stale -->
+  <rect x="64" y="298" width="640" height="92" rx="12" fill="#0f131b" stroke="#262f3d" stroke-width="1.5"/>
+  <text class="sans" x="96" y="356" font-size="34" fill="#7c8798">✗</text>
+  <text class="mono" x="140" y="346" font-size="24" fill="#9aa6b8">api/v1.md</text>
+  <text class="sans" x="140" y="374" font-size="19" fill="#7c8798">stale · superseded by a newer doc</text>
+  <text class="sans" x="688" y="352" font-size="20" fill="#7c8798" text-anchor="end">demoted</text>
+
+  <!-- duplicate -->
+  <rect x="64" y="406" width="640" height="92" rx="12" fill="#15130c" stroke="#3a3320" stroke-width="1.5"/>
+  <text class="sans" x="96" y="464" font-size="32" fill="#e0b341">⚠</text>
+  <text class="mono" x="140" y="454" font-size="24" fill="#cdd6e2">notes/api-copy.md</text>
+  <text class="sans" x="140" y="482" font-size="19" fill="#9aa6b8">duplicate · same content as canonical</text>
+  <text class="sans" x="688" y="460" font-size="20" fill="#e0b341" text-anchor="end">deduped</text>
+
+  <!-- arrow to result -->
+  <path d="M730 344 L800 344" stroke="#22c55e" stroke-width="2.5" fill="none"/>
+  <path d="M793 337 L805 344 L793 351 Z" fill="#22c55e"/>
+
+  <!-- result -->
+  <rect x="824" y="262" width="312" height="170" rx="14" fill="#0e1a13" stroke="#22c55e" stroke-width="2.5"/>
+  <text class="sans" x="980" y="312" font-size="22" font-weight="600" fill="#9aa6b8" text-anchor="middle">agent receives</text>
+  <text class="mono" x="980" y="356" font-size="26" font-weight="600" fill="#e6edf3" text-anchor="middle">★ api/v2.md</text>
+  <text class="sans" x="980" y="392" font-size="20" fill="#22c55e" text-anchor="middle">one canonical answer</text>
+  <text class="sans" x="980" y="416" font-size="18" fill="#7c8798" text-anchor="middle">not the candidate pile</text>
+
+  <text class="sans" x="64" y="588" font-size="24" font-weight="400" fill="#7c8798">no rereading six files to guess — <tspan fill="#e6edf3" font-weight="600">the marker is the answer</tspan></text>
+
+  <!-- legend -->
+  <g class="mono" font-size="19">
+    <text x="64" y="664" fill="#22c55e">★ canonical</text>
+    <text x="240" y="664" fill="#7c8798">✗ stale</text>
+    <text x="380" y="664" fill="#e0b341">⚠ duplicate</text>
+    <text x="560" y="664" fill="#6f7d92">◯ plan</text>
+  </g>
+  <text class="mono" x="1136" y="664" font-size="19" fill="#5a6577" text-anchor="end">trovex.dev</text>
+</svg>

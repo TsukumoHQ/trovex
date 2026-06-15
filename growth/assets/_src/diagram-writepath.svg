@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-label="The write path. One agent writes what it learns back as a canonical note; trovex keeps one current store; every other agent and teammate reads that one answer instead of re-deriving it.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+  </defs>
+  <rect width="1200" height="760" fill="#0a0e17"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#22c55e"/>
+
+  <text class="sans" x="64" y="92" font-size="44" font-weight="700" fill="#e6edf3">the write path</text>
+  <text class="sans" x="64" y="134" font-size="24" font-weight="400" fill="#7c8798">what one agent learns, the rest read — nobody re-derives it</text>
+
+  <!-- writer agent -->
+  <rect x="64" y="210" width="300" height="120" rx="14" fill="#11161f" stroke="#2a3342" stroke-width="1.5"/>
+  <text class="sans" x="88" y="252" font-size="24" font-weight="700" fill="#e6edf3">agent A</text>
+  <text class="sans" x="88" y="284" font-size="19" fill="#9aa6b8">figures out a thing once</text>
+  <text class="mono" x="88" y="312" font-size="17" fill="#22c55e">writes a canonical note</text>
+
+  <!-- write arrow -->
+  <path d="M364 270 L470 270" stroke="#22c55e" stroke-width="2.5" fill="none"/>
+  <path d="M463 263 L475 270 L463 277 Z" fill="#22c55e"/>
+  <text class="mono" x="417" y="256" font-size="18" fill="#22c55e" text-anchor="middle">write</text>
+
+  <!-- central store -->
+  <rect x="476" y="190" width="248" height="200" rx="16" fill="#0e1a13" stroke="#22c55e" stroke-width="2.5"/>
+  <text class="sans" x="600" y="252" font-size="30" font-weight="700" fill="#22c55e" text-anchor="middle">trovex</text>
+  <text class="sans" x="600" y="284" font-size="30" font-weight="700" fill="#22c55e" text-anchor="middle">store</text>
+  <text class="sans" x="600" y="324" font-size="19" fill="#9aa6b8" text-anchor="middle">one current answer</text>
+  <text class="sans" x="600" y="350" font-size="19" fill="#9aa6b8" text-anchor="middle">★ canonical, versioned</text>
+
+  <!-- read arrows -->
+  <path d="M724 250 L836 230" stroke="#7c8798" stroke-width="2.5" fill="none"/>
+  <path d="M829 226 L841 229 L833 239 Z" fill="#7c8798"/>
+  <path d="M724 320 L836 360" stroke="#7c8798" stroke-width="2.5" fill="none"/>
+  <path d="M831 350 L841 362 L827 363 Z" fill="#7c8798"/>
+  <text class="mono" x="788" y="276" font-size="18" fill="#7c8798" text-anchor="middle">read</text>
+
+  <!-- readers -->
+  <rect x="844" y="186" width="292" height="92" rx="12" fill="#11161f" stroke="#2a3342" stroke-width="1.5"/>
+  <text class="sans" x="868" y="228" font-size="23" font-weight="700" fill="#e6edf3">agent B, C…</text>
+  <text class="sans" x="868" y="258" font-size="18" fill="#9aa6b8">get the answer, skip the work</text>
+
+  <rect x="844" y="322" width="292" height="92" rx="12" fill="#11161f" stroke="#2a3342" stroke-width="1.5"/>
+  <text class="sans" x="868" y="364" font-size="23" font-weight="700" fill="#e6edf3">teammate / CI</text>
+  <text class="sans" x="868" y="394" font-size="18" fill="#9aa6b8">same source of truth, no drift</text>
+
+  <!-- bottom contrast -->
+  <line x1="64" y1="486" x2="1136" y2="486" stroke="#1c2430" stroke-width="2"/>
+  <text class="sans" x="64" y="548" font-size="26" font-weight="700" fill="#8b97a8">without a shared store</text>
+  <text class="sans" x="64" y="586" font-size="21" fill="#7c8798">every agent re-derives the same thing, every session — and can still land on a stale doc</text>
+
+  <text class="sans" x="64" y="650" font-size="26" font-weight="700" fill="#22c55e">with trovex</text>
+  <text class="sans" x="64" y="688" font-size="21" fill="#9aa6b8">write once, read many — <tspan fill="#e6edf3" font-weight="600">one source of truth across your agents and your team</tspan></text>
+
+  <text class="mono" x="1136" y="688" font-size="19" fill="#5a6577" text-anchor="end">trovex.dev</text>
+</svg>

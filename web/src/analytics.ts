@@ -35,6 +35,8 @@ export type EventName =
   | 'answers_clicked'
   | 'setup_clicked'
   | 'section_viewed'
+  | 'request_access_clicked'
+  | 'waitlist_submitted'
 
 type Props = Record<string, string>
 
@@ -134,8 +136,19 @@ export function deriveSession(): Props {
     utm_source: utm('utm_source'),
     utm_medium: utm('utm_medium'),
     utm_campaign: utm('utm_campaign'),
+    utm_content: utm('utm_content'),
   }
   return cached
+}
+
+/**
+ * Attribution payload to PERSIST with a waitlist signup (server-side), so every
+ * signup is traceable to a source. Closed enums + host-only referrer + UTM only —
+ * deliberately excludes the email and any PII. The waitlist endpoint stores this
+ * next to the (volunteered) email; analytics events never carry the email.
+ */
+export function getAttribution(): Props {
+  return { ...deriveSession() }
 }
 
 /** Fire an event with session props merged in. No-op if no analytics script is loaded. */
@@ -147,6 +160,24 @@ export function track(event: EventName, props: Props = {}): void {
 /** Call once on mount: the landing_view event carrying GEO/channel attribution. */
 export function trackLandingView(): void {
   track('landing_view')
+}
+
+/* ── Waitlist funnel (primary conversion under the private-beta GTM) ──────────
+ * The waitlist CTA + form live in App.tsx (cro-lead's file); these helpers give
+ * that surface a one-call hook so it's instrumented from birth:
+ *   - on the "request beta access" CTA click → trackRequestAccessClick(location)
+ *   - on a SUCCESSFUL waitlist submit         → trackWaitlistSubmitted()
+ * waitlist_submitted carries only the source attribution (geo_source/channel/utm_*),
+ * never the email. The email is volunteered PII and stays in the waitlist store. */
+
+/** Fire when the "request beta access" CTA is clicked. */
+export function trackRequestAccessClick(location: string): void {
+  track('request_access_clicked', { location })
+}
+
+/** Fire on a successful waitlist submission. No email / no PII — source only. */
+export function trackWaitlistSubmitted(location = 'waitlist'): void {
+  track('waitlist_submitted', { location })
 }
 
 /**

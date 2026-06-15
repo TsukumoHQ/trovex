@@ -14,8 +14,11 @@ real thing.
 
 ## 0. Headline (one number + one sentence)
 
-- **North-star proxy this week:** `consult_clicked` = `‹n›` (vs `‹n_prev›` last week, `‹±%›`).
-- **One sentence:** ‹what moved and why — e.g. "Perplexity citations drove +X sessions but consult intent flat; bottleneck is hero→consult, not reach."›
+Primary conversion under the private-beta GTM (memory `gtm-model`) = **waitlist signups**.
+
+- **Waitlist signups this week:** `waitlist_submitted` = `‹n›` (vs `‹n_prev›` last week, `‹±%›`).
+- **Top source:** ‹channel/engine› drove `‹n›` of them.
+- **One sentence:** ‹what moved and why — e.g. "Perplexity citations drove +X sessions, X% requested access; bottleneck is CTA→submit, not reach."›
 - **Lowest broken stage:** ‹stage› → **next move:** ‹owner + action / experiment #›.
 
 ## 1. Funnel (week over week)
@@ -25,17 +28,17 @@ Source: Plausible custom events (home SPA + `/vs/`), Vercel Web Analytics (pagev
 | Stage | Metric (event) | This wk | Last wk | Δ | Data quality |
 |-------|----------------|--------:|--------:|---|--------------|
 | Reach | sessions (`landing_view` + `/vs/` pageviews) | ‹› | ‹› | ‹› | real |
-| Intent · CTA | `cta_clicked` / sessions | ‹› | ‹› | ‹› | real |
-| Intent · GitHub | `github_clicked` (all locations) | ‹› | ‹› | ‹› | real |
-| Intent · install proxy | `command_copied` | ‹› | ‹› | ‹› | real **proxy** |
+| Intent | `request_access_clicked` / sessions | ‹› | ‹› | ‹› | real |
+| **Conversion** | `waitlist_submitted` (primary) | ‹› | ‹› | ‹› | real |
 | Consideration | `compare_clicked` → `/vs/` | ‹› | ‹› | ‹› | real |
-| **Lead** | `consult_clicked` | ‹› | ‹› | ‹› | real, low-volume |
+| Secondary | `github_clicked` / `command_copied` / `consult_clicked` | ‹› | ‹› | ‹› | real (not the conversion now) |
+| Access | waitlist → access granted | ‹› | ‹› | ‹› | from waitlist store |
 | Activation · index | `index_run` (1st) | ‹n/a› | ‹n/a› | — | opt-in telemetry: not built |
 | Activation · aha | `first_query` w/ `saved>0` | ‹n/a› | ‹n/a› | — | opt-in telemetry: not built |
 | Retention | repeat query-day (W1/W2) | ‹n/a› | ‹n/a› | — | opt-in telemetry: not built |
 | Vanity (context only) | GitHub stars / clones | ‹› | ‹› | ‹› | vanity-adjacent |
 
-**Conversion rates that matter:** sessions→`github_clicked` = `‹%›`; sessions→`consult_clicked` = `‹%›` (the north-star rate); `/vs/` sessions→`github_clicked` vs home (experiment #5 read) = `‹vs / home›`.
+**Conversion rates that matter:** sessions→`request_access_clicked` = `‹%›` (CTA pull); `request_access_clicked`→`waitlist_submitted` = `‹%›` (form completion); sessions→`waitlist_submitted` = `‹%›` (**the north-star rate**); `/vs/` sessions vs home conversion (experiment #5 read) = `‹vs / home›`.
 
 ## 2. GEO / channel mix (where reach came from)
 

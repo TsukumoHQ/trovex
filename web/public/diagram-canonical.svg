@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-label="Without trovex an agent rereads several markdown files to guess which is current. With trovex it gets one canonical section by path and line with a freshness marker. About 60 percent fewer tokens for the same answer.">
+  <defs>
+    <style>
+      .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
+      .mono { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+    </style>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1119"/>
+      <stop offset="1" stop-color="#0a0e17"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#22c55e"/>
+
+  <!-- titles -->
+  <text class="sans" x="60" y="70" font-size="30" font-weight="700" fill="#e6edf3">rereading the repo</text>
+  <text class="sans" x="60" y="100" font-size="20" font-weight="400" fill="#7c8798">an agent guesses which doc is current</text>
+
+  <text class="sans" x="700" y="70" font-size="30" font-weight="700" fill="#e6edf3">one canonical answer</text>
+  <text class="sans" x="700" y="100" font-size="20" font-weight="400" fill="#7c8798"><tspan fill="#22c55e">trovex</tspan> serves the current section</text>
+
+  <!-- ================= LEFT PANEL ================= -->
+  <g>
+    <!-- agent -->
+    <rect x="60" y="150" width="200" height="54" rx="10" fill="#11161f" stroke="#2a3342" stroke-width="1.5"/>
+    <text class="sans" x="160" y="184" font-size="20" font-weight="600" fill="#cdd6e2" text-anchor="middle">coding agent</text>
+
+    <!-- dashed connectors agent -> files -->
+    <g stroke="#3a4456" stroke-width="2" stroke-dasharray="5 6" fill="none">
+      <path d="M160 204 C160 250 330 250 330 286"/>
+      <path d="M160 204 C160 300 330 330 330 366"/>
+      <path d="M160 204 C160 360 330 410 330 446"/>
+      <path d="M160 204 C160 420 330 490 330 526"/>
+      <path d="M160 204 C160 470 330 560 330 606"/>
+    </g>
+
+    <!-- faint doc cards (rereads many to guess) -->
+    <g>
+      <rect x="330" y="280" width="250" height="44" rx="8" fill="#10151e" stroke="#262f3d" stroke-width="1.5"/>
+      <text class="mono" x="348" y="308" font-size="18" fill="#8b97a8">README.md</text>
+
+      <rect x="330" y="360" width="250" height="44" rx="8" fill="#10151e" stroke="#262f3d" stroke-width="1.5"/>
+      <text class="mono" x="348" y="388" font-size="18" fill="#8b97a8">docs/architecture.md</text>
+
+      <rect x="330" y="440" width="250" height="44" rx="8" fill="#10151e" stroke="#262f3d" stroke-width="1.5"/>
+      <text class="mono" x="348" y="468" font-size="18" fill="#8b97a8">api/v1.md</text>
+
+      <rect x="330" y="520" width="250" height="44" rx="8" fill="#10151e" stroke="#262f3d" stroke-width="1.5"/>
+      <text class="mono" x="348" y="548" font-size="18" fill="#8b97a8">api/v2.md</text>
+
+      <rect x="330" y="600" width="250" height="44" rx="8" fill="#10151e" stroke="#262f3d" stroke-width="1.5"/>
+      <text class="mono" x="348" y="628" font-size="18" fill="#8b97a8">CHANGELOG.md</text>
+    </g>
+
+    <!-- which is current? -->
+    <text class="sans" x="60" y="300" font-size="22" font-weight="600" fill="#e0b341">?</text>
+    <text class="sans" x="80" y="300" font-size="18" font-weight="400" fill="#9aa6b8">which one</text>
+    <text class="sans" x="80" y="324" font-size="18" font-weight="400" fill="#9aa6b8">is current?</text>
+
+    <!-- footer cost -->
+    <text class="sans" x="60" y="690" font-size="20" font-weight="400" fill="#7c8798">reads several to guess ·</text>
+    <text class="mono" x="320" y="690" font-size="20" font-weight="600" fill="#cdd6e2">~720 tokens</text>
+  </g>
+
+  <!-- ================= CENTER ================= -->
+  <line x1="618" y1="150" x2="618" y2="650" stroke="#1c2430" stroke-width="2"/>
+
+  <!-- ================= RIGHT PANEL ================= -->
+  <g>
+    <!-- agent -->
+    <rect x="700" y="150" width="200" height="54" rx="10" fill="#11161f" stroke="#2a3342" stroke-width="1.5"/>
+    <text class="sans" x="800" y="184" font-size="20" font-weight="600" fill="#cdd6e2" text-anchor="middle">coding agent</text>
+
+    <!-- arrow agent -> trovex -->
+    <path d="M800 204 L800 250" stroke="#3a4456" stroke-width="2" fill="none"/>
+    <path d="M794 244 L800 254 L806 244 Z" fill="#3a4456"/>
+
+    <!-- trovex node -->
+    <rect x="700" y="256" width="200" height="50" rx="10" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
+    <text class="sans" x="800" y="287" font-size="20" font-weight="700" fill="#22c55e" text-anchor="middle">trovex</text>
+
+    <!-- arrow trovex -> answer -->
+    <path d="M800 306 L800 360" stroke="#22c55e" stroke-width="2" fill="none"/>
+    <path d="M794 354 L800 364 L806 354 Z" fill="#22c55e"/>
+
+    <!-- ONE canonical card -->
+    <rect x="660" y="372" width="420" height="150" rx="12" fill="#0e1a13" stroke="#22c55e" stroke-width="2"/>
+    <text class="mono" x="684" y="418" font-size="24" font-weight="600" fill="#e6edf3">api/v2.md<tspan fill="#22c55e">:42-58</tspan></text>
+    <text class="sans" x="684" y="452" font-size="18" font-weight="400" fill="#9aa6b8">the current section — not the whole file</text>
+    <g>
+      <circle cx="694" cy="486" r="6" fill="#22c55e"/>
+      <text class="sans" x="710" y="492" font-size="18" font-weight="500" fill="#cdd6e2">fresh · updated 2h ago</text>
+    </g>
+
+    <!-- footer cost -->
+    <text class="sans" x="700" y="690" font-size="20" font-weight="400" fill="#7c8798">one canonical section ·</text>
+    <text class="mono" x="940" y="690" font-size="20" font-weight="600" fill="#22c55e">~280 tokens</text>
+  </g>
+
+  <!-- center savings badge -->
+  <g transform="translate(600,755)">
+    <rect x="-175" y="-32" width="350" height="64" rx="32" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
+    <text class="sans" x="0" y="-3" font-size="26" font-weight="700" fill="#22c55e" text-anchor="middle">~60% fewer tokens</text>
+    <text class="sans" x="0" y="21" font-size="17" font-weight="400" fill="#9aa6b8" text-anchor="middle">same answer, on doc lookups</text>
+  </g>
+</svg>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/for/claude-code/" />
+  <title>trovex for Claude Code — one canonical doc per query, ~60% fewer tokens</title>
+  <meta name="description" content="Add trovex to Claude Code as an HTTP MCP server. Run trovex serve, then `claude mcp add --transport http trovex http://localhost:8765/mcp`. Your agent gets one canonical doc per query instead of rereading the repo — about 60% fewer tokens." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/for/claude-code/" />
+  <meta property="og:title" content="trovex for Claude Code" />
+  <meta property="og:description" content="Add trovex to Claude Code as an HTTP MCP server in one command. One canonical doc per query, ~60% fewer tokens." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for Claude Code" />
+  <meta name="twitter:description" content="Add trovex to Claude Code as an HTTP MCP server in one command." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "For your MCP client", "item": "https://trovex.dev/for/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex for Claude Code", "item": "https://trovex.dev/for/claude-code/" }
+        ]
+      },
+      {
+        "@type": "HowTo",
+        "name": "Add trovex to Claude Code",
+        "description": "Connect trovex (a local HTTP MCP server) to Claude Code so your agent gets one canonical doc per query.",
+        "step": [
+          { "@type": "HowToStep", "name": "Index your repo", "text": "Run `uv run trovex index /path/to/repo` to index your markdown." },
+          { "@type": "HowToStep", "name": "Start the server", "text": "Run `uv run trovex serve`. trovex serves MCP at http://localhost:8765/mcp." },
+          { "@type": "HowToStep", "name": "Register it with Claude Code", "text": "Run `claude mcp add --transport http trovex http://localhost:8765/mcp`, or add it to .mcp.json with type http." },
+          { "@type": "HowToStep", "name": "Verify", "text": "Run /mcp inside Claude Code; trovex should show connected and expose the trovex tool." }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/for/">For your client</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/for/">For your client</a> / Claude Code
+    </nav>
+
+    <h1>trovex for <span class="ac">Claude Code</span></h1>
+    <p class="deck">Claude Code already reads a CLAUDE.md and rereads your repo to find context. Point it at trovex instead and it gets one canonical doc per query — about 60% fewer tokens.</p>
+
+    <div class="verdict">
+      <div class="l">In one command</div>
+      <p>trovex runs as a local HTTP MCP server. Start it, then register it with Claude Code's native MCP support:</p>
+      <div class="cmd mono" style="display:block;margin-top:12px;">$ claude mcp add --transport http trovex http://localhost:8765/mcp</div>
+    </div>
+
+    <h2>Setup, step by step</h2>
+    <ol>
+      <li><strong>Index your repo.</strong><div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex index /path/to/repo</div></li>
+      <li><strong>Start trovex.</strong> It serves MCP over HTTP at <code>http://localhost:8765/mcp</code>.<div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex serve</div></li>
+      <li><strong>Register it with Claude Code</strong> — the one-liner above, or add it to a project <code>.mcp.json</code>:
+        <pre style="margin-top:8px;overflow-x:auto;background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px;"><code>{
+  "mcpServers": {
+    "trovex": { "type": "http", "url": "http://localhost:8765/mcp" }
+  }
+}</code></pre>
+      </li>
+      <li><strong>Verify.</strong> Run <code>/mcp</code> inside Claude Code — trovex should show connected and expose the <code>trovex</code> tool.</li>
+    </ol>
+
+    <h2>Why Claude Code users want it</h2>
+    <p class="lead-answer">A <code>CLAUDE.md</code> is one static file that goes stale and can't route a question to the right doc. trovex keeps many docs canonical and hands Claude Code the single current one that answers — down to the section, with a freshness marker — so it stops rereading files to guess which is the source of truth. Same answers, about <strong>60% fewer tokens per lookup</strong>, and a shared write path so what one Claude Code session learns is read back by the next. See <a href="/vs/claude-md/">trovex vs CLAUDE.md</a> for the full comparison.</p>
+
+    <div class="related">
+      <div class="l">trovex for other clients</div>
+      <ul>
+        <li><a href="/for/cursor/">trovex for Cursor</a></li>
+        <li><a href="/for/windsurf/">trovex for Windsurf</a></li>
+        <li><a href="/for/cline/">trovex for Cline</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Give Claude Code one source of truth.</h2>
+      <p>Index your repo, start trovex, add the MCP server — about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/for/">For your client</a>
+      <a href="/answers/">Answers</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix</small>
+    </div>
+  </footer>
+</body>
+</html>

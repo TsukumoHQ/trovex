@@ -265,7 +265,7 @@ export default function App() {
           <span className="sp" />
           <a className="lk hide" href="#tour">Product</a>
           <a className="lk" href={REPO} target="_blank" rel="noreferrer">GitHub</a>
-          <a className="btn btn-primary nav-cta" href={REPO} target="_blank" rel="noreferrer">Get Trovex</a>
+          <a className="btn btn-primary nav-cta" href={REPO} target="_blank" rel="noreferrer">Get trovex</a>
         </div>
       </nav>
 
@@ -273,17 +273,17 @@ export default function App() {
         {/* Hero — category statement */}
         <section className="hero">
           <div className="wrap">
-            <h1>Trovex is the canonical doc store<br />for your <span className="ac">coding agents</span>.</h1>
+            <h1>trovex is the canonical doc store<br />for your <span className="ac">coding agents</span>.</h1>
             <p className="deck">
-              Your agents reread the repo every session to work out which doc is current. Trovex keeps
+              Your agents reread the repo every session to work out which doc is current. trovex keeps
               one canonical copy and hands them the right one. Same answers, about{' '}
               <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
             </p>
             <div className="hero-cta">
-              <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">{Github} Get Trovex</a>
-              <a className="btn btn-ghost" href="#tour">See it work</a>
+              <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">{Github} Get trovex</a>
             </div>
-            <Cmd text="uv run trovex serve" />
+            <Cmd text="uv run trovex index /path/to/repo" />
+            <a className="hero-see" href="#tour">see it work ↓</a>
           </div>
           <HeroWindow />
         </section>
@@ -347,9 +347,9 @@ export default function App() {
           <div className="wrap">
             <div className="cta reveal">
               <h2>Give your agents one source of truth.</h2>
-              <p>Point Trovex at your repo. Your agents stop guessing in about a minute.</p>
+              <p>Point trovex at your repo. Your agents stop guessing in about a minute.</p>
               <div className="hero-cta">
-                <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">{Github} Get Trovex</a>
+                <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">{Github} Get trovex</a>
               </div>
               <Cmd text="uv run trovex index /path/to/repo" />
               <p className="cta-note">No cloud, no API keys. Your docs never leave your machine.</p>

@@ -314,6 +314,19 @@ a { color: inherit; text-decoration: none; }
 .cta p { color: var(--fg-muted); margin: 16px auto 32px; max-width: 44ch; font-size: 18px; }
 .cta-note { margin-top: 16px; font-family: var(--font-mono); font-size: 12.5px; color: var(--fg-subtle); }
 
+/* waitlist form */
+.wl-form { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; max-width: 460px; margin: 0 auto; }
+.wl-input { flex: 1 1 220px; min-width: 0; padding: 0 16px; height: 46px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--stage-1); color: var(--fg); font-size: 15px; }
+.wl-input::placeholder { color: var(--fg-subtle); }
+.wl-input:focus { outline: none; border-color: var(--accent); }
+.wl-form .btn-primary { height: 46px; }
+.wl-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.wl-msg { flex-basis: 100%; margin: 12px 0 0; font-size: 14px; color: var(--fg-muted); }
+.wl-msg.wl-err { color: #f87171; }
+.wl-done { text-align: center; }
+.wl-done-t { font-size: 20px; font-weight: 600; color: var(--fg); margin: 0; }
+.wl-done-s { margin: 8px auto 0; max-width: 42ch; font-size: 15px; color: var(--fg-muted); }
+
 /* compatibility strip (legit proof, not fake logos) */
 .compat { padding: 30px 0 6px; text-align: center; }
 .compat .lab { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-faint); margin-bottom: 14px; }

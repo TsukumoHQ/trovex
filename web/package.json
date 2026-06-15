@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "check:brand": "node scripts/check-brand.mjs",
+    "build": "node scripts/check-brand.mjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/repomix/" />
+  <title>trovex vs repomix / files-to-prompt — packing the whole repo vs serving one answer</title>
+  <meta name="description" content="repomix and files-to-prompt pack your repo into one big prompt — perfect for a one-shot question about a whole codebase. They flood the context window on every repeated lookup. trovex serves the one doc that answers, for about 60% fewer tokens. Here's the comparison." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/repomix/" />
+  <meta property="og:title" content="trovex vs repomix / files-to-prompt" />
+  <meta property="og:description" content="Packing the whole repo into a prompt is great for one-shot questions. Here's where it gets expensive, and how trovex serves one answer per query instead." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs repomix / files-to-prompt" />
+  <meta name="twitter:description" content="Packing the whole repo vs serving one answer per query." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs repomix / files-to-prompt", "item": "https://trovex.dev/vs/repomix/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and repomix?",
+            "acceptedAnswer": { "@type": "Answer", "text": "repomix packs your whole repository into one big prompt for an LLM. trovex does the opposite: it indexes the repo and returns only the one current doc that answers a given query. repomix is built for a one-shot question about an entire codebase; trovex is built for repeated lookups across sessions, where loading everything each time is expensive." }
+          },
+          {
+            "@type": "Question",
+            "name": "When should I use repomix or files-to-prompt instead of trovex?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Use repomix or files-to-prompt when you want to hand an LLM a whole codebase at once — a one-time audit, onboarding a model to an unfamiliar repo, or a question that genuinely needs global context. Use trovex when agents ask many targeted questions over time and you don't want to pay to re-send the whole repo on every one." }
+          },
+          {
+            "@type": "Question",
+            "name": "Why is packing the whole repo into a prompt expensive?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Because the cost is paid every time. A packed repo sends all the files on every prompt, whether or not the question needed them, and a bigger context window is not a more current or more correct one. trovex sends the one section that answers, so a short answer costs short-answer tokens — about 60% fewer per lookup." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Comparisons</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs repomix
+    </nav>
+
+    <h1>trovex vs <span class="ac">repomix / files-to-prompt</span></h1>
+    <p class="deck">Packing the whole repo into a prompt is great for one-shot questions. Here's where it gets expensive — and what trovex does instead.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>repomix and files-to-prompt <strong>pack</strong> your repo (or a filtered subset) into one big prompt for an LLM. That's the right tool when you want to hand a model a whole codebase at once. For repeated, targeted lookups it floods the context window on every prompt — the opposite of token-efficient. trovex <strong>retrieves</strong>: it returns the one current doc that answers a query, down to the section, for about <strong>60% fewer tokens per lookup</strong>. Packing is for one-shot global context; trovex is for the everyday "which doc answers this?" loop.</p>
+    </div>
+
+    <h2>What do repomix and files-to-prompt do?</h2>
+    <p class="lead-answer">They concatenate your files into a single, prompt-ready blob. <code>repomix</code> packs a repository into one structured file (XML, markdown, or plain text) with a token count, optimized for pasting into an LLM. <code>files-to-prompt</code> does the same for a set of files or directories. Both are excellent at one job: getting a lot of code in front of a model in one shot — a whole-repo audit, onboarding an LLM to an unfamiliar project, or a question that truly needs the global picture.</p>
+
+    <h2>Where does packing get expensive?</h2>
+    <p class="lead-answer">When the same context is sent again and again. Packing has three costs that compound:</p>
+    <ul>
+      <li><strong>You pay for everything, every time.</strong> A packed repo includes all the files on every prompt, whether or not the question needed them — across every session and every agent.</li>
+      <li><strong>Bigger context isn't better context.</strong> Flooding the window with the whole repo dilutes the relevant part and can make answers worse, not just costlier.</li>
+      <li><strong>It's a snapshot, not a source of truth.</strong> A pack is a point-in-time dump with no freshness signal and no place for an agent to write back what it learned.</li>
+    </ul>
+
+    <h2>How is trovex different?</h2>
+    <p class="lead-answer">trovex is retrieval, not packing. It indexes your markdown once, then answers a query with the <strong>single canonical doc</strong> that addresses it — a <code>path:line</code> pointer and the section that matters, with a freshness marker so stale and duplicate copies are skipped. Instead of re-sending the repo on every question, an agent gets a short, current answer for short-answer tokens. And what one agent learns is written back through one shared point, so the next agent reads it instead of re-deriving it.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>repomix / files-to-prompt vs trovex, feature by feature</caption>
+        <thead>
+          <tr><th scope="col">Capability</th><th scope="col">repomix / files-to-prompt</th><th scope="col" class="trovex">trovex</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="feat">Core model</td><td>Pack the repo into one prompt</td><td>Retrieve the one doc that answers</td></tr>
+          <tr><td class="feat">Best for</td><td><span class="yes">✓</span> one-shot whole-repo questions</td><td><span class="yes">✓</span> repeated, targeted lookups</td></tr>
+          <tr><td class="feat">Tokens on a repeated lookup</td><td class="no">— whole pack, every time</td><td><span class="yes">~60% fewer</span> — one section served</td></tr>
+          <tr><td class="feat">Routes a query to the right doc</td><td class="no">— sends everything</td><td><span class="yes">✓</span> one canonical answer</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">— static snapshot</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">Write-back / shared memory</td><td class="no">—</td><td><span class="yes">✓</span> agents record once, all read it</td></tr>
+          <tr><td class="feat">Runs locally, no keys</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span> SQLite + ONNX, no cloud</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When should you reach for repomix instead?</h2>
+    <p class="lead-answer">When the task genuinely needs the whole codebase in one prompt: a one-time audit, sharing a repo with a model that's never seen it, or a question whose answer depends on global structure. For that, packing is simpler and exactly right. trovex is for the other 90% of the day — the steady stream of specific questions where re-sending the repo each time is what burns the tokens. Many people use both: repomix to bootstrap, trovex for the ongoing lookups.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">What is the difference between trovex and repomix?</p>
+        <p class="faq-a">repomix packs your whole repository into one big prompt for an LLM. trovex does the opposite: it indexes the repo and returns only the one current doc that answers a given query. repomix is built for a one-shot question about an entire codebase; trovex is built for repeated lookups across sessions, where loading everything each time is expensive.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">When should I use repomix or files-to-prompt instead of trovex?</p>
+        <p class="faq-a">Use repomix or files-to-prompt when you want to hand an LLM a whole codebase at once — a one-time audit, onboarding a model to an unfamiliar repo, or a question that genuinely needs global context. Use trovex when agents ask many targeted questions over time and you don't want to pay to re-send the whole repo on every one.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Why is packing the whole repo into a prompt expensive?</p>
+        <p class="faq-a">Because the cost is paid every time. A packed repo sends all the files on every prompt, whether or not the question needed them, and a bigger context window is not a more current or more correct one. trovex sends the one section that answers, so a short answer costs short-answer tokens — about 60% fewer per lookup.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Stop re-sending the repo on every question.</h2>
+      <p>Index once. trovex serves the one current answer per query.</p>
+      <div class="cmd mono">$ uv run trovex index /path/to/repo</div>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/claude-md/">trovex vs CLAUDE.md / AGENTS.md</a> — a static instructions file vs one canonical doc per query</li>
+        <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a> — a ranked list of chunks vs one canonical doc</li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

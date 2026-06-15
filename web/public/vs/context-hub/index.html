@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/context-hub/" />
+  <title>trovex vs context-hub (CTX) — a ranked list of chunks vs one canonical doc</title>
+  <meta name="description" content="Chunk-retrieval context servers like context-hub (CTX) return a ranked list of relevant snippets for the agent to sift and rank. trovex returns the one canonical doc that answers, with a freshness marker, and lets agents write back what they learn. Here's the comparison." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/context-hub/" />
+  <meta property="og:title" content="trovex vs context-hub (CTX)" />
+  <meta property="og:description" content="A ranked list of candidate chunks vs one canonical doc with a freshness marker — and a shared write path." />
+  <meta property="og:image" content="https://trovex.dev/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs context-hub (CTX)" />
+  <meta name="twitter:description" content="A ranked list of chunks vs one canonical doc." />
+  <meta name="twitter:image" content="https://trovex.dev/og-image.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs context-hub (CTX)", "item": "https://trovex.dev/vs/context-hub/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and a chunk-retrieval context server like context-hub?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Chunk-retrieval context servers return a ranked list of relevant snippets and leave the agent to sift and decide which to trust. trovex returns the one canonical doc that answers, with a freshness marker (canonical / stale / duplicate), so the agent isn't ranking candidates or risking a stale chunk. trovex also gives agents a shared write path, so what one learns is recorded once and read by the rest." }
+          },
+          {
+            "@type": "Question",
+            "name": "Why does returning one canonical answer matter for an agent?",
+            "acceptedAnswer": { "@type": "Answer", "text": "A pile of candidate chunks costs tokens to send and tokens to reason over, and it still leaves the agent guessing which snippet is current. One canonical answer with a freshness marker removes that guesswork and the duplicate context — about 60% fewer tokens per lookup, and a clearer answer." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does trovex let agents share what they learn?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes. Agents write back through one shared point, so an incident, decision, or note recorded by one agent is read by every other agent and teammate. Many context servers are read-only retrieval and don't close that write loop, so each agent re-derives what another already figured out." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Comparisons</a>
+      <a class="btn btn-ghost" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs context-hub
+    </nav>
+
+    <h1>trovex vs <span class="ac">context-hub (CTX)</span></h1>
+    <p class="deck">A ranked list of candidate chunks is a fine default. Here's what changes when the answer is one canonical doc instead — with a freshness marker and a write path.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Chunk-retrieval context servers like context-hub (CTX) return a <strong>ranked list of relevant snippets</strong> and leave the agent to sift, rank, and decide which to trust. That's a reasonable default for general retrieval. trovex returns the <strong>one canonical doc</strong> that answers — a <code>path:line</code> pointer with a freshness marker (canonical / stale / duplicate) — so the agent isn't ranking candidates or risking a stale chunk, at about <strong>60% fewer tokens per lookup</strong>. trovex also closes the loop the other way: agents write back what they learn through one shared point, so the fleet reads a single source of truth.</p>
+    </div>
+
+    <h2>How do chunk-retrieval context servers work?</h2>
+    <p class="lead-answer">Tools in this category — RAG-style MCP context servers, with context-hub (CTX) as one example — embed your content and, for a query, return the top-N most similar chunks. The agent receives several candidate snippets and has to read them, judge relevance, and decide which (if any) is authoritative. For broad "find me anything related" retrieval, that ranked-list model is a sensible and widely-used default.</p>
+
+    <h2>Where does a ranked list of chunks fall short for a coding agent?</h2>
+    <p class="lead-answer">When the agent needs <em>the</em> answer, not a reading list. Three gaps show up:</p>
+    <ul>
+      <li><strong>Sifting costs tokens twice.</strong> Several candidate chunks cost tokens to send and more tokens for the agent to reason over — and you often pay for near-duplicate snippets of the same content.</li>
+      <li><strong>No freshness signal.</strong> Similarity doesn't tell you which copy is current. A stale or duplicate chunk can rank high and be read as authoritative.</li>
+      <li><strong>Usually read-only.</strong> Most retrieval servers don't give agents a shared place to write back what they learned, so each agent re-derives what another already worked out.</li>
+    </ul>
+
+    <h2>How is trovex different?</h2>
+    <p class="lead-answer">trovex is built to return <strong>one canonical answer</strong>, not a candidate list. For a query it serves the single current doc that addresses it, down to the section, and marks it canonical, stale, or duplicate so the stale and duplicate copies never reach the agent's context. And it's a two-way store: an agent records an incident, decision, or note once, and every other agent and teammate reads it back — a single source of truth by construction, not a per-agent re-derivation. It runs locally: vectors in SQLite, ONNX embeddings, no cloud or API keys.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>Chunk-retrieval context servers (e.g. context-hub / CTX) vs trovex</caption>
+        <thead>
+          <tr><th scope="col">Capability</th><th scope="col">Chunk-retrieval server (CTX)</th><th scope="col" class="trovex">trovex</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="feat">What a query returns</td><td>A ranked list of candidate chunks</td><td><span class="yes">✓</span> one canonical doc, the section that answers</td></tr>
+          <tr><td class="feat">Agent has to sift &amp; rank</td><td class="no">— yes, every query</td><td><span class="yes">✓</span> no — one answer</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">— similarity only</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">Duplicate context filtered</td><td class="partial">~ near-duplicate chunks common</td><td><span class="yes">✓</span> duplicates skipped</td></tr>
+          <tr><td class="feat">Shared write-back (SSOT)</td><td class="no">— usually read-only</td><td><span class="yes">✓</span> agents record once, all read it</td></tr>
+          <tr><td class="feat">Tokens per lookup</td><td>Several chunks to send + reason over</td><td><span class="yes">~60% fewer</span> — one section served</td></tr>
+          <tr><td class="feat">Runs locally, no keys</td><td class="partial">~ varies by tool</td><td><span class="yes">✓</span> SQLite + ONNX, no cloud</td></tr>
+        </tbody>
+      </table>
+      <p class="note" style="padding:0 16px 14px;">Chunk-retrieval behavior described at the category level; specific context-hub features vary by version — check its docs for the current details.</p>
+    </div>
+
+    <h2>When is a general retrieval server the better fit?</h2>
+    <p class="lead-answer">When you want broad, exploratory recall over heterogeneous content and you're comfortable letting the agent rank what comes back — or when you've already standardized on a context server for non-markdown sources. A ranked-list model is general and flexible. trovex is the sharper fit when the job is repeated, specific lookups over your project's markdown, where one current answer beats a pile of candidates and the cost of re-derivation across a fleet of agents adds up.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">What is the difference between trovex and a chunk-retrieval context server like context-hub?</p>
+        <p class="faq-a">Chunk-retrieval context servers return a ranked list of relevant snippets and leave the agent to sift and decide which to trust. trovex returns the one canonical doc that answers, with a freshness marker (canonical / stale / duplicate), so the agent isn't ranking candidates or risking a stale chunk. trovex also gives agents a shared write path, so what one learns is recorded once and read by the rest.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Why does returning one canonical answer matter for an agent?</p>
+        <p class="faq-a">A pile of candidate chunks costs tokens to send and tokens to reason over, and it still leaves the agent guessing which snippet is current. One canonical answer with a freshness marker removes that guesswork and the duplicate context — about 60% fewer tokens per lookup, and a clearer answer.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does trovex let agents share what they learn?</p>
+        <p class="faq-a">Yes. Agents write back through one shared point, so an incident, decision, or note recorded by one agent is read by every other agent and teammate. Many context servers are read-only retrieval and don't close that write loop, so each agent re-derives what another already figured out.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>One canonical answer beats a pile of chunks.</h2>
+      <p>Point trovex at your repo and let your agents stop sifting.</p>
+      <div class="cmd mono">$ uv run trovex index /path/to/repo</div>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">Get trovex on GitHub</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/claude-md/">trovex vs CLAUDE.md / AGENTS.md</a> — a static instructions file vs one canonical doc per query</li>
+        <li><a href="/vs/repomix/">trovex vs repomix / files-to-prompt</a> — packing the whole repo into a prompt vs serving one answer</li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="https://github.com/Synergix-lab/trovex" target="_blank" rel="noreferrer">GitHub</a>
+      <small>© 2026 Synergix · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

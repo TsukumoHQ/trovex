@@ -42,26 +42,34 @@ surface; one success metric per test, declared up front; no peeking-to-stop.
 | 4 | Hero copy-command `index` (value step) gets copied more than `serve` | `index /path` vs `serve` | `command_copied` / sessions | cro-lead | **6.7** | **ready** |
 | 5 | Comparison pages convert AI-engine traffic better than home | `/vs/` vs home for `channel=ai_engine` | `github_clicked` rate within `ai_engine` | geo-lead #32/#49 | **6.7** | **ready** (per-page events live) |
 | 6 | Which competitor framing converts best (allocate content effort) | claude-md / repomix / mem0 / cursor-memory / vector-db-rag / context-hub | per-page `github_clicked` rate | geo-lead | **6.7** | **ready** (observational, no split) |
-| 7 | A sharper H1/deck lifts engagement past the hero | current vs content-lead variant | `cta_clicked` after hero | content-lead | **6.3** | needs `section_viewed` event |
+| 7 | A sharper H1/deck lifts engagement past the hero | current vs content-lead variant | `section_viewed` past hero | content-lead | **6.3** | **ready** (`section_viewed` live) |
 | 8 | A shareable savings receipt seeds referral sessions | receipt share on vs off | referred sessions (`utm_medium=referral`) | cro-lead #24/#50 | **5.7** | needs receipt feature + UTM |
 | 9 | MCP-registry listing copy lifts registry→site intent | listing A vs B | `utm_source=mcp-registry` × `github_clicked` | launch-lead | **5.7** | needs UTM on listings |
 | 10 | FAQ order/added objection reduces hero-only bounce | current vs reordered | `cta_clicked` after FAQ view | cro/content | **5.3** | needs `section_viewed` |
 
 (#10-style social-proof test stays out until real testimonials exist — never fabricate.)
 
-## Highest-value next 3 (all ready now)
+## Batch 1 — the first 3, stood up → [`experiments-batch-1.md`](./experiments-batch-1.md)
 
-1. **#1 consult-band** — closest proxy to the north star, metric live. Even with the
-   placeholder `CONSULT_URL`, `consult_clicked` rate is a fair painted-door read of intent.
-2. **#5 + #6 comparison pages** — the GEO bet (#32/#49 shipped 7 pages). Now we can see
-   which page and which channel actually convert, and tell geo-lead where to invest.
-3. **#2 / #4 hero CTA & command** — cheapest copy tests; validate cro-lead's shipped
-   landing changes against real `cta_clicked` / `command_copied`.
+Reconciled to the beta-phase north-star (**waitlist signups** primary; **consulting leads**
+the revenue end), the first three locked experiments are:
 
-## Committed instrumentation follow-up (unblocks #7, #10)
+1. **E1 — request-access CTA copy** (`ab-request-access-cta.md`) — the **primary beta
+   conversion** (`request_access_clicked` / `landing_view`). Promoted above the old #1
+   because the waitlist, not a github star, is the trovex conversion now.
+2. **E2 — consult-band → tsukumo handoff** (backlog #1) — closest web proxy to the
+   consulting north-star; metric `tsukumo_clicked` / `landing_view`, UTM'd to `source=suite`.
+3. **E3 — comparison pages convert AI-engine traffic** (#5 + #6) — the GEO bet, observational
+   (per-page × `channel`), hands geo-lead the allocation ranking.
 
-`section_viewed { section }` — one IntersectionObserver, fire-once per section — enables
-the scroll-depth / hero-pass / FAQ tests. Cheap; next on my list after this refresh.
+Each runs on a **live** event; sequential/observational at current thin traffic (see the
+batch-1 doc for the method + the concurrent-ready variant contract).
+
+## Instrumentation status
+
+`section_viewed { section }` (scroll-depth / hero-pass / FAQ) is **shipped + live** in
+`web/src/analytics.ts` (`trackSectionViews()`), so #7 and #10 are unblocked for a future
+batch.
 
 ## Acceptance
 

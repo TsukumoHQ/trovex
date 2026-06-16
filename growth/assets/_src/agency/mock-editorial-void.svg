@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024" role="img" aria-label="Agency concept mock editorial-void: systems for teams shipping AI.">
+  <defs><style>
+    .d { font-family: 'Fira Sans','Helvetica Neue',Arial,sans-serif; }
+    .m { font-family: 'Fira Code','SF Mono',ui-monospace,monospace; }
+  </style></defs>
+  <rect width="1536" height="1024" fill="#101010"/>
+  <image href="bg-editorial-void.png" x="0" y="0" width="1536" height="1024" preserveAspectRatio="xMidYMid slice"/>
+  <!-- top bar: placeholder wordmark + index + nav -->
+  <rect x="96" y="84" width="20" height="20" fill="#ff5a1f"/>
+  <text class="m" x="128" y="100" font-size="22" font-weight="600" fill="#0e0e0e">studio</text>
+  <text class="m" x="232" y="100" font-size="22" fill="#0e0e0e" opacity="0.6">[ working name ]</text>
+  <text class="m" x="1440" y="100" font-size="22" fill="#0e0e0e" opacity="0.8" text-anchor="end">work · approach · contact</text>
+  <text class="m" x="96" y="874" font-size="22" fill="#ff5a1f">01 — 04</text>
+
+  <text class="d" x="96" y="430" font-size="150" font-weight="800" letter-spacing="-0.03em" fill="#0e0e0e">systems for</text>
+  <text class="d" x="96" y="580" font-size="150" font-weight="800" letter-spacing="-0.03em" fill="#0e0e0e">teams</text>
+  <text class="d" x="96" y="730" font-size="150" font-weight="800" letter-spacing="-0.03em" fill="#0e0e0e">shipping AI.</text>
+  <!-- accent rule + tagline -->
+  <rect x="100" y="840" width="120" height="10" fill="#ff5a1f"/>
+  <text class="m" x="96" y="928" font-size="24" fill="#0e0e0e" opacity="0.85">studio — products that behave under load</text>
+  <text class="m" x="1440" y="928" font-size="22" fill="#0e0e0e" opacity="0.5" text-anchor="end">concept — type indicative</text>
+</svg>

@@ -26,6 +26,7 @@
 
 import { createHash } from 'node:crypto'
 import { rateLimited } from './_rate-limit.js'
+import { notifyOwner } from './_notify.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -209,6 +210,19 @@ export default async function handler(req, res) {
     if (!stored) {
       // No backend wired yet — be honest, don't claim a save.
       return res.status(503).json({ ok: false, error: 'not_configured' })
+    }
+    // Ping the owner on a genuinely new signup (skip known duplicates). Best-effort
+    // + env-gated; awaited (a plain Vercel function may freeze after the response).
+    // A failed notify never affects the stored signup.
+    if (sb !== 'duplicate') {
+      await notifyOwner({
+        title: 'New trovex waitlist signup',
+        fields: {
+          email,
+          source: buildSourceAndUtm(attribution).source,
+          via: meta.referer,
+        },
+      })
     }
     return res.status(200).json({ ok: true })
   } catch {

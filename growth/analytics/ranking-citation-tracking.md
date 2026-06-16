@@ -58,6 +58,11 @@ No engine exposes a citation-rank API, and answers vary by session/region/person
 So we **sample**: run each page's target query in each engine on a cadence and record
 whether trovex is **cited** (linked/named), and roughly where.
 
+**Automated now:** [`geo-citation-monitor.mjs`](./geo-citation-monitor.md) probes the query
+set through OpenAI `web_search` weekly and logs the **suite citation share** to
+`reports/geo-citations-<date>.md` (first read: 0/10 — invisible, the honest starting line).
+Perplexity + Google AIO are TODO (need keys). geo-lead owns query wording; this measures it.
+
 **Matrix (weekly, one tab per engine):**
 
 | Query (page) | ChatGPT | Perplexity | Google AIO | Claude | Notes |

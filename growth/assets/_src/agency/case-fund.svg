@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="tsukumo case study: a quant fund. agentic workflows in a live trading environment, built to the team's standards. anonymized.">
+  <defs><style>
+    .d { font-family: 'Archivo','Inter Tight',system-ui,sans-serif; }
+    .m { font-family: 'Space Mono','Geist Mono',ui-monospace,monospace; }
+  </style></defs>
+  <rect width="1200" height="750" fill="#121212"/>
+  <rect x="0" y="0" width="1200" height="8" fill="#c8ff00"/>
+
+  <text class="m" x="72" y="120" font-size="24" fill="#c8ff00">case · under NDA</text>
+  <text class="m" x="1128" y="120" font-size="60" font-weight="700" fill="#1b1a18" text-anchor="end">02</text>
+
+  <text class="d" x="68" y="320" font-size="116" font-weight="800" letter-spacing="-0.035em" fill="#f3f1ea">a quant fund</text>
+
+  <rect x="74" y="430" width="110" height="9" fill="#c8ff00"/>
+  <text class="m" x="72" y="498" font-size="26" fill="#f3f1ea" opacity="0.88">agentic workflows in a live trading environment,</text>
+  <text class="m" x="72" y="538" font-size="26" fill="#f3f1ea" opacity="0.88">built to the team's standards. anonymized.</text>
+
+  <line x1="72" y1="628" x2="1128" y2="628" stroke="rgba(243,241,234,0.14)" stroke-width="1.5"/>
+  <text class="m" x="72" y="676" font-size="22" fill="#f3f1ea" opacity="0.7">regulated · NDA</text>
+  <text class="m" x="1128" y="676" font-size="22" fill="#c8ff00" text-anchor="end">tsukumo</text>
+</svg>

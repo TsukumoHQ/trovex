@@ -28,3 +28,18 @@ Type: **Archivo** (display, Google Fonts — shippable until a licensed grotesk)
 Palette: ink `#121212` · bone `#f3f1ea` · concrete `#9a958c` · acid `#c8ff00`. No fabricated numbers
 (positioning is qualitative — "run AI in production, not demos"; real metrics flagged to cmo when available).
 Coded hero → built in `Synergix-lab/tsukumo` when the repo lands.
+
+---
+
+## Tsukumo asset set (#9f694f2c — cmo ports into Synergix-lab/tsukumo)
+Acid/brutalist (memory `tsukumo-tokens`). Sources in `_src/agency/`.
+
+| File | Use |
+|------|-----|
+| `tsukumo-og.png` (1200×630) | OG/social card — "run AI in production." + positioning |
+| `bg-hero-concrete.png` | textless concrete hero background (hard light) to overlay coded type |
+| `case-studio.png` / `case-fund.png` / `case-cil.png` (1200×750) | work-gallery / case-study cards |
+
+**Honesty:** qualitative only, **no fabricated numbers**. Case-card copy is **DRAFT** — content-lead
+owns the final approved one-liners (studio = WRAI.TH/trovex/yoru OSS; fund = anonymized/NDA; CI-Léman).
+Swap copy in the SVG sources (`gen_tsukumo_cases.py`) and re-render. `tsukumo` lowercase, no Synergix on surfaces.

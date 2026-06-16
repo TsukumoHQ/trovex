@@ -1,0 +1,46 @@
+/* Tsukumo — design tokens (LOCKED: direction 01 "Concrete & Acid")
+ * Agency = dev studio + AI consulting. Brutalist, loud, award-tier, builder-credible.
+ * Distinct from trovex (terminal-restraint). Drop into Synergix-lab/tsukumo (Next.js).
+ * Type: license a grotesk for production; Archivo (Google Fonts, free) is the shippable default.
+ */
+:root {
+  /* — palette (stark, two-tone base + ONE acid accent) — */
+  --tk-ink:        #121212; /* near-black base / page bg */
+  --tk-ink-2:      #1b1a18; /* raised surface */
+  --tk-concrete:   #9a958c; /* mid concrete (muted UI, dividers-on-light) */
+  --tk-concrete-d: #6b665e; /* darker concrete */
+  --tk-bone:       #f3f1ea; /* paper / primary text on ink */
+  --tk-bone-dim:   #b8b3a8; /* secondary text on ink */
+  --tk-acid:       #c8ff00; /* THE accent — use sparingly, one per view */
+  --tk-acid-ink:   #0e1100; /* text on acid fills */
+  --tk-hairline:   rgba(243,241,234,0.14);
+
+  /* — type — */
+  --tk-font-display: 'Archivo', 'Neue Haas Grotesk Display', 'Söhne', 'Inter Tight', system-ui, sans-serif;
+  --tk-font-mono:    'Space Mono', 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --tk-wght-display: 800;        /* heavy display; wordmark uses 800–900 */
+  --tk-track-display: -0.03em;   /* tight tracking on giant sizes */
+  --tk-leading-display: 0.92;
+
+  /* brutal type scale — display vs small, little in between */
+  --tk-hero:   clamp(3.5rem, 14vw, 13rem);
+  --tk-h1:     clamp(2.5rem, 8vw, 6rem);
+  --tk-h2:     clamp(1.75rem, 4vw, 3rem);
+  --tk-body:   clamp(1rem, 1.2vw, 1.25rem);
+  --tk-label:  0.8125rem; /* mono labels / index numbers */
+
+  /* — space / structure — */
+  --tk-gutter: clamp(1.25rem, 4vw, 4rem);
+  --tk-cols: 12;
+  --tk-rule: 1px;          /* hairline weight */
+  --tk-radius: 0;          /* brutalist: hard corners by default */
+
+  /* — motion (weighted, restrained) — */
+  --tk-ease: cubic-bezier(0.16, 1, 0.3, 1); /* heavy ease-out */
+  --tk-dur: 0.7s;
+}
+
+/* Reduced-motion: honor it. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --tk-dur: 0.001s; }
+}

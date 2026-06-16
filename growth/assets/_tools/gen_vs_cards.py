@@ -30,6 +30,32 @@ CARDS = [
         ("embed + chunk + rank yourself", "index once, ask, get one doc", None),
         ("returns a set of chunks", "one canonical answer + freshness", "~60% fewer tokens per lookup"),
     ], "a custom RAG stack fits bespoke needs. trovex for repo docs out of the box."),
+    # batch-2 (geo-shipped)
+    ("continue", "Continue.dev", "Continue.dev", [
+        ("a full in-IDE AI assistant", "a context source you plug in", None),
+        ("brings its own retrieval", "serves one canonical doc per query", None),
+        ("broad chat + edit workflow", "path:line + freshness", "~60% fewer tokens per lookup"),
+    ], "Continue is the assistant; trovex is the canonical-doc source you plug into it."),
+    ("aider", "Aider", "Aider", [
+        ("a coding agent with a repo map", "a canonical-doc server", None),
+        ("maps the repo to make edits", "returns the one current doc per query", None),
+        ("repo map in context", "just the section that answers", "~60% fewer tokens per lookup"),
+    ], "Aider is great for editing; trovex for which doc is canonical and current."),
+    ("cody", "Sourcegraph Cody", "Sourcegraph Cody", [
+        ("enterprise code search", "local canonical docs", None),
+        ("searches code across many repos", "serves one current doc per query", None),
+        ("cloud / org-scale", "local-first, runs on your machine", "~60% fewer tokens per lookup"),
+    ], "Cody is great for org-wide code search; trovex for a repo's canonical docs."),
+    ("pieces", "Pieces", "Pieces", [
+        ("personal workflow memory", "a repo's canonical docs", None),
+        ("snippets across your tools", "one current doc per query, path:line", None),
+        ("per-developer memory", "shared repo source of truth", "~60% fewer tokens per lookup"),
+    ], "Pieces is great for personal workflow memory; trovex for the repo's docs."),
+    ("claude-projects", "Claude Projects", "Claude Projects", [
+        ("uploaded static knowledge", "a live repo over MCP", None),
+        ("manual re-upload to update", "indexed, always current + freshness", None),
+        ("Claude.ai only", "any MCP client, runs locally", "~60% fewer tokens per lookup"),
+    ], "Claude Projects is great for uploaded refs; trovex for live repo docs."),
 ]
 
 ROW_Y = [246, 318, 390]

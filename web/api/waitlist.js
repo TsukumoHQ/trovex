@@ -102,6 +102,7 @@ async function storeSupabase(email, attribution, meta) {
   // This code path only ever runs server-side. The email is the only PII; never logged.
   const { source, utm } = buildSourceAndUtm(attribution)
   const row = {
+    project: 'trovex', // central multi-project Supabase: unique(project,email)
     email,
     source,
     utm,

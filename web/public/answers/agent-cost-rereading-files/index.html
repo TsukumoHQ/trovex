@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/agent-cost-rereading-files/" />
+  <title>How much do AI agents spend rereading the same files?</title>
+  <meta name="description" content="It depends on your repo and how often agents run, but the waste is structural: the same docs get reread every session, every agent, every teammate. The measurable part is the per-lookup reduction — about 60% fewer tokens when you serve one canonical doc instead of the top stale candidates." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/agent-cost-rereading-files/" />
+  <meta property="og:title" content="How much do AI agents spend rereading the same files?" />
+  <meta property="og:description" content="The waste is structural and compounds. The measurable part: ~60% fewer tokens per doc lookup." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="How much do agents spend rereading files?" />
+  <meta name="twitter:description" content="The waste compounds. ~60% fewer tokens per doc lookup with one canonical answer." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "How much agents spend rereading files", "item": "https://trovex.dev/answers/agent-cost-rereading-files/" }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How much do AI agents spend rereading the same files?",
+          "text": "How much money or tokens does an AI coding agent waste rereading the same docs each session?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/agent-cost-rereading-files/",
+            "text": "The exact dollar figure depends on your repo size, how often agents run, and your model's pricing, so there is no single honest number. But the waste is structural: the same markdown gets reread to re-establish context every session, for every agent, and for every teammate, so the cost compounds rather than being paid once. The part that is measurable and repeatable is the per-lookup reduction — serving the one canonical doc that answers, at the section level, is about 60% fewer tokens than reading the top few stale candidate files. trovex shows you the exact tokens it saved on your own repo via a savings dashboard, so you can replace the estimate with your real number."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / How much agents spend rereading files
+    </nav>
+
+    <h1>How much do AI agents spend rereading the same files?</h1>
+
+    <div class="verdict">
+      <div class="l">Direct answer</div>
+      <p>There's no single honest dollar figure — it depends on your repo size, how often agents run, and your model's pricing. But the waste is <strong>structural</strong>: the same docs get reread every session, for every agent, for every teammate, so the cost <strong>compounds</strong> instead of being paid once. The measurable, repeatable part is the per-lookup reduction — serving the one canonical doc at the section level is about <strong>60% fewer tokens</strong> than reading the top few stale candidates.</p>
+    </div>
+
+    <h2>Why the cost compounds (and is easy to miss)</h2>
+    <p class="lead-answer">A single reread looks cheap. The bill comes from repetition: an agent re-establishes context at the start of most sessions, you run several agents, and your teammates' agents do the same on the same repo. The same lookup gets paid for again and again, so a "small" per-session cost multiplies across sessions × agents × people. Bigger context windows don't help — you still pay per token, you can just load more of the same.</p>
+
+    <h2>Where the 60% comes from</h2>
+    <p class="lead-answer">It's the difference between two behaviors on one doc lookup: reading the top few candidate files (including stale and duplicate copies) to figure out which is current, versus being handed the single canonical section that answers. The latter is roughly 60% fewer tokens because the agent reads one current passage instead of several near-duplicates. That's a per-lookup number, measured on real repos — not a promise about your total bill, which depends on how many lookups you do.</p>
+
+    <h2>Get your real number</h2>
+    <p class="lead-answer"><a href="/">trovex</a> keeps a savings dashboard that shows, on your own repo, what the agents would have read versus what they actually read — so you can replace the estimate above with your measured figure. It runs locally (SQLite + ONNX, no cloud or keys).</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/reduce-agent-token-costs/">How do I reduce the token cost of giving a coding agent context?</a></li>
+        <li><a href="/answers/bigger-context-window-rereading/">Does a bigger context window make rereading docs cheaper?</a></li>
+        <li><a href="/answers/stop-agent-rereading-docs/">How do I stop my agent rereading the same files every session?</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Measure what you'd stop spending.</h2>
+      <p>trovex is in private beta — request access and see the savings on your own repo.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source (AGPL-3.0 core, MIT CLIs). Local-first — your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

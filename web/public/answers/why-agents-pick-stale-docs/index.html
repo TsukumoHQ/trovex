@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/why-agents-pick-stale-docs/" />
+  <title>Why do AI coding agents pick stale or outdated docs?</title>
+  <meta name="description" content="Because retrieval ranks by similarity, not freshness — an old postmortem or a duplicate wiki page can be the closest text match, and nothing marks which copy is current. A freshness signal (canonical / stale / duplicate) is what stops it." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/why-agents-pick-stale-docs/" />
+  <meta property="og:title" content="Why do AI coding agents pick stale docs?" />
+  <meta property="og:description" content="Similarity ranking has no idea which copy is current. A freshness marker is what fixes it." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Why do AI coding agents pick stale docs?" />
+  <meta name="twitter:description" content="Similarity ranking has no idea which copy is current." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Why agents pick stale docs", "item": "https://trovex.dev/answers/why-agents-pick-stale-docs/" }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "mainEntity": {
+          "@type": "Question",
+          "name": "Why do AI coding agents pick stale or outdated docs?",
+          "text": "My AI coding agent keeps surfacing old or outdated docs from the repo. Why does it pick the stale one?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/why-agents-pick-stale-docs/",
+            "text": "Because retrieval ranks by similarity, not freshness. When several markdown files mention the same topic — a current runbook, an old postmortem, a duplicate wiki page — the agent has no signal for which is authoritative, so it reads whichever is the closest text match. Similarity does not know which copy is current, so a stale or duplicate file can rank high and be read as the source of truth. The fix is a freshness signal: mark each result canonical, stale, or duplicate and return the one canonical doc, so the stale copies never reach the agent's context. trovex does this and serves the one current doc per query, at about 60% fewer tokens than reading the top candidates."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Why agents pick stale docs
+    </nav>
+
+    <h1>Why do AI coding agents pick stale or outdated docs?</h1>
+
+    <div class="verdict">
+      <div class="l">Direct answer</div>
+      <p>Because retrieval ranks by <strong>similarity, not freshness</strong>. When several files mention the same topic — a current runbook, an old postmortem, a duplicate wiki page — the agent has no signal for which is authoritative, so it reads whichever is the closest text match. A stale or duplicate copy can rank high and be read as the source of truth. The fix is a <strong>freshness signal</strong>: mark each result canonical, stale, or duplicate and return the one canonical doc, so the stale copies never reach the agent's context.</p>
+    </div>
+
+    <h2>Why similarity search surfaces the wrong copy</h2>
+    <p class="lead-answer">Embedding search answers "which text is most similar to the query?" — not "which doc is current?" An old incident write-up and the current runbook can be almost identical in wording, so the stale one scores just as high. Worse, near-duplicate copies (a wiki page and its README twin) both rank, so the agent pays to read the same content twice and still has to guess which to trust.</p>
+
+    <h2>What actually stops it</h2>
+    <ul>
+      <li><strong>A freshness marker per result</strong> — canonical, stale, or duplicate — so the agent never reasons over an outdated copy.</li>
+      <li><strong>Return one canonical doc</strong>, not a ranked list, so there's nothing to mis-rank.</li>
+      <li><strong>Skip duplicates</strong> instead of sending the agent two copies of the same thing.</li>
+    </ul>
+
+    <h2>How trovex handles it</h2>
+    <p class="lead-answer"><a href="/">trovex</a> indexes your repo's markdown and answers a query with the single current doc that addresses it — a <code>path:line</code> pointer with a freshness marker — so stale and duplicate copies are skipped, not ranked. Same answers, about <strong>60% fewer tokens per lookup</strong>. It runs locally (SQLite + ONNX, no cloud or keys).</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/stop-agent-rereading-docs/">How do I stop my agent rereading the same files every session?</a></li>
+        <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Skip the stale copies.</h2>
+      <p>trovex is in private beta — request access and serve your agents the one current doc per query.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source (AGPL-3.0 core, MIT CLIs). Local-first — your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

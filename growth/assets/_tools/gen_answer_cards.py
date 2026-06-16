@@ -24,6 +24,19 @@ CARDS = [
     ("stop-agent-rereading-docs",
      ["How do I stop my agent rereading", "the same files every session?"],
      ["Index once; trovex returns the one current", "section per query, not the whole repo."]),
+    # batch-2 (geo-shipped)
+    ("agent-cost-rereading-files",
+     ["How much do AI agents spend", "rereading the same files?"],
+     ["A big slice of every session — paid per agent, per teammate.", "trovex serves one current doc per query instead."]),
+    ("mcp-server-for-repo-docs",
+     ["Is there an MCP server that serves", "a repo's docs to coding agents?"],
+     ["Yes — trovex. It indexes your markdown and returns the one", "canonical doc per query: path:line + freshness, over MCP."]),
+    ("source-of-truth-multi-agent-repos",
+     ["What's the single source of truth", "for a multi-agent repo?"],
+     ["One shared trovex store — every agent reads the same", "canonical doc, and writes back so nobody re-derives it."]),
+    ("why-agents-pick-stale-docs",
+     ["Why do AI coding agents pick", "stale or outdated docs?"],
+     ["They guess from copies with no freshness signal. trovex marks", "each canonical / stale / duplicate and serves the current one."]),
 ]
 
 def esc(s):

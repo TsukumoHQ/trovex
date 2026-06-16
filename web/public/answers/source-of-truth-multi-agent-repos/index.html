@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/source-of-truth-multi-agent-repos/" />
+  <title>What's the single source of truth for a multi-agent repo?</title>
+  <meta name="description" content="One store that every agent both reads and writes through — so the repo's docs, not each agent's private context, are the source of truth. With one point of passage there are no copies to drift, and fleet cost stops compounding. Here's the pattern." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/source-of-truth-multi-agent-repos/" />
+  <meta property="og:title" content="Single source of truth for a multi-agent repo" />
+  <meta property="og:description" content="One read-and-write store so the repo's docs are the source of truth, not each agent's private context." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Source of truth for a multi-agent repo" />
+  <meta name="twitter:description" content="One read-and-write store; no drift; fleet cost stops compounding." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Source of truth for a multi-agent repo", "item": "https://trovex.dev/answers/source-of-truth-multi-agent-repos/" }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "mainEntity": {
+          "@type": "Question",
+          "name": "What is the single source of truth for a multi-agent repo?",
+          "text": "Several AI agents (and teammates) work on the same repo. What should be the single source of truth for their docs?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/source-of-truth-multi-agent-repos/",
+            "text": "The single source of truth should be one store that every agent both reads from and writes to — so the repo's documents, not each agent's private context, are authoritative. When reads and writes pass through one point, there are no separate copies to drift and nothing to sync, and a query returns the one canonical doc with a freshness marker rather than whatever a given agent happened to cache. This also stops fleet cost from compounding: instead of every agent re-deriving the same answer and rereading the same files, one agent records what it learned and the rest read it back. trovex implements this as a local MCP server with a shared write path, so a fleet of agents and the people around them work from the same canonical, current docs."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Source of truth for a multi-agent repo
+    </nav>
+
+    <h1>What's the single source of truth for a multi-agent repo?</h1>
+
+    <div class="verdict">
+      <div class="l">Direct answer</div>
+      <p>One store that every agent both <strong>reads from and writes to</strong> — so the repo's documents, not each agent's private context, are authoritative. With one point of passage for reads and writes there are no separate copies to drift and nothing to sync, and a query returns the one canonical doc with a freshness marker instead of whatever a given agent cached. It also stops fleet cost from compounding: one agent records what it learned, the rest read it back.</p>
+    </div>
+
+    <h2>Why "the repo" needs to be the unit, not each agent</h2>
+    <p class="lead-answer">In a multi-agent setup, the failure mode is divergence: each agent builds its own private context, so the same question gets re-derived, and two agents (or two teammates) end up acting on different copies of the same doc. If the source of truth lives inside an agent or an editor, it doesn't travel. Anchoring it to the <em>repo's</em> docs — one store all agents share — is what keeps everyone current.</p>
+
+    <h2>What the pattern requires</h2>
+    <ul>
+      <li><strong>One read path:</strong> every agent asks the same store and gets the same canonical answer, with a freshness marker.</li>
+      <li><strong>One write path:</strong> an agent records a decision or incident once, in the store the others read.</li>
+      <li><strong>No sync:</strong> because reads and writes share one point of passage, there are no copies to reconcile.</li>
+      <li><strong>Cost that doesn't scale with the fleet:</strong> the answer is computed once and reused, not re-derived per agent.</li>
+    </ul>
+
+    <h2>How trovex implements it</h2>
+    <p class="lead-answer"><a href="/">trovex</a> is a local-first MCP server with exactly this shared write path: agents read the one canonical doc per query and write records back through the same store, so the whole fleet and your teammates see one current source of truth. For the step-by-step version, see <a href="/answers/shared-source-of-truth-multiple-agents/">how to keep multiple agents on the same docs</a>.</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/vs/cursor-memory/">trovex vs Cursor memory</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>One source of truth for the whole fleet.</h2>
+      <p>trovex is in private beta — request access and put every agent on one store.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source (AGPL-3.0 core, MIT CLIs). Local-first — your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

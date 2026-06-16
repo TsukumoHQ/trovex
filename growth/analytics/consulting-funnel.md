@@ -115,8 +115,10 @@ Provide an analytics module on tsukumo equivalent to trovex's `web/src/analytics
 
 - Inquiry PII (name/email/company) lives only in the CRM/first-party store — **never** in
   analytics. Attribution events carry source only.
-- No fabricated leads/case-study numbers (cmo rule). Mark `n/a` until tsukumo.ch + a CRM
-  exist; the agency repo isn't built yet, so stages 4–6 are **specced, not yet measured**.
+- No fabricated leads/case-study numbers (cmo rule). tsukumo.ch is now **live** and stage 4
+  (`assessment_request`) is **instrumented + QA'd** (tsukumo PR #130); the operational read
+  lives in [`suite-agency-funnel-dashboard.md`](./suite-agency-funnel-dashboard.md). Stages
+  5–6 remain manual CRM. Mark `n/a` until data accrues — never invent counts.
 - AI-engine/dark-social attribution is a floor; `how_heard` is the honest counterweight.
 - Cross-property awareness (stages 1–2) needs WRAI.TH + yoru to carry the same analytics
   as trovex — flag as a per-property rollout (trovex is the reference impl).

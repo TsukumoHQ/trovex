@@ -127,8 +127,9 @@ is inflated and `ai_engine` is a **floor**, not the true number. The `how_heard`
 | content (ai_engine/search/social) | ‹› | ‹› | ‹› | ‹› |
 | direct / referral | ‹› | ‹› | ‹› | ‹› |
 
-Feeds the weekly north-star report (`north-star-report-template.md`) — one source of truth,
-no double-keeping. **Best source = highest qualified-per-visit, not highest raw visits.**
+Feeds the weekly digest (`weekly-digest-template.md`) — the recurring fill-in artifact —
+and the north-star report (`north-star-report-template.md`). One source of truth, no
+double-keeping. **Best source = highest qualified-per-visit, not highest raw visits.**
 
 ## 6. First attribution read — live data, 2026-06-16
 

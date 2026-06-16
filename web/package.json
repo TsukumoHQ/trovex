@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "check:brand": "node scripts/check-brand.mjs",
-    "build": "node scripts/check-brand.mjs && tsc -b && vite build",
+    "check:sitemap": "node scripts/check-sitemap.mjs",
+    "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

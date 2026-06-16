@@ -184,18 +184,19 @@ export default async function handler(req, res) {
   // Honeypot: a bot filled the hidden field. Pretend success, store nothing.
   if (honeypot) return res.status(200).json({ ok: true })
 
+  const meta = serverMeta(req)
+  // Throttle floods before any further work (durable via KV when configured, else
+  // best-effort per-instance). Gated ahead of validation so spam of any shape is
+  // capped; honeypot + validation remain the hard defenses.
+  if (await rateLimited({ scope: 'waitlist', ipHash: meta.ip_hash, ip: meta.ip })) {
+    return res.status(429).json({ ok: false, error: 'rate_limited' })
+  }
+
   if (!email || email.length > 254 || !EMAIL_RE.test(email)) {
     return res.status(400).json({ ok: false, error: 'invalid_email' })
   }
 
   const attribution = pickAttribution(body)
-  const meta = serverMeta(req)
-
-  // Throttle floods before the store (durable via KV when configured, else
-  // best-effort per-instance). honeypot + validation remain the hard defenses.
-  if (await rateLimited({ scope: 'waitlist', ipHash: meta.ip_hash, ip: meta.ip })) {
-    return res.status(429).json({ ok: false, error: 'rate_limited' })
-  }
 
   try {
     // storeSupabase returns 'ok' | 'duplicate' (stored) or 'skip' (not configured →

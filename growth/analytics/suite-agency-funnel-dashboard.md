@@ -15,19 +15,15 @@ consulting leads?"
 
 ---
 
-## 0. Prerequisite (one-time, blocks the live read)
+## 0. Prerequisite (done)
 
-Plausible's Stats API needs (a) an **API key** (read-only) and (b) the **custom properties
-allow-listed** in site settings so they're queryable by breakdown:
-
-```
-source · geo_source · channel · from_suite · page · location · from_tool · how_heard ·
-utm_source · utm_medium · utm_campaign · utm_content
-```
-
-Until the key exists, the panels below are **specced and verified-firing, but unread**
-(§6). Provision a read-only key in Plausible → tsukumo.ch → Settings → API Keys, store it
-in the analytics runner env (never in git), and the §3 queries return numbers as-is.
+The read-only Stats API key is **provisioned** (out-of-git at
+`~/.config/trovex-growth/plausible.env`: `PLAUSIBLE_STATS_API_KEY` + `PLAUSIBLE_SITE_ID`;
+load `set -a; . ~/.config/trovex-growth/plausible.env; set +a` — never print/commit). The §3
+queries return live numbers (confirmed, §6). `source`/`geo_source` props are queryable; if a
+breakdown on another custom prop returns empty, allow-list it in Plausible → tsukumo.ch →
+Settings (the full set: `source · geo_source · channel · from_suite · page · location ·
+from_tool · how_heard · utm_source · utm_medium · utm_campaign · utm_content`).
 
 ---
 
@@ -131,27 +127,25 @@ Feeds the weekly digest (`weekly-digest-template.md`) — the recurring fill-in 
 and the north-star report (`north-star-report-template.md`). One source of truth, no
 double-keeping. **Best source = highest qualified-per-visit, not highest raw visits.**
 
-## 6. First attribution read — live data, 2026-06-16
+## 6. First real read — baseline, 2026-06-17
 
-**Honest status: insufficient data — no read yet.** Two reasons, both stated plainly:
+The read-only Stats API key is **live**, so this is no longer "insufficient" — it's a real,
+pulled baseline. Full report: [`reports/agency-baseline-2026-06-17.md`](./reports/agency-baseline-2026-06-17.md).
 
-1. **No Plausible Stats API key available** to me (no public/shared dashboard either:
-   `plausible.io/share/tsukumo.ch` → 404; the API returns *"Missing API key"*). I will not
-   estimate or fabricate counts. The §3 queries are ready to run the moment a read-only key
-   is provisioned (§0).
-2. **The site is freshly live.** Tsukumo analytics shipped recently and tsukumo PR #130
-   (the QA pass) deployed today; the suite-side tiles (1–3) need WRAI.TH/yoru to port the
-   module first. So even with a key, the current window is **pre-meaningful-traffic** —
-   expected counts are ~0 to single digits and not yet interpretable.
+- **North star (`assessment_request`, `source=suite`): 0.** Total `assessment_request`: **0**.
+- **Organic visitors: 0.** Plausible shows 2 visitors (06-16/17) — both are analytics-lead's
+  own end-to-end verification sessions (direct). The site went live 2026-06-16; no
+  distribution push yet, so the funnel is correctly empty.
+- **Instrumentation confirmed landing** in the dashboard: `pageview`, `page_view`,
+  `tsukumo_visit` (with `source`/`geo_source` props), `intent_page_view`, `cta_clicked` all
+  surface for real; `assessment_request` was aborted in-test on purpose (never inject a fake
+  conversion). So tracking is not the blocker — only traffic is.
 
-**Therefore the first real read = the baseline capture.** Once the key lands: run §3, record
-the dated zero/low baseline verbatim, and re-read weekly. Do not call a launch "flat" off a
-pre-traffic window. First interpretable read expected after the first distribution push
-(Product Hunt / Show HN / GEO seeding) sends real volume.
+**API quirk to remember:** `period=7d`/`30d` returned 0 here while explicit
+`period=custom&date=start,end` ranges return the real counts — pull with explicit date ranges.
 
-**What IS verified now (tsukumo PR #130, live QA):** every tile-4–7 event fires correctly
-and is PII-clean — so when traffic arrives, the dashboard reads true. Instrumentation is
-not the blocker; the API key + traffic are.
+First interpretable read = after the first distribution push (Product Hunt / Show HN / GEO
+seeding). The weekly digest fills from then.
 
 ## 7. Honesty / privacy
 

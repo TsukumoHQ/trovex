@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024" role="img" aria-label="tsukumo — run AI in production. We turn your dev team into agentic operators: augment, never replace. A dev studio and AI consulting. tsukumo.ch">
+  <defs>
+    <style>
+      .d { font-family: 'Archivo','Inter Tight',system-ui,sans-serif; }
+      .m { font-family: 'Space Mono','Geist Mono',ui-monospace,monospace; }
+    </style>
+    <linearGradient id="s" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000" stop-opacity="0.6"/>
+      <stop offset="0.68" stop-color="#000" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1536" height="1024" fill="#121212"/>
+  <image href="bg-concrete-acid.png" x="0" y="0" width="1536" height="1024" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="1536" height="1024" fill="url(#s)"/>
+
+  <!-- top bar -->
+  <rect x="96" y="86" width="22" height="22" fill="#c8ff00"/>
+  <text class="d" x="130" y="106" font-size="30" font-weight="800" letter-spacing="-0.02em" fill="#f3f1ea">tsukumo</text>
+  <text class="m" x="1440" y="105" font-size="22" fill="#f3f1ea" opacity="0.82" text-anchor="end">work · approach · contact</text>
+  <text class="m" x="96" y="900" font-size="22" fill="#c8ff00">01 — 04</text>
+
+  <!-- hero headline -->
+  <text class="d" x="92" y="430" font-size="168" font-weight="800" letter-spacing="-0.035em" fill="#f3f1ea">run AI in</text>
+  <text class="d" x="92" y="600" font-size="168" font-weight="800" letter-spacing="-0.035em" fill="#c8ff00">production.</text>
+
+  <!-- sub -->
+  <rect x="96" y="660" width="120" height="10" fill="#c8ff00"/>
+  <text class="m" x="96" y="724" font-size="27" fill="#f3f1ea" opacity="0.9">we turn your dev team into agentic operators —</text>
+  <text class="m" x="96" y="762" font-size="27" fill="#f3f1ea" opacity="0.9">augment, never replace.</text>
+
+  <!-- footer -->
+  <text class="m" x="96" y="952" font-size="23" fill="#f3f1ea" opacity="0.7">a dev studio + AI consulting · tsukumo.ch</text>
+  <text class="m" x="1440" y="952" font-size="21" fill="#f3f1ea" opacity="0.45" text-anchor="end">concept — direction 01</text>
+</svg>

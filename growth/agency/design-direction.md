@@ -1,9 +1,12 @@
-# Agency site — visual direction (DRAFT for cmo/owner pick)
+# Agency site — visual direction
 
-> **Status: DIRECTION OPTIONS, not locked.** Three named vibes + concept hero mocks to
-> choose the feel. Final palette/type get locked once the agency **name** lands.
-> Name-agnostic for now (placeholder wordmark in the mocks). A human picks the direction;
-> nothing here is live.
+> **LOCKED → Tsukumo, direction 01 "Concrete & Acid"** (cmo, memory `agency-identity`).
+> Name: **tsukumo** (付喪神, lowercase wordmark) · domain tsukumo.ch · accent acid-lime `#c8ff00`.
+> Tokens locked in [`design-tokens.css`](./design-tokens.css). Brand assets:
+> `growth/assets/agency/tsukumo-wordmark.png`, `tsukumo-hero.png`. Build the coded hero in the
+> incoming `Synergix-lab/tsukumo` repo (Next.js). Directions 02/03 below kept for reference.
+>
+> _Original brief (3 options) preserved below; 01 was chosen._
 >
 > **Deliberately NOT the trovex look.** trovex is terminal-restraint (near-black, one green,
 > Fira mono, developer-honest). The agency has its **own, bolder identity** — brutalist +

@@ -19,7 +19,7 @@ AI-engine signal (those referrers get stripped). Pairs with referrer-host fallba
 |-------|---------|------|
 | `utm_source` | where the click physically comes from | closed list below; must match `web/src/analytics.ts`. Unmapped → silently `referral`/`unknown`. |
 | `utm_medium` | kind of placement | closed: `ai_answer`, `organic`, `social`, `community`, `registry`, `referral`, `email`, `paid`. |
-| `utm_campaign` | the initiative | kebab-case, reuse names: `private-beta`, `geo-seed`, `comparison-pages`, `newsletter`, `agency-launch` (the tsukumo/agency launch push), `launch-hn`, `launch-ph`. |
+| `utm_campaign` | the initiative | kebab-case, reuse names: `private-beta`, `geo-seed`, `comparison-pages`, `newsletter`, `agency-launch` (the tsukumo/agency launch push), `launch-hn`, `launch-ph`, `lead-nurture` (post-capture nurture sequence). |
 | `utm_content` | which variant/placement of the link | distinguishes A/B variants & placements: `cta-hero`, `cta-footer`, `post-1`, `thread-tweet-3`, `vs-mem0`, `card-a`. Powers per-variant attribution. |
 
 `utm_content` is the new one: it's how we tell apart two versions of the same campaign
@@ -57,6 +57,7 @@ Base: `https://trovex.dev/?utm_source=…&utm_medium=…&utm_campaign=…&utm_co
 | launch-lead — registry listing (when public phase opens) | `?utm_source=mcp-registry&utm_medium=registry&utm_campaign=launch&utm_content=listing` |
 | launch-lead — Product Hunt launch | `?utm_source=producthunt&utm_medium=social&utm_campaign=agency-launch&utm_content=ph-tagline` |
 | content-lead — newsletter | `?utm_source=newsletter&utm_medium=email&utm_campaign=private-beta&utm_content=issue-1` |
+| social — lead-nurture email (to tsukumo `/engagements`) | `?utm_source=trovex&utm_medium=oss-suite&utm_campaign=lead-nurture&utm_content=nurture-e<N>` (waitlist) · `?utm_medium=email&utm_campaign=lead-nurture&utm_content=nurture-e<N>` (contact) — see `retention-cohort-spec.md` |
 | community — Discord drop | `?utm_source=discord&utm_medium=community&utm_campaign=private-beta&utm_content=mcp-server` |
 
 Ownership: geo-lead tags GEO/SEO + comparison/answers links; social-lead tags social;

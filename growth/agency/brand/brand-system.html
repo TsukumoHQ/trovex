@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tsukumo — brand system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#121212;--ink2:#1b1a18;--concrete:#9a958c;--concrete-d:#6b665e;
+    --bone:#f3f1ea;--bone-dim:#b8b3a8;--acid:#c8ff00;--acid-ink:#0e1100;
+    --hair:rgba(243,241,234,0.14);
+    --d:'Archivo','Inter Tight',system-ui,sans-serif;--m:'Space Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--bone);font-family:var(--m);font-size:15px;line-height:1.55;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1100px;margin:0 auto;padding:64px 40px 96px}
+  .rule{height:6px;background:var(--acid);width:100%}
+  h1{font-family:var(--d);font-weight:900;letter-spacing:-0.04em;line-height:0.92;
+    font-size:clamp(3rem,12vw,8rem);margin:28px 0 6px}
+  h1 .sq{display:inline-block;width:0.6em;height:0.6em;background:var(--acid);margin-right:0.18em;vertical-align:0.02em}
+  .lede{font-family:var(--d);font-weight:600;font-size:clamp(1.1rem,2.4vw,1.6rem);color:var(--bone);
+    max-width:60ch;letter-spacing:-0.01em;margin-bottom:8px}
+  .meta{color:var(--bone-dim);font-size:13px}
+  section{margin-top:64px;padding-top:28px;border-top:1px solid var(--hair)}
+  .idx{color:var(--acid);font-size:13px;letter-spacing:0.1em}
+  h2{font-family:var(--d);font-weight:800;letter-spacing:-0.03em;font-size:clamp(1.6rem,4vw,2.6rem);margin:6px 0 20px}
+  .grid{display:grid;gap:14px}
+  .sw{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .chip{border:1px solid var(--hair)}
+  .chip .cap{height:96px}
+  .chip .lab{padding:10px 12px;font-size:12px;display:flex;justify-content:space-between;gap:8px}
+  .chip .lab b{color:var(--bone)} .chip .lab span{color:var(--bone-dim)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td,th{text-align:left;padding:9px 10px;border-bottom:1px solid var(--hair);vertical-align:top}
+  th{color:var(--acid);font-weight:700}
+  .spec{font-family:var(--d);letter-spacing:-0.03em;color:var(--bone)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  .do b{color:var(--acid)} .dont b{color:var(--concrete)}
+  ul{list-style:none} li{padding:5px 0;border-bottom:1px solid var(--hair)}
+  .acidbox{background:var(--acid);color:var(--acid-ink);padding:22px 24px;font-family:var(--d);
+    font-weight:800;font-size:clamp(1.4rem,4vw,2.4rem);letter-spacing:-0.03em}
+  .foot{margin-top:64px;color:var(--bone-dim);font-size:12px;display:flex;justify-content:space-between}
+  @media(max-width:680px){.two{grid-template-columns:1fr}}
+  @media print{
+    body{background:#fff;color:#111}
+    .wrap{max-width:none;padding:0}
+    section{break-inside:avoid;border-top:1px solid #ccc}
+    .meta,.chip .lab span,.foot{color:#555}
+    .idx,th,.do b{color:#3a6a00}
+    .acidbox{background:#c8ff00;color:#0e1100}
+    .lede,h1,.spec,.chip .lab b{color:#111}
+  }
+</style>
+</head>
+<body>
+<div class="rule"></div>
+<div class="wrap">
+
+  <div class="idx">brand system · direction 01 "concrete &amp; acid"</div>
+  <h1><span class="sq"></span>tsukumo</h1>
+  <p class="lede">付喪神 — tools that gain a spirit. The studio that turns dev teams into agentic operators. run AI in production, augment never replace.</p>
+  <p class="meta">primary brand = the agency. suite (trovex · wrai.th · yoru) = proof + funnel. tsukumo.ch</p>
+
+  <section>
+    <div class="idx">01</div><h2>Color</h2>
+    <div class="grid sw">
+      <div class="chip"><div class="cap" style="background:#121212;border-bottom:1px solid var(--hair)"></div><div class="lab"><b>ink</b><span>#121212</span></div></div>
+      <div class="chip"><div class="cap" style="background:#1b1a18"></div><div class="lab"><b>ink-2</b><span>#1b1a18</span></div></div>
+      <div class="chip"><div class="cap" style="background:#9a958c"></div><div class="lab"><b>concrete</b><span>#9a958c</span></div></div>
+      <div class="chip"><div class="cap" style="background:#6b665e"></div><div class="lab"><b>concrete-d</b><span>#6b665e</span></div></div>
+      <div class="chip"><div class="cap" style="background:#f3f1ea"></div><div class="lab"><b>bone</b><span>#f3f1ea</span></div></div>
+      <div class="chip"><div class="cap" style="background:#c8ff00"></div><div class="lab"><b>acid</b><span>#c8ff00</span></div></div>
+    </div>
+    <p class="meta" style="margin-top:14px">Two-tone base (ink + bone) + <b style="color:var(--acid)">exactly one</b> acid accent per view. Acid marks the one thing that matters. Never decorative.</p>
+  </section>
+
+  <section>
+    <div class="idx">02</div><h2>Type</h2>
+    <p class="spec" style="font-weight:900;font-size:clamp(2.4rem,9vw,5rem);line-height:0.92">run AI in production.</p>
+    <p class="meta" style="margin:6px 0 18px">Archivo 800–900 · tracking −0.03em · leading 0.92 · set huge.</p>
+    <p style="font-size:15px;color:var(--bone-dim)">Space Mono — labels, nav, captions, index numbers, code. the built-by-engineers tell.</p>
+    <table style="margin-top:18px">
+      <tr><th>step</th><th>size</th><th>use</th></tr>
+      <tr><td>hero</td><td>clamp(3.5rem,14vw,13rem)</td><td>one-line statements</td></tr>
+      <tr><td>h1</td><td>clamp(2.5rem,8vw,6rem)</td><td>section heads</td></tr>
+      <tr><td>h2</td><td>clamp(1.75rem,4vw,3rem)</td><td>sub-heads</td></tr>
+      <tr><td>body</td><td>clamp(1rem,1.2vw,1.25rem)</td><td>prose, kept short</td></tr>
+      <tr><td>label</td><td>0.8125rem mono</td><td>index, captions, nav</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <div class="idx">03</div><h2>Wordmark &amp; layout</h2>
+    <div class="two">
+      <div>
+        <p style="margin-bottom:10px"><b style="color:var(--bone)">wordmark</b></p>
+        <p class="meta">lowercase <b style="color:var(--bone)">tsukumo</b>, Archivo 800, acid square mark before the word (height ≈ cap height). Clear-space = one square on all sides. Min 96px / 20mm, else square-only.</p>
+      </div>
+      <div>
+        <p style="margin-bottom:10px"><b style="color:var(--bone)">layout</b></p>
+        <p class="meta">12-col, content on odd ranges (hang off the grid). Hairline rules + margin index numbers. Hard corners (radius 0). Negative space is a material. Motion: heavy ease-out, masked type reveals, honor reduced-motion.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="idx">04</div><h2>Do / don't</h2>
+    <div class="two">
+      <ul class="do">
+        <li><b>✅</b> one acid accent per view</li>
+        <li><b>✅</b> oversized type, raw asymmetric grid</li>
+        <li><b>✅</b> mono labels + index numbers</li>
+        <li><b>✅</b> concrete texture, hard directional light</li>
+        <li><b>✅</b> real words, qualitative proof</li>
+      </ul>
+      <ul class="dont">
+        <li><b>✕</b> more than one accent in view</li>
+        <li><b>✕</b> centered safe layouts, rounded friendly corners</li>
+        <li><b>✕</b> gradients / blobs / stock photos / glowing brains</li>
+        <li><b>✕</b> fabricated numbers, logos, testimonials</li>
+        <li><b>✕</b> the name "Synergix" on any public surface</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="idx">05</div><h2>Suite</h2>
+    <table>
+      <tr><th>brand</th><th>surface</th><th>look</th></tr>
+      <tr><td class="spec">tsukumo</td><td>agency site, decks</td><td>this system — concrete + acid, Archivo / Space Mono</td></tr>
+      <tr><td class="spec">trovex</td><td>OSS product (beta)</td><td>terminal-restraint: #0a0e17, green #22c55e, Fira — honest/humble</td></tr>
+      <tr><td class="spec">wrai.th</td><td>orchestration (OSS)</td><td>suite member, own mark TBD</td></tr>
+      <tr><td class="spec">yoru</td><td>observability (OSS)</td><td>suite member, own mark TBD</td></tr>
+    </table>
+  </section>
+
+  <div class="acidbox" style="margin-top:48px">augment, never replace.</div>
+
+  <div class="foot"><span>tsukumo — brand system</span><span>no fabricated proof · tsukumo.ch</span></div>
+</div>
+</body>
+</html>

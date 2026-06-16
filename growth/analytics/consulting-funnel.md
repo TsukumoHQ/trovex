@@ -22,17 +22,24 @@ whoever builds `tsukumo` (Next.js + Vercel).
 [channel] → [OSS property: WRAI.TH / trovex / yoru] → discover the suite → tsukumo.ch → consulting inquiry → qualified → engagement
 ```
 
+Canonical event taxonomy (memory `funnel-event-taxonomy`; launch #54
+`content/funnel-wiring.md`; tsukumo `src/lib/analytics.ts`):
+
 | # | Stage | Where measured | Event / signal |
 |---|-------|----------------|----------------|
-| 1 | Awareness (per property) | each property's own analytics | `landing_view` by `geo_source`/`channel` |
-| 2 | Suite discovery | property sites | `suite_clicked` (cross-link to WRAI.TH/trovex/yoru) |
-| 3 | Agency referral | property → tsukumo.ch | outbound CTA, **UTM-tagged** (`utm_source=<property>`) |
-| 4 | **Consulting inquiry** | tsukumo.ch form | `consulting_inquiry` (the conversion) |
-| 5 | Qualified | CRM (manual) | inquiry triaged as a real fit |
-| 6 | Engagement | CRM (manual) | signed / scoped work (the money) |
+| 1 | Awareness (per property) | each property's own analytics | `oss_surface_view` by `geo_source`/`channel` |
+| 1b | Adoption | suite repos | `oss_adopt` (install / waitlist / discord) |
+| 2 | Suite → agency | property sites (suite repos) | `suite_to_agency_click` + **UTM** (`utm_source=wraith\|trovex\|yoru`, `utm_campaign=suite`) |
+| 3 | Agency visit | tsukumo.ch | `tsukumo_visit` (`from_suite`, `source`) → `intent_page_view` |
+| 4 | **Assessment request** | tsukumo.ch form | `assessment_request` (the conversion) |
+| 5 | Qualified / proposal | CRM (manual) | `proposal_sent`; triaged as a real fit |
+| 6 | Engagement | CRM (manual) | `engagement_won` — signed / scoped work (the money) |
 
-Stage 4 (`consulting_inquiry`) is the **primary web-measurable conversion**; stages 5–6
-are manual CRM stages (high value, low volume) — the honest revenue end.
+Stage 4 (`assessment_request`) is the **primary web-measurable conversion**; stages 5–6
+are manual CRM stages (high value, low volume) — the honest revenue end. Every tsukumo
+event rides `source` (`suite\|referral\|content\|direct`). **North star =
+`assessment_request` where `source=suite`** ("does the OSS suite produce consulting
+leads?").
 
 ## 2. Attribution — three signals, because B2B journeys are long + dark
 
@@ -72,7 +79,7 @@ properties use `utm_medium=suite-crosslink`.
 
 Mirror the trovex waitlist pattern (`waitlist-tracking.md`), privacy-respecting:
 
-- On submit success → fire `consulting_inquiry` with **source attribution only**
+- On submit success → fire `assessment_request` with **source attribution only**
   (`source_property`, `channel`, `utm_*`, `referrer` host, `how_heard`) — **never** the
   name/email/company (that PII goes to the CRM/first-party store only).
 - POST the inquiry with the page's derived attribution (a `getAttribution()` equivalent on
@@ -86,7 +93,7 @@ Provide an analytics module on tsukumo equivalent to trovex's `web/src/analytics
 
 ## 5. The consulting-lead metric + readout
 
-- **Consulting-lead metric** = a submitted `consulting_inquiry` on tsukumo.ch (stage 4).
+- **Consulting-lead metric** = a submitted `assessment_request` on tsukumo.ch (stage 4).
   Qualified-lead = stage 5 (CRM). Both reported; stage 4 is the leading indicator.
 - **Weekly readout — leads by source property × channel:**
 
@@ -97,7 +104,7 @@ Provide an analytics module on tsukumo equivalent to trovex's `web/src/analytics
 | yoru | ‹› | ‹› | ‹› | |
 | direct / search / other | ‹› | ‹› | ‹› | dark funnel → lean on how_heard |
 
-- **Rates:** property-site → tsukumo click-through; tsukumo session → `consulting_inquiry`;
+- **Rates:** property-site → tsukumo click-through; tsukumo session → `assessment_request`;
   inquiry → qualified → engagement (CRM).
 - **Self-report vs auto disagreement** shown openly (e.g. "how_heard says trovex, referrer
   says direct" — the dark-funnel signal).

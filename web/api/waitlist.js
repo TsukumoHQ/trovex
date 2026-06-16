@@ -25,6 +25,7 @@
  */
 
 import { createHash } from 'node:crypto'
+import { rateLimited } from './_rate-limit.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -38,14 +39,16 @@ function serverMeta(req) {
     if (raw) referer = new URL(raw).host.slice(0, 64)
   } catch { /* malformed Referer — ignore */ }
 
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+  const ip = fwd || req.socket?.remoteAddress || ''
   let ip_hash = null
   const salt = process.env.WAITLIST_IP_SALT
-  if (salt) {
-    const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
-    const ip = fwd || req.socket?.remoteAddress || ''
-    if (ip) ip_hash = createHash('sha256').update(salt + ip).digest('hex').slice(0, 32)
+  if (salt && ip) {
+    ip_hash = createHash('sha256').update(salt + ip).digest('hex').slice(0, 32)
   }
-  return { referer, ip_hash }
+  // ip is returned for the in-memory rate-limit fallback ONLY — never stored,
+  // logged, or persisted (only ip_hash is written to a row).
+  return { referer, ip_hash, ip: ip || null }
 }
 
 // Closed allowlist of source-attribution fields (no PII). Anything else is dropped;
@@ -187,6 +190,12 @@ export default async function handler(req, res) {
 
   const attribution = pickAttribution(body)
   const meta = serverMeta(req)
+
+  // Throttle floods before the store (durable via KV when configured, else
+  // best-effort per-instance). honeypot + validation remain the hard defenses.
+  if (await rateLimited({ scope: 'waitlist', ipHash: meta.ip_hash, ip: meta.ip })) {
+    return res.status(429).json({ ok: false, error: 'rate_limited' })
+  }
 
   try {
     // storeSupabase returns 'ok' | 'duplicate' (stored) or 'skip' (not configured →

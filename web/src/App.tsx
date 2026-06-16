@@ -440,6 +440,14 @@ export default function App() {
             <a href="/vs/" onClick={() => track('compare_clicked', { location: 'footer' })}>Compare</a>
             <a href="/answers/" onClick={() => track('answers_clicked', { location: 'footer' })}>Answers</a>
             <a href="/for/" onClick={() => track('setup_clicked', { location: 'footer' })}>Setup</a>
+            <a
+              href="https://tsukumo.ch/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => track('tsukumo_clicked', { location: 'footer' })}
+            >
+              built by tsukumo ↗
+            </a>
           </nav>
           <small>© 2026 trovex · one source of truth for your agents' docs</small>
         </div>

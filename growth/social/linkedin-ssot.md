@@ -7,7 +7,7 @@
 > Lowercase `trovex`. Passed copy-gate.
 
 ## UTM link (first comment)
-`https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist`
+`https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
 
 ---
 

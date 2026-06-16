@@ -8,8 +8,8 @@
 > "join 500 devs" — it's an early private beta. Lowercase `trovex`. Passed copy-gate.
 
 ## UTM links (per `growth/analytics/geo-attribution.md`, social owns social links)
-- X: `https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist`
-- LinkedIn: `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist`
+- X: `https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
+- LinkedIn: `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
 - Put the link in a REPLY (X) / FIRST COMMENT (LinkedIn), not the post body.
 
 ---

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/pieces/" />
+  <title>trovex vs Pieces — personal workflow memory vs a repo's canonical docs</title>
+  <meta name="description" content="Pieces is a developer tool for long-term, personal memory across your apps — snippets, context from your workflow, recall across tools. trovex serves a repo's canonical docs to coding agents with a freshness marker. Different jobs. Here's the honest comparison." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/pieces/" />
+  <meta property="og:title" content="trovex vs Pieces" />
+  <meta property="og:description" content="Personal cross-tool workflow memory vs a repo's canonical docs served to agents. Different jobs." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs Pieces" />
+  <meta name="twitter:description" content="Personal cross-tool workflow memory vs a repo's canonical docs served to agents." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs Pieces", "item": "https://trovex.dev/vs/pieces/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and Pieces?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Pieces is a developer tool focused on personal, long-term memory across your apps — saving snippets and capturing context from your workflow so you and an assistant can recall it later, across tools. trovex is focused on a repo's canonical documentation: it indexes the repo's markdown and serves a coding agent the one current doc that answers a query, with a freshness marker. Pieces remembers your personal activity; trovex serves the repo's authoritative docs to agents. Different jobs." }
+          },
+          {
+            "@type": "Question",
+            "name": "Can trovex and Pieces be used together?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes — they don't overlap much. Use Pieces for personal cross-tool recall of snippets and workflow context; use trovex to give your coding agents the repo's canonical docs as one current answer per query. One is about your memory; the other is about the repo's source of truth." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is trovex a personal memory tool?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. trovex is a shared, repo-scoped source of truth, not a personal memory store. Its write path is for agents and teammates to record canonical docs that everyone reads, not for capturing one person's activity across apps." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs Pieces
+    </nav>
+
+    <h1>trovex vs <span class="ac">Pieces</span></h1>
+    <p class="deck">Pieces remembers your personal workflow across apps. trovex serves the repo's canonical docs to agents. Different jobs — here's how they line up.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Pieces is a developer tool for <strong>personal, long-term memory across your apps</strong> — saving snippets and capturing workflow context so you and an assistant can recall it later. trovex is focused on a <strong>repo's canonical documentation</strong>: it serves a coding agent the one current doc that answers a query, with a freshness marker, for about <strong>60% fewer tokens per lookup</strong>. Pieces remembers <em>your</em> activity; trovex serves the <em>repo's</em> authoritative docs to agents. They don't really overlap.</p>
+    </div>
+
+    <h2>What is Pieces?</h2>
+    <p class="lead-answer">Pieces for Developers is a tool centered on memory and context that follows you across the apps you use — saving and organizing snippets, and capturing the context of what you've been working on so it can be recalled later by you or an AI copilot. Its value is continuity across tools and time. (Features evolve — check Pieces' current docs for specifics.)</p>
+
+    <h2>Where trovex is different</h2>
+    <p class="lead-answer">trovex isn't about your personal history — it's about the repo's source of truth. It indexes a repo's markdown and routes a query to the single canonical doc, marks stale and duplicate copies so they're skipped, reads at the section level, and lets agents and teammates write canonical records everyone reads. The write path is shared and repo-scoped, not a personal capture of your activity.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>Pieces vs trovex</caption>
+        <thead><tr><th scope="col">Capability</th><th scope="col">Pieces</th><th scope="col" class="trovex">trovex</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">Focus</td><td>Personal memory across your apps</td><td>A repo's canonical docs for agents</td></tr>
+          <tr><td class="feat">What it stores</td><td>Snippets, workflow context</td><td>The repo's markdown, canonical-routed</td></tr>
+          <tr><td class="feat">Shared / repo-scoped</td><td class="partial">~ personal-first</td><td><span class="yes">✓</span> shared source of truth</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">—</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">One canonical answer per query</td><td class="no">— recall set</td><td><span class="yes">✓</span> section-level</td></tr>
+          <tr><td class="feat">Interface</td><td>Desktop app + integrations</td><td>MCP server + CLI, local</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When is Pieces the right choice?</h2>
+    <p class="lead-answer">When you want continuity for <em>yourself</em> — recalling snippets and the context of past work across the tools you use — Pieces is built for that. Reach for trovex when the job is giving coding agents the repo's canonical documentation as one current answer per query. They address different needs and can run side by side.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item"><p class="faq-q">What is the difference between trovex and Pieces?</p><p class="faq-a">Pieces focuses on personal, long-term memory across your apps — snippets and workflow context for later recall. trovex focuses on a repo's canonical documentation, serving an agent the one current doc per query with a freshness marker. Pieces remembers your activity; trovex serves the repo's authoritative docs.</p></div>
+      <div class="faq-item"><p class="faq-q">Can trovex and Pieces be used together?</p><p class="faq-a">Yes — they barely overlap. Pieces for personal cross-tool recall; trovex to give coding agents the repo's canonical docs as one current answer per query.</p></div>
+      <div class="faq-item"><p class="faq-q">Is trovex a personal memory tool?</p><p class="faq-a">No. trovex is a shared, repo-scoped source of truth. Its write path is for agents and teammates to record canonical docs everyone reads, not for capturing one person's activity across apps.</p></div>
+    </section>
+
+    <div class="cta">
+      <h2>The repo's source of truth, for agents.</h2>
+      <p>trovex is in private beta — request access and serve one canonical doc per query.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source (AGPL-3.0 core, MIT CLIs). Local-first — your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/mem0/">trovex vs mem0</a></li>
+        <li><a href="/vs/claude-projects/">trovex vs Claude Projects</a></li>
+        <li><a href="/vs/cursor-memory/">trovex vs Cursor memory</a></li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+  <script defer src="/vs/track.js"></script>
+</body>
+</html>

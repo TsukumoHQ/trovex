@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/continue/" />
+  <title>trovex vs Continue.dev — a context source you plug in vs a full assistant</title>
+  <meta name="description" content="Continue.dev is a free, open-source AI coding assistant and framework with its own codebase retrieval and MCP support. trovex is an MCP context server that serves one canonical doc per query. They compose: connect trovex to Continue. Here's the honest comparison." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/continue/" />
+  <meta property="og:title" content="trovex vs Continue.dev" />
+  <meta property="og:description" content="A full OSS assistant with its own RAG and MCP support vs an MCP context server serving one canonical doc. They compose." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs Continue.dev" />
+  <meta name="twitter:description" content="An OSS assistant with MCP support vs an MCP context server. They compose." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs Continue.dev", "item": "https://trovex.dev/vs/continue/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is trovex an alternative to Continue.dev?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Not exactly — they sit at different layers. Continue.dev is a full open-source AI coding assistant and framework (chat, autocomplete, custom models) with its own codebase retrieval. trovex is an MCP context server that serves one canonical doc per query with a freshness marker. Because Continue can connect MCP servers, you can use trovex as a context source inside Continue rather than replacing it." }
+          },
+          {
+            "@type": "Question",
+            "name": "How is trovex's context different from Continue's @codebase retrieval?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Continue's built-in retrieval returns relevant chunks for the model to use. trovex returns the single canonical doc that answers, with a freshness marker (canonical / stale / duplicate) so stale and duplicate copies are skipped, and it lets agents write records back. It's opinionated for a repo's markdown docs rather than general code RAG." }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use trovex and Continue together?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes. Keep Continue as your assistant and connect trovex as an MCP server so your repo's canonical docs are available to it, alongside Continue's own context. They are complementary." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs Continue.dev
+    </nav>
+
+    <h1>trovex vs <span class="ac">Continue.dev</span></h1>
+    <p class="deck">Continue is a full assistant with its own retrieval. trovex is a context source you plug in. They compose — here's the honest comparison.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Continue.dev is a free, open-source AI coding <strong>assistant and framework</strong> — chat, autocomplete, custom models — with its own codebase retrieval and MCP support. trovex is an <strong>MCP context server</strong> that serves the one canonical doc per query with a freshness marker, for about <strong>60% fewer tokens per lookup</strong>. They're at different layers: because Continue can connect MCP servers, you use trovex <em>inside</em> Continue rather than instead of it. trovex sharpens the doc-context part; Continue stays your assistant.</p>
+    </div>
+
+    <h2>What is Continue.dev?</h2>
+    <p class="lead-answer">Continue is an open-source AI coding assistant for VS Code and JetBrains, plus a framework for building custom retrieval pipelines. It brings chat, inline edits, and autocomplete with the model of your choice, and it has its own <code>@codebase</code> context and MCP integration. You pay only for the model you use.</p>
+
+    <h2>Where trovex fits</h2>
+    <p class="lead-answer">trovex isn't an assistant — it's the thing that answers "which doc is canonical?" cheaply and correctly. Continue's built-in retrieval returns relevant chunks; trovex returns the single current doc, marks stale and duplicate copies so they're skipped, reads at the section level, and lets agents write records back. Point Continue at trovex over MCP and your repo's canonical markdown becomes part of its context.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>Continue.dev vs trovex</caption>
+        <thead><tr><th scope="col">Capability</th><th scope="col">Continue.dev</th><th scope="col" class="trovex">trovex</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">Type</td><td>AI assistant + RAG framework</td><td>MCP context server</td></tr>
+          <tr><td class="feat">Chat / autocomplete / edits</td><td><span class="yes">✓</span></td><td class="no">— not its job</td></tr>
+          <tr><td class="feat">Doc retrieval model</td><td>Relevant chunks (@codebase)</td><td><span class="yes">✓</span> one canonical doc</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">—</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">Write-back (SSOT)</td><td class="no">—</td><td><span class="yes">✓</span> shared write path</td></tr>
+          <tr><td class="feat">Works via MCP</td><td><span class="yes">✓</span> MCP host</td><td><span class="yes">✓</span> MCP server (plug in)</td></tr>
+          <tr><td class="feat">License / cost</td><td>OSS, pay for the model</td><td>OSS (AGPL core / MIT CLIs), local</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When is Continue the right choice?</h2>
+    <p class="lead-answer">When you want a full, customizable assistant in your editor — chat, autocomplete, your own models — Continue is an excellent OSS choice. Add trovex when you want your repo's docs served as one canonical, current answer rather than chunks, with a freshness signal and a shared write path. The two layer cleanly; this isn't an either/or.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item"><p class="faq-q">Is trovex an alternative to Continue.dev?</p><p class="faq-a">Not exactly — different layers. Continue is a full OSS assistant and framework with its own retrieval; trovex is an MCP context server serving one canonical doc per query. Continue can connect MCP servers, so you use trovex inside Continue rather than replacing it.</p></div>
+      <div class="faq-item"><p class="faq-q">How is trovex's context different from Continue's @codebase retrieval?</p><p class="faq-a">Continue returns relevant chunks; trovex returns the single canonical doc with a freshness marker so stale/duplicate copies are skipped, and lets agents write records back. It's opinionated for a repo's markdown rather than general code RAG.</p></div>
+      <div class="faq-item"><p class="faq-q">Can I use trovex and Continue together?</p><p class="faq-a">Yes. Keep Continue as your assistant and connect trovex as an MCP server so your repo's canonical docs are available to it. They're complementary.</p></div>
+    </section>
+
+    <div class="cta">
+      <h2>Sharper doc context for your assistant.</h2>
+      <p>trovex is in private beta — request access and plug it into Continue or any MCP client.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/for/">See the setup guides</a>
+      </div>
+      <p class="note">Open source (AGPL-3.0 core, MIT CLIs). Local-first — your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/aider/">trovex vs Aider</a></li>
+        <li><a href="/vs/cody/">trovex vs Sourcegraph Cody</a></li>
+        <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a></li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+  <script defer src="/vs/track.js"></script>
+</body>
+</html>

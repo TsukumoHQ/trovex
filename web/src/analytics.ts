@@ -19,6 +19,7 @@ type GeoSource =
   | 'bing'
   | 'search'
   | 'social'
+  | 'producthunt'
   | 'referral'
   | 'direct'
   | 'unknown'
@@ -67,6 +68,7 @@ const HOST_SOURCE: Array<[RegExp, GeoSource]> = [
   [/(^|\.)reddit\.com$/, 'social'],
   [/(^|\.)news\.ycombinator\.com$/, 'social'],
   [/(^|\.)lobste\.rs$/, 'social'],
+  [/(^|\.)producthunt\.com$/, 'producthunt'],
 ]
 
 /* UTM source → geo_source. Links WE control are the only reliable AI-engine signal. */
@@ -80,6 +82,8 @@ const UTM_SOURCE: Record<string, GeoSource> = {
   copilot: 'copilot',
   bing: 'bing',
   google: 'search',
+  producthunt: 'producthunt',
+  ph: 'producthunt',
 }
 
 const AI_ENGINES: GeoSource[] = ['chatgpt', 'perplexity', 'claude', 'gemini', 'copilot']
@@ -87,7 +91,7 @@ const AI_ENGINES: GeoSource[] = ['chatgpt', 'perplexity', 'claude', 'gemini', 'c
 function channelOf(s: GeoSource): Channel {
   if (AI_ENGINES.includes(s)) return 'ai_engine'
   if (s === 'search' || s === 'bing') return 'search'
-  if (s === 'social') return 'social'
+  if (s === 'social' || s === 'producthunt') return 'social'
   if (s === 'referral') return 'referral'
   return 'direct'
 }

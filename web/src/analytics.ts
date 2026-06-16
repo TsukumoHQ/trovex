@@ -34,6 +34,7 @@ export type EventName =
   | 'compare_clicked'
   | 'answers_clicked'
   | 'setup_clicked'
+  | 'tsukumo_clicked'
   | 'section_viewed'
   | 'request_access_clicked'
   | 'waitlist_submitted'

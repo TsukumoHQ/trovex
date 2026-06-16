@@ -48,14 +48,16 @@ module and fire suite-side events — trovex is the reference impl; WRAI.TH + yo
 per-property rollout (tracked in `consulting-funnel.md` §7). Tiles 4–7 are **live on
 tsukumo now**. Tile 8 is manual CRM (low volume, high value).
 
-## 2. The three headline numbers (render big)
+## 2. The headline numbers (render big)
 
 1. **North star — suite-sourced assessment requests (30d):**
    `assessment_request` filtered `source==suite`. The one number that proves the model.
 2. **Total assessment requests (30d):** all `source`. Leading revenue indicator.
-3. **Suite → agency conversion:** `assessment_request` ÷ `tsukumo_visit` (all sources),
-   and the suite-only variant (`source==suite` numerator and denominator). Honest rate,
-   not a vanity count.
+3. **Qualified leads (hot + warm):** `leads` with `lead_band ∈ {hot,warm}` (ICP-fit, see
+   [`lead-scoring.md`](./lead-scoring.md)) — *qualified* reach → leads is the actual north
+   star, not raw count. Raw can rise while qualified stays flat; show both.
+4. **Suite → agency / suite → qualified rate:** `assessment_request` ÷ `tsukumo_visit`
+   (all + suite-only), and qualified suite leads ÷ suite visits. Honest rate, not vanity.
 
 ## 3. Exact Plausible Stats API queries (v1)
 

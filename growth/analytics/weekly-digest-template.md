@@ -70,6 +70,13 @@ from leads
 where project = 'tsukumo' and created_at >= now() - interval '7 days'
 group by channel, how_heard order by count(*) desc;
 
+-- Qualified leads by band (ICP-fit; see lead-scoring.md). Qualified = hot + warm.
+select coalesce(lead_band,'unscored') as band, count(*),
+       count(*) filter (where channel='oss_suite' or lower(how_heard) in ('wraith','trovex','yoru')) as suite
+from leads
+where project='tsukumo' and created_at >= now() - interval '7 days'
+group by 1;
+
 -- Waitlist signups (top-of-funnel proxy, cross-property)
 select project, count(*) from waitlist
 where created_at >= now() - interval '7 days' group by project;
@@ -78,8 +85,13 @@ where created_at >= now() - interval '7 days' group by project;
 | Supabase metric | This wk | Last wk | Δ |
 |-----------------|--------:|--------:|---|
 | `leads` (tsukumo, all) | ‹› | ‹› | ‹› |
-| `leads` suite-attributed (north star) | ‹› | ‹› | ‹› |
+| **qualified leads (hot+warm)** | ‹› | ‹› | ‹› |
+| — of which suite-attributed (north star) | ‹› | ‹› | ‹› |
 | `waitlist` signups (all projects) | ‹› | ‹› | ‹› |
+
+**Suite→qualified rate** = qualified suite leads ÷ suite `tsukumo_visit` = `‹%›`. The
+quality metric — raw lead count can rise while qualified stays flat; report both. Bands per
+[`lead-scoring.md`](./lead-scoring.md) (hot ≥55, warm ≥30; aggregate only, never per-lead).
 
 > Careers `applications` are a **separate** funnel (hiring ≠ consulting) — track elsewhere, don't mix into the north star.
 

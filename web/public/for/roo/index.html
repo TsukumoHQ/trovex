@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/for/roo/" />
+  <title>trovex for Roo Code — add a streamable-HTTP MCP server, ~60% fewer tokens</title>
+  <meta name="description" content="Add trovex to Roo Code as a remote streamable-HTTP MCP server in mcp_settings.json. Run trovex serve, point Roo at http://localhost:8765/mcp. Your agent gets one canonical doc per query instead of rereading the repo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/for/roo/" />
+  <meta property="og:title" content="trovex for Roo Code" />
+  <meta property="og:description" content="Add trovex to Roo Code as a streamable-HTTP MCP server. One canonical doc per query, ~60% fewer tokens." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for Roo Code" />
+  <meta name="twitter:description" content="Add trovex to Roo Code as a streamable-HTTP MCP server." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "For your MCP client", "item": "https://trovex.dev/for/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex for Roo Code", "item": "https://trovex.dev/for/roo/" }
+        ]
+      },
+      {
+        "@type": "HowTo",
+        "name": "Add trovex to Roo Code",
+        "description": "Connect trovex (a local HTTP MCP server) to Roo Code as a remote streamable-HTTP server.",
+        "step": [
+          { "@type": "HowToStep", "name": "Index your repo", "text": "Run `uv run trovex index /path/to/repo`." },
+          { "@type": "HowToStep", "name": "Start the server", "text": "Run `uv run trovex serve`. trovex serves MCP at http://localhost:8765/mcp." },
+          { "@type": "HowToStep", "name": "Edit mcp_settings.json", "text": "Add a trovex entry with type streamable-http and the URL via Roo's MCP settings." },
+          { "@type": "HowToStep", "name": "Enable it", "text": "Toggle trovex on in Roo's MCP panel; its tool becomes available to the agent." }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/for/">For your client</a> / Roo Code
+    </nav>
+
+    <h1>trovex for <span class="ac">Roo Code</span></h1>
+    <p class="deck">Roo Code supports remote streamable-HTTP MCP servers natively. Point it at trovex and the agent gets one canonical doc per query, about 60% fewer tokens.</p>
+
+    <div class="verdict">
+      <div class="l">The config</div>
+      <p>Start trovex, then add it to Roo's <code>mcp_settings.json</code> (via the MCP panel) as a streamable-HTTP server:</p>
+      <pre style="margin-top:12px;overflow-x:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;"><code>{
+  "mcpServers": {
+    "trovex": {
+      "type": "streamable-http",
+      "url": "http://localhost:8765/mcp"
+    }
+  }
+}</code></pre>
+    </div>
+
+    <p class="note" style="margin-bottom:2px;">trovex is in private beta — <a href="/#waitlist">request access</a> first; the steps below work once you're in.</p>
+    <h2>Setup, step by step</h2>
+    <ol>
+      <li><strong>Index your repo.</strong><div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex index /path/to/repo</div></li>
+      <li><strong>Start trovex.</strong> It serves MCP over HTTP at <code>http://localhost:8765/mcp</code>.<div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex serve</div></li>
+      <li><strong>Open Roo's MCP settings</strong> and add the snippet above to <code>mcp_settings.json</code>. Roo accepts the <code>streamable-http</code> transport with a <code>url</code> (no command/args needed for a remote server).</li>
+      <li><strong>Enable it.</strong> Toggle trovex on in the MCP panel; its <code>trovex</code> tool is now available to the agent.</li>
+    </ol>
+    <p class="note">Roo's MCP transport fields move between releases — if it doesn't connect, check Roo Code's current <a href="https://docs.roocode.com/features/mcp/server-transports" target="_blank" rel="noreferrer">MCP transport docs</a>.</p>
+
+    <h2>Why Roo Code users want it</h2>
+    <p class="lead-answer">Roo reads files directly, which is exactly what burns tokens when project knowledge is spread across many markdown docs. trovex gives Roo the one canonical doc that answers a query — section-level, with a freshness marker — so it stops opening several files to find the current one. About <strong>60% fewer tokens per lookup</strong>, plus a shared write path so what Roo learns is saved once and read back.</p>
+
+    <div class="related">
+      <div class="l">trovex for other clients</div>
+      <ul>
+        <li><a href="/for/cline/">trovex for Cline</a></li>
+        <li><a href="/for/zed/">trovex for Zed</a></li>
+        <li><a href="/for/cursor/">trovex for Cursor</a></li>
+        <li><a href="/for/">All clients</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Give Roo Code one source of truth.</h2>
+      <p>trovex is in private beta — request access, then index your repo and add the server.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source (AGPL-3.0 core, MIT CLIs). Local-first — your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/for/">For your client</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

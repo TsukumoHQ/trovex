@@ -79,24 +79,33 @@ function readJson(req) {
   })
 }
 
+// Map the closed attribution enums to the `waitlist` table shape:
+//   source = the acquisition source (geo_source/channel, falling back to utm_source)
+//   utm    = jsonb bag of the raw utm_* fields (+ referrer host the client derived)
+function buildSourceAndUtm(attribution) {
+  const source =
+    attribution.geo_source || attribution.channel || attribution.utm_source || null
+  const utm = {}
+  for (const k of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'referrer', 'channel', 'geo_source']) {
+    if (attribution[k]) utm[k] = attribution[k]
+  }
+  return { source, utm: Object.keys(utm).length ? utm : null }
+}
+
+// Result of a store attempt: 'ok' (inserted), 'duplicate' (already on the list),
+// 'skip' (backend not configured → try the next one), or throws on a real error.
 async function storeSupabase(email, attribution, meta) {
   const url = process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return false
-  // Service role bypasses RLS — this code path only ever runs server-side.
-  // Columns mirror the closed attribution enums + server-derived meta (referer host,
-  // hashed IP). The email is the only PII; never logged.
+  if (!url || !key) return 'skip'
+  // Service role bypasses RLS (RLS is ON with no policy → only the server writes).
+  // This code path only ever runs server-side. The email is the only PII; never logged.
+  const { source, utm } = buildSourceAndUtm(attribution)
   const row = {
     email,
-    geo_source: attribution.geo_source || null,
-    channel: attribution.channel || null,
-    utm_source: attribution.utm_source || null,
-    utm_medium: attribution.utm_medium || null,
-    utm_campaign: attribution.utm_campaign || null,
-    utm_content: attribution.utm_content || null,
-    referrer: attribution.referrer || null,
+    source,
+    utm,
     referer: meta.referer || null,
-    ip_hash: meta.ip_hash || null,
   }
   const res = await fetch(`${url}/rest/v1/waitlist`, {
     method: 'POST',
@@ -108,7 +117,17 @@ async function storeSupabase(email, attribution, meta) {
     },
     body: JSON.stringify(row),
   })
-  return res.ok
+  if (res.ok) return 'ok'
+  // Unique violation on email → already on the list; treat as success.
+  if (res.status === 409) return 'duplicate'
+  // 23505 can also surface inside a 400/422 body depending on PostgREST version.
+  if (res.status === 400 || res.status === 422) {
+    const detail = await res.text().catch(() => '')
+    if (detail.includes('23505') || detail.includes('duplicate key')) return 'duplicate'
+    // Surface the real failure (e.g. relation does not exist) without leaking PII.
+    throw new Error(`supabase ${res.status}`)
+  }
+  throw new Error(`supabase ${res.status}`)
 }
 
 async function storeKV(email, attribution) {
@@ -169,10 +188,13 @@ export default async function handler(req, res) {
   const meta = serverMeta(req)
 
   try {
+    // storeSupabase returns 'ok' | 'duplicate' (stored) or 'skip' (not configured →
+    // fall through to the legacy backends). 'skip' is truthy, so branch explicitly.
+    const sb = await storeSupabase(email, attribution, meta)
     const stored =
-      (await storeSupabase(email, attribution, meta)) ||
-      (await storeKV(email, attribution)) ||
-      (await storeGitHubIssue(email, attribution))
+      sb === 'ok' || sb === 'duplicate'
+        ? true
+        : (await storeKV(email, attribution)) || (await storeGitHubIssue(email, attribution))
     if (!stored) {
       // No backend wired yet — be honest, don't claim a save.
       return res.status(503).json({ ok: false, error: 'not_configured' })

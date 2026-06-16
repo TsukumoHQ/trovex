@@ -19,7 +19,7 @@ AI-engine signal (those referrers get stripped). Pairs with referrer-host fallba
 |-------|---------|------|
 | `utm_source` | where the click physically comes from | closed list below; must match `web/src/analytics.ts`. Unmapped → silently `referral`/`unknown`. |
 | `utm_medium` | kind of placement | closed: `ai_answer`, `organic`, `social`, `community`, `registry`, `referral`, `email`, `paid`. |
-| `utm_campaign` | the initiative | kebab-case, reuse names: `private-beta`, `geo-seed`, `comparison-pages`, `newsletter`, `launch-hn` (held), `launch-ph` (held). |
+| `utm_campaign` | the initiative | kebab-case, reuse names: `private-beta`, `geo-seed`, `comparison-pages`, `newsletter`, `agency-launch` (the tsukumo/agency launch push), `launch-hn`, `launch-ph`. |
 | `utm_content` | which variant/placement of the link | distinguishes A/B variants & placements: `cta-hero`, `cta-footer`, `post-1`, `thread-tweet-3`, `vs-mem0`, `card-a`. Powers per-variant attribution. |
 
 `utm_content` is the new one: it's how we tell apart two versions of the same campaign
@@ -37,6 +37,7 @@ specific post/placement drove a signup.
 | Google (organic / AI Overviews) | `google` | `search` |
 | Bing / Copilot | `bing` / `copilot` | `bing` / `copilot` |
 | Hacker News / Reddit / Lobsters / X / LinkedIn | `hackernews` / `reddit` / `lobsters` / `x` / `linkedin` | `social` |
+| Product Hunt | `producthunt` (alias `ph`) | `social` |
 | MCP registry / directory | `mcp-registry` (or specific slug) | `referral` |
 | Newsletter / Discord | `newsletter` / `discord` | `referral` / `social` |
 
@@ -54,6 +55,7 @@ Base: `https://trovex.dev/?utm_source=…&utm_medium=…&utm_campaign=…&utm_co
 | social-lead — X thread | `?utm_source=x&utm_medium=social&utm_campaign=private-beta&utm_content=thread-1` |
 | social-lead — LinkedIn post | `?utm_source=linkedin&utm_medium=social&utm_campaign=private-beta&utm_content=post-1` |
 | launch-lead — registry listing (when public phase opens) | `?utm_source=mcp-registry&utm_medium=registry&utm_campaign=launch&utm_content=listing` |
+| launch-lead — Product Hunt launch | `?utm_source=producthunt&utm_medium=social&utm_campaign=agency-launch&utm_content=ph-tagline` |
 | content-lead — newsletter | `?utm_source=newsletter&utm_medium=email&utm_campaign=private-beta&utm_content=issue-1` |
 | community — Discord drop | `?utm_source=discord&utm_medium=community&utm_campaign=private-beta&utm_content=mcp-server` |
 

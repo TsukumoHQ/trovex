@@ -36,7 +36,7 @@ in the comments — that messier version is exactly the kind of thing I help tea
 
 ## Posting notes
 - Link → trovex.dev beta (UTM) in **first comment**, not body:
-  `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist`
+  `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
   Do NOT link the github repo — it's private during the beta.
 - Best window: weekday morning; reply to early comments fast (reach is reply-weighted).
 - No hashtag spam; 2-3 relevant tags max if any (#aiagents #devtools).

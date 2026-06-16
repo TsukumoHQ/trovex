@@ -41,7 +41,7 @@ being an afternoon and starts being worth a conversation — which is part of wh
 ## Posting notes
 - The SCREENSHOT carries this post — make it legible, real numbers only, no mockup-as-real.
 - Link → trovex.dev beta (UTM) first comment, NOT the repo (private during beta):
-  `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist`
+  `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
 - Keep it short on LinkedIn; the image + the number do the work.
 
 ## Self-audit

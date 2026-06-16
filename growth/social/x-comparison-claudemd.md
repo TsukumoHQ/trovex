@@ -7,7 +7,7 @@
 > `trovex`. Passed copy-gate.
 
 ## UTM link (in the CTA reply)
-`https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist`
+`https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
 
 ---
 

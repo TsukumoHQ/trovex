@@ -7,8 +7,8 @@
 > Lowercase `trovex`. Passed copy-gate.
 
 ## UTM links (social owns social, per geo-attribution.md)
-- X: `https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist`
-- LinkedIn: `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist`
+- X: `https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
+- LinkedIn: `https://trovex.dev/?utm_source=linkedin&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
 
 ---
 

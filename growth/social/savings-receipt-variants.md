@@ -70,7 +70,7 @@ want your own receipt?
 ~60% is what i saw on lookups. yours will differ — that's the point.
 ```
 Caption: `i'm not asking you to trust my ~60%. get beta access and measure your own.`
-Link with it: `https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist`
+Link with it: `https://trovex.dev/?utm_source=x&utm_medium=social&utm_campaign=beta-waitlist#waitlist`
 (swap `utm_source=linkedin` on LinkedIn).
 
 ---

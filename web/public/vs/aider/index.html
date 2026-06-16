@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/aider/" />
+  <title>trovex vs Aider — a coding agent with a repo map vs a canonical-doc server</title>
+  <meta name="description" content="Aider is a terminal AI pair programmer that uses a repo map of your code to make edits via git. trovex is an MCP server that serves your repo's canonical docs to agents. Different layers — code-editing vs doc context. Here's the honest comparison." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/aider/" />
+  <meta property="og:title" content="trovex vs Aider" />
+  <meta property="og:description" content="A terminal coding agent with a code repo map vs an MCP server serving canonical docs. Different layers." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs Aider" />
+  <meta name="twitter:description" content="A terminal coding agent with a code repo map vs an MCP server serving canonical docs." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs Aider", "item": "https://trovex.dev/vs/aider/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and Aider?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Aider is a terminal AI pair programmer — it talks to an LLM, builds a repo map of your code with tree-sitter, and makes edits to your files via git. trovex is not a coding agent; it is an MCP server that serves your repo's canonical markdown docs to an agent, one current doc per query with a freshness marker. Aider's repo map is about code structure for editing; trovex is about which doc is the source of truth. Different layers." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Aider's repo map replace trovex?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. The repo map summarizes your code so the model knows the structure to edit. It doesn't route a question to the one canonical doc, mark stale copies, or serve markdown documentation with freshness — which is trovex's job. They address different needs." }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use trovex with Aider?",
+            "acceptedAnswer": { "@type": "Answer", "text": "trovex serves canonical docs over MCP, so any MCP-capable client can read them. Aider is best at code editing in the terminal; if your workflow needs the repo's canonical documentation served to an agent, trovex provides that. Check Aider's current docs for its MCP support." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs Aider
+    </nav>
+
+    <h1>trovex vs <span class="ac">Aider</span></h1>
+    <p class="deck">Aider edits your code from the terminal. trovex serves your docs to agents. Different layers — here's how they line up.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Aider is a terminal AI <strong>pair programmer</strong>: it builds a repo map of your code with tree-sitter and makes edits via git. trovex is <strong>not a coding agent</strong> — it's an MCP server that serves your repo's canonical markdown docs, one current doc per query with a freshness marker, for about <strong>60% fewer tokens per lookup</strong>. Aider's repo map is about code structure for editing; trovex is about which <em>doc</em> is the source of truth. They solve different problems.</p>
+    </div>
+
+    <h2>What is Aider?</h2>
+    <p class="lead-answer">Aider is a fast, zero-config, open-source pair programmer that runs in your terminal. It summarizes your codebase into a repo map so the model has the structure it needs, then applies changes to files through git commits. You pay only for the underlying model. It's great at implementing features and fixing code directly.</p>
+
+    <h2>Where trovex is different</h2>
+    <p class="lead-answer">trovex doesn't write code — it answers "which doc is canonical?" When your project knowledge lives across many markdown files (runbooks, ADRs, READMEs), trovex returns the single current one that answers a query, marks stale and duplicate copies so they're skipped, reads at the section level, and lets agents write records back. Aider's repo map gives a coding model code structure; trovex gives any agent the authoritative documentation, cheaply.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>Aider vs trovex</caption>
+        <thead><tr><th scope="col">Capability</th><th scope="col">Aider</th><th scope="col" class="trovex">trovex</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">Type</td><td>Terminal coding agent</td><td>MCP context server</td></tr>
+          <tr><td class="feat">Edits your code</td><td><span class="yes">✓</span> via git</td><td class="no">— not its job</td></tr>
+          <tr><td class="feat">Context it builds</td><td>Repo map of code (tree-sitter)</td><td>Canonical markdown doc per query</td></tr>
+          <tr><td class="feat">Freshness signal on docs</td><td class="no">—</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">Write-back / shared docs</td><td class="no">—</td><td><span class="yes">✓</span> shared write path</td></tr>
+          <tr><td class="feat">License / cost</td><td>OSS, pay for the model</td><td>OSS (AGPL core / MIT CLIs), local</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When is Aider the right choice?</h2>
+    <p class="lead-answer">When you want an LLM to actually edit your code from the terminal, Aider is excellent and purpose-built for it. Reach for trovex when the job is serving your repo's <em>documentation</em> to agents as one canonical, current answer — a different layer that can sit alongside whatever does the editing.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item"><p class="faq-q">What is the difference between trovex and Aider?</p><p class="faq-a">Aider is a terminal AI pair programmer — it builds a repo map of your code and edits files via git. trovex is an MCP server that serves your repo's canonical markdown docs, one current doc per query with a freshness marker. Aider's repo map is about code structure for editing; trovex is about which doc is the source of truth.</p></div>
+      <div class="faq-item"><p class="faq-q">Does Aider's repo map replace trovex?</p><p class="faq-a">No. The repo map summarizes code structure for editing. It doesn't route a question to the one canonical doc, mark stale copies, or serve documentation with freshness — that's trovex's job.</p></div>
+      <div class="faq-item"><p class="faq-q">Can I use trovex with Aider?</p><p class="faq-a">trovex serves canonical docs over MCP, so any MCP-capable client can read them. Aider is best at terminal code editing; if your workflow needs the repo's documentation served to an agent, trovex provides that. Check Aider's current docs for its MCP support.</p></div>
+    </section>
+
+    <div class="cta">
+      <h2>Canonical docs for your agents.</h2>
+      <p>trovex is in private beta — request access and serve the one current doc per query.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source (AGPL-3.0 core, MIT CLIs). Local-first — your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/continue/">trovex vs Continue.dev</a></li>
+        <li><a href="/vs/cody/">trovex vs Sourcegraph Cody</a></li>
+        <li><a href="/vs/repomix/">trovex vs repomix / files-to-prompt</a></li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+  <script defer src="/vs/track.js"></script>
+</body>
+</html>

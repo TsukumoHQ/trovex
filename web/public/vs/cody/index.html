@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/vs/cody/" />
+  <title>trovex vs Sourcegraph Cody — enterprise code search vs local canonical docs</title>
+  <meta name="description" content="Sourcegraph Cody is an enterprise AI assistant that pulls context from code search and embeddings across many repos (Enterprise plan only as of 2025). trovex is a free, local-first MCP server that serves one canonical doc per query for a single repo. Here's the honest comparison." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/vs/cody/" />
+  <meta property="og:title" content="trovex vs Sourcegraph Cody" />
+  <meta property="og:description" content="Enterprise cross-repo code search vs a free, local-first server serving one canonical doc per query." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex vs Sourcegraph Cody" />
+  <meta name="twitter:description" content="Enterprise cross-repo code search vs a free, local-first canonical-doc server." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://trovex.dev/vs/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex vs Sourcegraph Cody", "item": "https://trovex.dev/vs/cody/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is the difference between trovex and Sourcegraph Cody?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Cody is an enterprise AI coding assistant that draws context from the Sourcegraph platform — code search and embeddings across many repositories — and is available on the Enterprise plan (Sourcegraph discontinued the free and Pro tiers in 2025). trovex is a free, open-source, local-first MCP server that serves the one canonical markdown doc per query for a single repo, with a freshness marker. Cody is broad, cross-repo, and hosted; trovex is focused, local, and free." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is trovex a free alternative to Cody?",
+            "acceptedAnswer": { "@type": "Answer", "text": "For the narrower job of serving a repo's canonical docs to a coding agent, yes — trovex is open source and runs locally with no per-seat cost. It is not a replacement for Cody's cross-repo code intelligence at enterprise scale; it is a focused, local context server for one repo's documentation." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does trovex send my code to the cloud like a hosted assistant?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. trovex runs on your machine — indexing and embeddings are local (SQLite + ONNX), no cloud and no API keys. Many enterprise assistants rely on hosted indexing; trovex keeps everything local." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/vs/">Comparisons</a> / trovex vs Sourcegraph Cody
+    </nav>
+
+    <h1>trovex vs <span class="ac">Sourcegraph Cody</span></h1>
+    <p class="deck">Cody is enterprise code intelligence across many repos. trovex is a free, local server for one repo's canonical docs. Here's the honest comparison.</p>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Cody is an enterprise AI assistant that pulls context from <strong>code search and embeddings across many repositories</strong> on the Sourcegraph platform (available on the Enterprise plan; the free and Pro tiers were discontinued in 2025). trovex is a <strong>free, open-source, local-first</strong> MCP server that serves the one canonical markdown doc per query for a single repo, with a freshness marker, for about <strong>60% fewer tokens per lookup</strong>. Cody is broad, cross-repo, and hosted; trovex is focused, local, and free.</p>
+    </div>
+
+    <h2>What is Sourcegraph Cody?</h2>
+    <p class="lead-answer">Cody is Sourcegraph's AI coding assistant. Its strength is context: it uses Sourcegraph's code search and embeddings to retrieve relevant snippets from across an organization's repositories before prompting the model. That cross-repo code intelligence is built for large teams and is offered on the Enterprise plan.</p>
+
+    <h2>Where trovex is different</h2>
+    <p class="lead-answer">trovex is narrower by design and local. It targets one repo's markdown documentation, returns the single canonical doc that answers a query (with a canonical / stale / duplicate marker), reads at the section level, and lets agents write records back — all on your machine, with no per-seat cost and no code leaving your laptop. It's a focused context source for a coding agent, not an enterprise code-search platform.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>Sourcegraph Cody vs trovex</caption>
+        <thead><tr><th scope="col">Capability</th><th scope="col">Sourcegraph Cody</th><th scope="col" class="trovex">trovex</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">Scope</td><td>Cross-repo code intelligence</td><td>One repo's canonical docs</td></tr>
+          <tr><td class="feat">Context model</td><td>Code search + embeddings (snippets)</td><td>One canonical doc per query</td></tr>
+          <tr><td class="feat">Freshness signal</td><td class="no">—</td><td><span class="yes">✓</span> canonical / stale / duplicate</td></tr>
+          <tr><td class="feat">Runs locally, no keys</td><td class="no">— hosted / enterprise</td><td><span class="yes">✓</span> SQLite + ONNX</td></tr>
+          <tr><td class="feat">Cost</td><td>Enterprise plan, per seat</td><td><span class="yes">Free</span> OSS (AGPL core / MIT CLIs)</td></tr>
+          <tr><td class="feat">Best for</td><td>Large orgs, many repos</td><td>Solo / small teams, one repo</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>When is Cody the right choice?</h2>
+    <p class="lead-answer">When you're an organization that needs AI context across many repositories with enterprise controls, Cody's code intelligence is built for exactly that. trovex is the better fit when you want a free, local, focused way to serve one repo's canonical documentation to your coding agent — without a per-seat contract or sending code to the cloud.</p>
+
+    <section aria-label="Frequently asked questions">
+      <h2>FAQ</h2>
+      <div class="faq-item"><p class="faq-q">What is the difference between trovex and Sourcegraph Cody?</p><p class="faq-a">Cody draws context from code search and embeddings across many repos (Enterprise plan; free/Pro tiers were discontinued in 2025). trovex is a free, local-first MCP server that serves the one canonical markdown doc per query for a single repo, with a freshness marker. Cody is broad, cross-repo, hosted; trovex is focused, local, free.</p></div>
+      <div class="faq-item"><p class="faq-q">Is trovex a free alternative to Cody?</p><p class="faq-a">For the narrower job of serving a repo's canonical docs to an agent, yes — trovex is open source and local with no per-seat cost. It is not a replacement for Cody's cross-repo enterprise code intelligence; it is a focused context server for one repo's documentation.</p></div>
+      <div class="faq-item"><p class="faq-q">Does trovex send my code to the cloud?</p><p class="faq-a">No. Indexing and embeddings run locally (SQLite + ONNX), no cloud and no API keys. Many enterprise assistants rely on hosted indexing; trovex keeps everything local.</p></div>
+    </section>
+
+    <div class="cta">
+      <h2>Free, local, canonical docs.</h2>
+      <p>trovex is in private beta — request access and serve one current doc per query.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source (AGPL-3.0 core, MIT CLIs). Local-first — your docs never leave your machine.</p>
+    </div>
+
+    <div class="related">
+      <div class="l">More comparisons</div>
+      <ul>
+        <li><a href="/vs/continue/">trovex vs Continue.dev</a></li>
+        <li><a href="/vs/aider/">trovex vs Aider</a></li>
+        <li><a href="/vs/vector-db-rag/">trovex vs a vector-DB RAG setup</a></li>
+        <li><a href="/vs/">All comparisons</a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Comparisons</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+  <script defer src="/vs/track.js"></script>
+</body>
+</html>

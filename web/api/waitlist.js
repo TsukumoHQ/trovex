@@ -9,10 +9,14 @@
  *
  * Storage is env-gated so no secret lives in the repo and nothing is captured until
  * the operator wires a backend in Vercel. In priority order:
- *   1. Upstash/Vercel KV   — set WAITLIST_KV_REST_API_URL + WAITLIST_KV_REST_API_TOKEN
+ *   1. Supabase            — set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (service key is
+ *                            SERVER-ONLY: never client, never NEXT_PUBLIC, never committed).
+ *                            Inserts a row into the `waitlist` table via the REST endpoint.
+ *                            RLS is ON with no public policy, so only the service role writes.
+ *   2. Upstash/Vercel KV   — set WAITLIST_KV_REST_API_URL + WAITLIST_KV_REST_API_TOKEN
  *                            (or the platform's KV_REST_API_URL / KV_REST_API_TOKEN)
- *   2. GitHub issue        — set WAITLIST_GITHUB_TOKEN + WAITLIST_GITHUB_REPO (owner/repo)
- *   3. none configured     — 503 { reason: 'not_configured' }; the form says the list
+ *   3. GitHub issue        — set WAITLIST_GITHUB_TOKEN + WAITLIST_GITHUB_REPO (owner/repo)
+ *   4. none configured     — 503 { reason: 'not_configured' }; the form says the list
  *                            isn't open yet. We never claim success without storing.
  *
  * Privacy: the email is volunteered PII and is the ONLY thing stored. It is never
@@ -20,7 +24,29 @@
  * (source attribution only) — see web/src/analytics.ts.
  */
 
+import { createHash } from 'node:crypto'
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Server-derived, non-client attribution (never trust the body for these).
+// referer = host only (no path/query/PII). ip_hash = salted SHA-256 so a row can be
+// rate-limited / de-duped without storing a raw IP; skipped if no salt is configured.
+function serverMeta(req) {
+  let referer = null
+  try {
+    const raw = req.headers.referer || req.headers.referrer
+    if (raw) referer = new URL(raw).host.slice(0, 64)
+  } catch { /* malformed Referer — ignore */ }
+
+  let ip_hash = null
+  const salt = process.env.WAITLIST_IP_SALT
+  if (salt) {
+    const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    const ip = fwd || req.socket?.remoteAddress || ''
+    if (ip) ip_hash = createHash('sha256').update(salt + ip).digest('hex').slice(0, 32)
+  }
+  return { referer, ip_hash }
+}
 
 // Closed allowlist of source-attribution fields (no PII). Anything else is dropped;
 // each value is coerced to a short string so a crafted body can't bloat storage.
@@ -51,6 +77,38 @@ function readJson(req) {
     })
     req.on('error', () => resolve({}))
   })
+}
+
+async function storeSupabase(email, attribution, meta) {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return false
+  // Service role bypasses RLS — this code path only ever runs server-side.
+  // Columns mirror the closed attribution enums + server-derived meta (referer host,
+  // hashed IP). The email is the only PII; never logged.
+  const row = {
+    email,
+    geo_source: attribution.geo_source || null,
+    channel: attribution.channel || null,
+    utm_source: attribution.utm_source || null,
+    utm_medium: attribution.utm_medium || null,
+    utm_campaign: attribution.utm_campaign || null,
+    utm_content: attribution.utm_content || null,
+    referrer: attribution.referrer || null,
+    referer: meta.referer || null,
+    ip_hash: meta.ip_hash || null,
+  }
+  const res = await fetch(`${url}/rest/v1/waitlist`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(row),
+  })
+  return res.ok
 }
 
 async function storeKV(email, attribution) {
@@ -108,9 +166,13 @@ export default async function handler(req, res) {
   }
 
   const attribution = pickAttribution(body)
+  const meta = serverMeta(req)
 
   try {
-    const stored = (await storeKV(email, attribution)) || (await storeGitHubIssue(email, attribution))
+    const stored =
+      (await storeSupabase(email, attribution, meta)) ||
+      (await storeKV(email, attribution)) ||
+      (await storeGitHubIssue(email, attribution))
     if (!stored) {
       // No backend wired yet — be honest, don't claim a save.
       return res.status(503).json({ ok: false, error: 'not_configured' })

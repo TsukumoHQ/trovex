@@ -25,6 +25,15 @@
 | direct | 28 |
 | trovex | 1 |
 
+## Community / top-of-funnel capture (new surfaces)
+| Surface | Metric | Count |
+|---------|--------|------:|
+| Newsletter | newsletter_signup (event) | 0 |
+| Newsletter | new rows (Supabase) | 0 |
+| Tool /context-cost | tool_view → completed → cta | 0 → 0 → 0 |
+
+**Tool funnel:** view→completed n/a · completed→cta n/a. (Tool CTA → /assessment; see which readiness band converts via `event:props:result`.)
+
 ## Other reads (run separately)
 - GEO citation share — `geo-citation-monitor.mjs` → `reports/geo-citations-*.md`.
 - Per-post performance + read-depth — `blog-performance.mjs` → `reports/blog-performance-*.md`.

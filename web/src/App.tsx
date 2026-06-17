@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { track, trackLandingView, trackRequestAccessClick, trackWaitlistSubmitted, getAttribution } from './analytics'
 
-// During the private beta everything funnels to the in-page waitlist — the repo is
-// private, so no public GitHub link can ship without 404ing for visitors.
-// TODO(human): when a real consulting contact exists (email / booking / form), point this at it.
-const CONSULT_URL = '#waitlist'
+// The beta CTA funnels to the in-page waitlist. The consult band is the suite→agency
+// handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so tsukumo reads
+// it as source=suite and the loop closes to assessment_request.
+const CONSULT_URL =
+  'https://tsukumo.ch/consulting?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting'
 const reduceMotion =
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -424,7 +425,14 @@ export default function App() {
           <div className="wrap">
             <p className="consult">
               Rolling agents out across a team? We consult on doing it well at scale.{' '}
-              <a href={CONSULT_URL} onClick={() => track('consult_clicked', { location: 'consult-band' })}>Let's talk →</a>
+              <a
+                href={CONSULT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => track('tsukumo_clicked', { location: 'consult-band' })}
+              >
+                Let&apos;s talk →
+              </a>
             </p>
           </div>
         </section>

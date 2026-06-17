@@ -1,5 +1,11 @@
 # Suite → Agency — Weekly Metrics Digest (template)
 
+> **Automated:** `weekly-digest-runner.mjs` now auto-assembles this from live Plausible +
+> Supabase into `reports/agency-digest-<date>.md` (run weekly; `--since <launch-date>` for a
+> clean post-launch window). This template stays as the reference shape + the manual/CRM
+> fields the runner can't pull (qualified→won, experiment reads).
+
+
 *Owner: analytics-lead · Cadence: weekly (Mon, covering prev Mon–Sun) · Copy per week into `growth/analytics/reports/agency-YYYY-Www.md`.*
 
 The recurring read of the **consulting** funnel — the revenue end. Pulls **two live sources**:

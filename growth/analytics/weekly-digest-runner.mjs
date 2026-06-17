@@ -57,10 +57,14 @@ async function main() {
   const n = (v) => (v == null ? "n/a" : String(v));
 
   // --- Plausible: funnel + north star ---
-  const [visit, intent, cta, contact, suiteClick, assessAll, assessSuite] = await Promise.all([
+  const [visit, intent, cta, contact, suiteClick, assessAll, assessSuite,
+         newsletterEv, toolView, toolDone, toolCta] = await Promise.all([
     evAgg(sid, w, "tsukumo_visit"), evAgg(sid, w, "intent_page_view"), evAgg(sid, w, "cta_clicked"),
     evAgg(sid, w, "contact_clicked"), evAgg(sid, w, "suite_to_agency_click"),
     evAgg(sid, w, "assessment_request"), evAgg(sid, w, "assessment_request", ";event:props:source==suite"),
+    // community / top-of-funnel capture surfaces (newsletter + zero-party tool)
+    evAgg(sid, w, "newsletter_signup"), evAgg(sid, w, "tool_view"),
+    evAgg(sid, w, "tool_completed"), evAgg(sid, w, "tool_cta_clicked"),
   ]);
   const geo = await plausible(`breakdown?site_id=${sid}&period=custom&date=${w.start},${w.end}&property=event:props:geo_source&filters=event:name==tsukumo_visit&metrics=events`).then((d) => d.results || []).catch(() => []);
 
@@ -68,6 +72,8 @@ async function main() {
   let leads = [], wl = [];
   try { leads = await supabase(`leads?project=eq.tsukumo&created_at=gte.${w.start}&select=lead_band,channel,how_heard`); } catch { leads = null; }
   try { wl = await supabase(`waitlist?created_at=gte.${w.start}&select=project`); } catch { wl = null; }
+  let nl = null;
+  try { nl = (await supabase(`newsletter?project=eq.tsukumo&created_at=gte.${w.start}&select=project`)).length; } catch { nl = null; }
   const isSuite = (l) => l.channel === "oss_suite" || ["wraith", "trovex", "yoru"].includes((l.how_heard || "").toLowerCase());
   const band = (b) => (leads ? leads.filter((l) => l.lead_band === b).length : null);
   const qualified = leads ? leads.filter((l) => l.lead_band === "hot" || l.lead_band === "warm").length : null;
@@ -99,6 +105,15 @@ async function main() {
     ``,
     `## GEO / channel (tsukumo_visit by geo_source)`,
     geo.length ? `| geo_source | visits |\n|------------|------:|\n${geo.map((g) => `| ${g.geo_source} | ${g.events} |`).join("\n")}` : `_no visits in window_`,
+    ``,
+    `## Community / top-of-funnel capture (new surfaces)`,
+    `| Surface | Metric | Count |`,
+    `|---------|--------|------:|`,
+    `| Newsletter | newsletter_signup (event) | ${n(newsletterEv)} |`,
+    `| Newsletter | new rows (Supabase) | ${nl == null ? "n/a" : nl} |`,
+    `| Tool /context-cost | tool_view → completed → cta | ${n(toolView)} → ${n(toolDone)} → ${n(toolCta)} |`,
+    ``,
+    `**Tool funnel:** view→completed ${rate(toolDone, toolView)} · completed→cta ${rate(toolCta, toolDone)}. (Tool CTA → /assessment; see which readiness band converts via \`event:props:result\`.)`,
     ``,
     `## Other reads (run separately)`,
     `- GEO citation share — \`geo-citation-monitor.mjs\` → \`reports/geo-citations-*.md\`.`,

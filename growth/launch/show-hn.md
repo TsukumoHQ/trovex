@@ -1,46 +1,154 @@
-# Show HN — trovex (DRAFT, do not submit)
+# Show HN kit (DRAFT, do not submit)
 
-**Status:** DRAFT / copy only. A human submits this. Nothing is posted live.
-**Owner:** launch-lead · **Reviewed against:** product-marketing-context.md, voice, no-synergix-mention, domain-research
-**Repo:** github.com/Synergix-lab/trovex · **Landing:** trovex.dev
+**Status:** DRAFT / copy only. A human (owner) submits. Nothing posted live.
+**Owner:** launch-lead · **Reviewed against:** launch-teardown-playbook.md (#162), suite-positioning.md, launch-day-runbook.md, product-marketing-context.md, voice, no-synergix-mention, autonomy-rules
+**Repos:** wrai.th → github.com/Synergix-lab/WRAI.TH (public, v1.0) · trovex → github.com/Synergix-lab/trovex (private beta)
 
-> HN rule reminders baked into this draft (from research): no superlatives, link the repo, the
-> founder answers questions in their own voice, and **no booster comments from friends/employees**
-> (vote rings get flagged and can kill the post). Our "seeding kit" below is pre-written *founder*
-> answers to likely questions — not sockpuppets.
+> **Refreshed against the launch teardown (#162).** The five rules that won every studied launch are baked in:
+> (1) one reproducible number, not an adjective · (2) link the **repo**, not a landing page · (3) founder in the
+> thread, fast + deep · (4) state a real limitation up front · (5) **nothing ships on launch day** (last code lands
+> ≥1 week prior). No superlatives, no vote-begging, no booster comments (HN flags vote rings).
 
 ---
 
-## 1. Title (pick ONE)
+## 0. Which tool leads the Show HN — and why
 
-HN titles are short, plain, no hype, no superlatives. Candidates, ranked:
+**wrai.th leads. Not trovex (yet), and never the agency.**
 
-1. **`Show HN: Trovex – stop coding agents rereading your repo's docs every session`**  *(recommended)*
-2. `Show HN: Trovex – serve coding agents one canonical doc instead of a repo reread`
-3. `Show HN: Trovex – an MCP server that routes agent doc lookups, ~60% fewer tokens`
-4. `Show HN: Trovex – local MCP server that gives agents the one current .md, not six`
+- **wrai.th is the launchable one:** public, v1.0 stable, real cold install — exactly what HN runs (`git clone` / one binary, no signup). It's also the widest top-of-funnel of the suite (suite-positioning).
+- **trovex is private beta** — it fails teardown rule #5 (a stranger can't cold-install it cleanly yet). Launching it on HN now would put a broken/locked install in the top comment. Its Show HN kit is kept ready in **§B** for when the repo + PyPI go public (unfreeze-checklist TROVEX TRACK).
+- **The agency is never the Show HN.** tsukumo appears only as the low-key "who builds this" footnote in the repo (oss-agency-bridge.md), never as the HN pitch. HN punishes a consulting pitch dressed as a Show HN.
+
+So: **§A = wrai.th Show HN (fire first).** §B = trovex Show HN (when public). Don't stack them; space the launches (launch-day-runbook).
+
+---
+
+# §A — wrai.th Show HN (the lead one-shot)
+
+## A1. Title (pick ONE — plain, names the tech, no superlatives)
+
+1. **`Show HN: wrai.th – run a fleet of AI coding agents from one control plane`**  *(recommended — concrete, names the job)*
+2. `Show HN: wrai.th – orchestration for AI coding agents: shared memory, messaging, tasks`
+3. `Show HN: wrai.th – one binary to coordinate multiple coding agents (MCP, local)`
+4. `Show HN: wrai.th – mission control for AI agents (persistent memory + a shared task board)`
 
 Notes:
-- #1 leads with the pain, not the product — strongest for a cold HN audience.
-- HN allows a number if it's concrete and defensible; #3 uses ~60% but a skeptic will ask how it's
-  measured — only use it if the first comment shows the measurement (it does, §3).
-- Keep "Trovex" capitalized in the title per HN convention; lowercase `trovex` everywhere in prose.
+- #1 leads with the *job* (run a fleet), strongest for a cold HN audience; #2/#4 spell out the mechanism for the skeptic.
+- Capitalize at sentence start per HN convention; lowercase `wrai.th` in prose.
+- No number in the title — wrai.th's pitch is capability, not a single benchmark (unlike trovex's ~60%). Don't fake one.
+
+## A2. Post type & link
+
+- **Show HN**, URL → the **repo** (`github.com/Synergix-lab/WRAI.TH`), not a landing page. A runnable, self-hostable repo is the HN trust signal.
+- Any site link goes in the first comment as secondary.
+
+## A3. First comment (founder posts immediately — the 7 beats from #162)
+
+> who you are → one sentence → the problem → backstory → how it works (technical) → what's different → ask for feedback (+ one honest limitation). Plain founder voice, no pitch.
+
+```
+Hi HN. I build tools for teams running AI coding agents; wrai.th is the one that coordinates them.
+
+One sentence: wrai.th is a local control plane for a fleet of coding agents — persistent memory,
+inter-agent messaging, a shared task board, and one dashboard — so multiple agents (and your
+teammates') work together instead of each in its own silo.
+
+The problem I kept hitting: one coding agent is easy; running several is where it falls apart. They
+don't share memory, they re-derive what another already figured out, they step on each other, and you
+have no single view of who's doing what or what they did overnight. I wanted mission control, not a
+pile of terminals.
+
+How it works:
+- Agents register and talk over MCP: messaging, a shared task board (claim/start/complete), and a
+  persistent memory store they all read/write, so context survives across agents and sessions.
+- [Founder/eng: the real coordination mechanism — how tasks are claimed without clobbering, how memory
+  scope works. Fill with accurate detail; don't hand-wave on HN.]
+- It's local and [one binary / zero-config — confirm exact run story]; AGPL, self-hostable, no cloud
+  lock-in.
+
+What's different from [orchestration frameworks people know]: [Founder: the honest one-liner — wrai.th
+is the run-it control plane (memory + messaging + tasks + dashboard), not a code framework you wire by
+hand. Keep it fair, name the real alternative.]
+
+One honest limitation: [Founder: state it plainly — e.g. early on multi-machine, or which clients are
+verified. A real weakness up front buys more trust here than any feature.]
+
+It's open source (AGPL). Install + run is in the README. I'd genuinely like feedback on the coordination
+model — where it breaks with more agents, and what you'd want from the memory layer.
+Repo: https://github.com/Synergix-lab/WRAI.TH
+```
+
+> Brand check: never names a company. "I build tools for teams running AI coding agents" carries the
+> consulting context without a pitch. The suite (trovex/yoru) can be mentioned in a *reply* if asked,
+> not in the opening comment.
+
+## A4. Founder engagement (the only "seeding" — no booster comments)
+
+- Be at a keyboard the first **2–3h**; reply to every substantive comment within minutes (Fly.io founder answered ~53 — that *is* the seeding).
+- Answer the hardest technical critic first and most generously; agree-then-respond.
+- Concede real limits plainly. Never argue, never hype, never paste the same line twice.
+- Bug found → thank, file an issue, link it. That thread becomes the social proof.
+- **No vote-begging, no friends planting praise** — HN detects vote rings and kills the post.
+
+## A5. Likely-question answer bank (founder posts as replies when asked)
+
+**Q: How is this different from LangGraph / CrewAI / an agent framework?**
+> [Founder: honest answer — those are frameworks you write your orchestration in; wrai.th is a running
+> control plane (memory + messaging + shared tasks + dashboard) you point existing MCP agents at. Name
+> the real tool, be fair, don't trash it.]
+
+**Q: Does it work with Claude Code / Cursor / my agent?**
+> Anything that speaks MCP. Config is in the README. *(Confirm exact client config before launch.)*
+
+**Q: Local or cloud? Privacy?**
+> Local-first, self-hostable, no cloud lock-in. [Confirm what (if anything) leaves the machine.] You can read the code.
+
+**Q: How does it stop two agents clobbering the same task / shared state?**
+> *(Founder/eng: the real mechanism — task claim, memory scope/locks. Accurate detail; don't hand-wave.)*
+
+**Q: AGPL — that kills it for my company.**
+> Core is AGPL; self-host + modify freely; AGPL only bites if you run a *modified* version as a network
+> service and don't share changes. A team that needs to embed/host it privately without that, reach out —
+> happy to talk. *(Low-key commercial/consulting door. Keep it casual; do not pitch.)*
+
+**Q: Is this maintained or a weekend project? Roadmap?**
+> *(Founder: one honest sentence on commitment + what's next. Don't overpromise.)*
+
+**Q: Does it pair with anything for context/observability?**
+> Yes — trovex (one canonical doc per query, fewer tokens) and yoru (see what the fleet did). Use wrai.th
+> alone or add those layers. *(Only if asked — the suite is a reply, not the pitch.)*
+
+## A6. Pre-flight checklist (owner runs before submitting)
+
+- [ ] README has a copy-paste install + run that **works from a clean clone** (teardown #5).
+- [ ] The exact client/MCP config in the README is verified to run.
+- [ ] **Nothing ships on launch day** — last code landed ≥1 week prior; the build is stable.
+- [ ] Fill the [bracketed] technical answers in A3/A5 with real detail — HN will probe them.
+- [ ] GitHub topics/tags set (PostHog lesson → Trending eligibility); CONTRIBUTING + issues on.
+- [ ] No "Synergix" in any prose a visitor lands on (README/site); URL org identifier is fine.
+- [ ] Owner free **2–3h** after submit; first comment (A3) ready to paste the second it lands.
+- [ ] Timing: US weekday AM ET (Tue–Thu ~9–11am) — a minor lever, not the strategy. Submit, then post A3.
+- [ ] **Do NOT** ask anyone to upvote or post supportive comments.
 
 ---
 
-## 2. Post type & link
+# §B — trovex Show HN (HOLD until trovex is public)
 
-- Submit as **Show HN** with the URL pointing to the **GitHub repo** (`github.com/Synergix-lab/trovex`),
-  not the landing page. HN's dev audience trusts a repo (runnable, self-hostable) over a marketing site.
-- Put the landing (trovex.dev) as a secondary link inside the first comment, not as the submission URL.
+> Fire only after the trovex repo + PyPI are public and a stranger can `uvx trovex index/serve` cleanly
+> (unfreeze-checklist TROVEX TRACK). Space it from the wrai.th day. Until then this is held.
 
----
+## B1. Title (pick ONE)
+1. **`Show HN: trovex – stop coding agents rereading your repo's docs every session`** *(recommended)*
+2. `Show HN: trovex – serve coding agents one canonical doc instead of a repo reread`
+3. `Show HN: trovex – an MCP server that routes agent doc lookups, ~60% fewer tokens`
+4. `Show HN: trovex – local MCP server that gives agents the one current .md, not six`
 
-## 3. First comment (the founder posts this immediately after submitting)
+- #1 leads with the pain. #3 uses ~60% — only if the first comment shows the measurement (it does, B3). Capitalize at sentence start; lowercase `trovex` in prose.
 
-> Follows the HN-admin structure: who you are → one sentence → problem → backstory → solution with
-> technical detail → what's different → invite feedback. Written in a plain founder voice, no pitch.
+## B2. Post type & link
+- Show HN → the **repo** (`github.com/Synergix-lab/trovex`); landing (trovex.dev) secondary, in the first comment.
 
+## B3. First comment (founder posts immediately — 7 beats)
 ```
 Hi HN. I build tools for teams running AI coding agents, and trovex is one of them.
 
@@ -66,14 +174,13 @@ How it works:
 On the ~60% number: it's tokens spent on .md reads for a lookup. Serving one section plus pointers,
 versus the agent reading the top candidate files to decide which is canonical. It's a measured
 reduction on my repos, not a benchmark I'm asking you to take on faith; the tool ships a savings view
-so you can see would-have-read vs. actual on your own corpus. Your mileage depends on how doc-heavy
-your repo is. On a tiny doc set it won't save much, and I'd rather say that than oversell it.
+so you can see would-have-read vs. actual on your own corpus. On a tiny doc set it won't save much,
+and I'd rather say that than oversell it.
 
 How it compares to what people already use:
 - CLAUDE.md / AGENTS.md / .cursorrules: one static blob — great until it goes stale and can't route a
   query to the right doc/section.
-- repomix / dumping files: floods the context window with everything, which is the opposite of what I
-  wanted.
+- repomix / dumping files: floods the context window with everything, the opposite of what I wanted.
 - plain RAG/context servers: hand back a pile of candidate chunks to rank; trovex returns the one
   canonical doc with a freshness marker and closes the write loop.
 
@@ -82,104 +189,37 @@ I'd genuinely like feedback on the routing — where it picks the wrong "canonic
 freshness signals you'd trust. Repo: https://github.com/Synergix-lab/trovex · more at https://trovex.dev
 ```
 
-> Brand check: this comment never names a company. "I build tools for teams running AI coding agents"
-> carries the consulting context without a sales pitch and without naming anything.
+## B4. trovex Q&A bank
+*(Unchanged from the prior kit — still valid. Key answers:)*
+
+**Q: Different from CLAUDE.md / AGENTS.md?** One static file that goes stale + can't route per query; trovex keeps many docs and serves the current one with a freshness marker.
+**Q: Just RAG with extra steps?** Uses embeddings, but returns the one canonical doc (path:line + freshness) + a write path, not a candidate pile.
+**Q: Why not a bigger context window?** Cost compounds (session × agent × teammate); big context ≠ *current* context. Right doc cheaply, not more doc.
+**Q: How is ~60% measured?** Tokens on .md reads: one section + pointers vs reading top candidates; the savings view shows would-have-read vs actual on your repo. Repo-dependent.
+**Q: Embeddings / phone home?** Local only — fastembed/ONNX on-device, sqlite-vec, no cloud/keys.
+**Q: Which clients?** Anything MCP (Claude Code, Cursor…); config in README. *(Confirm stdio invocation before launch.)*
+**Q: AGPL kills it for my company?** Core AGPL / CLI MIT; only bites on modified network service. Want to embed privately? reach out — happy to talk. *(Low-key door; don't pitch.)*
+**Q: Write path / how is "canonical" decided?** *(Founder/eng: real mechanism — single point of passage, duplicate/stale flagging. Accurate detail before launch.)*
+**Q: Hosted / try without installing?** Local-first by design, no signup. *(Do NOT mention any internal prod host — brand rule.)*
+
+## B5. trovex pre-flight
+- [ ] Repo public + PyPI live; `uvx trovex index/serve` works from a clean machine.
+- [ ] Client config verified; savings view shows a real number on a sample repo.
+- [ ] Beta proof folded in if available (real numbers + permissioned quote).
+- [ ] Same founder-presence + no-vote-begging rules as A4/A6.
 
 ---
 
-## 4. Comment-seeding plan (the honest kind)
+## §C — Who posts (both tracks)
 
-**The only "seeding" we do is the founder being present and substantive.** No booster comments, no
-asking friends to upvote or plant praise — HN detects vote rings and will flag/kill the post, and it's
-against the rules. Research point (Fly.io launch): the founder personally answered ~53 comments; that
-engagement *is* the seeding.
+- **The owner posts** from a real, aged HN account (autonomy-rules: platform posts need owner creds; launch-lead drafts, never submits).
+- One human voice in the thread — the founder. No team members posting as independent "users."
+- launch-lead's job ends at "ready-to-paste": title chosen, first comment + Q&A filled with real technical detail, pre-flight green. The owner fires.
 
-**Founder game plan for launch day:**
-- Be at a keyboard for the first 2–3 hours and reply to every substantive comment within minutes.
-- Answer the technical critic first and most generously — HN rewards a founder who engages the
-  hardest question head-on.
-- Concede real limitations plainly (small doc sets, the ~60% being repo-dependent). Honesty out-performs
-  defensiveness here.
-- Never argue, never get hype-y, never paste the same canned line twice. Each reply in your own voice.
-- If someone finds a bug, thank them, file an issue, link it. That thread becomes social proof on its own.
+## §D — What success looks like (not vanity)
 
----
-
-## 5. Likely-question answer bank (pre-written, founder posts as replies when asked)
-
-**Q: How is this different from just putting everything in CLAUDE.md / AGENTS.md?**
-> Those are one static file. They work until the corpus grows and they go stale — there's no per-query
-> routing and no signal for "this doc is current vs. that one is outdated." trovex keeps many docs and
-> serves the one that answers the question, with a freshness marker, so the agent isn't reading a
-> three-week-old note as gospel.
-
-**Q: Isn't this just RAG with extra steps?**
-> Mechanically it uses embeddings + vector search, yes. The difference is the output: a RAG/context
-> server usually returns N candidate chunks for the model to sift. trovex returns the single canonical
-> doc (path:line + freshness) and lets the agent read just the section it needs — plus a write path so
-> agents share one store instead of re-deriving. It's opinionated about giving one answer, not a pile.
-
-**Q: Why not just use a bigger context window / let the agent read files?**
-> Two reasons. Cost compounds — every session × every agent × every teammate pays for the same reread.
-> And a big context window isn't the same as the *current* context; the agent can still pick the stale
-> file. trovex is about the right doc cheaply, not more doc.
-
-**Q: How do you measure the ~60%?**
-> Tokens spent on .md reads for a lookup: serving one section + pointers vs. the agent reading the top
-> candidate files to decide which is canonical. The tool shows would-have-read vs. actual on your own
-> repo, so you can check it instead of trusting my number. On a small doc set it'll be much less — it's
-> repo-dependent and I try not to oversell it.
-
-**Q: What embeddings / does it phone home? Privacy?**
-> Local only. Embeddings run on-device via fastembed (ONNX under the hood), vectors live in a local
-> SQLite db (sqlite-vec). No cloud, no API keys, nothing leaves your machine. You can read the code.
-
-**Q: Which agents/clients does it work with?**
-> Anything that speaks MCP — it exposes a standard MCP server (Claude Code, Cursor, etc.). Config snippet
-> is in the README. *(Confirm the exact stdio invocation against the CLI before this goes live.)*
-
-**Q: AGPL? That kills it for my company.**
-> The core is AGPL-3.0, the CLI is MIT. Self-host and modify freely; AGPL only bites if you run a
-> *modified* version as a network service and don't share changes. If a team needs to embed/host it
-> privately without that obligation, reach out and we'll sort it — happy to talk.
-> *(This is the low-key consulting/commercial door. Keep it this casual; do not pitch.)*
-
-**Q: How does the write path avoid two agents clobbering each other / how is "canonical" decided?**
-> *(Founder/eng to answer with the real mechanism — single point of passage, how duplicates/staleness
-> are flagged. Fill in accurate technical detail before launch; don't hand-wave on HN.)*
-
-**Q: Is this hosted? Can I try it without installing?**
-> It's local-first by design — you run it on your machine, no signup. Index a repo and serve in a couple
-> of commands (README). *(Do NOT mention the internal prod host — brand rule. If a hosted demo is wanted
-> later, it needs a brand-neutral URL first.)*
-
-**Q: Roadmap / is this maintained or a weekend project?**
-> *(Founder: one honest sentence on commitment + what's next — e.g. better freshness signals, more client
-> configs. Don't overpromise.)*
-
----
-
-## 6. Pre-flight checklist (human runs before submitting)
-
-- [ ] README has a copy-paste install + index that actually works from a clean clone.
-- [ ] The MCP client config in the README is verified to run (exact stdio flag confirmed).
-- [ ] The savings view works and shows a real would-have-read vs. actual number on a sample repo.
-- [ ] Repo has a clear license note (AGPL core / MIT CLI) and a CONTRIBUTING / issues enabled.
-- [ ] No "Synergix" surfaced anywhere in repo prose that a visitor lands on (README, site). Technical
-      org identifier in the URL is fine.
-- [ ] Founder is free for 2–3 hours after submit to answer comments.
-- [ ] Pick the title (recommend #1). Have the first comment (§3) ready to paste the second the post lands.
-- [ ] Decide timing: research suggests a US weekday morning (Tue/Wed) ET — treat as a hypothesis, not a
-      guarantee. Submit, then immediately post the first comment.
-- [ ] Do NOT ask anyone to upvote or post supportive comments. None.
-
-## 7. What success looks like (so we don't chase vanity)
-
-- Primary: qualified devs install + index + see their own savings number (activation), and a few file
-  issues / star because it solved a real annoyance.
-- Secondary: one or two "a team lead reached out" conversations from the AGPL/consulting door — that's
-  the north star, not front-page rank.
-- Front page is nice but not the goal; a smaller thread of high-intent MCP users who actually install is
-  worth more than a hype spike that bounces.
+- **Primary:** qualified devs install + run it (activation) — wrai.th fleet running / trovex savings number seen — and a few file issues or star because it solved a real annoyance.
+- **Secondary:** one or two "a team lead reached out" conversations from the AGPL/consulting door — the north star, not front-page rank.
+- A smaller thread of high-intent users who actually install beats a hype spike that bounces.
 
 *All copy above is a draft. Nothing has been submitted to Hacker News.*

@@ -35,6 +35,7 @@ meaningful after a distribution push sends real volume. Full table:
 | Layer | Status | Source |
 |-------|--------|--------|
 | **Pageviews / visitors per post** | ✅ live | Plausible Stats API (keyed) |
+| **Read-depth (25/50/75/100%)** | ✅ live | `article_read{slug,pct}` (tsukumo PR #238) — rank by *reads*, not just views |
 | **AI-cited?** | partial | a `/blog/` URL appearing in [`geo-citation-monitor`](./geo-citation-monitor.md) output; per-post needs the **post→target-query map** (geo-lead owns wording) |
 | **GSC position / impressions** | ⏳ pending creds | Google Search Console Search Analytics API (dimension=page) — needs an OAuth/service-account credential + a verified `tsukumo.ch` property |
 | **Sessions → lead per post** | ⏳ v2 | Plausible funnel `entry_page=/blog/X → assessment_request` — needs traffic to power |
@@ -47,8 +48,10 @@ meaningful after a distribution push sends real volume. Full table:
 
 ## How it feeds the funnel
 
-Top posts by pageviews (and later by GSC rank + sessions→lead) = where content/geo double
-down; the zero-traffic tail = rework or cut. Pairs with the GEO citation hit-list
+Top posts by pageviews + **read-depth** (and later GSC rank + sessions→lead) = where
+content/geo double down; the zero-traffic tail = rework or cut. **Read-depth separates
+opened-not-read from actually-read** — break `article_read` down by `event:props:pct` for a
+slug; views without 75/100 = fix the lede/structure. Pairs with the GEO citation hit-list
 ([`geo-citation-hitlist` memory](./ranking-citation-tracking.md)) so we make the *winning*
 topics citable, not random ones. Feeds the [weekly digest](./weekly-digest-template.md).
 

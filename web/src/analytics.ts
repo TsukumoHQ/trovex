@@ -39,6 +39,11 @@ export type EventName =
   | 'section_viewed'
   | 'request_access_clicked'
   | 'waitlist_submitted'
+  // canonical cross-property suite→agency funnel (funnel-event-taxonomy memory).
+  // trovex = reference impl; wrai.th/yoru inherit this module + fire the same events.
+  | 'oss_surface_view'
+  | 'oss_adopt'
+  | 'suite_to_agency_click'
 
 type Props = Record<string, string>
 
@@ -84,6 +89,17 @@ const UTM_SOURCE: Record<string, GeoSource> = {
   google: 'search',
   producthunt: 'producthunt',
   ph: 'producthunt',
+  // launch + community sources — map BEFORE launch day or their ROI decays to direct/unknown.
+  hackernews: 'social',
+  hn: 'social',
+  reddit: 'social',
+  lobsters: 'social',
+  x: 'social',
+  twitter: 'social',
+  linkedin: 'social',
+  discord: 'social',
+  'mcp-registry': 'referral',
+  newsletter: 'referral',
 }
 
 const AI_ENGINES: GeoSource[] = ['chatgpt', 'perplexity', 'claude', 'gemini', 'copilot']
@@ -162,9 +178,12 @@ export function track(event: EventName, props: Props = {}): void {
   window.plausible(event, { props: { ...deriveSession(), ...props } })
 }
 
-/** Call once on mount: the landing_view event carrying GEO/channel attribution. */
+/** Call once on mount: the landing_view event carrying GEO/channel attribution. Also fires
+ *  the canonical `oss_surface_view` (the cross-property top-of-funnel "reached an OSS
+ *  property" event) so the suite→agency dashboard can read trovex's reach. */
 export function trackLandingView(): void {
   track('landing_view')
+  track('oss_surface_view', { surface: 'trovex' })
 }
 
 /* ── Waitlist funnel (primary conversion under the private-beta GTM) ──────────
@@ -180,9 +199,25 @@ export function trackRequestAccessClick(location: string): void {
   track('request_access_clicked', { location })
 }
 
-/** Fire on a successful waitlist submission. No email / no PII — source only. */
+/** Fire on a successful waitlist submission. No email / no PII — source only. Also fires the
+ *  canonical `oss_adopt{kind:waitlist}` (the cross-property adoption event). */
 export function trackWaitlistSubmitted(location = 'waitlist'): void {
   track('waitlist_submitted', { location })
+  trackOssAdopt('waitlist')
+}
+
+/** Canonical cross-property adoption event. kind = how the dev adopted trovex. Call
+ *  trackOssAdopt('install') from the command-copy / quickstart, 'discord' from a Discord join. */
+export function trackOssAdopt(kind: 'install' | 'waitlist' | 'discord'): void {
+  track('oss_adopt', { tool: 'trovex', kind })
+}
+
+/** Fire on a trovex→tsukumo crosslink click: the canonical `suite_to_agency_click` (so the
+ *  agency side can attribute which OSS property drove the visit) + trovex's own
+ *  `tsukumo_clicked`. `link_location` = where the link sits (consult-band | footer | …). */
+export function trackTsukumoClick(link_location: string): void {
+  track('tsukumo_clicked', { location: link_location })
+  track('suite_to_agency_click', { from_tool: 'trovex', link_location })
 }
 
 /**

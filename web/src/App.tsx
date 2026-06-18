@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { track, trackLandingView, trackRequestAccessClick, trackWaitlistSubmitted, getAttribution } from './analytics'
+import { track, trackLandingView, trackRequestAccessClick, trackWaitlistSubmitted, trackTsukumoClick, getAttribution } from './analytics'
 
 // The beta CTA funnels to the in-page waitlist. The consult band is the suite→agency
 // handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so tsukumo reads
@@ -429,7 +429,7 @@ export default function App() {
                 href={CONSULT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => track('tsukumo_clicked', { location: 'consult-band' })}
+                onClick={() => trackTsukumoClick('consult-band')}
               >
                 Let&apos;s talk →
               </a>
@@ -452,7 +452,7 @@ export default function App() {
               href="https://tsukumo.ch/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting"
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => track('tsukumo_clicked', { location: 'footer' })}
+              onClick={() => trackTsukumoClick('footer')}
             >
               built by tsukumo ↗
             </a>

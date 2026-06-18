@@ -18,8 +18,8 @@ AI-engine signal (those referrers get stripped). Pairs with referrer-host fallba
 | Param | Meaning | Rule |
 |-------|---------|------|
 | `utm_source` | where the click physically comes from | closed list below; must match `web/src/analytics.ts`. Unmapped → silently `referral`/`unknown`. |
-| `utm_medium` | kind of placement | closed: `ai_answer`, `organic`, `social`, `community`, `registry`, `referral`, `email`, `paid`. |
-| `utm_campaign` | the initiative | kebab-case, reuse names: `private-beta`, `geo-seed`, `comparison-pages`, `newsletter`, `agency-launch` (the tsukumo/agency launch push), `launch-hn`, `launch-ph`, `lead-nurture` (post-capture nurture sequence). |
+| `utm_medium` | kind of placement | closed: `ai_answer`, `organic`, `social`, `community`, `registry`, `referral`, `email`, `dm` (1:1 direct message), `paid`. |
+| `utm_campaign` | the initiative | kebab-case, reuse names: `private-beta`, `geo-seed`, `comparison-pages`, `newsletter`, `agency-launch` (the tsukumo/agency launch push), `launch-hn`, `launch-ph`, `lead-nurture` (post-capture nurture sequence), `reengage` (re-engagement series). |
 | `utm_content` | which variant/placement of the link | distinguishes A/B variants & placements: `cta-hero`, `cta-footer`, `post-1`, `thread-tweet-3`, `vs-mem0`, `card-a`. Powers per-variant attribution. |
 
 `utm_content` is the new one: it's how we tell apart two versions of the same campaign

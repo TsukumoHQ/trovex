@@ -29,6 +29,8 @@
 - [What is canonical context for coding agents?](https://trovex.dev/answers/canonical-context-for-agents/): the single current, authoritative doc that answers a query.
 - [Does a bigger context window make rereading docs cheaper?](https://trovex.dev/answers/bigger-context-window-rereading/): no — it raises the ceiling, not the efficiency.
 - [How do I keep multiple agents working from the same docs?](https://trovex.dev/answers/shared-source-of-truth-multiple-agents/): one shared read-and-write point, no drift.
+- [Is there an MCP server that serves a repo's docs to coding agents?](https://trovex.dev/answers/mcp-server-for-repo-docs/): yes — trovex is an MCP server that returns the one canonical doc per query, not the whole repo.
+- [What's the single source of truth for a multi-agent repo?](https://trovex.dev/answers/source-of-truth-multi-agent-repos/): one canonical, freshness-marked doc every agent reads and writes back, instead of each agent guessing from raw files.
 
 ## Setup (per MCP client)
 - [trovex for Claude Code](https://trovex.dev/for/claude-code/): `claude mcp add --transport http trovex http://localhost:8765/mcp`.

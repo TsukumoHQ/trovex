@@ -43,10 +43,13 @@ Each tile = one Plausible custom event from the live taxonomy. Period default = 
 | 7 | **★ Assessment request** | `assessment_request` | **THE conversion** — by `source`, `how_heard` |
 | 8 | Qualified / won | CRM (manual) | `proposal_sent`, `engagement_won` — the money |
 
-Tiles 1–3 only fill once the **suite repos** (trovex/WRAI.TH/yoru) port the analytics
-module and fire suite-side events — trovex is the reference impl; WRAI.TH + yoru are a
-per-property rollout (tracked in `consulting-funnel.md` §7). Tiles 4–7 are **live on
-tsukumo now**. Tile 8 is manual CRM (low volume, high value).
+Tiles 1–3: **trovex now fires the suite-side events** (`oss_surface_view`, `oss_adopt`,
+`suite_to_agency_click` — reference impl, trovex PR); WRAI.TH + yoru inherit the same module
+(per-property rollout, `consulting-funnel.md` §7). **Read caveat:** these fire on
+**trovex.dev's own Plausible property** (separate from tsukumo.ch), so reading tiles 1–2
+needs a **trovex.dev Stats API key** (my key is tsukumo.ch only — flagged to cmo). Tile 3's
+agency-side landing is already readable now (`tsukumo_visit` with `source=suite`, via the
+UTM'd crosslink). Tiles 4–7 are **live on tsukumo**. Tile 8 is manual CRM.
 
 ## 2. The headline numbers (render big)
 

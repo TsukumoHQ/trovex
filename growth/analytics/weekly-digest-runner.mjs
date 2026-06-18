@@ -15,8 +15,22 @@
  * Usage:  node weekly-digest-runner.mjs [--since 2026-07-01] [--dry]
  */
 import { writeFileSync, mkdirSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Suite GitHub reach (top-of-funnel for the CLI repos with no landing — see
+// github-suite-reach.mjs / suite-reach-measurement.md). Uses the gh CLI; n/a if unavailable.
+const SUITE_REPOS = ["Synergix-lab/WRAI.TH", "Synergix-lab/trovex", "Synergix-lab/yoru"];
+function ghReach() {
+  return SUITE_REPOS.map((r) => {
+    const j = (p) => { try { return JSON.parse(execSync(`gh api ${p} 2>/dev/null`, { encoding: "utf8" })); } catch { return null; } };
+    const base = j(`repos/${r}`);
+    if (!base) return { repo: r, na: true };
+    const c = j(`repos/${r}/traffic/clones`);
+    return { repo: r, stars: base.stargazers_count, clones14: c ? `${c.count}/${c.uniques}` : "n/a" };
+  });
+}
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ymd = (d) => d.toISOString().slice(0, 10);
@@ -79,6 +93,7 @@ async function main() {
   const qualified = leads ? leads.filter((l) => l.lead_band === "hot" || l.lead_band === "warm").length : null;
   const qualifiedSuite = leads ? leads.filter((l) => (l.lead_band === "hot" || l.lead_band === "warm") && isSuite(l)).length : null;
 
+  const reach = ghReach();
   const date = ymd(new Date());
   const rate = (a, b) => (a == null || !b ? "n/a" : `${Math.round((a / b) * 100)}%`);
   const md = [
@@ -90,6 +105,13 @@ async function main() {
     `- **North star — suite-sourced assessment requests: ${n(assessSuite)}.** All assessment requests: ${n(assessAll)}.`,
     `- **Qualified leads (hot+warm): ${n(qualified)}** (suite-attributed: ${n(qualifiedSuite)}). Bands — hot ${n(band("hot"))} · warm ${n(band("warm"))} · cold ${n(band("cold"))}.`,
     `- **Waitlist signups (all projects): ${wl ? wl.length : "n/a"}.**`,
+    ``,
+    `## Suite reach — GitHub (top of funnel, all-time stars + 14d clones)`,
+    `| Repo | Stars | Clones 14d (total/uniq) |`,
+    `|------|------:|-------------------------|`,
+    ...reach.map((r) => r.na ? `| ${r.repo} | n/a | n/a |` : `| ${r.repo} | ${r.stars} | ${r.clones14} |`),
+    `> CLI repos (WRAI.TH/yoru) have no landing — GitHub traffic is their reach. The full chain:`,
+    `> suite reach (here) → suite_to_agency_click → assessment_request → qualified (below).`,
     ``,
     `## Funnel (Plausible, ${w.start}→${w.end})`,
     `| Stage | Event | Count |`,

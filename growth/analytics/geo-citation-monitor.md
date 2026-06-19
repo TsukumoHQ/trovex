@@ -36,6 +36,24 @@ site for our own name yet). Competitors do appear (e.g. repomix on the alternati
 This is the honest GEO starting line: invisible. Every category row is a target for geo-lead.
 Full table: [`reports/geo-citations-2026-06-16.md`](./reports/geo-citations-2026-06-16.md).
 
+## Two cohorts — standing + offensive (added 2026-06-19)
+
+The panel now probes **two cohorts** in one run:
+
+- **Standing (10):** the original suite-category queries. Kept stable so the **weekly trend
+  stays comparable** — don't churn this set.
+- **Offensive (12):** the citation **write-list** the team is actively building answers for
+  (source: memory [[citation-uncited-queries]] / `content/geo/query-gap-backlog.md`, geo-lead,
+  intent×winnability scored). This is the **post-deploy verification overlay**: probe the exact
+  buyer questions tech-copy/geo are targeting so "did the new page earn a citation?" is a
+  measured number, not a guess. A row here flipping ✅ is the proof a page landed.
+
+**Pre-deploy baseline — 2026-06-19: standing 0/10, offensive 0/12 (0/22 overall).** Offensive
+is 0 *by definition* until the answer pages deploy and the engine indexes them — that's the
+honest starting line, not a miss. Verification = re-run after each batch deploys; do **not**
+block writing on it. Full table:
+[`reports/geo-citations-2026-06-19.md`](./reports/geo-citations-2026-06-19.md).
+
 ## Honesty + limits
 
 - **Sampled snapshot, not a rank.** AI answers vary by run/region/personalization. One run is
@@ -60,4 +78,5 @@ geo-lead as the answer/comparison pages to strengthen; re-run weekly to see the 
 - [x] Computes suite citation share + per-query competitor capture; dated report output.
 - [x] First real read logged honestly (0/10) — no fabrication; keys out-of-git (env only).
 - [x] Cadence + how-to-run + dashboard/geo-lead handoff.
+- [x] Offensive cohort wired (12 write-list queries) as the post-deploy verification overlay.
 - [ ] Add Perplexity + Google AIO engines (need keys) — widens the panel.

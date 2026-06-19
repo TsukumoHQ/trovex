@@ -16,7 +16,7 @@ const DATES = `"datePublished": "${PUBLISHED}", "dateModified": "${MODIFIED}"`;
 const STAMP = `<p class="updated">Updated <time datetime="${MODIFIED}">${MODIFIED_HUMAN}</time></p>`;
 
 const dirs = [];
-for (const sec of ["answers", "vs"]) {
+for (const sec of ["answers", "vs", "for"]) {
   const base = `public/${sec}`;
   for (const slug of readdirSync(base, { withFileTypes: true })) {
     if (!slug.isDirectory()) continue;
@@ -31,12 +31,12 @@ for (const f of dirs) {
   const before = html;
   const eol = html.includes("\r\n") ? "\r\n" : "\n";
 
-  // 1. Inject dates + speakable into the QAPage/FAQPage node (once). Idempotent:
+  // 1. Inject dates + speakable into the QAPage/FAQPage/HowTo node (once). Idempotent:
   //    if already present, refresh dateModified only. $2 preserves the matched EOL;
   //    the 8-space indent matches the sibling "mainEntity" line.
   if (!html.includes('"speakable"')) {
     html = html.replace(
-      /("@type": "(?:QAPage|FAQPage)",)(\r?\n)/,
+      /("@type": "(?:QAPage|FAQPage|HowTo)",)(\r?\n)/,
       `$1$2        ${DATES},${eol}        ${SPEAKABLE},${eol}`,
     );
   } else {

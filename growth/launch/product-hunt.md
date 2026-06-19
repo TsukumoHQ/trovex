@@ -46,6 +46,13 @@ Point your MCP agents at it. Open source, self-hostable, no cloud lock-in.
 - **Optional Slide 0 (≤30s screen capture):** spin up 2–3 agents → watch them claim tasks + share memory live.
 > Honesty gate: real screens only. No fabricated metrics/logos/"trusted by." [design/eng build from real runs.]
 
+> **Built assets (design, #209) → `growth/assets/launch/wraith/`** (wrai.th brand: dark `#0a0c10` + emerald
+> `#4ade80`, NOT tsukumo acid; verbatim copy from the gallery spec). DONE: slide-4 (how-it-works), slide-5
+> (trust), `og-card.png` (1200×630 — also the show-hn link unfurl), `thumbnail-240.png`. PENDING: slides 1–3
+> are **real /v2/ dashboard captures** — a human grabs them per `CAPTURE-BRIEF.md` (live colony, honesty gate),
+> drops `raw-slide-1..3.png`, design composites into 1270×760 frames. Tracked as a human task. Gallery is
+> complete once those 3 land — then the one-shots need only owner go.
+
 ## A5. Maker first comment (post at launch — personal story + use-case question)
 ```
 Hi PH. I build tools for teams running AI coding agents; wrai.th is the one that coordinates them.

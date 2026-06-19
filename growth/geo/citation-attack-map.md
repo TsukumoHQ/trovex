@@ -46,5 +46,31 @@ So the offensive is **tune + widen + earn**, not "build pages that already exist
 - **analytics-lead:** re-run the monitor (owns `OPENAI_API_KEY`) to track movement once PR B deploys + indexes; **widen the panel to Perplexity + Google AI Overviews** before drawing conclusions from one OpenAI run.
 - **launch / social / content:** the off-site half — `brand-trovex` and cold category discovery are won by earned citations (Reddit/HN/awesome-lists/listicles), per `growth/geo/earned-citation-strategy.md` (tsukumo) and the suite's own GitHub presence.
 
+## Re-run baseline — on-page status per query (for analytics, 2026-06-19)
+
+On-page work is COMPLETE for all 10. This is the definitive target+lever table to diff
+the next monitor run against (re-run AFTER these deploy + get re-indexed; sitemap lastmod
+bumped to 06-19 to push the re-crawl — PR #201).
+
+| # | Query | Live target | Speakable | Fresh (06-19) | Schema | Shipped in |
+|---|---|---|:--:|:--:|---|---|
+| 1 | context-fewer-tokens | trovex `/answers/canonical-context-for-agents/` | ✓ | ✓ | QAPage | #195, sitemap #201 |
+| 2 | stop-rereading-repo | trovex `/answers/stop-agent-rereading-docs/` | ✓ | ✓ | QAPage | #195, #201 |
+| 3 | ssot-multiple-agents | trovex `/answers/shared-source-of-truth-multiple-agents/` (+ `/source-of-truth-multi-agent-repos/`) | ✓ | ✓ | QAPage | #186, #195, #201 |
+| 4 | reduce-agent-token-cost | trovex `/answers/reduce-agent-token-costs/` | ✓ | ✓ | QAPage | #195, #201 |
+| 5 | claude-md-alternative | trovex `/vs/claude-md/` | ✓ | ✓ | FAQPage | #195, #201 |
+| 6 | repomix-alternative | trovex `/vs/repomix/` (beat repomix) | ✓ | ✓ | FAQPage | #195, #201 |
+| 7 | mcp-context-server | trovex `/answers/mcp-server-for-repo-docs/` | ✓ | ✓ | QAPage | #186, #195, #201 |
+| 8 | brand-trovex | trovex `/` + `llms.txt` | n/a | — | Org/SoftwareApp | on-page optimal — **off-site/age**, earned citations |
+| 9 | consulting-agents-prod | tsukumo `/answers/what-is-ai-in-production-consulting` | ✓ | ✓ | Article+FAQ+DefinedTerm | freshness #312 |
+| 10 | agentic-operators-studio | tsukumo `/answers/ai-dev-studios-agentic-operators` (NEW) | ✓ | ✓ | Article+FAQ+DefinedTerm | #301, #312 |
+
+Crawl prereq verified: robots.txt on **both** trovex + tsukumo explicitly allows GPTBot /
+OAI-SearchBot / PerplexityBot / ClaudeBot / Google-Extended / Applebot-Extended.
+
+**No remaining geo on-page lever.** 0/10 → win now depends on (a) deploy + re-index (sitemap
+pushed), (b) analytics re-run widened to Perplexity + Google AIO, (c) off-site earned citations
+for `brand-trovex` + cold category (launch/social).
+
 ## Honesty
 No fabricated metrics; the only number is the real ~60% (trovex). The map states what exists vs what's missing — no claim that 0/10 is "fixed" by content alone; the largest lever for the branded/cold queries is time + earned citations, tracked weekly by analytics.

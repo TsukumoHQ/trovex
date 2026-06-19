@@ -47,7 +47,7 @@
           {
             "@type": "Question",
             "name": "What is the difference between trovex and mem0?",
-            "acceptedAnswer": { "@type": "Answer", "text": "mem0 is a general memory layer that remembers facts, preferences, and conversation history for an agent or app across sessions, usually via an API and an LLM extraction step. trovex is narrower and source-of-truth focused: it indexes your repo's markdown and serves the one canonical doc that answers a query, with a freshness marker, locally over MCP. mem0 remembers what was said; trovex serves what is currently true in your docs." }
+            "acceptedAnswer": { "@type": "Answer", "text": "mem0 is a general memory layer: it remembers facts, preferences, and conversation across sessions, usually via an API plus an LLM extraction step. trovex is narrower: it indexes your repo's markdown and serves the one canonical doc that answers a query, with a freshness marker, locally over MCP, for about 60% fewer tokens per lookup. They're complementary." }
           },
           {
             "@type": "Question",
@@ -91,7 +91,7 @@
 
     <div class="verdict">
       <div class="l">Short answer</div>
-      <p>mem0 is a general <strong>memory layer</strong> — it remembers facts, preferences, and conversation history for an agent or app across sessions, usually via an API plus an LLM extraction step. trovex is narrower and <strong>source-of-truth focused</strong>: it indexes your repo's markdown and serves the one canonical doc that answers a query, with a freshness marker, locally over MCP, for about <strong>60% fewer tokens per lookup</strong>. mem0 remembers what was said; trovex serves what is currently true in your docs. They're complementary.</p>
+      <p>mem0 is a general <strong>memory layer</strong>: it remembers facts, preferences, and conversation across sessions, usually via an API plus an LLM extraction step. trovex is <strong>narrower</strong>: it indexes your repo's markdown and serves the one canonical doc that answers a query, with a freshness marker, locally over MCP, for about 60% fewer tokens per lookup. They're complementary.</p>
     </div>
 
     <h2>What is mem0?</h2>

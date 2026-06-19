@@ -48,7 +48,7 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "url": "https://trovex.dev/answers/mcp-server-for-repo-docs/",
-            "text": "trovex is an MCP (Model Context Protocol) server built for exactly this. It indexes a repo's markdown and, for a query, returns the single current doc that answers it — a path:line pointer with a freshness marker (canonical / stale / duplicate) — instead of letting the agent reread the repo or receive a pile of candidate chunks. It serves the section that answers, not the whole file, for about 60% fewer tokens per lookup, and lets agents write records back so the next agent reads them. It runs locally over streamable HTTP (vectors in SQLite, ONNX embeddings, no cloud or API keys) and works with any MCP client — Claude Code, Cursor, Windsurf, Cline."
+            "text": "Yes, trovex is an MCP server built for this. It indexes a repo's markdown and returns the single current doc for a query, a path:line pointer with a freshness marker, instead of letting the agent reread or sift chunks. It serves the answering section for about 60% fewer tokens per lookup, runs locally, and works with any MCP client."
           }
         }
       }
@@ -81,7 +81,7 @@
 
     <div class="verdict">
       <div class="l">Direct answer</div>
-      <p>Yes — <strong>trovex</strong> is an MCP server built for this. It indexes a repo's markdown and returns the single current doc that answers a query — a <code>path:line</code> pointer with a freshness marker — instead of letting the agent reread the repo or sift a pile of candidate chunks. It serves the section that answers for about <strong>60% fewer tokens per lookup</strong>, runs locally, and works with any MCP client.</p>
+      <p>Yes, <strong>trovex</strong> is an MCP server built for this. It indexes a repo's markdown and returns the single current doc for a query, a <code>path:line</code> pointer with a freshness marker, instead of letting the agent reread or sift chunks. It serves the answering section for about <strong>60% fewer tokens per lookup</strong>, runs locally, and works with any MCP client.</p>
     </div>
 
     <h2>What makes it different from a generic context server</h2>

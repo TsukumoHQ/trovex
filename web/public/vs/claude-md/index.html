@@ -47,7 +47,7 @@
           {
             "@type": "Question",
             "name": "What is the difference between trovex and CLAUDE.md?",
-            "acceptedAnswer": { "@type": "Answer", "text": "CLAUDE.md is one static markdown file your agent loads in full every session. trovex indexes many docs and serves the single current one that answers a given query, with a freshness marker, instead of loading everything up front. CLAUDE.md is a fixed blob; trovex routes a question to the right doc and section." }
+            "acceptedAnswer": { "@type": "Answer", "text": "CLAUDE.md and AGENTS.md are one static markdown file your agent loads in full every session. They suit a short, stable rule set, but go stale, don't scale, and can't route a query to the right doc. trovex indexes many docs and serves the single current one per query for 60% fewer tokens per lookup, and the two work together." }
           },
           {
             "@type": "Question",
@@ -91,7 +91,7 @@
 
     <div class="verdict">
       <div class="l">Short answer</div>
-      <p>CLAUDE.md and AGENTS.md are one static markdown file your agent loads in full every session. They're great for a short, stable set of project rules. They go stale, don't scale past a handful of topics, and can't route a question to the right doc or section. trovex indexes many docs and serves the single current one that answers a query — a <code>path:line</code> pointer with a freshness marker — for about <strong>60% fewer tokens per lookup</strong>. The two work well together: keep a small CLAUDE.md, let trovex carry the corpus.</p>
+      <p>CLAUDE.md and AGENTS.md are one static markdown file your agent loads in full every session. They suit a short, stable rule set, but go stale, don't scale, and can't route a query to the right doc. trovex indexes many docs and serves the single current one per query for <strong>60% fewer tokens per lookup</strong>, and the two work together.</p>
     </div>
 
     <h2>What are CLAUDE.md and AGENTS.md?</h2>

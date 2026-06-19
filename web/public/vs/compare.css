@@ -52,6 +52,10 @@ code {
 .crumb { font-size: 0.85rem; color: var(--fg-subtle); padding-top: 26px; }
 .crumb a { color: var(--fg-muted); }
 
+/* freshness stamp — visible mirror of schema dateModified (GEO recency signal) */
+.updated { font-size: 0.8rem; color: var(--fg-subtle); margin: 16px 0 0; letter-spacing: 0.02em; }
+.updated time { color: var(--fg-muted); }
+
 /* headings */
 main { padding-bottom: 80px; }
 h1 { font-size: clamp(1.9rem, 5vw, 2.7rem); line-height: 1.12; letter-spacing: -0.02em; margin: 14px 0 0; }

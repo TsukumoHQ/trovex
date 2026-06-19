@@ -14,7 +14,7 @@
  *
  * Usage:  node weekly-digest-runner.mjs [--since 2026-07-01] [--dry]
  */
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +34,28 @@ function ghReach() {
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ymd = (d) => d.toISOString().slice(0, 10);
+
+// GEO citation share is the TOP of the suite→agency funnel (a buyer asking an AI engine,
+// before any visit). Read it from the latest geo-citation-monitor report instead of re-probing
+// — the digest surfaces the leading indicator without burning an OpenAI call. Honest n/a if no
+// report exists. Cohort lines (standing/offensive) only exist on reports from 2026-06-19+.
+function latestCitationShare() {
+  try {
+    const dir = join(__dir, "reports");
+    const files = readdirSync(dir).filter((f) => /^geo-citations-\d{4}-\d{2}-\d{2}\.md$/.test(f)).sort();
+    if (!files.length) return null;
+    const file = files[files.length - 1];
+    const txt = readFileSync(join(dir, file), "utf8");
+    const date = file.slice("geo-citations-".length, -3);
+    const grab = (re) => { const m = txt.match(re); return m ? m[1] : null; };
+    return {
+      date,
+      overall: grab(/Suite citation share:\s*([0-9]+\/[0-9]+ queries \([0-9]+%\))/),
+      standing: grab(/\*\*Standing\*\*[^:]*:\s*\*\*([0-9]+\/[0-9]+ \([0-9]+%\))\*\*/),
+      offensive: grab(/\*\*Offensive\*\*[^:]*:\s*\*\*([0-9]+\/[0-9]+ \([0-9]+%\))\*\*/),
+    };
+  } catch { return null; }
+}
 
 function window_() {
   const end = new Date();
@@ -94,6 +116,10 @@ async function main() {
   const qualifiedSuite = leads ? leads.filter((l) => (l.lead_band === "hot" || l.lead_band === "warm") && isSuite(l)).length : null;
 
   const reach = ghReach();
+  const cite = latestCitationShare();
+  const citeLine = cite
+    ? `- **GEO citation share (latest read ${cite.date}): ${cite.standing ? `standing ${cite.standing}` : cite.overall || "n/a"}${cite.offensive ? ` · offensive ${cite.offensive}` : ""}.** Leading indicator — AI engines citing the suite, upstream of any visit.`
+    : `- **GEO citation share: n/a** (no \`reports/geo-citations-*.md\` yet — run \`geo-citation-monitor.mjs\`).`;
   const date = ymd(new Date());
   const rate = (a, b) => (a == null || !b ? "n/a" : `${Math.round((a / b) * 100)}%`);
   const md = [
@@ -105,6 +131,7 @@ async function main() {
     `- **North star — suite-sourced assessment requests: ${n(assessSuite)}.** All assessment requests: ${n(assessAll)}.`,
     `- **Qualified leads (hot+warm): ${n(qualified)}** (suite-attributed: ${n(qualifiedSuite)}). Bands — hot ${n(band("hot"))} · warm ${n(band("warm"))} · cold ${n(band("cold"))}.`,
     `- **Waitlist signups (all projects): ${wl ? wl.length : "n/a"}.**`,
+    citeLine,
     ``,
     `## Suite reach — GitHub (top of funnel, all-time stars + 14d clones)`,
     `| Repo | Stars | Clones 14d (total/uniq) |`,
@@ -138,8 +165,9 @@ async function main() {
     `**Tool funnel:** view→completed ${rate(toolDone, toolView)} · completed→cta ${rate(toolCta, toolDone)}. (Tool CTA → /assessment; see which readiness band converts via \`event:props:result\`.)`,
     ``,
     `## Other reads (run separately)`,
-    `- GEO citation share — \`geo-citation-monitor.mjs\` → \`reports/geo-citations-*.md\`.`,
+    `- GEO citation share — surfaced in Headline from the latest \`reports/geo-citations-*.md\`; re-probe weekly via \`geo-citation-monitor.mjs\` (standing + offensive cohorts).`,
     `- Per-post performance + read-depth — \`blog-performance.mjs\` → \`reports/blog-performance-*.md\`.`,
+    `- Site traffic snapshot (hygiene-floored, internal-traffic flagged) — \`plausible-snapshot.mjs\` → \`reports/plausible-snapshot-*.md\`.`,
     ``,
     `## Hygiene`,
     `- Window honors \`--since <launch-date>\`; pre-launch traffic is crawler+verification noise (see \`traffic-hygiene.md\`) — start the window at launch day for a clean read.`,

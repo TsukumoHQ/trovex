@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/blog/" />
+  <title>Blog — trovex</title>
+  <meta name="description" content="Writing on the token economics of AI coding agents: what rereading docs costs, why agents pick stale files, and how serving one canonical doc cuts the bill." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/blog/" />
+  <meta property="og:title" content="Blog — trovex" />
+  <meta property="og:description" content="Writing on the token economics of AI coding agents and the cost of rereading docs." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Blog — trovex" />
+  <meta name="twitter:description" content="Writing on the token economics of AI coding agents." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://trovex.dev/blog/" }
+        ]
+      },
+      {
+        "@type": "Blog",
+        "name": "trovex blog",
+        "description": "Writing on the token economics of AI coding agents and the cost of rereading docs.",
+        "url": "https://trovex.dev/blog/",
+        "inLanguage": "en",
+        "publisher": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+        "blogPost": [
+          {
+            "@type": "BlogPosting",
+            "headline": "The token cost of coding agents rereading your docs",
+            "description": "The math on what rereading docs costs your agent every session, and how serving one canonical doc cuts a typical lookup from ~720 to ~280 tokens.",
+            "datePublished": "2026-06-15",
+            "dateModified": "2026-06-20",
+            "url": "https://trovex.dev/blog/the-token-cost-of-agents-rereading-docs/",
+            "author": { "@type": "Organization", "name": "trovex" }
+          },
+          {
+            "@type": "BlogPosting",
+            "headline": "MCP context patterns for coding agents: dump, retrieve, or answer",
+            "description": "Three ways to feed a coding agent project context over MCP: dump the repo, return candidate chunks, or serve one canonical answer. What each costs, and how to choose.",
+            "datePublished": "2026-06-16",
+            "dateModified": "2026-06-20",
+            "url": "https://trovex.dev/blog/mcp-context-patterns-for-coding-agents/",
+            "author": { "@type": "Organization", "name": "trovex" }
+          },
+          {
+            "@type": "BlogPosting",
+            "headline": "One source of truth for a fleet of coding agents",
+            "description": "Several agents on one repo re-derive answers and write notes that drift. A shared read/write path makes a thing learned once canonical for everyone.",
+            "datePublished": "2026-06-16",
+            "dateModified": "2026-06-20",
+            "url": "https://trovex.dev/blog/one-source-of-truth-for-a-fleet-of-agents/",
+            "author": { "@type": "Organization", "name": "trovex" }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/blog/">Blog</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / Blog
+    </nav>
+
+    <h1>Blog</h1>
+    <p class="deck">Writing on the token economics of AI coding agents — what rereading docs actually costs, and how serving one canonical doc cuts the bill.</p>
+
+    <div class="related">
+      <div class="l">Posts</div>
+      <ul>
+        <li><a href="/blog/the-token-cost-of-agents-rereading-docs/">The token cost of coding agents rereading your docs</a></li>
+        <li><a href="/blog/mcp-context-patterns-for-coding-agents/">MCP context patterns for coding agents: dump, retrieve, or answer</a></li>
+        <li><a href="/blog/one-source-of-truth-for-a-fleet-of-agents/">One source of truth for a fleet of coding agents</a></li>
+      </ul>
+    </div>
+
+    <p class="note">More on the way. The <a href="/answers/">Answers</a> cover the common questions in short form, and the <a href="/vs/">comparisons</a> stack trovex against the alternatives.</p>
+
+    <div class="cta">
+      <h2>One source of truth for your agents' docs.</h2>
+      <p>trovex serves your coding agent the single current doc that answers a query, instead of letting it reread the repo to guess.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/blog/">Blog</a>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+</body>
+</html>

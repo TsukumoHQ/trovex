@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/blog/one-source-of-truth-for-a-fleet-of-agents/" />
+  <title>One source of truth for a fleet of coding agents</title>
+  <meta name="description" content="When several agents and teammates work the same repo, they re-derive the same answers and write notes that drift. Here's why a shared read/write path beats scattered .md files, and what it changes." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/blog/one-source-of-truth-for-a-fleet-of-agents/" />
+  <meta property="og:title" content="One source of truth for a fleet of coding agents" />
+  <meta property="og:description" content="Several agents on one repo re-derive answers and write notes that drift. A shared read/write path makes a thing learned once canonical for everyone." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="One source of truth for a fleet of coding agents" />
+  <meta name="twitter:description" content="Why a shared read/write path beats scattered .md files once a second agent touches the repo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://trovex.dev/blog/" },
+          { "@type": "ListItem", "position": 3, "name": "One source of truth for a fleet of coding agents", "item": "https://trovex.dev/blog/one-source-of-truth-for-a-fleet-of-agents/" }
+        ]
+      },
+      {
+        "@type": "BlogPosting",
+        "headline": "One source of truth for a fleet of coding agents",
+        "description": "When several agents and teammates work the same repo, they re-derive the same answers and write notes that drift. A shared read/write path makes a thing learned once canonical for everyone.",
+        "datePublished": "2026-06-16",
+        "dateModified": "2026-06-20",
+        "url": "https://trovex.dev/blog/one-source-of-truth-for-a-fleet-of-agents/",
+        "mainEntityOfPage": "https://trovex.dev/blog/one-source-of-truth-for-a-fleet-of-agents/",
+        "image": "https://trovex.dev/og.png",
+        "inLanguage": "en",
+        "articleSection": "ssot-coordination",
+        "keywords": "ai coding agents, multi-agent, source of truth, mcp, developer tools",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "author": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+        "publisher": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/blog/">Blog</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap post">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/blog/">Blog</a> / One source of truth for a fleet
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-20">20 June 2026</time></p>
+    <h1>One source of truth for a fleet of coding agents</h1>
+
+    <div class="verdict">
+      <div class="l">Short version</div>
+      <p>One agent on one repo wastes tokens rereading docs. Several agents, or several teammates, do something worse: they re-derive the same answers in parallel and write what they learn into scattered files that quietly drift out of sync. The fix isn't more docs or a bigger context window. It's one shared read/write path, so a thing learned once is canonical for everyone who reads it next. This post is about the write side of that, the part that only shows up once more than one agent touches the repo.</p>
+    </div>
+
+    <h2>What goes wrong when you add the second agent?</h2>
+    <p>A single agent rereading docs is a cost problem. We did the token math on that in <a href="/blog/the-token-cost-of-agents-rereading-docs/">the token cost of agents rereading docs</a>. Add a second agent, or a teammate, and you get a consistency problem on top of it. Three things start happening:</p>
+    <ul>
+      <li><strong>Parallel re-derivation.</strong> Your agent works out the rollback steps on Monday. Your teammate's agent works out the same rollback steps on Tuesday, from scratch, because it has no idea the first one already did. You pay twice for one answer.</li>
+      <li><strong>Drift.</strong> Each agent writes its findings into its own <code>.md</code>, or a chat log, or a comment. Now there are three notes about rollback, written at three times, and nothing says which is current. The next reader guesses, and sometimes guesses wrong.</li>
+      <li><strong>Lost knowledge.</strong> An agent figures out why the API returned 504s after a deploy, writes it into a session that ends, and the knowledge evaporates. The next incident re-runs the investigation.</li>
+    </ul>
+    <p>None of this is fixed by a smarter agent or a larger window. It's a structural problem: there is no single place where "what we know" lives.</p>
+
+    <h2>Why doesn't CLAUDE.md or a shared wiki solve this?</h2>
+    <p>They solve a slice and then stop.</p>
+    <p>A <code>CLAUDE.md</code> or <code>AGENTS.md</code> is a single hand-maintained file. It works until the knowledge outgrows one file, which is fast on a real project. It also assumes a human keeps it current; agents generate knowledge faster than a person curates it, so it lags. A wiki or a docs folder is many files with no canonical signal. It's exactly the pile the single-agent post was about, now also being written to by several actors at once. More writers, more drift.</p>
+    <p>What's missing in both is a <strong>write path with a notion of canonical</strong>: a place an agent can save a finding such that the save itself makes it the current answer, and the older note is marked superseded rather than left to compete.</p>
+
+    <h2>What a shared write path changes</h2>
+    <p>The idea is small. Give every agent one place to read from and one place to write to, and make that place the source of truth by construction. Concretely, with trovex an agent can:</p>
+    <ul>
+      <li><strong>Write what it learns once.</strong> An incident, a decision, "the rollback steps that actually worked", saved as a record through the shared write path. Not into a new loose file.</li>
+      <li><strong>Read it back by meaning, at the section level.</strong> The next agent asks a question and gets that record as the canonical answer, with a freshness marker, not a list of candidate notes to compare.</li>
+      <li><strong>Supersede instead of duplicate.</strong> A newer record on the same topic becomes canonical; the old one is marked, not deleted and not left to masquerade as current.</li>
+    </ul>
+    <p>Because reads and writes go through one point, there are no copies to sync. The fleet and the humans see the same store.</p>
+
+    <h2>A concrete walk-through</h2>
+    <p>Two agents, one repo, one week:</p>
+    <ul>
+      <li><strong>Monday — agent A</strong> hits a 504 storm after a deploy, works out the cause (a connection pool exhausted by a migration), fixes it, and writes a record: <em>"incident: api 504s after deploy, pool exhausted by long migration; mitigation: cap migration concurrency."</em></li>
+      <li><strong>Tuesday — agent B</strong>, a different session on a teammate's machine, sees 504s again. It asks trovex "why would the api 504 after a deploy?" and gets agent A's record back as the canonical answer. It applies the known mitigation in minutes instead of re-investigating.</li>
+      <li><strong>Wednesday — the mitigation changes.</strong> Someone lands a real fix. An agent writes the new record; trovex marks it canonical and the Monday note as superseded. Nobody has to remember to delete the old one.</li>
+    </ul>
+    <p>The token saving (the ~60% from the first post) still applies to every one of those reads. The new thing is that the <em>second</em> investigation never happened at all.</p>
+
+    <h2>Is this just a database for agents?</h2>
+    <p>Sort of, with two differences that matter.</p>
+    <p>A plain database (or a vector store, or a notes app) gives you storage and retrieval. It doesn't give you <strong>canonical</strong>: ask it a question and it returns whatever matches, ranked by similarity, with no opinion about which is current. trovex's unit of output is the one current answer with a freshness marker, and its write path supersedes rather than appends.</p>
+    <p>The second difference is that it's <strong>the same store the agents already read code-context from</strong>, reached through the same MCP tool, local-first. There's no separate system for "agent memory" to wire up and keep in sync. The read path and the write path are one path.</p>
+
+    <h2>When does this matter, honestly?</h2>
+    <p>If you run one agent, in one session, on a small repo, the write path is a nice-to-have. The single-agent token math is your main win.</p>
+    <p>It starts to matter the moment there's a <em>second</em> actor on the same repo: a second agent, a second session that should remember the first, or a teammate. That's where re-derivation and drift cost real time, and where keeping things consistent by hand stops scaling. If that's your situation, the shared write path is the point, not a footnote.</p>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/blog/the-token-cost-of-agents-rereading-docs/">The token cost of coding agents rereading your docs</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/source-of-truth-multi-agent-repos/">What's the single source of truth for a multi-agent repo?</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Stop paying for the second investigation.</h2>
+      <p>trovex is in private beta. Request access, then have one agent write a record and another ask the question it answers, and watch the second one get the answer back instead of working it out again.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. Core AGPL-3.0, CLIs MIT. No cloud, no API keys. Your docs never leave your machine.</p>
+      <p class="note">Rolling agents out across a team and the drift-and-re-derivation tax is real? That's the kind of thing we help teams fix — happy to talk.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/blog/">Blog</a>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+</body>
+</html>

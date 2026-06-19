@@ -1,20 +1,14 @@
-# .trovexignore — files the trovex hooks leave alone (read/write raw on disk).
-# Everything else .md routes through trovex (trovex_search/trovex_read, trovex_write).
-# One glob per line; matched against repo-relative and absolute paths.
-
-# Repo + meta files you legitimately read/write directly
+# trovex write-guard zone franche — ONLY these .md STAY real files on disk.
+# Everything else routes to the trovex store (trovex_write).
+# Owner directive (2026-06-20): full-trovex, EXCEPT blog articles.
+#
+# Kept on disk for correctness (toolchain / harness / agents read these from
+# disk — routing them to the store would break the repo):
 README.md
-CHANGELOG.md
-LICENSE.md
-LICENSE
-REFONTE.md
-source.md
-*.example
-
-# Agent harness files the tooling reads directly
-**/CLAUDE.md
-**/AGENTS.md
-.claude/**
-
-# Build / site generators that consume markdown from disk
-docs/site/**
+CLAUDE.md
+AGENTS.md
+LICENSE*
+.claude/*
+#
+# Blog articles stay publishable source files (they ship as web pages):
+**/blog/**

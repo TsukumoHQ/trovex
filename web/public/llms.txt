@@ -34,6 +34,8 @@
 
 ## Deep dives
 - [The token cost of coding agents rereading your docs](https://trovex.dev/blog/the-token-cost-of-agents-rereading-docs/): the full math — a typical doc lookup drops from ~720 to ~280 tokens (~60% fewer) when you serve one canonical doc instead of letting the agent reread the pile to guess which is current. Shows where the number comes from and how to reproduce it on your own repo.
+- [MCP context patterns for coding agents: dump, retrieve, or answer](https://trovex.dev/blog/mcp-context-patterns-for-coding-agents/): the three ways to feed an agent project context over MCP (dump the repo, return candidate chunks, or serve one canonical answer), what each costs, and how to choose.
+- [One source of truth for a fleet of coding agents](https://trovex.dev/blog/one-source-of-truth-for-a-fleet-of-agents/): once a second agent or teammate touches the repo, scattered notes re-derive and drift; a shared read/write path makes a thing learned once canonical for everyone.
 
 ## Setup (per MCP client)
 - [trovex for Claude Code](https://trovex.dev/for/claude-code/): `claude mcp add --transport http trovex http://localhost:8765/mcp`.

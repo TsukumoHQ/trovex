@@ -17,6 +17,7 @@ submitted live; a human (owner) fires each. launch-lead drafts; the owner pulls 
 | `suite-positioning.md` | How wrai.th / trovex / yoru fit + feed tsukumo. The shared story every asset cross-references. |
 | `unfreeze-checklist.md` | The blocker/dependency un-freeze (PyPI, repo public, history scrub, gates). What must be true before firing. |
 | `launch-day-runbook.md` | **The master sequence** — pre/during/post across directories+HN+PH+social+community, owner go-gates in one table. |
+| `launch-timeline.md` | The condensed one-card fire-order (HN+PH+registries+community+social merged into a dated T-minus sequence with gates + UTM). Quick-reference companion to the runbook. |
 | `launch-teardown-playbook.md` | Evidence behind the rules — best OSS launches distilled (the 5 winning rules + anti-patterns). |
 
 ---
@@ -27,17 +28,21 @@ submitted live; a human (owner) fires each. launch-lead drafts; the owner pulls 
 - `show-hn.md` — Show HN kit. **wrai.th leads** (§A, launchable now); trovex held (§B, when public). Teardown-aligned.
 - `product-hunt.md` — trovex Product Hunt kit (tagline, gallery, maker comment, supporter DMs).
 - `wraith-kit.md` — wrai.th launch kit (registries + Show HN angle for the widest TOF).
+- `wraith-gallery-asset-spec.md` — production spec for the wrai.th PH/OG gallery (slides + on-slide copy + dimensions) → design builds; last asset gating the one-shots.
 - `faq-bank.md` — objection + FAQ answer bank (founder reply drafts for HN/PH/community).
 
 **Registries + directories (the shelf — compounding, reversible)**
-- `mcp-registries.md` — MCP registry listings + per-registry submission checklists (Official → Glama → mcp.so → awesome-mcp → secondary).
+- `mcp-registries.md` — MCP registry listings + per-registry submission checklists (Official → Glama → mcp.so → awesome-mcp → secondary). [trovex]
+- `wraith-registry-checklists.md` — wrai.th per-registry run-checklists (Go-binary path: Official Registry + GitHub Release + pkg.go.dev + Glama + awesome-mcp + awesome-go). [wrai.th — the early-fire bucket]
+- `wraith-registry-packages.md` — wrai.th ready-to-submit registry packages (paste-ready listing copy per registry).
 - `registry-variants.md` — per-registry copy-paste listing variants.
 - `directory-submissions.md` — AI/dev-tool dirs (trovex) + agency dirs (tsukumo): research-backed plan + skip list.
 - `directory-packages-top5.md` — paste-ready submission packages for the top-5 (Awesome lists, AlternativeTo, DevHunt, PH, Clutch).
 
 **Community + earned media (value-first, spaced)**
 - `community-participation-playbook.md` — durable "how we show up" (9:1 rule, contribution ladder, GEO/citation, cadence).
-- `community-plan.md` — 30-day launch-window seeding plan + per-venue seed drafts.
+- `community-plan.md` — 30-day launch-window seeding plan + per-venue seed drafts (fire-ready calendar + suite sequencing).
+- `venue-final-posts.md` — venue-final community seed posts, ready-to-fire per venue.
 - `outreach.md` — 1:1 newsletter/Discord notes (personalized, not blasts).
 - `partnerships.md` — value-first co-marketing targets (clients, frameworks, media) + competitors to position-against.
 - `earned-media-targets.md` — guest/expert/podcast targets + pitch drafts (rung-5 of the community playbook).
@@ -45,6 +50,7 @@ submitted live; a human (owner) fires each. launch-lead drafts; the owner pulls 
 
 **Top-of-funnel tool**
 - `free-tool-spec.md` — spec for a free token-savings calculator (for cmo/eng to scope).
+- `free-tool-brief.md` — build-ready brief for the standalone agent token-cost calculator.
 
 **Suite → agency bridge**
 - `../agency/launch/oss-agency-bridge.md` — low-key "built by the team behind tsukumo" README/footer blocks per repo + UTM/event spec.

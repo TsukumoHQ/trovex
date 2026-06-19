@@ -52,9 +52,29 @@ Plausible has no delete-event API, so the pre-launch window can't be scrubbed. I
 - The first "real" organic read = first window that starts after launch *and* after §2/§3 are
   in effect.
 
-## 5. Acceptance
+## 5. The honest reader — enforces §4 in code
+
+`plausible-snapshot.mjs` is the one command for "what's the traffic?" so a clean read is
+repeatable, not a hand-curl that quietly blends the dirty window. It bakes the hygiene rules in:
+
+```bash
+set -a; . ~/.config/trovex-growth/plausible.env; set +a
+node growth/analytics/plausible-snapshot.mjs            # clean window (since the hygiene floor)
+node growth/analytics/plausible-snapshot.mjs --since 2026-06-01   # earlier => loud BASELINE-NOISE banner
+node growth/analytics/plausible-snapshot.mjs --save     # also write reports/plausible-snapshot-<date>.md
+```
+
+- **`HYGIENE_START`** const = the floor; `--since` defaults to it. Ask for an earlier window and
+  it prints a **BASELINE-NOISE** banner instead of a clean-looking number. Bump the const to the
+  real distribution date once launch fires.
+- **Internal-traffic tell:** bounce <20% or avg duration >4min => the window is still mostly us
+  (team browsers without the ignore flag + UA-spoofed headless). The reader flags it so nobody
+  quotes test traffic as demand. (Today: bounce 0% / ~3min => flagged — correct.)
+
+## 6. Acceptance
 
 - [x] Bot filtering confirmed on (pa- script default) + the UA-spoof caveat documented.
 - [x] `localStorage.plausible_ignore` convention for internal/team browsers.
 - [x] Verification-harness self-exclude rule (addInitScript flag) — no future e2e pollution.
 - [x] Data-handling: reads start at launch date; pre-launch = annotated baseline-noise, no scrub-API.
+- [x] Honest reader (`plausible-snapshot.mjs`) enforces the date-floor + auto-flags internal traffic.

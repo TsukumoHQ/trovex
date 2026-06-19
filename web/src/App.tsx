@@ -447,6 +447,7 @@ export default function App() {
             <a href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'footer' })}>Product</a>
             <a href="/vs/" onClick={() => track('compare_clicked', { location: 'footer' })}>Compare</a>
             <a href="/answers/" onClick={() => track('answers_clicked', { location: 'footer' })}>Answers</a>
+            <a href="/blog/" onClick={() => track('cta_clicked', { cta_id: 'blog', location: 'footer' })}>Blog</a>
             <a href="/for/" onClick={() => track('setup_clicked', { location: 'footer' })}>Setup</a>
             <a
               href="https://tsukumo.ch/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting"

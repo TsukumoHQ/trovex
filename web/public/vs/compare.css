@@ -88,6 +88,27 @@ td.feat { color: var(--fg-muted); }
 .no { color: var(--fg-subtle); }
 .partial { color: #d9a441; }
 
+/* code block — multi-line, for blog walkthroughs (inline `code` is styled above) */
+.codeblock {
+  margin: 22px 0 0; padding: 16px 18px; overflow-x: auto;
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px;
+  line-height: 1.55;
+}
+.codeblock code { background: none; border: none; padding: 0; color: var(--fg); }
+
+/* metric callout — the headline before→after number (e.g. 720 → 280) */
+.metric {
+  margin: 26px 0 0; padding: 20px; border-radius: 12px; text-align: center;
+  background: var(--accent-soft); border: 1px solid var(--accent-line);
+}
+.metric-n { display: block; font-family: 'Fira Code', ui-monospace, monospace; font-size: clamp(1.6rem, 5vw, 2.2rem); font-weight: 500; color: var(--accent); letter-spacing: -0.01em; }
+.metric-l { display: block; margin-top: 6px; font-size: 0.92rem; color: var(--fg-muted); }
+
+/* lists in long-form posts (scoped to .post so comparison/answer pages are untouched) */
+.post ul { margin: 14px 0 0; padding-left: 22px; color: var(--fg-muted); }
+.post li { margin: 8px 0 0; }
+.post li strong { color: var(--fg); }
+
 /* faq */
 .faq-item { border-top: 1px solid var(--line); padding: 20px 0 0; margin-top: 20px; }
 .faq-q { font-weight: 600; color: var(--fg); margin: 0; }

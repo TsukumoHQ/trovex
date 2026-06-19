@@ -82,17 +82,13 @@
 
 *(Draft for cmo/owner to route to the tsukumo repo/owner. Reflects agency-positioning, agency-icp, agency-proof, agency-fact-founded.)*
 
+> **Positioning copy = CANONICAL, reuse verbatim** (source: memory `positioning-blurb` / `content/positioning-blurb.md`, tech-copy #329). Do NOT re-paraphrase — that's pitch drift. The three fields below are the canonical 1-line / 1-sentence / 1-paragraph; the directory metadata (location/founded/services/proof/pricing) is agency-specific scaffolding.
+
 **Name:** tsukumo
-**Tagline:** Turn your dev team into agentic operators — prod-grade AI, not seat licenses.
-**Short:** Boutique AI-engineering studio + consulting. We help scale-up dev teams run AI coding agents at prod quality — augmenting developers, not replacing them.
-**One-paragraph:**
-> tsukumo is a Switzerland-based AI-engineering studio and consulting practice (est. 2026). We work with
-> startups and scale-up engineering teams (≈30 devs) that don't want to miss the AI shift but are stuck:
-> real existing dev standards to respect, shallow AI use, devs who are wary of it. We turn that team into
-> agentic operators — augmenting developers, ~10x output, prod-grade — through hands-on engagements:
-> agentic-dev training, agentic process setup, and building agentic-first systems. Two doors: studio
-> (build my product) and consulting (my team struggles with AI). Tools and seats aren't capability; we
-> install the capability.
+**Tagline (canonical 1-line):** We run AI in production. We build it for you, or we teach your team to.
+**Short (canonical 1-sentence):** tsukumo runs AI agents in production: we build your product with agent fleets, or we turn your developers into the operators who run them, on your stack and your standards.
+**One-paragraph (canonical):**
+> tsukumo is a Swiss dev studio and AI consultancy, and we run agents in production on our own software before we touch yours. Two doors, one capability: we build your product with fleets of AI agents at studio pace, or we transition your developers into the operators who run them, on your stack and your standards. We augment engineers, we don't replace them, and we don't sell "cheaper"; we sell prod-grade output and roughly 10x from the team you already trust. The open suite we ship, WRAI.TH, trovex, and yoru, is the proof.
 **Services / categories:** AI consulting · AI development · Software development · Generative AI · AI agents / agentic systems · Developer enablement / training
 **Location:** Switzerland · **Founded:** 2026
 **Proof (qualitative only — agency-proof):** Engagements include a quant/finance firm (agentic-dev training + CTO upskilling) and a real-estate company (agentic acquisition marketing + an agentic-first platform + GEO). No fabricated metrics or logos until the owner approves specifics.

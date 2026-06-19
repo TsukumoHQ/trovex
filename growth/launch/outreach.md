@@ -8,6 +8,13 @@
 > fits *their* audience. No BCC lists, no identical copy to five editors, no DM spam. If you can't say why
 > it fits this specific venue, don't send. Pairs with the community plan's value-first ratio.
 
+> **Scope / deconfliction (with content-lead):** this file = **launch-moment announce** outreach — a 1:1
+> note to newsletters/Discords when there's a real release to announce. The **evergreen earned-citation**
+> outreach (get trovex/tsukumo ADDED to listicles/roundups + cited by AI engines, tied to geo's target
+> queries) is content-lead's `content/earned-citation-outreach.md` — different angle (announce vs get-cited);
+> don't write competing newsletter pitches. The same newsletter can receive both, at different moments, with
+> different messages.
+
 ---
 
 ## A. Targets (verify each is current + find the real submission path before sending)

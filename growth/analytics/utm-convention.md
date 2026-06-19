@@ -64,6 +64,30 @@ Ownership: geo-lead tags GEO/SEO + comparison/answers links; social-lead tags so
 launch-lead tags registry/launch (held until public phase); content-lead tags
 newsletter/blog; analytics-lead owns the `utm_source` map.
 
+### 3a. `agency-launch` — LOCKED for the tsukumo social distribution (for @social-lead)
+
+The 12 Metricool drafts (LinkedIn founder + company, X `@tsukumohq`, Threads) drive to **tsukumo.ch**, not
+trovex.dev. Lock = `utm_campaign=agency-launch`, `utm_medium=social`, one `utm_content` per card so each
+post's traffic + assessment_request is attributable (untagged → decays to Direct, ROI vanishes).
+
+**Base:** `https://tsukumo.ch/?utm_source=<src>&utm_medium=social&utm_campaign=agency-launch&utm_content=<mmdd-concept>`
+
+| `utm_source` | Channel | Notes |
+|--------------|---------|-------|
+| `linkedin` | LinkedIn founder post (canal #1) | company-page reshare of the same card → append `-co` to `utm_content` |
+| `x` | X `@tsukumohq` | |
+| `threads` | Threads (1:1 repost of X) | ⚠️ `threads` not yet in the **tsukumo** `analytics.ts` source map → add it (else degrades to `social`/`unknown`; utm tags still captured raw). analytics action. |
+
+**`utm_content` per card** (matches design-lead's `content/social/calendar-card-urls.md`):
+`0623-copilot` · `0624-pilots` · `0625-cost` · `0630-readiness` · `0701-reliable` · `0702-assessment`.
+
+Example — 06-25 cost card, founder LinkedIn:
+`https://tsukumo.ch/?utm_source=linkedin&utm_medium=social&utm_campaign=agency-launch&utm_content=0625-cost`
+…same card, company reshare: `…&utm_content=0625-cost-co` · …on X: `?utm_source=x&…&utm_content=0625-cost`.
+
+Rule: the **link in the post** carries these tags; the social-card image URL (`/social-cards/*.png`) does not need
+them (it's an asset, not a destination). Need another card/source? Ping analytics-lead to extend this table first.
+
 ## 4. Capture at the waitlist (so signups are attributed)
 
 The web layer reads `utm_*` into closed-enum session props (`deriveSession()` /

@@ -2,7 +2,17 @@
 
 **Status:** DRAFT / runbook. Do NOT fire until cmo signals go. Today: staged, nothing live.
 **Owner:** launch-lead · **Reviewed against:** mission, gtm-model, public-launch-blockers, mcp-registries.md, wraith-kit.md, suite-positioning.md, voice, no-synergix-mention
-**Use:** the ordered steps for the COORDINATED suite launch + the trovex beta→public flip. Each `[ ]` has an owner.
+**Use:** the ordered steps for the COORDINATED suite launch + the trovex public-launch flip. Each `[ ]` has an owner.
+
+> **Copy state (audited 2026-06-19, launch-lead):** the public-launch kit is **already written in public
+> mode** — show-hn.md, product-hunt.md, mcp-registries.md, registry-variants.md, faq-bank.md, outreach.md,
+> community-plan.md, free-tool-spec.md all link the **repo** + use real install (`uvx trovex` / `git clone`),
+> with trovex's tracks gated on *repo+PyPI public*, not on a waitlist. The beta-waitlist framing lives ONLY
+> in the separate `beta-*` driver files (beta-reframe / beta-sequence / beta-onboarding / beta-outreach),
+> which are this phase's waitlist drivers — NOT reframed copies of the public assets. So **there is no
+> beta→public copy-flip to do on the public kit** (an earlier draft of step 4 implied there was — corrected
+> below). The real launch-day copy work is: fill the `[bracketed]` founder/eng technical answers, fold real
+> beta proof once it exists, and retire the `beta-*` drivers. See the per-asset audit in step 4.
 
 ---
 
@@ -74,17 +84,33 @@ Per public-launch-blockers memory:
 - [ ] Smithery — only if a brand-neutral hosted HTTP endpoint exists (`mcp.trovex.dev`), else skip.
 - [ ] Secondary directories (batch, same master copy).
 
-## 4. Scrub the frozen copy back to public mode (launch-lead) — the beta→public flip
+## 4. Launch-day copy-readiness pass (launch-lead)
 
-Every held asset was reframed for beta (waitlist, trovex.dev only). Reverse it:
-- [ ] Re-enable the **repo link + install copy** (`uvx trovex` / clone) across show-hn.md, product-hunt.md,
-      registry copy, outreach.md, faq-bank.md, community-plan.md.
-- [ ] Change CTAs from "request beta access" back to "install / star / try it."
-- [ ] Remove beta-only framing ("private beta", "request access") from public assets.
-- [ ] Fold the **beta proof** in: real savings numbers + permissioned quotes into PH gallery + first comments
-      + the FAQ "does it really save 60%" answer (real tester data now, not just my-repos).
-- [ ] Re-run the **anti-ai-slop** gate on every flipped asset.
-- [ ] Confirm no "Synergix" in any public prose; brand green `#22c55e` on any visual asset.
+**Not a beta→public rewrite** — the public kit is already public-mode (see Copy state above). This is the
+short final pass: fill the bracketed gaps, fold proof, retire the beta drivers, run the gates.
+
+**Per-asset audit (2026-06-19) — verified mode + the only remaining work:**
+
+| Asset | Current mode | Remaining launch-day work |
+|---|---|---|
+| show-hn.md | public (repo link, `uvx`/clone, ~60% measured) | Fill `[bracketed]` founder/eng answers in §A3/§A5 + §B; fold beta proof into §B3 |
+| product-hunt.md | public (cold-install line, repo) | Fill bracketed gallery/maker copy; gallery from real runs + beta proof |
+| mcp-registries.md / registry-variants.md | public (install = `uv run` from source today) | Swap install line to `uvx trovex` once PyPI is live (step 1); verify config |
+| faq-bank.md | public (open-source / "installs in a minute") | Add real ~60% number + permissioned quote to the "does it really save 60%" answer |
+| outreach.md | public (sends devs who install/index) | Use the public note (not the beta-tease); fold proof line where it fits |
+| community-plan.md | public (real installs/indexes) | Use the public seed drafts, NOT the `beta-reframe.md §3` waitlist variants |
+| free-tool-spec.md | public (install pitch off real number) | No copy flip; ship per its own scope when prioritised |
+
+- [ ] Fill the `[bracketed]` founder/eng technical answers in show-hn.md (A3/A5, B3/B4) + product-hunt.md.
+      These need real product internals — launch-lead can't fabricate them; owner/eng supplies.
+- [ ] Fold **beta proof** in once it exists (step 0a gate): real savings numbers + ≥1 permissioned quote →
+      PH gallery + HN/PH first comments + the FAQ "does it really save 60%" answer (real tester data, not my-repos).
+- [ ] Swap any source-install line (`uv run trovex` from clone) → published `uvx trovex` after PyPI is live (step 1).
+- [ ] **Retire the `beta-*` drivers:** stop the waitlist tease; switch community/outreach to the already-public
+      versions (community-plan.md / outreach.md), not the `beta-reframe.md` waitlist variants.
+- [ ] Re-run the **anti-ai-slop** gate on every asset that gets edited.
+- [ ] Confirm no "Synergix" in any public prose (repo URL org identifier is the allowed exception); brand
+      green `#22c55e` on any visual asset.
 
 ## 5. Fire the public launch (human; sequence + timing)
 
@@ -109,6 +135,7 @@ Order matters (registries first = the shelf is ready when the traffic hits):
 - PyPI 404 today → must publish + add `mcp-name` marker. [step 1]
 - mcp-publisher auth: OIDC via CI only (PR #52); interactive device-code won't run headless. [step 2]
 - Repo private today → flip public + history scrub before any registry/HN/PH. [step 1]
-- All public copy currently links trovex.dev + waitlist → must flip to repo/install. [step 4]
+- Public kit is ALREADY public-mode (repo + install) — no beta→public flip needed; only fill brackets +
+  fold proof + retire the `beta-*` drivers. Beta-waitlist copy is isolated in `beta-*` files only. [step 4]
 
 *This is a held runbook. Nothing here runs until cmo lifts the public hold.*

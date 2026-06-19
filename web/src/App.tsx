@@ -323,9 +323,9 @@ export default function App() {
           <div className="wrap">
             <h1>Stop your <span className="ac">coding agents</span><br />rereading the repo.</h1>
             <p className="deck">
-              trovex is the canonical doc store for your coding agents. It serves each one the single
-              current doc that answers a query, with a freshness marker, instead of rereading the repo
-              to guess. Same answers, about{' '}
+              Your coding agents burn tokens hunting for answers scattered across the repo. trovex is
+              the canonical doc store: it serves each agent the single current doc that answers a query,
+              with a freshness marker, instead of rereading the repo to guess. Same answers, about{' '}
               <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
             </p>
             <div className="hero-cta">

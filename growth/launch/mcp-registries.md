@@ -18,7 +18,7 @@ MCP registries are trovex's app-store shelf — where the people most likely to 
   releases + editorial/newsletter pickup (PulseMCP curates). So: ship a clean release, a real
   one-line install, and a savings number people can repro.
 - **Submit order (do in this sequence):**
-  1. Official Registry (`server.json` + `mcp-publisher`) → unlocks PulseMCP / VS Code / Docker free
+  1. Official Registry (`server.json` + `mcp-publisher`) → auto-propagates free to PulseMCP / VS Code / Docker
   2. Glama (web form; now gates the awesome-mcp-servers PR)
   3. awesome-mcp-servers (GitHub PR; requires a Glama listing first)
   4. mcp.so (web form + GitHub login)

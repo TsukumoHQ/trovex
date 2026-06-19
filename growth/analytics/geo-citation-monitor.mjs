@@ -1,37 +1,46 @@
 #!/usr/bin/env node
 /**
- * GEO citation-share monitor — measure AI-engine citations of the suite DIRECTLY.
+ * GEO citation-share PANEL — measure AI-engine citations of the suite DIRECTLY, across engines.
  *
- * AI engines strip referrers, so our Plausible GEO attribution is a floor. This probes the
- * ICP's real questions through an AI search engine, reads back the actual citations, and
- * records whether trovex / tsukumo / the suite is cited — turning the GEO bet into a real,
- * weekly, trendable metric. Top-1% AEO practice: measure citation share at the source.
+ * AI engines strip referrers, so Plausible GEO attribution is a floor. This probes the ICP's
+ * real questions through MULTIPLE AI-search engines, reads back the actual citations, and records
+ * whether trovex / tsukumo / the suite is cited — turning the GEO bet into a real, weekly,
+ * trendable metric. Top-1% AEO practice: measure citation share at the source, per engine.
  *
- * Engine: OpenAI Responses API + web_search (a real AI-search surface, ~ChatGPT-with-search).
- * Perplexity / Google AI Overviews are designed-for but need their own keys (see TODO).
+ * WHY A PANEL (4 engines): citation sets overlap only ~11% across engines — winning ChatGPT does
+ * NOT mean you win Perplexity/Gemini/Google-AIO. Each engine is its own surface to win, so we score
+ * each SEPARATELY (not just a union). Only ~14% of marketers track this at all → cheap, durable edge.
  *
- * Honesty: AI answers are NON-DETERMINISTIC (vary by run/region/personalization). This is a
- * SAMPLED SNAPSHOT, never a guaranteed rank. We log exactly what the API returns — no
- * fabrication. Run weekly; the trend matters more than any single run.
+ * Engines (each runs ONLY if its key is in env; missing key → marked `n/a`, NEVER fabricated):
+ *   - openai      ChatGPT-with-search    OPENAI_API_KEY      (/v1/responses + web_search)
+ *   - perplexity  Perplexity             PERPLEXITY_API_KEY  (/chat/completions, sonar)
+ *   - gemini      Google Gemini grounded GEMINI_API_KEY      (generateContent + google_search)
+ *   - google_aio  Google AI Overviews    SERPAPI_KEY         (SerpAPI — no official AIO API exists)
  *
- * Keys: reads OPENAI_API_KEY from the environment only (load out-of-git, e.g.
- *   set -a; . ~/.config/trovex-growth/openai.env; set +a
- * Never hardcode/commit a key; the output contains only domains + counts, no secrets.
+ * Honesty: AI answers are NON-DETERMINISTIC (vary by run/region/personalization). This is a SAMPLED
+ * SNAPSHOT, never a guaranteed rank. We log exactly what each API returns — no fabrication. A missing
+ * engine reads `n/a`, a failed call reads `ERR`, a real zero reads `0`. Run weekly; the TREND is the
+ * signal, not any single run.
  *
- * Usage:  node geo-citation-monitor.mjs            # writes reports/geo-citations-<UTCdate>.md
- *         node geo-citation-monitor.mjs --dry       # print, don't write
+ * Keys: read from the environment ONLY (load out-of-git, e.g.
+ *   set -a; . ~/.config/trovex-growth/ai-engines.env; set +a
+ * Never hardcode/commit a key; output contains only domains + counts, no secrets.
+ *
+ * Usage:  node geo-citation-monitor.mjs                 # all engines that have a key
+ *         node geo-citation-monitor.mjs --dry           # print, don't write
+ *         node geo-citation-monitor.mjs --engines=openai,perplexity   # subset
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const MODEL = "gpt-4o";
-const ENGINE = "openai-web-search";
 
 // Our properties — a citation of any counts as "suite cited".
 const OURS = [/(^|\.)trovex\.dev$/, /(^|\.)tsukumo\.ch$/, /(^|\.)wrai\.th$/, /(^|\.)yoru\.sh$/];
-// Known competitors/alternatives we want to see who wins the category (substring match on host+path).
+// Plus a loose token match (Gemini/AIO often return redirect URLs whose real source is in the title).
+const OURS_TOKENS = ["trovex", "tsukumo", "wrai.th", "yoru.sh"];
+// Known competitors/alternatives — who wins the category (substring match on host+path+title).
 const COMPETITORS = ["repomix", "context-hub", "mem0", "cursor", "claude.md", "claude.ai", "github.com/anthropics", "llmstxt", "aider"];
 
 // ICP queries — paired with geo-lead's query map (ranking-citation-tracking.md). Mix of
@@ -52,9 +61,8 @@ const STANDING = [
 
 // OFFENSIVE cohort — the citation write-list the team is actively building answers for
 // (source: memory `citation-uncited-queries` / content/geo/query-gap-backlog.md, 2026-06-19).
-// This is the VERIFICATION OVERLAY: probe the exact buyer questions tech-copy/geo are
-// targeting so "did the page move the citation?" becomes a measured number post-deploy.
-// Started 0/12 by definition (pages not live yet) — that's the honest pre-deploy baseline.
+// VERIFICATION OVERLAY: probe the exact buyer questions tech-copy/geo target so "did the page move
+// the citation?" becomes a measured number post-deploy. Started 0/12 (pages not live) — honest baseline.
 const OFFENSIVE = [
   { id: "agents-reliable-in-prod", tier: 1, q: "How do I make AI coding agents reliable in production — guardrails, review gates, observability? Name specific tools, articles, or studios and link them." },
   { id: "agent-observability", tier: 1, q: "How do I know what my AI coding agent actually did — what tools give agent observability and audit trails? Link specific tools or guides." },
@@ -75,116 +83,266 @@ const QUERIES = [...STANDING, ...OFFENSIVE];
 function hostOf(url) {
   try { return new URL(url).hostname.toLowerCase(); } catch { return ""; }
 }
-function isOurs(url) {
-  const h = hostOf(url);
-  return OURS.some((re) => re.test(h));
+// Match against the URL host AND any title text (engines like Gemini/AIO return redirect URLs whose
+// real source domain only survives in the citation title).
+function isOurs(cite) {
+  const h = hostOf(cite.url);
+  if (OURS.some((re) => re.test(h))) return true;
+  const blob = `${cite.url} ${cite.title || ""}`.toLowerCase();
+  return OURS_TOKENS.some((t) => blob.includes(t));
 }
-function competitorIn(url) {
-  const u = url.toLowerCase();
-  return COMPETITORS.filter((c) => u.includes(c));
+function competitorIn(cite) {
+  const blob = `${cite.url} ${cite.title || ""}`.toLowerCase();
+  return COMPETITORS.filter((c) => blob.includes(c));
+}
+// Roll a raw citation list ({url,title}[]) into the per-(engine,query) result shape.
+function summarize(cites) {
+  const clean = cites.filter((c) => c && c.url);
+  const uniqHosts = [...new Set(clean.map((c) => hostOf(c.url)).filter(Boolean))];
+  const ours = clean.filter(isOurs);
+  const comps = [...new Set(clean.flatMap(competitorIn))];
+  const ourUrls = [...new Set(ours.map((c) => c.url))];
+  return { citations: clean.length, hosts: uniqHosts, weCited: ours.length > 0, ourUrls, competitors: comps };
 }
 
-async function probe(key, query) {
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      tools: [{ type: "web_search_preview" }],
-      tool_choice: { type: "web_search_preview" }, // force the search so we get real citations
-      input: query.q,
-    }),
-  });
-  if (!res.ok) return { error: `HTTP ${res.status}` };
-  const data = await res.json();
-  const cites = [];
-  for (const item of data.output || []) {
-    if (item.type !== "message") continue;
-    for (const c of item.content || []) {
-      for (const a of c.annotations || []) {
-        if (a.type === "url_citation" && a.url) cites.push(a.url);
+// ---- Engine adapters. Each returns a citation list [{url, title}] or throws. ----
+const ENGINES = {
+  openai: {
+    label: "ChatGPT (OpenAI web_search)",
+    envKey: "OPENAI_API_KEY",
+    model: "gpt-4o",
+    async probe(key, q) {
+      const res = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: this.model,
+          tools: [{ type: "web_search_preview" }],
+          tool_choice: { type: "web_search_preview" }, // force the search → real citations
+          input: q.q,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const cites = [];
+      for (const item of data.output || []) {
+        if (item.type !== "message") continue;
+        for (const c of item.content || []) {
+          for (const a of c.annotations || []) {
+            if (a.type === "url_citation" && a.url) cites.push({ url: a.url, title: a.title || "" });
+          }
+        }
       }
-    }
-  }
-  const uniqHosts = [...new Set(cites.map(hostOf).filter(Boolean))];
-  const ours = cites.filter(isOurs);
-  const comps = [...new Set(cites.flatMap(competitorIn))];
-  return { citations: cites.length, hosts: uniqHosts, weCited: ours.length > 0, ourUrls: [...new Set(ours)], competitors: comps };
+      return cites;
+    },
+  },
+  perplexity: {
+    label: "Perplexity (sonar)",
+    envKey: "PERPLEXITY_API_KEY",
+    model: "sonar",
+    async probe(key, q) {
+      const res = await fetch("https://api.perplexity.ai/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: this.model, messages: [{ role: "user", content: q.q }] }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      // Prefer structured search_results (objects); fall back to the legacy citations url[] array.
+      if (Array.isArray(data.search_results) && data.search_results.length) {
+        return data.search_results.map((s) => ({ url: s.url, title: s.title || "" }));
+      }
+      return (data.citations || []).map((u) => ({ url: typeof u === "string" ? u : u.url, title: "" }));
+    },
+  },
+  gemini: {
+    label: "Gemini (grounded w/ google_search)",
+    envKey: "GEMINI_API_KEY",
+    model: "gemini-2.5-flash",
+    async probe(key, q) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${key}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: q.q }] }], tools: [{ google_search: {} }] }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const chunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      // web.uri is a vertexaisearch redirect; the real source domain survives in web.title — keep both.
+      return chunks.filter((c) => c.web?.uri).map((c) => ({ url: c.web.uri, title: c.web.title || "" }));
+    },
+  },
+  google_aio: {
+    label: "Google AI Overviews (via SerpAPI)",
+    envKey: "SERPAPI_KEY",
+    async probe(key, q) {
+      const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(q.q)}&api_key=${key}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const aio = data.ai_overview;
+      if (!aio) return []; // no AI Overview shown for this query = honest 0, not an error
+      const refs = aio.references || [];
+      const fromRefs = refs.filter((r) => r.link).map((r) => ({ url: r.link, title: r.title || r.source || "" }));
+      if (fromRefs.length) return fromRefs;
+      // Some payloads only embed links inside text_blocks → harvest those.
+      const blocks = aio.text_blocks || [];
+      const out = [];
+      const walk = (b) => {
+        for (const ref of b.reference_indexes ? [] : []) out.push(ref); // placeholder; references is primary
+        if (Array.isArray(b.list)) b.list.forEach(walk);
+      };
+      blocks.forEach(walk);
+      return out;
+    },
+  },
+};
+
+function chosenEngines() {
+  const flag = process.argv.find((a) => a.startsWith("--engines="));
+  const want = flag ? flag.split("=")[1].split(",").map((s) => s.trim()) : Object.keys(ENGINES);
+  return want.filter((name) => ENGINES[name]);
+}
+
+function cohortShare(rows, cohort) {
+  const v = rows.filter((r) => r.cohort === cohort && !r.error && !r.skipped);
+  const c = v.filter((r) => r.weCited).length;
+  return { cited: c, total: v.length, pct: v.length ? Math.round((c / v.length) * 100) : 0 };
 }
 
 async function main() {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    console.error("No OPENAI_API_KEY in env. Load it out-of-git first:\n  set -a; . ~/.config/trovex-growth/openai.env; set +a");
+  const dry = process.argv.includes("--dry");
+  const engines = chosenEngines();
+
+  // Resolve which engines actually have a key — the rest are reported n/a, never silently dropped.
+  const live = [];
+  const skipped = [];
+  for (const name of engines) {
+    const key = process.env[ENGINES[name].envKey];
+    (key ? live : skipped).push(name);
+  }
+  if (!live.length) {
+    console.error(
+      `No engine keys in env. Load at least one out-of-git, e.g.\n` +
+      `  set -a; . ~/.config/trovex-growth/ai-engines.env; set +a\n` +
+      `Expected vars: ${engines.map((n) => ENGINES[n].envKey).join(", ")}`,
+    );
     process.exit(2);
   }
-  const dry = process.argv.includes("--dry");
-  const rows = [];
-  for (const query of QUERIES) {
-    process.stderr.write(`probing ${query.id}… `);
-    try {
-      const r = await probe(key, query);
-      rows.push({ ...query, ...r });
-      process.stderr.write(r.error ? `ERR ${r.error}\n` : `${r.weCited ? "CITED" : "not cited"} (${r.citations} citations)\n`);
-    } catch (e) {
-      rows.push({ ...query, error: String(e).slice(0, 80) });
-      process.stderr.write(`ERR\n`);
+
+  // results[engine][queryId] = summarized result
+  const results = {};
+  for (const name of live) {
+    results[name] = {};
+    const key = process.env[ENGINES[name].envKey];
+    for (const query of QUERIES) {
+      process.stderr.write(`[${name}] ${query.id}… `);
+      try {
+        const cites = await ENGINES[name].probe(key, query);
+        const r = summarize(cites);
+        results[name][query.id] = { ...query, ...r };
+        process.stderr.write(`${r.weCited ? "CITED" : "not cited"} (${r.citations})\n`);
+      } catch (e) {
+        results[name][query.id] = { ...query, error: String(e.message || e).slice(0, 60) };
+        process.stderr.write(`ERR ${String(e.message || e).slice(0, 40)}\n`);
+      }
     }
   }
 
-  const valid = rows.filter((r) => !r.error);
-  const citedN = valid.filter((r) => r.weCited).length;
-  const share = valid.length ? Math.round((citedN / valid.length) * 100) : 0;
-  // Per-cohort share — the offensive cohort is the one we expect to move once pages deploy.
-  const cohortShare = (name) => {
-    const v = valid.filter((r) => r.cohort === name);
-    const c = v.filter((r) => r.weCited).length;
-    return { cited: c, total: v.length, pct: v.length ? Math.round((c / v.length) * 100) : 0 };
-  };
-  const standing = cohortShare("standing");
-  const offensive = cohortShare("offensive");
-  // UTC date, passed implicitly — no Date fabrication beyond the run stamp.
+  // Per-engine share + union ("cited by ANY engine" — the suite's total surface coverage).
+  const perEngine = {};
+  for (const name of live) {
+    const rows = Object.values(results[name]);
+    perEngine[name] = {
+      overall: cohortShare(rows, "standing"),
+      standing: cohortShare(rows, "standing"),
+      offensive: cohortShare(rows, "offensive"),
+      all: (() => {
+        const v = rows.filter((r) => !r.error);
+        const c = v.filter((r) => r.weCited).length;
+        return { cited: c, total: v.length, pct: v.length ? Math.round((c / v.length) * 100) : 0 };
+      })(),
+    };
+  }
+  const unionCited = (q) => live.some((name) => results[name][q.id]?.weCited);
+  const unionAll = { cited: QUERIES.filter(unionCited).length, total: QUERIES.length };
+  unionAll.pct = unionAll.total ? Math.round((unionAll.cited / unionAll.total) * 100) : 0;
+
   const date = new Date().toISOString().slice(0, 10);
 
-  const md = [
-    `# GEO Citation-Share — ${date} (${ENGINE})`,
-    ``,
-    `*Owner: analytics-lead · Engine: OpenAI web_search (model \`${MODEL}\`) · Sampled snapshot — AI answers are non-deterministic; this is one run, not a guaranteed rank. No fabricated data.*`,
-    ``,
-    `**Suite citation share: ${citedN}/${valid.length} queries (${share}%)** — i.e. of the ICP questions probed, the share where trovex/tsukumo/wrai.th/yoru.sh was cited.`,
-    ``,
-    `**By cohort:**`,
-    `- **Standing** (suite-category panel, stable weekly trend): **${standing.cited}/${standing.total} (${standing.pct}%)**`,
-    `- **Offensive** (the citation write-list being built — \`citation-uncited-queries\`): **${offensive.cited}/${offensive.total} (${offensive.pct}%)** — verification overlay; expected 0 until pages deploy + get indexed.`,
-    ``,
-    `| Query | Cohort | Kind | We cited? | Our URL(s) | Competitors cited | Total citations |`,
-    `|-------|--------|------|:---------:|-----------|-------------------|----------------:|`,
-    ...rows.map((r) =>
-      r.error
-        ? `| ${r.id} | ${r.cohort} | ${r.kind} | ERR | — | — | ${r.error} |`
-        : `| ${r.id} | ${r.cohort} | ${r.kind} | ${r.weCited ? "✅" : "—"} | ${(r.ourUrls || []).join("<br>") || "—"} | ${(r.competitors || []).join(", ") || "—"} | ${r.citations} |`,
-    ),
-    ``,
-    `## How to read this`,
-    `- **Share is the metric** — track it weekly; one run is noisy, the trend is the signal.`,
-    `- **Two cohorts:** *standing* keeps the weekly trend comparable; *offensive* is the post-deploy verification overlay for the queries tech-copy/geo are actively building answers for. A row in *offensive* flipping ✅ is the proof a new page earned a citation.`,
-    `- **Unbranded "category" queries** = the real prize (a buyer asking generically). **Branded** = does the engine even know us yet.`,
-    `- Hand the not-cited rows back to geo-lead/tech-copy: those are the answer/comparison pages to ship or strengthen.`,
-    `- Engine coverage: OpenAI web_search live; **Perplexity + Google AI Overviews are TODO (need their own keys)** — add them to widen the panel.`,
-    ``,
-    `### Queries probed`,
-    `**Standing:**`,
-    ...STANDING.map((q) => `- \`${q.id}\` (${q.kind}): ${q.q}`),
-    `**Offensive (write-list):**`,
-    ...OFFENSIVE.map((q) => `- \`${q.id}\` (tier ${q.tier}): ${q.q}`),
-  ].join("\n");
+  // ---- readout ----
+  const md = [];
+  md.push(`# GEO Citation-Share Panel — ${date}`);
+  md.push(``);
+  md.push(`*Owner: analytics-lead · Engines this run: **${live.join(", ")}**${skipped.length ? ` · n/a (no key): **${skipped.join(", ")}**` : ""}*`);
+  md.push(`*Sampled snapshot — AI answers are non-deterministic; this is one run, not a guaranteed rank. No fabricated data: a missing engine reads n/a, a failed call ERR, a real zero 0.*`);
+  md.push(``);
+  md.push(`## Citation share by engine (each engine is its own surface to win — ~11% overlap)`);
+  md.push(``);
+  md.push(`| Engine | Status | All | Standing | Offensive |`);
+  md.push(`|--------|--------|:---:|:--------:|:---------:|`);
+  for (const name of engines) {
+    if (!live.includes(name)) { md.push(`| ${ENGINES[name].label} | n/a (no ${ENGINES[name].envKey}) | — | — | — |`); continue; }
+    const e = perEngine[name];
+    md.push(`| ${ENGINES[name].label} | live | **${e.all.cited}/${e.all.total} (${e.all.pct}%)** | ${e.standing.cited}/${e.standing.total} (${e.standing.pct}%) | ${e.offensive.cited}/${e.offensive.total} (${e.offensive.pct}%) |`);
+  }
+  md.push(`| **UNION (any engine)** | — | **${unionAll.cited}/${unionAll.total} (${unionAll.pct}%)** | — | — |`);
+  md.push(``);
+  md.push(`**Standing** = stable suite-category panel (weekly trend). **Offensive** = the citation write-list (\`citation-uncited-queries\`); a row flipping ✅ = proof a new page earned a citation. **Union** = share where ANY engine cited us = total reachable surface.`);
+  md.push(``);
 
-  if (dry) { console.log(md); return; }
+  // Per-query matrix: one column per live engine, ✅/—/ERR per cell.
+  md.push(`## Per-query × engine matrix`);
+  md.push(``);
+  md.push(`| Query | Cohort | Kind | ${live.join(" | ")} |`);
+  md.push(`|-------|--------|------|${live.map(() => ":--:").join("|")}|`);
+  for (const query of QUERIES) {
+    const cells = live.map((name) => {
+      const r = results[name][query.id];
+      if (!r) return "·";
+      if (r.error) return `ERR`;
+      return r.weCited ? "✅" : "—";
+    });
+    md.push(`| ${query.id} | ${query.cohort} | ${query.kind} | ${cells.join(" | ")} |`);
+  }
+  md.push(``);
+
+  // Detail: where exactly we were cited + who the category winners are, per engine.
+  md.push(`## Detail — our citations + competitors seen`);
+  for (const name of live) {
+    md.push(``);
+    md.push(`### ${ENGINES[name].label}`);
+    md.push(`| Query | We cited? | Our URL(s) | Competitors cited | Total citations |`);
+    md.push(`|-------|:---------:|-----------|-------------------|----------------:|`);
+    for (const query of QUERIES) {
+      const r = results[name][query.id];
+      if (r.error) { md.push(`| ${query.id} | ERR | — | — | ${r.error} |`); continue; }
+      md.push(`| ${query.id} | ${r.weCited ? "✅" : "—"} | ${(r.ourUrls || []).join("<br>") || "—"} | ${(r.competitors || []).join(", ") || "—"} | ${r.citations} |`);
+    }
+  }
+  md.push(``);
+  md.push(`## How to read / run this SYSTEM`);
+  md.push(`- **Share per engine is the metric** — track weekly; one run is noisy, the trend is the signal. Win each engine separately.`);
+  md.push(`- **Not-cited rows → geo-lead / tech-copy**: those are the answer/comparison pages to ship or strengthen. An *offensive* row flipping ✅ after a deploy = the page earned the citation.`);
+  md.push(`- **Honesty:** a missing engine is \`n/a (no key)\`, never a fabricated 0. Add an engine by exporting its key (\`${Object.values(ENGINES).map((e) => e.envKey).join("\`, \`")}\`).`);
+  md.push(`- **Cadence:** weekly + after each offensive batch deploys (allow index lag before re-reading — re-running pre-reindex manufactures a false 0).`);
+  md.push(`- **Run:** \`set -a; . ~/.config/trovex-growth/ai-engines.env; set +a && node geo-citation-monitor.mjs\``);
+  md.push(``);
+  md.push(`### Queries probed`);
+  md.push(`**Standing:**`);
+  STANDING.forEach((q) => md.push(`- \`${q.id}\` (${q.kind}): ${q.q}`));
+  md.push(`**Offensive (write-list):**`);
+  OFFENSIVE.forEach((q) => md.push(`- \`${q.id}\` (tier ${q.tier}): ${q.q}`));
+
+  const out = md.join("\n");
+  if (dry) { console.log(out); return; }
   const outDir = join(__dir, "reports");
   mkdirSync(outDir, { recursive: true });
   const outPath = join(outDir, `geo-citations-${date}.md`);
-  writeFileSync(outPath, md + "\n");
-  console.log(`wrote ${outPath} — suite citation share ${citedN}/${valid.length} (${share}%)`);
+  writeFileSync(outPath, out + "\n");
+  const summary = live.map((n) => `${n} ${perEngine[n].all.cited}/${perEngine[n].all.total}`).join(", ");
+  console.log(`wrote ${outPath} — per-engine: ${summary}; union ${unionAll.cited}/${unionAll.total} (${unionAll.pct}%)`);
 }
 
 main();

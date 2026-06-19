@@ -51,7 +51,7 @@ Four weeks. Week 1 is pure contribution (earn standing). Promotion stays rare an
 ### Week 1 — show up, contribute, zero promotion
 - Join r/mcp, the MCP Discords, r/ChatGPTCoding, r/LocalLLaMA. Read rules + pinned posts.
 - In r/mcp: post a short intro of what you built and tag mods to request the mcp-server-authors flair
-  (this is the sanctioned path in, and unlocks author channels). This is the one Week-1 exception where
+  (this is the sanctioned path in, and opens author channels). This is the one Week-1 exception where
   naming the project is expected.
 - Answer 5–10 real questions across venues about MCP setup, token cost, context, doc routing. No link
   to trovex unless it's a direct, honest answer to "is there a tool that does X" — and even then, mention

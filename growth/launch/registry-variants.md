@@ -69,7 +69,7 @@ listing first. Place alphabetically in the right category (likely "Knowledge & M
 
 - **List line:**
   ```markdown
-  - [trovex](https://github.com/Synergix-lab/trovex) 🐍 🏠 - Indexes your repo's markdown and serves coding agents the one canonical doc (path:line + freshness) instead of a reread. ~60% fewer tokens. Local-first.
+  - [trovex](https://github.com/Synergix-lab/trovex) 🐍 🏠 - Local MCP server that returns the one canonical doc per query (path:line + freshness marker), not a ranked list of chunks. ~60% fewer tokens per lookup. AGPL, on-device.
   ```
 - **Legend used:** 🐍 Python · 🏠 local/self-hosted — confirm these are still the current keys.
 - **Checklist:** Glama listing exists; one server, one alphabetical line, no unrelated changes; follow

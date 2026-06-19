@@ -31,8 +31,11 @@ These are DONE and ready, but **frozen** until cmo lifts the public-launch hold.
 | faq-bank.md | reply bank | keep — still valid; add beta Q's (§4) |
 | .github/workflows/publish-mcp.yml (PR #52) | registry publish | **HOLD/UNFIRED** — do not merge til public phase |
 
-When the hold lifts: these need one scrub pass (re-enable the repo link, flip "request access" back to
-"install"), then fire in the sequence in mcp-registries.md §0.
+> **Correction (audited 2026-06-19):** the public kits above were later rebuilt in **public mode** — they
+> already link the repo + use real install (`uvx trovex` / clone), with trovex gated on *repo+PyPI public*,
+> not a waitlist. So they do **not** need a "scrub back to public" pass; the beta-waitlist framing lives only
+> in these `beta-*` files. When the hold lifts, the remaining copy work is the readiness pass in
+> unfreeze-checklist.md §4 (fill brackets, fold proof, retire these beta drivers) — then fire per mcp-registries.md §0.
 
 ---
 

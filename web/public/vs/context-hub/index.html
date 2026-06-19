@@ -47,7 +47,7 @@
           {
             "@type": "Question",
             "name": "What is the difference between trovex and a chunk-retrieval context server like context-hub?",
-            "acceptedAnswer": { "@type": "Answer", "text": "Chunk-retrieval context servers return a ranked list of relevant snippets and leave the agent to sift and decide which to trust. trovex returns the one canonical doc that answers, with a freshness marker (canonical / stale / duplicate), so the agent isn't ranking candidates or risking a stale chunk. trovex also gives agents a shared write path, so what one learns is recorded once and read by the rest." }
+            "acceptedAnswer": { "@type": "Answer", "text": "Chunk-retrieval servers like context-hub (CTX) return a ranked list of snippets and leave the agent to sift, rank, and decide which to trust. trovex returns the one canonical doc, with a freshness marker, so the agent isn't ranking candidates, for 60% fewer tokens per lookup. trovex lets agents write back through one shared point for a single source of truth." }
           },
           {
             "@type": "Question",
@@ -91,7 +91,7 @@
 
     <div class="verdict">
       <div class="l">Short answer</div>
-      <p>Chunk-retrieval context servers like context-hub (CTX) return a <strong>ranked list of relevant snippets</strong> and leave the agent to sift, rank, and decide which to trust. That's a reasonable default for general retrieval. trovex returns the <strong>one canonical doc</strong> that answers — a <code>path:line</code> pointer with a freshness marker (canonical / stale / duplicate) — so the agent isn't ranking candidates or risking a stale chunk, at about <strong>60% fewer tokens per lookup</strong>. trovex also closes the loop the other way: agents write back what they learn through one shared point, so the fleet reads a single source of truth.</p>
+      <p>Chunk-retrieval servers like context-hub (CTX) return a ranked list of snippets and leave the agent to sift, rank, and decide which to trust. trovex returns the <strong>one canonical doc</strong>, with a freshness marker, so the agent isn't ranking candidates, for 60% fewer tokens per lookup. trovex lets agents write back through one shared point for a single source of truth.</p>
     </div>
 
     <h2>How do chunk-retrieval context servers work?</h2>

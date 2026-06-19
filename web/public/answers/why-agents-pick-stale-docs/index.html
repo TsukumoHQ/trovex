@@ -48,7 +48,7 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "url": "https://trovex.dev/answers/why-agents-pick-stale-docs/",
-            "text": "Because retrieval ranks by similarity, not freshness. When several markdown files mention the same topic — a current runbook, an old postmortem, a duplicate wiki page — the agent has no signal for which is authoritative, so it reads whichever is the closest text match. Similarity does not know which copy is current, so a stale or duplicate file can rank high and be read as the source of truth. The fix is a freshness signal: mark each result canonical, stale, or duplicate and return the one canonical doc, so the stale copies never reach the agent's context. trovex does this and serves the one current doc per query, at about 60% fewer tokens than reading the top candidates."
+            "text": "Because retrieval ranks by similarity, not freshness. A current runbook and an old postmortem can read alike, so the agent reads the closest match and a stale or duplicate copy gets served as truth. The fix is a freshness signal: mark each result canonical, stale, or duplicate, return the canonical doc, and keep stale copies out of the agent's context."
           }
         }
       }
@@ -81,7 +81,7 @@
 
     <div class="verdict">
       <div class="l">Direct answer</div>
-      <p>Because retrieval ranks by <strong>similarity, not freshness</strong>. When several files mention the same topic — a current runbook, an old postmortem, a duplicate wiki page — the agent has no signal for which is authoritative, so it reads whichever is the closest text match. A stale or duplicate copy can rank high and be read as the source of truth. The fix is a <strong>freshness signal</strong>: mark each result canonical, stale, or duplicate and return the one canonical doc, so the stale copies never reach the agent's context.</p>
+      <p>Because retrieval ranks by <strong>similarity, not freshness</strong>. A current runbook and an old postmortem can read alike, so the agent reads the closest match and a stale or duplicate copy gets served as truth. The fix is a <strong>freshness signal</strong>: mark each result canonical, stale, or duplicate, return the canonical doc, and keep stale copies out of the agent's context.</p>
     </div>
 
     <h2>Why similarity search surfaces the wrong copy</h2>

@@ -51,7 +51,7 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "url": "https://trovex.dev/answers/reduce-agent-token-costs/",
-            "text": "Cut the repeated retrieval, not the one-time prompt. Most of a coding agent's context cost is paying again and again to reread the same docs to find which one is current. Three changes cut it sharply: route each query to the single canonical doc that answers it instead of returning a candidate list; read at the section level so a short answer costs short-answer tokens; and skip stale and duplicate copies so they never enter context. Together that is about 60% fewer tokens per doc lookup. An open-source local tool like trovex applies all three as an MCP server and shows you the tokens it saved."
+            "text": "Cut the repeated retrieval, not the one-time prompt. Most of a coding agent's context cost is paying repeatedly to reread the same docs to find which is current. Route each query to the single canonical doc that answers it, read at the section level, and skip stale and duplicate copies. Together that's about 60% fewer tokens per doc lookup."
           }
         }
       }
@@ -81,7 +81,7 @@
 
     <div class="verdict">
       <div class="l">Direct answer</div>
-      <p>Cut the <strong>repeated retrieval</strong>, not the one-time prompt. Most of a coding agent's context cost is paying again and again to reread the same docs to find which is current. Route each query to the single canonical doc that answers it, read at the section level, and skip stale and duplicate copies. Together that's about <strong>60% fewer tokens per doc lookup</strong>.</p>
+      <p>Cut the <strong>repeated retrieval</strong>, not the one-time prompt. Most of a coding agent's context cost is paying repeatedly to reread the same docs to find which is current. Route each query to the single canonical doc that answers it, read at the section level, and skip stale and duplicate copies. Together that's about <strong>60% fewer tokens per doc lookup</strong>.</p>
     </div>
 
     <h2>Where does the cost actually go?</h2>

@@ -47,7 +47,7 @@
           {
             "@type": "Question",
             "name": "What is the difference between trovex and repomix?",
-            "acceptedAnswer": { "@type": "Answer", "text": "repomix packs your whole repository into one big prompt for an LLM. trovex does the opposite: it indexes the repo and returns only the one current doc that answers a given query. repomix is built for a one-shot question about an entire codebase; trovex is built for repeated lookups across sessions, where loading everything each time is expensive." }
+            "acceptedAnswer": { "@type": "Answer", "text": "repomix and files-to-prompt pack your repo into one prompt for an LLM, the right tool when you want a model to see a whole codebase at once. For repeated lookups it floods the context window every time. trovex retrieves: it returns the one current doc that answers a query, down to the section, for about 60% fewer tokens per lookup." }
           },
           {
             "@type": "Question",
@@ -91,7 +91,7 @@
 
     <div class="verdict">
       <div class="l">Short answer</div>
-      <p>repomix and files-to-prompt <strong>pack</strong> your repo (or a filtered subset) into one big prompt for an LLM. That's the right tool when you want to hand a model a whole codebase at once. For repeated, targeted lookups it floods the context window on every prompt — the opposite of token-efficient. trovex <strong>retrieves</strong>: it returns the one current doc that answers a query, down to the section, for about <strong>60% fewer tokens per lookup</strong>. Packing is for one-shot global context; trovex is for the everyday "which doc answers this?" loop.</p>
+      <p>repomix and files-to-prompt <strong>pack</strong> your repo into one prompt for an LLM, the right tool when you want a model to see a whole codebase at once. For repeated lookups it floods the context window every time. trovex <strong>retrieves</strong>: it returns the one current doc that answers a query, down to the section, for about 60% fewer tokens per lookup.</p>
     </div>
 
     <h2>What do repomix and files-to-prompt do?</h2>

@@ -51,7 +51,7 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "url": "https://trovex.dev/answers/shared-source-of-truth-multiple-agents/",
-            "text": "Give every agent one shared point to both read and write, instead of separate copies each maintains on its own. When one agent records what it learns — an incident, a decision, a fix that worked — through a single store, every other agent and teammate reads that same record back instead of re-deriving it. Because there is one point of passage for reads and writes, there are no copies to drift and nothing to sync: it is a single source of truth by construction. trovex implements this as a local MCP server with a shared write path, so a fleet of agents and the people around them all see the same canonical, current docs."
+            "text": "Give every agent one shared point to both read and write, instead of separate copies each maintains. When one agent records what it learns, every other agent and teammate reads that record back instead of re-deriving it. With one point of passage there are no copies to drift and nothing to sync: a single source of truth by construction."
           }
         }
       }
@@ -81,7 +81,7 @@
 
     <div class="verdict">
       <div class="l">Direct answer</div>
-      <p>Give every agent <strong>one shared point to both read and write</strong>, instead of separate copies each maintains. When one agent records what it learns through a single store, every other agent and teammate reads that record back instead of re-deriving it. With one point of passage for reads and writes there are no copies to drift and nothing to sync — a <strong>single source of truth by construction</strong>.</p>
+      <p>Give every agent <strong>one shared point to both read and write</strong>, instead of separate copies each maintains. When one agent records what it learns, every other agent and teammate reads that record back instead of re-deriving it. With one point of passage there are no copies to drift and nothing to sync: a <strong>single source of truth by construction</strong>.</p>
     </div>
 
     <h2>Why do agents drift apart?</h2>

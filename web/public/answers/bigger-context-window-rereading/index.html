@@ -51,7 +51,7 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "url": "https://trovex.dev/answers/bigger-context-window-rereading/",
-            "text": "No. A bigger context window raises the ceiling on how much you can load, not the efficiency of loading it. You still pay for every token you put in the window, on every session, across every agent and teammate — so rereading the same docs is exactly as expensive per token as before, you can just do more of it. A bigger window is also not a more current one: it can hold the stale copy just as easily as the canonical one, so it does nothing for correctness. The durable fix is to load less but the right thing: serve one canonical doc per query with a freshness marker instead of rereading files, which is about 60% fewer tokens per lookup. trovex does this as a local MCP server."
+            "text": "No. A bigger context window raises how much you can load, not how efficiently. You still pay for every token, every session, every agent, so rereading docs is as expensive per token, you just do more of it. A bigger window isn't a more current one either. Serving one canonical answer per query is about 60% fewer tokens per lookup."
           }
         }
       }
@@ -81,7 +81,7 @@
 
     <div class="verdict">
       <div class="l">Direct answer</div>
-      <p><strong>No.</strong> A bigger context window raises the ceiling on how much you can load, not the efficiency of loading it. You still pay for every token you put in the window, on every session, across every agent — so rereading the same docs is exactly as expensive per token, you can just do more of it. And a bigger window isn't a more current one. Serving one canonical answer per query is about <strong>60% fewer tokens per lookup</strong>.</p>
+      <p><strong>No.</strong> A bigger context window raises how much you can load, not how efficiently. You still pay for every token, every session, every agent, so rereading docs is as expensive per token, you just do more of it. A bigger window isn't a more current one either. Serving one canonical answer per query is about <strong>60% fewer tokens per lookup</strong>.</p>
     </div>
 
     <h2>Why doesn't a larger window lower the cost?</h2>

@@ -29,6 +29,7 @@ submitted live; a human (owner) fires each. launch-lead drafts; the owner pulls 
 - `product-hunt.md` — trovex Product Hunt kit (tagline, gallery, maker comment, supporter DMs).
 - `wraith-kit.md` — wrai.th launch kit (registries + Show HN angle for the widest TOF).
 - `wraith-gallery-asset-spec.md` — production spec for the wrai.th PH/OG gallery (slides + on-slide copy + dimensions) → design builds; last asset gating the one-shots.
+- `trovex-gallery-asset-spec.md` — production spec for the trovex PH/OG gallery (savings-receipt led). **HOLD building until trovex flips public**; staged so the one-shot is build-ready at the flip.
 - `faq-bank.md` — objection + FAQ answer bank (founder reply drafts for HN/PH/community).
 
 **Registries + directories (the shelf — compounding, reversible)**

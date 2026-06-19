@@ -8,10 +8,19 @@
 
 ## Fire-readiness + execution layer (2026-06-19 — distribution phase)
 
-**Go-state:** the funnel this seeds INTO is live — tsukumo.ch + /assessment operational, trovex
-`/api/waitlist` returns 200 (cmo-tested), trovex repo public. So this plan is **fireable**; the only
-per-item gate left is reading each venue's current rules at fire time (research gaps below). A human posts
-every item — launch-lead stages + sequences, never posts.
+**Go-state: GO (2026-06-19).** The distribution gate fell — channels are LIVE (owner connected Metricool:
+LinkedIn perso+page, X @LoicMancino + @tsukumohq, Threads; Plausible on). The funnel destination is live
+(tsukumo.ch + /assessment, trovex `/api/waitlist` 200, repo public). So the value-first community seeding can
+**start now** — the only per-item gate left is reading each venue's current rules at fire time (research gaps
+below). A human posts every item — launch-lead stages + sequences, never posts.
+
+**Paired get-cited track (fire alongside, different angle):** content-lead's `content/earned-citation-outreach.md`
+(merged) is the evergreen GET-CITED set — listicle/roundup adds + dev-newsletter pitches + citation-seed angles,
+mapped to geo's target queries (#328). This community plan = value-first community presence; that file =
+get-added-and-cited. Same value-first rules, no competing posts (deconflicted: outreach.md scope note). The
+human fires both; I sequence. **Separate, still gated:** wrai.th/trovex MCP **registries** (eng-decision human
+task b6da7ebe) and the one-shot **Show HN / Product Hunt** (owner go + gallery) — those are NOT part of this
+ongoing-seeding GO.
 
 **Suite sequencing (which tool seeds first):**
 - **wrai.th leads.** It's public + v1.0 stable and the widest top-of-funnel — use the wrai.th seed drafts in

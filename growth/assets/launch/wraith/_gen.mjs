@@ -29,6 +29,31 @@ const frame = (w, hgt, kids, pad = 72) => h("div", { style: { width: `${w}px`, h
   h("div", { style: { position: "absolute", top: 0, left: 0, width: "100%", height: "5px", backgroundColor: W.accent } }),
   ...kids);
 
+// ---- Slides 1-3 — REAL /v2/ dashboard captures, composited into branded frames.
+// Raws are human-captured from a clean throwaway "wraith-demo" colony (PR #226),
+// leak-verified zero client/Synergix names. Honesty gate: real run, real data.
+const dataURI = async (file) => `data:image/png;base64,${(await readFile(join(HERE, file))).toString("base64")}`;
+
+// Fixed screenshot box (all raws are 2540x1520 → 1.671 aspect). Height-locked so
+// the three slides sit uniformly; width derived from the real aspect.
+const SHOT_H = 470;
+const SHOT_W = Math.round((SHOT_H * 2540) / 1520); // 785
+
+function screenSlide(parts, src) {
+  // parts = [pre, accent, post] of the verbatim caption (accent = emerald span).
+  const [pre, accent, post] = parts;
+  return h("div", { style: { width: "1270px", height: "760px", display: "flex", flexDirection: "column", backgroundColor: W.bg, color: W.text, padding: "56px", fontFamily: "Space Mono", position: "relative" } },
+    h("div", { style: { position: "absolute", top: 0, left: 0, width: "100%", height: "5px", backgroundColor: W.accent } }),
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+      wordmark(26),
+      h("div", { style: { fontSize: "19px", color: W.muted, letterSpacing: "0.16em" } }, "LIVE · /v2/")),
+    h("div", { style: { display: "flex", flexWrap: "wrap", marginTop: "22px", fontSize: "38px", lineHeight: 1.14, color: W.text, maxWidth: "1110px" } },
+      h("span", {}, pre.replace(/\s+$/, "\u00a0")), h("span", { style: { color: W.accent } }, accent), post ? h("span", {}, "\u00a0" + post) : null),
+    h("div", { style: { display: "flex", flex: 1, alignItems: "center", justifyContent: "center", marginTop: "26px" } },
+      h("div", { style: { display: "flex", border: `1px solid ${W.border}`, borderRadius: "12px", overflow: "hidden", backgroundColor: W.card } },
+        h("img", { src, width: SHOT_W, height: SHOT_H, style: { display: "block" } }))));
+}
+
 // ---- Slide 4 — HOW IT WORKS (3-step flow) ----
 function slide4() {
   const node = (n, label) => h("div", { style: { display: "flex", flexDirection: "column", gap: "14px", flex: 1, border: `1px solid ${W.border}`, backgroundColor: W.card, borderRadius: "10px", padding: "30px 26px" } },
@@ -66,7 +91,7 @@ function og() {
     wordmark(34),
     h("div", { style: { display: "flex", flexDirection: "column", gap: "26px" } },
       h("div", { style: { display: "flex", flexWrap: "wrap", fontSize: "62px", lineHeight: 1.08, color: W.text, maxWidth: "1020px" } },
-        h("span", {}, "mission control for your "), h("span", { style: { color: W.accent } }, "AI agent fleet")),
+        h("span", {}, "mission control for your\u00a0"), h("span", { style: { color: W.accent } }, "AI agent fleet")),
       h("div", { style: { fontSize: "27px", color: W.muted } }, "memory · messaging · tasks · one dashboard. local, open source.")),
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
       h("div", { style: { fontSize: "21px", color: W.accent } }, "github.com/Synergix-lab/WRAI.TH"),
@@ -83,6 +108,9 @@ function thumb() {
 }
 
 const jobs = [
+  ["slide-1-mission-control.png", screenSlide(["mission control for your ", "AI agent fleet"], await dataURI("raw-slide-1-overview.png")), 1270, 760],
+  ["slide-2-coordination.png", screenSlide(["agents that message each other + ", "share one task board"], await dataURI("raw-slide-2-messages.png")), 1270, 760],
+  ["slide-3-memory.png", screenSlide(["persistent memory that ", "survives /clear"], await dataURI("raw-slide-3-memory.png")), 1270, 760],
   ["slide-4-how-it-works.png", slide4(), 1270, 760],
   ["slide-5-trust.png", slide5(), 1270, 760],
   ["og-card.png", og(), 1200, 630],

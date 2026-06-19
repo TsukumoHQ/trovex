@@ -85,7 +85,7 @@
     </div>
 
     <h2>Why does the agent reread files in the first place?</h2>
-    <p class="lead-answer">Because nothing tells it which doc is authoritative. When several markdown files mention the same topic — a runbook, an ADR, an old wiki page — the agent has no signal for which is current, so it opens them and reasons over the pile. It does this every session, for every agent, paying the same tokens to re-answer "which file is the source of truth?" each time.</p>
+    <p class="lead-answer">Because nothing tells it which doc is authoritative. When several markdown files mention the same topic, say a runbook, an ADR, an old wiki page, the agent has no signal for which is current, so it opens them and reasons over the pile. It does this every session, for every agent, paying the same tokens to re-answer "which file is the source of truth?" each time.</p>
 
     <h2>What actually fixes it?</h2>
     <p class="lead-answer">Three things, together:</p>
@@ -96,7 +96,7 @@
     </ul>
 
     <h2>How trovex does it</h2>
-    <p class="lead-answer"><a href="/">trovex</a> is an open-source, local-first MCP server that does exactly this. It indexes your repo's markdown, answers a query with the one canonical doc (down to the section, with a freshness marker), and lets agents write back what they learn so the next agent reads it instead of re-deriving it. It runs on your machine — vectors in SQLite, ONNX embeddings, no cloud or API keys — and shows you the tokens it saved. trovex is in private beta — <a href="/#waitlist">request access</a>; once you're in, setup is about a minute:</p>
+    <p class="lead-answer"><a href="/">trovex</a> is an open-source, local-first MCP server that does exactly this. It indexes your repo's markdown, answers a query with the one canonical doc (down to the section, with a freshness marker), and lets agents write back what they learn so the next agent reads it instead of re-deriving it. It runs on your machine (vectors in SQLite, ONNX embeddings, no cloud or API keys) and shows you the tokens it saved. trovex is in private beta — <a href="/#waitlist">request access</a>; once you're in, setup is about a minute:</p>
     <div class="cmd mono" style="display:inline-block;margin-top:14px;">$ uv run trovex index /path/to/repo</div>
 
     <div class="related">

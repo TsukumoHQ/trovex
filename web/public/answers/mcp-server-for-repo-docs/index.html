@@ -88,7 +88,7 @@
     <p class="lead-answer">Most retrieval servers hand back the top-k similar chunks and leave the agent to rank them, with no freshness signal. trovex is opinionated for repo docs: it returns <em>one</em> canonical doc, marks stale and duplicate copies so they're skipped, reads at the section level, and closes the write loop — an agent records what it learns once and the rest read it back. See <a href="/vs/context-hub/">trovex vs context-hub</a> and <a href="/vs/vector-db-rag/">vs a vector-DB RAG setup</a> for the contrast.</p>
 
     <h2>How it runs</h2>
-    <p class="lead-answer">trovex serves MCP over streamable HTTP at <code>http://localhost:8765/mcp</code>. Indexing and embeddings run on your machine — vectors in SQLite, ONNX embeddings — so there's no cloud and no API keys, and your code never leaves your machine. Connect it from <a href="/for/claude-code/">Claude Code</a>, <a href="/for/cursor/">Cursor</a>, <a href="/for/windsurf/">Windsurf</a>, <a href="/for/cline/">Cline</a>, or any MCP client.</p>
+    <p class="lead-answer">trovex serves MCP over streamable HTTP at <code>http://localhost:8765/mcp</code>. Indexing and embeddings run on your machine — vectors in SQLite, ONNX embeddings. There's no cloud and no API keys, and your code never leaves your machine. Connect it from <a href="/for/claude-code/">Claude Code</a>, <a href="/for/cursor/">Cursor</a>, <a href="/for/windsurf/">Windsurf</a>, <a href="/for/cline/">Cline</a>, or any MCP client.</p>
 
     <div class="related">
       <div class="l">Related</div>

@@ -95,13 +95,13 @@
     </div>
 
     <h2>What is mem0?</h2>
-    <p class="lead-answer">mem0 is an open-source memory layer for AI agents and apps. It stores and retrieves long-term memories — user preferences, facts, prior conversation — combining vector search with entity/graph linking, exposed through an API and SDKs, with hosted and self-hosted options. It's a strong, widely-adopted way to give an existing agent persistent memory of its interactions.</p>
+    <p class="lead-answer">mem0 is an open-source memory layer for AI agents and apps. It stores and retrieves long-term memories (user preferences, facts, prior conversation), combining vector search with entity/graph linking, exposed through an API and SDKs, with hosted and self-hosted options. It's a strong, widely-adopted way to give an existing agent persistent memory of its interactions.</p>
 
     <h2>Where do the two differ?</h2>
     <ul>
       <li><strong>What's stored.</strong> mem0 remembers interaction history and extracted facts; trovex serves your authored docs (the repo's markdown), not chat memory.</li>
       <li><strong>Freshness vs accumulation.</strong> trovex marks a doc canonical, stale, or duplicate so the agent reads the current one. General memory tends to accumulate, which is useful for recall but doesn't tell an agent which version is now authoritative.</li>
-      <li><strong>Local and turnkey.</strong> trovex runs on your machine with no API keys and no LLM extraction step — index markdown, serve over MCP. mem0's extraction and (optionally) hosted storage trade some locality for general memory power.</li>
+      <li><strong>Local and ready-to-run.</strong> trovex runs on your machine with no API keys and no LLM extraction step — index markdown, serve over MCP. mem0's extraction and (optionally) hosted storage trade some locality for general memory power.</li>
     </ul>
 
     <div class="tbl-wrap">
@@ -120,7 +120,7 @@
     </div>
 
     <h2>When is mem0 the right choice?</h2>
-    <p class="lead-answer">When you need an agent or app to remember its users and conversations over time — preferences, prior decisions, personalization — across many kinds of content, with a managed option. That's mem0's strength. Reach for <a href="/">trovex</a> when the job is your project's <em>documentation</em>: routing a query to the one current doc, skipping stale copies, and keeping a fleet of coding agents on a single source of truth, locally. Many setups can use both.</p>
+    <p class="lead-answer">When you need an agent or app to remember its users and conversations over time (preferences, prior decisions, personalization) across many kinds of content, with a managed option. That's mem0's strength. Reach for <a href="/">trovex</a> when the job is your project's <em>documentation</em>: routing a query to the one current doc, skipping stale copies, and keeping a fleet of coding agents on a single source of truth, locally. Many setups can use both.</p>
 
     <section aria-label="Frequently asked questions">
       <h2>FAQ</h2>

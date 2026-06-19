@@ -95,7 +95,7 @@
     </div>
 
     <h2>How does Cursor's memory work?</h2>
-    <p class="lead-answer">Cursor offers <em>Rules</em> — static text you maintain that loads into every conversation in a project — and has experimented with a <em>Memories</em> feature that stored project-level facts from chats (its availability has changed across versions). The community <em>Memory Bank</em> is a documentation-driven pattern layered on top. All of these are scoped to a project and live within Cursor.</p>
+    <p class="lead-answer">Cursor offers <em>Rules</em>, static text you maintain that loads into every conversation in a project, and has experimented with a <em>Memories</em> feature that stored project-level facts from chats (its availability has changed across versions). The community <em>Memory Bank</em> is a documentation-driven pattern layered on top. All of these are scoped to a project and live within Cursor.</p>
     <p class="note">Cursor's built-in memory features have changed between releases — check Cursor's current docs for exactly what's available in your version.</p>
 
     <h2>Where does that fall short?</h2>
@@ -128,7 +128,7 @@
 
     <section aria-label="Frequently asked questions">
       <h2>FAQ</h2>
-      <div class="faq-item"><p class="faq-q">What is the difference between trovex and Cursor's memory?</p><p class="faq-a">Cursor's memory features (Rules, Memories, the community Memory Bank) keep project context inside Cursor, scoped to a project. trovex is editor-independent: it serves canonical repo docs over MCP to any client — Claude Code, Cursor, Windsurf, Cline — with a freshness marker, so the same source of truth follows you across tools.</p></div>
+      <div class="faq-item"><p class="faq-q">What is the difference between trovex and Cursor's memory?</p><p class="faq-a">Cursor's memory features (Rules, Memories, the community Memory Bank) keep project context inside Cursor, scoped to a project. trovex is editor-independent: it serves canonical repo docs over MCP to any client (Claude Code, Cursor, Windsurf, Cline), with a freshness marker, so the same source of truth follows you across tools.</p></div>
       <div class="faq-item"><p class="faq-q">Does Cursor's memory work across projects and other editors?</p><p class="faq-a">Generally no. It's scoped per project and lives inside Cursor, so an insight saved in one repo doesn't surface in another, and opening another agent loses that context. trovex stores docs in your repo and serves them over MCP, so any MCP client and teammate read the same canonical content.</p></div>
       <div class="faq-item"><p class="faq-q">Can I use trovex alongside Cursor's rules?</p><p class="faq-a">Yes. Keep a short set of Cursor rules for editor-specific behavior, and use trovex for the project's documentation — the many markdown files that go stale and need routing to the one current answer, with a freshness marker and a shared write path static rules don't have.</p></div>
     </section>

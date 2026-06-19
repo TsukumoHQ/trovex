@@ -7,21 +7,21 @@
   <meta name="theme-color" content="#0b0e14" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="canonical" href="https://trovex.dev/vs/vector-db-rag/" />
-  <title>trovex vs a vector-DB RAG setup — turnkey canonical answers vs a pipeline you build</title>
-  <meta name="description" content="Rolling your own RAG over a vector database (Pinecone, pgvector, Chroma) gives you top-k chunks and a pipeline to maintain. trovex is a turnkey local MCP server that returns one canonical doc with a freshness marker — no chunk-ranking, no infra to run. Here's the comparison." />
+  <title>trovex vs a vector-DB RAG setup — ready-to-run canonical answers vs a pipeline you build</title>
+  <meta name="description" content="Rolling your own RAG over a vector database (Pinecone, pgvector, Chroma) gives you top-k chunks and a pipeline to maintain. trovex is a ready-to-run local MCP server that returns one canonical doc with a freshness marker — no chunk-ranking, no infra to run. Here's the comparison." />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="trovex" />
   <meta property="og:url" content="https://trovex.dev/vs/vector-db-rag/" />
   <meta property="og:title" content="trovex vs a vector-DB RAG setup" />
-  <meta property="og:description" content="Top-k chunks and a pipeline you build vs a turnkey local server that returns one canonical doc with a freshness marker." />
+  <meta property="og:description" content="Top-k chunks and a pipeline you build vs a ready-to-run local server that returns one canonical doc with a freshness marker." />
   <meta property="og:image" content="https://trovex.dev/vs/vector-db-rag/og.png" />
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="trovex vs a vector-DB RAG setup" />
-  <meta name="twitter:description" content="Turnkey canonical answers vs a RAG pipeline you build." />
+  <meta name="twitter:description" content="Ready-to-run canonical answers vs a RAG pipeline you build." />
   <meta name="twitter:image" content="https://trovex.dev/vs/vector-db-rag/og.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -87,7 +87,7 @@
 
     <p class="updated">Updated <time datetime="2026-06-19">19 June 2026</time></p>
     <h1>trovex vs <span class="ac">a vector-DB RAG setup</span></h1>
-    <p class="deck">Rolling your own RAG gives you top-k chunks and a pipeline to maintain. trovex is the turnkey version for repo docs: one canonical answer, locally, over MCP.</p>
+    <p class="deck">Rolling your own RAG gives you top-k chunks and a pipeline to maintain. trovex is the ready-to-run version for repo docs: one canonical answer, locally, over MCP.</p>
 
     <div class="verdict">
       <div class="l">Short answer</div>
@@ -105,7 +105,7 @@
     </ul>
 
     <h2>How is trovex different?</h2>
-    <p class="lead-answer"><a href="/">trovex</a> is the opinionated, turnkey version for a repo's markdown. It still uses embeddings and vectors — ONNX embeddings in a local SQLite store — but instead of returning a ranked list, it resolves a query to the <strong>one canonical doc</strong>, serves the section that answers, marks stale and duplicate copies, and lets agents write records back. You install it and point it at your repo; there's no pipeline to assemble and no cloud DB or keys.</p>
+    <p class="lead-answer"><a href="/">trovex</a> is the opinionated, ready-to-run version for a repo's markdown. It still uses embeddings and vectors (ONNX embeddings in a local SQLite store), but instead of returning a ranked list, it resolves a query to the <strong>one canonical doc</strong>, serves the section that answers, marks stale and duplicate copies, and lets agents write records back. You install it and point it at your repo; there's no pipeline to assemble and no cloud DB or keys.</p>
 
     <div class="tbl-wrap">
       <table>

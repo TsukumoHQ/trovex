@@ -30,13 +30,19 @@ So the offensive is **tune + widen + earn**, not "build pages that already exist
 | 9 | consulting-agents-prod | consulting | **tsukumo** | `/answers/what-is-ai-in-production-consulting`, `/answers/get-dev-team-using-ai-agents` | tune for "reliably in production **at scale**" intent → PR C (tsukumo) |
 | 10 | agentic-operators-studio | consulting | **tsukumo** | `/answers/ai-native-engineering-team`, `/studio`, glossary "agentic operator" | tune for "AI **dev studio**" framing → PR C (tsukumo) |
 
-## Done this PR (A)
+## Done — PR A (#186, merged)
 - `web/public/llms.txt`: surfaced `mcp-server-for-repo-docs` (the Q7 target — was absent) and `source-of-truth-multi-agent-repos` (2nd Q3 target) in the Answers list.
 - This map.
 
+## Done — PR B (this PR)
+- `Speakable` + `datePublished`/`dateModified` added to **all 20** target pages (9 `/answers` QAPage + 11 `/vs` FAQPage). Speakable `cssSelector` = `["h1", ".verdict p"]` — the visible direct-answer block engines lift.
+- Visible "Updated 19 June 2026" stamp on every page, mirroring the schema date (schema must mirror visible content) + styled `.updated` in `vs/compare.css`.
+- Idempotent injector `web/scripts/add-geo-freshness.mjs` (re-run to bump the date next pass). All 20 JSON-LD blocks re-validated as parseable; sitemap + brand guards green.
+- **Follow-up (not in this PR):** the `.verdict` leads run 78–100w, not the ideal 40–60w. Tightening them is editorial surgery that also rewrites the mirrored `acceptedAnswer.text` — queued for a focused copy pass (geo + content), tracked separately so this freshness PR stays atomic.
+
 ## Sequenced next (the actual citability lift)
-- **PR B — trovex (highest lift):** add `Speakable` + `dateModified`/`datePublished` to all 9 `/answers` + 12 `/vs` pages. Recency is the biggest cheap signal (industry data: ~+30% citation; ~82% of cited pages are <30 days), and Speakable marks the passage engines quote. Both are currently **absent** on these pages. Confirm each page leads with a 40–60-word direct answer.
-- **PR C — tsukumo:** confirm/tune the two consulting answer pages for the exact Q9/Q10 intent ("at scale / in production", "AI dev studio").
+- **Verdict tighten (geo + content):** trim each `/answers` + `/vs` lead to 40–60w, keeping the schema `acceptedAnswer.text` mirror in sync.
+- **PR C — tsukumo:** confirm/tune the two consulting answer pages for the exact Q9/Q10 intent ("at scale / in production", "AI dev studio"). (Blog cornerstone capsules now render as visible Speakable blocks — tsukumo PR #286.)
 - **analytics-lead:** re-run the monitor (owns `OPENAI_API_KEY`) to track movement once PR B deploys + indexes; **widen the panel to Perplexity + Google AI Overviews** before drawing conclusions from one OpenAI run.
 - **launch / social / content:** the off-site half — `brand-trovex` and cold category discovery are won by earned citations (Reddit/HN/awesome-lists/listicles), per `growth/geo/earned-citation-strategy.md` (tsukumo) and the suite's own GitHub presence.
 

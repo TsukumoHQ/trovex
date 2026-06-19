@@ -6,6 +6,35 @@
 
 ---
 
+## Fire-readiness + execution layer (2026-06-19 — distribution phase)
+
+**Go-state:** the funnel this seeds INTO is live — tsukumo.ch + /assessment operational, trovex
+`/api/waitlist` returns 200 (cmo-tested), trovex repo public. So this plan is **fireable**; the only
+per-item gate left is reading each venue's current rules at fire time (research gaps below). A human posts
+every item — launch-lead stages + sequences, never posts.
+
+**Suite sequencing (which tool seeds first):**
+- **wrai.th leads.** It's public + v1.0 stable and the widest top-of-funnel — use the wrai.th seed drafts in
+  `wraith-kit.md §3` (r/mcp, r/LocalLLaMA Go-binary angle, MCP/Cline/Continue/Cursor #showcase, r/golang,
+  its own Discord). Pairs with the wrai.th-registries bucket firing in parallel (`wraith-registry-checklists.md`).
+- **trovex follows** on the same value-first cadence (this plan). Don't seed the same person/venue BOTH tools
+  the same week — that reads as a campaign, not a contributor.
+- The suite cross-reference (trovex pairs with wrai.th) goes in a *reply when asked*, never the opening post.
+
+**Per-post fire checklist (human runs, every single post):**
+- [ ] Read the venue's rules + pinned posts RIGHT NOW (they change). If self-promo isn't allowed, don't.
+- [ ] It's an answer to a real existing thread OR the sanctioned intro (r/mcp flair) — not a drive-by drop.
+- [ ] Personalize the draft; never paste verbatim, never the same link across venues same-day.
+- [ ] Post from a real, aged account (no alts). Honesty gate: only what you actually measured.
+- [ ] Log it (venue / date / link) so the 9:1 contribute-to-promote ratio stays real.
+
+**Research gaps to close before firing (the only blockers — a human verifies):**
+- [ ] Exact self-promo rules for r/LocalLLaMA + r/ChatGPTCoding (sidebars/wiki, promo-day norms).
+- [ ] Which MCP / Cline / Continue / Cursor Discords have a #showcase channel (share only there).
+- [ ] Current newsletter submission forms (PulseMCP, TLDR, Console.dev, Cooperpress).
+
+---
+
 ## The one rule that governs everything
 
 Reddit (and most dev communities) define spam by **behavior, not intent**: a user whose history is

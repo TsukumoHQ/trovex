@@ -32,6 +32,9 @@
 - [Is there an MCP server that serves a repo's docs to coding agents?](https://trovex.dev/answers/mcp-server-for-repo-docs/): yes — trovex is an MCP server that returns the one canonical doc per query, not the whole repo.
 - [What's the single source of truth for a multi-agent repo?](https://trovex.dev/answers/source-of-truth-multi-agent-repos/): one canonical, freshness-marked doc every agent reads and writes back, instead of each agent guessing from raw files.
 
+## Deep dives
+- [The token cost of coding agents rereading your docs](https://trovex.dev/blog/the-token-cost-of-agents-rereading-docs/): the full math — a typical doc lookup drops from ~720 to ~280 tokens (~60% fewer) when you serve one canonical doc instead of letting the agent reread the pile to guess which is current. Shows where the number comes from and how to reproduce it on your own repo.
+
 ## Setup (per MCP client)
 - [trovex for Claude Code](https://trovex.dev/for/claude-code/): `claude mcp add --transport http trovex http://localhost:8765/mcp`.
 - [trovex for Cursor](https://trovex.dev/for/cursor/): add it to `.cursor/mcp.json`, enable in Settings → MCP.

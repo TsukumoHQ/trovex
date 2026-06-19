@@ -158,15 +158,15 @@ const ENGINES = {
   gemini: {
     label: "Gemini (grounded w/ google_search)",
     envKey: "GEMINI_API_KEY",
-    model: "gemini-2.5-flash",
+    model: "gemini-flash-latest",
     async probe(key, q) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${key}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-goog-api-key": key },
         body: JSON.stringify({ contents: [{ parts: [{ text: q.q }] }], tools: [{ google_search: {} }] }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`); // 429 = RESOURCE_EXHAUSTED → key valid but no quota/billing
       const data = await res.json();
       const chunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       // web.uri is a vertexaisearch redirect; the real source domain survives in web.title — keep both.
@@ -176,25 +176,24 @@ const ENGINES = {
   google_aio: {
     label: "Google AI Overviews (via SerpAPI)",
     envKey: "SERPAPI_KEY",
+    // SerpAPI returns the AI Overview in TWO steps: the google search returns a `page_token`,
+    // then a second `engine=google_ai_overview` call fetches the actual overview + references.
+    // (~2 SerpAPI credits per query → 22 queries ≈ 44 credits/run; mind the monthly quota.)
     async probe(key, q) {
       const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(q.q)}&api_key=${key}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const aio = data.ai_overview;
+      let aio = data.ai_overview;
       if (!aio) return []; // no AI Overview shown for this query = honest 0, not an error
+      // Paginated: first response is just a token → fetch the real overview.
+      if (aio.page_token && !aio.references && !aio.text_blocks) {
+        const r2 = await fetch(`https://serpapi.com/search.json?engine=google_ai_overview&page_token=${encodeURIComponent(aio.page_token)}&api_key=${key}`);
+        if (!r2.ok) throw new Error(`HTTP ${r2.status} (aio page)`);
+        aio = (await r2.json()).ai_overview || {};
+      }
       const refs = aio.references || [];
-      const fromRefs = refs.filter((r) => r.link).map((r) => ({ url: r.link, title: r.title || r.source || "" }));
-      if (fromRefs.length) return fromRefs;
-      // Some payloads only embed links inside text_blocks → harvest those.
-      const blocks = aio.text_blocks || [];
-      const out = [];
-      const walk = (b) => {
-        for (const ref of b.reference_indexes ? [] : []) out.push(ref); // placeholder; references is primary
-        if (Array.isArray(b.list)) b.list.forEach(walk);
-      };
-      blocks.forEach(walk);
-      return out;
+      return refs.filter((r) => r.link).map((r) => ({ url: r.link, title: r.title || r.source || "" }));
     },
   },
 };

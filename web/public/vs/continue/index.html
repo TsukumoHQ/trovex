@@ -47,7 +47,7 @@
           {
             "@type": "Question",
             "name": "Is trovex an alternative to Continue.dev?",
-            "acceptedAnswer": { "@type": "Answer", "text": "Not exactly — they sit at different layers. Continue.dev is a full open-source AI coding assistant and framework (chat, autocomplete, custom models) with its own codebase retrieval. trovex is an MCP context server that serves one canonical doc per query with a freshness marker. Because Continue can connect MCP servers, you can use trovex as a context source inside Continue rather than replacing it." }
+            "acceptedAnswer": { "@type": "Answer", "text": "Continue.dev is a free, open-source AI coding assistant and framework with chat, autocomplete, and custom models, plus codebase retrieval and MCP support. trovex is an MCP context server serving the one canonical doc per query with a freshness marker, for 60% fewer tokens per lookup. They sit at different layers: Continue connects MCP servers, so use trovex inside it." }
           },
           {
             "@type": "Question",
@@ -91,7 +91,7 @@
 
     <div class="verdict">
       <div class="l">Short answer</div>
-      <p>Continue.dev is a free, open-source AI coding <strong>assistant and framework</strong> — chat, autocomplete, custom models — with its own codebase retrieval and MCP support. trovex is an <strong>MCP context server</strong> that serves the one canonical doc per query with a freshness marker, for about <strong>60% fewer tokens per lookup</strong>. They're at different layers: because Continue can connect MCP servers, you use trovex <em>inside</em> Continue rather than instead of it. trovex sharpens the doc-context part; Continue stays your assistant.</p>
+      <p>Continue.dev is a free, open-source AI coding <strong>assistant and framework</strong> with chat, autocomplete, and custom models, plus codebase retrieval and MCP support. trovex is an <strong>MCP context server</strong> serving the one canonical doc per query with a freshness marker, for 60% fewer tokens per lookup. They sit at different layers: Continue connects MCP servers, so use trovex inside it.</p>
     </div>
 
     <h2>What is Continue.dev?</h2>

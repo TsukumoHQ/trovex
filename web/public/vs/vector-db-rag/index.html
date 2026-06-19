@@ -47,7 +47,7 @@
           {
             "@type": "Question",
             "name": "What is the difference between trovex and a vector-DB RAG setup?",
-            "acceptedAnswer": { "@type": "Answer", "text": "A vector-DB RAG setup is a pipeline you build: chunk your docs, embed them, store them in a vector database like Pinecone, pgvector, or Chroma, and at query time retrieve the top-k most similar chunks for the model to read. trovex is a turnkey local tool that returns one canonical doc with a freshness marker over MCP — no chunking strategy to tune, no ranking for the agent to do, and no separate infrastructure to run. RAG gives you candidate chunks; trovex gives you the current answer." }
+            "acceptedAnswer": { "@type": "Answer", "text": "A vector-DB RAG setup is a pipeline you build: chunk, embed, and store docs in Pinecone, pgvector, or Chroma, then retrieve the top-k similar chunks at query time. trovex is a ready-to-run local tool that returns one canonical doc with a freshness marker over MCP, no pipeline to tune, about 60% fewer tokens per lookup." }
           },
           {
             "@type": "Question",
@@ -91,7 +91,7 @@
 
     <div class="verdict">
       <div class="l">Short answer</div>
-      <p>A vector-DB RAG setup is a <strong>pipeline you build</strong>: chunk your docs, embed them, store them in Pinecone / pgvector / Chroma, and retrieve the top-k similar chunks at query time. trovex is a <strong>turnkey local tool</strong> that returns one canonical doc with a freshness marker over MCP — no chunking to tune, no ranking for the agent to do, no separate infra to run, about <strong>60% fewer tokens per lookup</strong>. RAG gives you candidate chunks; trovex gives you the current answer.</p>
+      <p>A vector-DB RAG setup is a <strong>pipeline you build</strong>: chunk, embed, and store docs in Pinecone, pgvector, or Chroma, then retrieve the top-k similar chunks at query time. trovex is a <strong>ready-to-run local tool</strong> that returns one canonical doc with a freshness marker over MCP, no pipeline to tune, about 60% fewer tokens per lookup.</p>
     </div>
 
     <h2>What does a vector-DB RAG setup involve?</h2>
@@ -127,7 +127,7 @@
 
     <section aria-label="Frequently asked questions">
       <h2>FAQ</h2>
-      <div class="faq-item"><p class="faq-q">What is the difference between trovex and a vector-DB RAG setup?</p><p class="faq-a">A vector-DB RAG setup is a pipeline you build: chunk, embed, store in a vector DB, retrieve the top-k similar chunks. trovex is a turnkey local tool that returns one canonical doc with a freshness marker over MCP — no chunking to tune, no ranking for the agent, no separate infra. RAG gives you candidate chunks; trovex gives you the current answer.</p></div>
+      <div class="faq-item"><p class="faq-q">What is the difference between trovex and a vector-DB RAG setup?</p><p class="faq-a">A vector-DB RAG setup is a pipeline you build: chunk, embed, store in a vector DB, retrieve the top-k similar chunks. trovex is a ready-to-run local tool that returns one canonical doc with a freshness marker over MCP — no chunking to tune, no ranking for the agent, no separate infra. RAG gives you candidate chunks; trovex gives you the current answer.</p></div>
       <div class="faq-item"><p class="faq-q">Why not just build RAG over a vector database?</p><p class="faq-a">You can, and for custom or large-scale retrieval it may be right. But raw RAG returns top-k similar chunks without telling the agent which is current, often includes near-duplicates, and leaves you to maintain chunking, retrieval, ranking, and MCP wiring. trovex packages the opinionated version for repo docs, locally, with no API keys.</p></div>
       <div class="faq-item"><p class="faq-q">Does trovex use embeddings and vectors?</p><p class="faq-a">Yes — it embeds your markdown with ONNX and stores vectors in SQLite locally. The difference is what it does with them: instead of a ranked list of chunks, it resolves a query to the one canonical doc and serves the section that answers, with a freshness marker.</p></div>
     </section>

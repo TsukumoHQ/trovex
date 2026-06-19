@@ -48,7 +48,7 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "url": "https://trovex.dev/answers/agent-cost-rereading-files/",
-            "text": "The exact dollar figure depends on your repo size, how often agents run, and your model's pricing, so there is no single honest number. But the waste is structural: the same markdown gets reread to re-establish context every session, for every agent, and for every teammate, so the cost compounds rather than being paid once. The part that is measurable and repeatable is the per-lookup reduction — serving the one canonical doc that answers, at the section level, is about 60% fewer tokens than reading the top few stale candidate files. trovex shows you the exact tokens it saved on your own repo via a savings dashboard, so you can replace the estimate with your real number."
+            "text": "There's no single honest dollar figure: it depends on your repo size, how often agents run, and your model's pricing. But the waste is structural, the same docs reread every session, for every agent, for every teammate. The measurable part is per-lookup: serving the one canonical section is about 60% fewer tokens than reading the top stale candidates."
           }
         }
       }
@@ -81,7 +81,7 @@
 
     <div class="verdict">
       <div class="l">Direct answer</div>
-      <p>There's no single honest dollar figure — it depends on your repo size, how often agents run, and your model's pricing. But the waste is <strong>structural</strong>: the same docs get reread every session, for every agent, for every teammate, so the cost <strong>compounds</strong> instead of being paid once. The measurable, repeatable part is the per-lookup reduction — serving the one canonical doc at the section level is about <strong>60% fewer tokens</strong> than reading the top few stale candidates.</p>
+      <p>There's no single honest dollar figure: it depends on your repo size, how often agents run, and your model's pricing. But the waste is <strong>structural</strong>, the same docs reread every session, for every agent, for every teammate. The measurable part is per-lookup: serving the one canonical section is about <strong>60% fewer tokens</strong> than reading the top stale candidates.</p>
     </div>
 
     <h2>Why the cost compounds (and is easy to miss)</h2>

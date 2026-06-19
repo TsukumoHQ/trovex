@@ -48,7 +48,7 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "url": "https://trovex.dev/answers/source-of-truth-multi-agent-repos/",
-            "text": "The single source of truth should be one store that every agent both reads from and writes to — so the repo's documents, not each agent's private context, are authoritative. When reads and writes pass through one point, there are no separate copies to drift and nothing to sync, and a query returns the one canonical doc with a freshness marker rather than whatever a given agent happened to cache. This also stops fleet cost from compounding: instead of every agent re-deriving the same answer and rereading the same files, one agent records what it learned and the rest read it back. trovex implements this as a local MCP server with a shared write path, so a fleet of agents and the people around them work from the same canonical, current docs."
+            "text": "One store that every agent both reads from and writes to, so the repo's documents, not each agent's private context, are authoritative. With one point of passage there are no copies to drift and nothing to sync, and a query returns the one canonical doc with a freshness marker, not whatever an agent cached. It stops fleet cost from compounding."
           }
         }
       }
@@ -81,7 +81,7 @@
 
     <div class="verdict">
       <div class="l">Direct answer</div>
-      <p>One store that every agent both <strong>reads from and writes to</strong> — so the repo's documents, not each agent's private context, are authoritative. With one point of passage for reads and writes there are no separate copies to drift and nothing to sync, and a query returns the one canonical doc with a freshness marker instead of whatever a given agent cached. It also stops fleet cost from compounding: one agent records what it learned, the rest read it back.</p>
+      <p>One store that every agent both <strong>reads from and writes to</strong>, so the repo's documents, not each agent's private context, are authoritative. With one point of passage there are no copies to drift and nothing to sync, and a query returns the one canonical doc with a freshness marker, not whatever an agent cached. It stops <strong>fleet cost from compounding</strong>.</p>
     </div>
 
     <h2>Why "the repo" needs to be the unit, not each agent</h2>

@@ -47,7 +47,7 @@
           {
             "@type": "Question",
             "name": "What is the difference between trovex and Aider?",
-            "acceptedAnswer": { "@type": "Answer", "text": "Aider is a terminal AI pair programmer — it talks to an LLM, builds a repo map of your code with tree-sitter, and makes edits to your files via git. trovex is not a coding agent; it is an MCP server that serves your repo's canonical markdown docs to an agent, one current doc per query with a freshness marker. Aider's repo map is about code structure for editing; trovex is about which doc is the source of truth. Different layers." }
+            "acceptedAnswer": { "@type": "Answer", "text": "Aider is a terminal AI pair programmer: it builds a repo map of your code and edits files via git. trovex is not a coding agent. It's an MCP server serving your repo's canonical markdown docs, one doc per query with a freshness marker, for about 60% fewer tokens per lookup. trovex tracks which doc is the source of truth." }
           },
           {
             "@type": "Question",
@@ -91,7 +91,7 @@
 
     <div class="verdict">
       <div class="l">Short answer</div>
-      <p>Aider is a terminal AI <strong>pair programmer</strong>: it builds a repo map of your code with tree-sitter and makes edits via git. trovex is <strong>not a coding agent</strong> — it's an MCP server that serves your repo's canonical markdown docs, one current doc per query with a freshness marker, for about <strong>60% fewer tokens per lookup</strong>. Aider's repo map is about code structure for editing; trovex is about which <em>doc</em> is the source of truth. They solve different problems.</p>
+      <p>Aider is a terminal AI <strong>pair programmer</strong>: it builds a repo map of your code and edits files via git. trovex is <strong>not a coding agent</strong>. It's an MCP server serving your repo's canonical markdown docs, one doc per query with a freshness marker, for about <strong>60% fewer tokens per lookup</strong>. trovex tracks which doc is the source of truth.</p>
     </div>
 
     <h2>What is Aider?</h2>

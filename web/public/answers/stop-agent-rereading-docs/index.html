@@ -51,7 +51,7 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "url": "https://trovex.dev/answers/stop-agent-rereading-docs/",
-            "text": "Stop handing the agent raw files to sift and give it a single canonical answer per query instead. Index your repo's markdown once, then serve the agent the one current doc that answers a question — a path:line pointer with a freshness marker — rather than letting it reread files to guess which is canonical. That cuts the cost to about 60% fewer tokens per lookup, because the agent reads one current section instead of the top few stale candidates. An open-source tool like trovex does this as a local MCP server: it returns the canonical doc, marks stale and duplicate copies so they are skipped, and lets agents write back what they learn so the next agent reads it instead of re-deriving it."
+            "text": "Give the agent a single canonical answer per query instead of raw files to sift. Index your repo's markdown once, then serve the one current doc that answers a question, a path:line pointer with a freshness marker, rather than letting it reread files to guess which is canonical. That cuts the cost to about 60% fewer tokens per lookup."
           }
         }
       }
@@ -81,7 +81,7 @@
 
     <div class="verdict">
       <div class="l">Direct answer</div>
-      <p>Give the agent a <strong>single canonical answer per query</strong> instead of raw files to sift. Index your repo's markdown once, then serve the agent the one current doc that answers a question — a <code>path:line</code> pointer with a freshness marker — rather than letting it reread files to guess which is canonical. That cuts the cost to about <strong>60% fewer tokens per lookup</strong>, because the agent reads one current section instead of the top few stale candidates.</p>
+      <p>Give the agent a <strong>single canonical answer per query</strong> instead of raw files to sift. Index your repo's markdown once, then serve the one current doc that answers a question, a <code>path:line</code> pointer with a freshness marker, rather than letting it reread files to guess which is canonical. That cuts the cost to about <strong>60% fewer tokens per lookup</strong>.</p>
     </div>
 
     <h2>Why does the agent reread files in the first place?</h2>

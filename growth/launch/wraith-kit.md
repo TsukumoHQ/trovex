@@ -87,6 +87,10 @@ budgeting picks the wrong thing to keep. Repo: https://github.com/Synergix-lab/W
 
 ## 2. Registries / directories
 
+> **Per-registry run-checklists (URL, prereqs, fields, format, gotchas, who-fires):** see
+> `wraith-registry-checklists.md`. This section is the channels + master copy; that file is the step-by-step
+> a human follows. These are the "can go FIRST" reversible/compounding bucket (unfreeze-checklist §0).
+
 wrai.th is an MCP server (the `agent-relay` server) — same shelf as trovex. Two channels:
 
 **MCP registries** (per mcp-registries.md mechanics + public-launch-kit-deep.md target list):

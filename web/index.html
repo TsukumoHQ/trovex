@@ -59,7 +59,21 @@
           "@id": "https://trovex.dev/#organization",
           "name": "trovex",
           "url": "https://trovex.dev/",
-          "logo": "https://trovex.dev/favicon.svg"
+          "logo": "https://trovex.dev/favicon.svg",
+          "sameAs": ["https://github.com/Synergix-lab/trovex"],
+          "parentOrganization": { "@id": "https://tsukumo.ch/#org" }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://tsukumo.ch/#org",
+          "name": "tsukumo",
+          "url": "https://tsukumo.ch/",
+          "description": "Swiss dev studio and AI consultancy that runs AI agents in production. Maker of the open trovex / WRAI.TH / yoru suite.",
+          "sameAs": [
+            "https://trovex.dev",
+            "https://github.com/Synergix-lab/WRAI.TH",
+            "https://yoru.sh"
+          ]
         },
         {
           "@type": "WebSite",
@@ -97,7 +111,8 @@
             "priceCurrency": "USD"
           },
           "author": { "@id": "https://trovex.dev/#organization" },
-          "publisher": { "@id": "https://trovex.dev/#organization" }
+          "publisher": { "@id": "https://trovex.dev/#organization" },
+          "creator": { "@id": "https://tsukumo.ch/#org" }
         },
         {
           "@type": "FAQPage",

@@ -35,6 +35,9 @@ ignore="$root/.trovexignore"
 if [ -f "$ignore" ]; then
   rel="${file#"$root"/}"
   while IFS= read -r pat || [ -n "$pat" ]; do
+    pat="${pat%$'\r'}"   # strip trailing CR — autocrlf checks out .trovexignore as CRLF,
+                          # and "README.md\r" never glob-matches → the guard would wrongly
+                          # DENY every keep-list write (README/CLAUDE/blog). P1 footgun.
     [ -z "$pat" ] && continue
     case "$pat" in \#*) continue ;; esac
     # shellcheck disable=SC2254  # intentional glob from the file

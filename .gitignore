@@ -30,3 +30,6 @@ fastembed_cache/
 *.env
 secrets/
 *.key
+
+# Vercel CLI local link
+.vercel

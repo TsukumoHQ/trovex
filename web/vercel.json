@@ -6,6 +6,9 @@
   "rewrites": [
     { "source": "/js/script.js", "destination": "https://plausible.io/js/script.js" },
     { "source": "/api/event", "destination": "https://plausible.io/api/event" },
-    { "source": "/savings", "destination": "/savings.html" }
-  ]
+    { "source": "/savings", "destination": "/api/savings" }
+  ],
+  "functions": {
+    "api/savings-card.js": { "includeFiles": "api/_fonts/**" }
+  }
 }

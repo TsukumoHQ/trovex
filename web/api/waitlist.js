@@ -27,6 +27,7 @@
 import { createHash } from 'node:crypto'
 import { rateLimited } from './_rate-limit.js'
 import { notifyOwner } from './_notify.js'
+import { syncLeadToTwenty } from './_twenty.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -215,14 +216,17 @@ export default async function handler(req, res) {
     // + env-gated; awaited (a plain Vercel function may freeze after the response).
     // A failed notify never affects the stored signup.
     if (sb !== 'duplicate') {
-      await notifyOwner({
-        title: 'New trovex waitlist signup',
-        fields: {
-          email,
-          source: buildSourceAndUtm(attribution).source,
-          via: meta.referer,
-        },
-      })
+      const { source, utm } = buildSourceAndUtm(attribution)
+      // Best-effort side-effects: owner ping + Twenty CRM pipeline mirror.
+      // Neither affects the stored signup; run concurrently so latency doesn't
+      // stack, and both are env-gated + swallow their own errors.
+      await Promise.all([
+        notifyOwner({
+          title: 'New trovex waitlist signup',
+          fields: { email, source, via: meta.referer },
+        }),
+        syncLeadToTwenty({ email, name: null, company: null, source, message: null, utm: utm || {}, referer: meta.referer }),
+      ])
     }
     return res.status(200).json({ ok: true })
   } catch {

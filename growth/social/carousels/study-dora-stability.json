@@ -1,0 +1,38 @@
+{
+  "slug": "study-dora-stability",
+  "audience": "company",
+  "kicker": "the research — DORA",
+  "cover": {
+    "title": "AI made it easy to ship more",
+    "accent": "ship more",
+    "sub": "Google's 2024 DORA report, the largest study of software delivery we have, found that's the problem."
+  },
+  "slides": [
+    {
+      "title": "+25% adoption, −7.2% stability",
+      "accent": "−7.2% stability",
+      "body": "Rising AI adoption tracked with a 7.2% drop in delivery stability and a 1.5% drop in throughput. ~76% of teams were already using AI."
+    },
+    {
+      "title": "the cause isn't bad AI code",
+      "accent": "isn't bad AI code",
+      "body": "It's batch size. AI removes the friction that kept change sets small, and big batches break delivery. DORA has shown this for a decade."
+    },
+    {
+      "title": "more code, less stable delivery",
+      "accent": "less stable",
+      "body": "You didn't get faster delivery. You got bigger batches. The same pattern METR and GitClear found from different angles."
+    },
+    {
+      "title": "the fix is delivery discipline",
+      "accent": "delivery discipline",
+      "body": "Small changes, review gates, observability. The unglamorous parts DORA always pointed at, now non-optional at AI volume."
+    }
+  ],
+  "cta": {
+    "title": "find your weakest lever",
+    "accent": "weakest lever",
+    "sub": "A scoped read of your agent setup in your real repo, sources and method included. The prioritized plan is yours to keep.",
+    "foot": "tsukumo.ch/assessment"
+  }
+}

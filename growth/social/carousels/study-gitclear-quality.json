@@ -1,0 +1,38 @@
+{
+  "slug": "study-gitclear-quality",
+  "audience": "company",
+  "kicker": "the research — GitClear",
+  "cover": {
+    "title": "AI ships code by copy-paste",
+    "accent": "copy-paste",
+    "sub": "GitClear counted 211 million changed lines. As AI spread, pasted code overtook refactored code for the first time."
+  },
+  "slides": [
+    {
+      "title": "copy-paste rose 8.3% to 12.3%",
+      "accent": "8.3% to 12.3%",
+      "body": "Share of changed lines that were pasted, 2020 to 2024. Roughly a 48% jump as AI tools spread across teams."
+    },
+    {
+      "title": "refactoring fell 24.1% to 9.5%",
+      "accent": "24.1% to 9.5%",
+      "body": "Moved (refactored) lines collapsed. In 2024, pasted code passed refactored code for the first time GitClear has measured."
+    },
+    {
+      "title": "churn climbed 3.1% to 5.7%",
+      "accent": "3.1% to 5.7%",
+      "body": "Code rewritten within two weeks of commit. The early-warning sign of debt AI defers onto your team, later."
+    },
+    {
+      "title": "speed now, maintenance bill later",
+      "accent": "maintenance bill",
+      "body": "The speed is real. So is the debt. GitClear's method runs on your own repo, so you can measure your duplication trend."
+    }
+  ],
+  "cta": {
+    "title": "measure your duplication trend",
+    "accent": "your duplication trend",
+    "sub": "A straight read of your agent setup in your real repo, sources and method included. The prioritized plan is yours to keep.",
+    "foot": "tsukumo.ch/assessment"
+  }
+}

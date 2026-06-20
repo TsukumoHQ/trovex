@@ -7,8 +7,9 @@
 > (SQLite + ONNX), runs on your machine. Ships as an MCP server and a CLI.
 
 - Website: https://trovex.dev
-- Access: private beta — request access at https://trovex.dev/#waitlist (the install steps below work once you're in)
-- Repository: https://github.com/TsukumoHQ/trovex (private during the beta)
+- Access: public beta — the repository is public; install from https://github.com/TsukumoHQ/trovex (a star helps)
+- Repository: https://github.com/TsukumoHQ/trovex (public)
+- Community: https://tsukumo.ch/slack (questions and setup help)
 - License: core AGPL-3.0, CLIs MIT
 - Category: context / memory infrastructure for AI coding agents
 - Interface: Model Context Protocol (MCP) server (local, streamable-HTTP at http://localhost:8765/mcp) + CLI
@@ -29,8 +30,8 @@
   API keys, your code never leaves your machine.
 
 The only performance number trovex claims is about **60% fewer tokens per doc lookup** — one
-canonical answer versus reading the top few stale candidate files. It's pre-launch and open
-source; there are no customer counts or ratings to cite.
+canonical answer versus reading the top few stale candidate files. It's open source and in
+public beta; there are no customer counts or ratings to cite.
 
 ## Who it's for
 

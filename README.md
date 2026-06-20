@@ -21,9 +21,8 @@ SQLite, embeddings via ONNX, no cloud or API keys.
 
 ## Quick start
 
-trovex is in [private beta](#private-beta). Once you have repo access, there's no clone and
-no `pip install` step — `uv tool install` builds it straight from git and puts `trovex` on
-your PATH:
+trovex is in public beta. No clone, no `pip install` step — `uv tool install` builds it
+straight from git and puts `trovex` on your PATH:
 
 ```bash
 uv tool install git+https://github.com/TsukumoHQ/trovex   # one-time, no clone
@@ -90,11 +89,11 @@ The reasoning behind the ~60% number is written up in
 - sqlite-vec (vector search in SQLite)
 - Jinja2 + HTMX (UI, no build step)
 
-## Private beta
+## Public beta
 
-trovex is in private beta. The repo is gated while we work with a small group of early
-testers. [Request access at trovex.dev](https://trovex.dev) and we'll get you set up. Early
-testers get hands-on onboarding and a direct say in the roadmap.
+trovex is in public beta. Install it, run it on your repo, and if it saves you tokens a
+[GitHub star](https://github.com/TsukumoHQ/trovex) helps other devs find it. Issues and
+PRs welcome.
 
 ## License
 

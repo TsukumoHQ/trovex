@@ -88,6 +88,12 @@ td.feat { color: var(--fg-muted); }
 .no { color: var(--fg-subtle); }
 .partial { color: #d9a441; }
 
+/* blog post hero (conceptual illustration, brand green on dark) */
+.post-hero {
+  display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover;
+  margin: 24px 0 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-card);
+}
+
 /* code block — multi-line, for blog walkthroughs (inline `code` is styled above) */
 .codeblock {
   margin: 22px 0 0; padding: 16px 18px; overflow-x: auto;

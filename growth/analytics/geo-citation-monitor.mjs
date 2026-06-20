@@ -26,9 +26,13 @@
  *   set -a; . ~/.config/trovex-growth/ai-engines.env; set +a
  * Never hardcode/commit a key; output contains only domains + counts, no secrets.
  *
- * Usage:  node geo-citation-monitor.mjs                 # all engines that have a key
- *         node geo-citation-monitor.mjs --dry           # print, don't write
+ * Output:  the report prints to STDOUT (owner rule: "rien en md, tout dans trovex") → pipe it into
+ *          trovex_write to centralize. Progress + summary go to stderr. `--save` also drops a disk
+ *          .md (opt-in escape hatch). NEVER commit a disk report by default.
+ *
+ * Usage:  node geo-citation-monitor.mjs                 # all engines w/ a key → report to stdout
  *         node geo-citation-monitor.mjs --engines=openai,perplexity   # subset
+ *         node geo-citation-monitor.mjs --save          # also write reports/geo-citations-<date>.md
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -38,8 +42,10 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 
 // Our properties — a citation of any counts as "suite cited".
 const OURS = [/(^|\.)trovex\.dev$/, /(^|\.)tsukumo\.ch$/, /(^|\.)wrai\.th$/, /(^|\.)yoru\.sh$/];
-// Plus a loose token match (Gemini/AIO often return redirect URLs whose real source is in the title).
-const OURS_TOKENS = ["trovex", "tsukumo", "wrai.th", "yoru.sh"];
+// Token match for engines that return redirect URLs (real source only in the title). FULL-DOMAIN /
+// org tokens ONLY — bare "trovex" collides with an unrelated company (trovex.ai), which produced a
+// false-positive citation. Require our actual domains or github org so a namesake can't read as us.
+const OURS_TOKENS = ["trovex.dev", "tsukumo.ch", "wrai.th", "yoru.sh", "synergix-lab/trovex", "github.com/synergix-lab"];
 // Known competitors/alternatives — who wins the category (substring match on host+path+title).
 const COMPETITORS = ["repomix", "context-hub", "mem0", "cursor", "claude.md", "claude.ai", "github.com/anthropics", "llmstxt", "aider"];
 
@@ -78,7 +84,22 @@ const OFFENSIVE = [
   { id: "ai-adoption-scaleups", tier: 2, q: "How should a scale-up or mid-market engineering team adopt AI coding agents at scale? Name specific studios or consultancies and link them." },
 ].map((q) => ({ ...q, kind: "offensive", cohort: "offensive" }));
 
-const QUERIES = [...STANDING, ...OFFENSIVE];
+// PRODUCTS cohort — the suite is 3 OSS products feeding one consulting funnel, and citation
+// sets barely overlap by category. trovex (context) is already covered by STANDING; this adds
+// dedicated category + branded queries for the OTHER two so each product's citation share is
+// measurable on its OWN terms, not just "some suite property got cited". Tagged by `product`.
+const PRODUCTS = [
+  // WRAI.TH — multi-agent orchestration / running agent fleets in production.
+  { id: "wraith-orchestrate-fleet", product: "wraith", kind: "category", q: "What tool gives one control plane to run a fleet of AI coding agents in production? Name specific tools and link them." },
+  { id: "wraith-agents-collaborate", product: "wraith", kind: "category", q: "How do I coordinate multiple AI agents that hand work to each other on a shared codebase? Recommend specific orchestration tools with links." },
+  { id: "wraith-branded", product: "wraith", kind: "branded", q: "What is WRAI.TH (the AI-agent orchestration tool) and who makes it?" },
+  // yoru.sh — observability / audit trails for AI agents.
+  { id: "yoru-agent-observability", product: "yoru", kind: "category", q: "What tools give observability, traces and audit trails for what AI coding agents actually did? Name specific tools and link them." },
+  { id: "yoru-monitor-agents-prod", product: "yoru", kind: "category", q: "How do I monitor AI agents running in production — logs, traces, replay of their actions? Recommend specific tools with links." },
+  { id: "yoru-branded", product: "yoru", kind: "branded", q: "What is yoru.sh (observability for AI agents) and who makes it?" },
+].map((q) => ({ ...q, cohort: "products" }));
+
+const QUERIES = [...STANDING, ...OFFENSIVE, ...PRODUCTS];
 
 function hostOf(url) {
   try { return new URL(url).hostname.toLowerCase(); } catch { return ""; }
@@ -211,7 +232,6 @@ function cohortShare(rows, cohort) {
 }
 
 async function main() {
-  const dry = process.argv.includes("--dry");
   const engines = chosenEngines();
 
   // Resolve which engines actually have a key — the rest are reported n/a, never silently dropped.
@@ -257,6 +277,7 @@ async function main() {
       overall: cohortShare(rows, "standing"),
       standing: cohortShare(rows, "standing"),
       offensive: cohortShare(rows, "offensive"),
+      products: cohortShare(rows, "products"),
       all: (() => {
         const v = rows.filter((r) => !r.error);
         const c = v.filter((r) => r.weCited).length;
@@ -279,16 +300,34 @@ async function main() {
   md.push(``);
   md.push(`## Citation share by engine (each engine is its own surface to win — ~11% overlap)`);
   md.push(``);
-  md.push(`| Engine | Status | All | Standing | Offensive |`);
-  md.push(`|--------|--------|:---:|:--------:|:---------:|`);
+  md.push(`| Engine | Status | All | Standing | Offensive | Products |`);
+  md.push(`|--------|--------|:---:|:--------:|:---------:|:--------:|`);
   for (const name of engines) {
-    if (!live.includes(name)) { md.push(`| ${ENGINES[name].label} | n/a (no ${ENGINES[name].envKey}) | — | — | — |`); continue; }
+    if (!live.includes(name)) { md.push(`| ${ENGINES[name].label} | n/a (no ${ENGINES[name].envKey}) | — | — | — | — |`); continue; }
     const e = perEngine[name];
-    md.push(`| ${ENGINES[name].label} | live | **${e.all.cited}/${e.all.total} (${e.all.pct}%)** | ${e.standing.cited}/${e.standing.total} (${e.standing.pct}%) | ${e.offensive.cited}/${e.offensive.total} (${e.offensive.pct}%) |`);
+    md.push(`| ${ENGINES[name].label} | live | **${e.all.cited}/${e.all.total} (${e.all.pct}%)** | ${e.standing.cited}/${e.standing.total} (${e.standing.pct}%) | ${e.offensive.cited}/${e.offensive.total} (${e.offensive.pct}%) | ${e.products.cited}/${e.products.total} (${e.products.pct}%) |`);
   }
-  md.push(`| **UNION (any engine)** | — | **${unionAll.cited}/${unionAll.total} (${unionAll.pct}%)** | — | — |`);
+  md.push(`| **UNION (any engine)** | — | **${unionAll.cited}/${unionAll.total} (${unionAll.pct}%)** | — | — | — |`);
   md.push(``);
-  md.push(`**Standing** = stable suite-category panel (weekly trend). **Offensive** = the citation write-list (\`citation-uncited-queries\`); a row flipping ✅ = proof a new page earned a citation. **Union** = share where ANY engine cited us = total reachable surface.`);
+  md.push(`**Standing** = stable suite-category panel (weekly trend). **Offensive** = the citation write-list (\`citation-uncited-queries\`); a row flipping ✅ = proof a new page earned a citation. **Products** = per-product category/branded queries (WRAI.TH + yoru.sh). **Union** = share where ANY engine cited us = total reachable surface.`);
+  md.push(``);
+
+  // Per-PRODUCT union share — each suite product is its own funnel; measure each on its own queries.
+  // trovex's category share lives in Standing (the whole standing set is trovex/context). wraith + yoru
+  // get dedicated queries here. A product cited by ANY engine on ANY of its queries counts.
+  md.push(`## Citation share by product (union, any engine)`);
+  md.push(``);
+  md.push(`| Product | Surface | Cited (any engine) |`);
+  md.push(`|---------|---------|:------------------:|`);
+  md.push(`| trovex | context for coding agents | ${unionAll.total ? `see Standing (${live.length ? perEngine[live[0]].standing.total : 0} queries)` : "—"} |`);
+  for (const product of ["wraith", "yoru"]) {
+    const pq = PRODUCTS.filter((q) => q.product === product);
+    const cited = pq.filter(unionCited).length;
+    const surface = product === "wraith" ? "agent-fleet orchestration" : "agent observability";
+    md.push(`| ${product === "wraith" ? "WRAI.TH" : "yoru.sh"} | ${surface} | ${cited}/${pq.length} |`);
+  }
+  md.push(``);
+  md.push(`The suite is 3 OSS products feeding one consulting funnel — a citation of any (trovex / WRAI.TH / yoru.sh / tsukumo) counts as "suite cited", but each product wins its category on its OWN queries, so they're scored apart.`);
   md.push(``);
 
   // Per-query matrix: one column per live engine, ✅/—/ERR per cell.
@@ -326,22 +365,30 @@ async function main() {
   md.push(`- **Not-cited rows → geo-lead / tech-copy**: those are the answer/comparison pages to ship or strengthen. An *offensive* row flipping ✅ after a deploy = the page earned the citation.`);
   md.push(`- **Honesty:** a missing engine is \`n/a (no key)\`, never a fabricated 0. Add an engine by exporting its key (\`${Object.values(ENGINES).map((e) => e.envKey).join("\`, \`")}\`).`);
   md.push(`- **Cadence:** weekly + after each offensive batch deploys (allow index lag before re-reading — re-running pre-reindex manufactures a false 0).`);
-  md.push(`- **Run:** \`set -a; . ~/.config/trovex-growth/ai-engines.env; set +a && node geo-citation-monitor.mjs\``);
+  md.push(`- **Run:** \`set -a; . ~/.config/trovex-growth/ai-engines.env; set +a && node geo-citation-monitor.mjs\` → report prints to stdout; centralize via trovex_write (no disk .md by default).`);
   md.push(``);
   md.push(`### Queries probed`);
   md.push(`**Standing:**`);
   STANDING.forEach((q) => md.push(`- \`${q.id}\` (${q.kind}): ${q.q}`));
   md.push(`**Offensive (write-list):**`);
   OFFENSIVE.forEach((q) => md.push(`- \`${q.id}\` (tier ${q.tier}): ${q.q}`));
+  md.push(`**Products (per-product):**`);
+  PRODUCTS.forEach((q) => md.push(`- \`${q.id}\` (${q.product}/${q.kind}): ${q.q}`));
 
   const out = md.join("\n");
-  if (dry) { console.log(out); return; }
-  const outDir = join(__dir, "reports");
-  mkdirSync(outDir, { recursive: true });
-  const outPath = join(outDir, `geo-citations-${date}.md`);
-  writeFileSync(outPath, out + "\n");
+  // The report goes to trovex, not disk (owner: "rien en md, tout dans trovex"). Default = print to
+  // STDOUT so the run pipes straight into trovex_write; stderr carries progress + the summary, so a
+  // capture of stdout is a clean report. `--save` is an opt-in disk escape hatch (off by default).
+  console.log(out);
   const summary = live.map((n) => `${n} ${perEngine[n].all.cited}/${perEngine[n].all.total}`).join(", ");
-  console.log(`wrote ${outPath} — per-engine: ${summary}; union ${unionAll.cited}/${unionAll.total} (${unionAll.pct}%)`);
+  process.stderr.write(`per-engine: ${summary}; union ${unionAll.cited}/${unionAll.total} (${unionAll.pct}%)\n`);
+  if (process.argv.includes("--save")) {
+    const outDir = join(__dir, "reports");
+    mkdirSync(outDir, { recursive: true });
+    const outPath = join(outDir, `geo-citations-${date}.md`);
+    writeFileSync(outPath, out + "\n");
+    process.stderr.write(`also saved ${outPath} (--save)\n`);
+  }
 }
 
 main();

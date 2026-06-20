@@ -243,8 +243,8 @@ const FEATURES = [
 const GITHUB = 'https://github.com/TsukumoHQ/trovex'
 // Public-beta support channel (one redirect everyone links — tsukumo.ch/slack).
 const SLACK_URL = 'https://tsukumo.ch/slack'
-// Sibling OSS tool in the tsukumo suite. Points at the repo until tsukumo.ch/wraith ships.
-const WRAITH_GH = 'https://github.com/TsukumoHQ/WRAI.TH'
+// Sibling OSS tool in the tsukumo suite — now has its own landing (live).
+const WRAITH_URL = 'https://tsukumo.ch/wraith?utm_source=trovex&utm_medium=oss-suite&utm_campaign=wraith'
 
 export default function App() {
   useReveal()
@@ -420,7 +420,7 @@ export default function App() {
           </nav>
           <small className="footer-suite">
             part of the tsukumo suite: <a href="/">trovex</a> (docs) ·{" "}
-            <a href={WRAITH_GH} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'wraith', location: 'footer-suite' })}>wrai.th</a> (agent orchestration)
+            <a href={WRAITH_URL} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'wraith', location: 'footer-suite' })}>wrai.th</a> (agent orchestration)
           </small>
           <small>© 2026 trovex · one source of truth for your agents' docs</small>
         </div>

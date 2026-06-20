@@ -65,20 +65,42 @@ export function receiptSvg(m: ReceiptCardInput): string | null {
 }
 
 /**
- * Build the card and trigger a browser download (no infra). No-op when gated off.
- * Returns true if a card was produced.
+ * Build the card, rasterize to PNG client-side (canvas — no infra), and trigger a
+ * download. PNG because X / LinkedIn / Slack reject SVG on upload; a PNG drags
+ * straight into a post, so the share loop completes. No-op when gated off.
+ * Resolves true if a card was produced. Fonts come from the page (Fira loaded).
  */
-export function downloadReceiptCard(m: ReceiptCardInput, filename = 'trovex-savings.svg'): boolean {
+export async function downloadReceiptCard(m: ReceiptCardInput, filename = 'trovex-savings.png'): Promise<boolean> {
   const svg = receiptSvg(m);
   if (!svg) return false;
-  const blob = new Blob([svg], { type: 'image/svg+xml' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  return true;
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+  try {
+    const img = new Image();
+    img.decoding = 'async';
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('receipt svg failed to load'));
+      img.src = svgUrl;
+    });
+    const scale = 2; // retina
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200 * scale;
+    canvas.height = 630 * scale;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!png) return false;
+    const pngUrl = URL.createObjectURL(png);
+    const a = document.createElement('a');
+    a.href = pngUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(pngUrl);
+    return true;
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
 }

@@ -1,0 +1,12 @@
+# Keep executable shell scripts and the trovex ignore-list as LF on every
+# platform. With core.autocrlf=true a CRLF checkout makes the md-guard hook
+# unparseable by bash (and "README.md\r" never glob-matches in .trovexignore,
+# wrongly denying keep-list writes). eol=lf pins them so the deployed/copied
+# files are always valid — the fix survives reinstalls on any machine.
+*.sh text eol=lf
+deploy/hooks/* text eol=lf
+.trovexignore text eol=lf
+
+# Bundled OG-card fonts must never be line-ending converted.
+*.ttf binary
+*.otf binary

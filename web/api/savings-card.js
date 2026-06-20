@@ -18,7 +18,6 @@
  * build-time blog-OG script uses), fonts bundled in ./_fonts.
  */
 
-import { Resvg } from '@resvg/resvg-js'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -76,7 +75,11 @@ function buildSvg(m) {
 </svg>`
 }
 
-function svgToPng(svg) {
+async function svgToPng(svg) {
+  // Lazy import so a missing native binary degrades to the SVG fallback below
+  // rather than failing the whole module at load (a broken card must never 500
+  // — it would kill the og:image and the page's preview entirely).
+  const { Resvg } = await import('@resvg/resvg-js')
   return new Resvg(svg, {
     fitTo: { mode: 'width', value: 1200 },
     font: { fontBuffers: FONT_BUFFERS, loadSystemFonts: false, defaultFontFamily: 'Fira Code' },
@@ -85,7 +88,7 @@ function svgToPng(svg) {
     .asPng()
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   let params
   try {
     params = new URL(req.url, 'http://localhost').searchParams
@@ -105,7 +108,7 @@ export default function handler(req, res) {
   }
 
   try {
-    const png = svgToPng(svg)
+    const png = await svgToPng(svg)
     res.setHeader('Content-Type', 'image/png')
     return res.status(200).send(png)
   } catch {

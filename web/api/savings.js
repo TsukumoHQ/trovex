@@ -66,7 +66,10 @@ export default async function handler(req, res) {
   }
 
   // Only rewrite meta for a shareworthy result; otherwise serve the page as-is.
-  if (hasInputs(params)) {
+  // Any failure here is non-fatal: we serve the unmodified static page (generic
+  // og card) rather than 500 the calculator.
+  try {
+   if (hasInputs(params)) {
     const m = compute(readInputs(params))
     if (isShareworthy(m)) {
       // Card URL carries ONLY the six inputs (no utm / format), so the CDN cache
@@ -91,6 +94,9 @@ export default async function handler(req, res) {
       html = setMeta(html, 'property="og:description"', desc)
       html = setMeta(html, 'property="og:url"', `${origin}/savings${search}`)
     }
+   }
+  } catch {
+    /* meta-injection failed — serve the unmodified page (generic og card) */
   }
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8')

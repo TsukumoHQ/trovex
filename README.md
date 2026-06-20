@@ -95,6 +95,9 @@ trovex is in public beta. Install it, run it on your repo, and if it saves you t
 [GitHub star](https://github.com/TsukumoHQ/trovex) helps other devs find it. Issues and
 PRs welcome.
 
+Questions, or comparing notes with other people running agents? Join the community Slack:
+[tsukumo.ch/slack](https://tsukumo.ch/slack).
+
 ## License
 
 trovex is licensed under the **GNU AGPL-3.0-or-later** (see [`LICENSE`](LICENSE)). You can

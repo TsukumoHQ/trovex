@@ -1,12 +1,12 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.synergix-lab/trovex",
+  "name": "io.github.tsukumohq/trovex",
   "title": "trovex",
   "description": "Serves coding agents one canonical doc per query instead of rereading the repo — ~60% fewer tokens.",
   "version": "0.11.0",
   "websiteUrl": "https://trovex.dev",
   "repository": {
-    "url": "https://github.com/Synergix-lab/trovex",
+    "url": "https://github.com/TsukumoHQ/trovex",
     "source": "github"
   },
   "packages": [

@@ -30,6 +30,7 @@ const POSTS = [
   ["local-first-vs-cloud-rag-for-agent-context", "Local-first vs cloud RAG for serving your coding agents", "context"],
   ["mcp-context-patterns-for-coding-agents", "MCP context patterns for coding agents:", "dump, retrieve, or answer"],
   ["one-source-of-truth-for-a-fleet-of-agents", "One source of truth for", "a fleet of coding agents"],
+  ["the-token-cost-of-agents-rereading-docs", "The token cost of coding agents", "rereading your docs"],
 ];
 
 function card(pre, accent) {

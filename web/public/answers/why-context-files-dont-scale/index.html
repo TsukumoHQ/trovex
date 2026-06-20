@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/why-context-files-dont-scale/" />
+  <title>Why do AGENTS.md / CLAUDE.md context files stop scaling? (2026)</title>
+  <meta name="description" content="A context file that helps at 5 docs hurts at 50. A 2026 ETH Zurich study found repo context files cut agent task success and raised cost over 20%. Keep the file short; serve the right slice per task." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/why-context-files-dont-scale/" />
+  <meta property="og:title" content="Why AGENTS.md / CLAUDE.md context files stop scaling" />
+  <meta property="og:description" content="The file that helps at 5 docs hurts at 50. Keep it short; serve the right slice per task." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Why context files stop scaling for coding agents" />
+  <meta name="twitter:description" content="A context file that helps at 5 docs hurts at 50. Keep it short; serve the right slice." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Why context files stop scaling", "item": "https://trovex.dev/answers/why-context-files-dont-scale/" }
+        ]
+      },
+      {
+        "@type": "Article",
+        "headline": "Why do AGENTS.md / CLAUDE.md context files stop scaling?",
+        "description": "Why a single context file degrades as a doc set grows, the ETH Zurich evidence, and what to do instead.",
+        "datePublished": "2026-06-20", "dateModified": "2026-06-20",
+        "author": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+        "publisher": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+        "mainEntityOfPage": "https://trovex.dev/answers/why-context-files-dont-scale/",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "citation": "https://arxiv.org/abs/2602.11988",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Do AGENTS.md / CLAUDE.md files help coding agents?",
+            "acceptedAnswer": { "@type": "Answer", "text": "At a small scale, a short human-written file of stable rules helps. As the doc set grows, a single file works against you: a 2026 ETH Zurich study found that adding repository context files tended to reduce task success and raised inference cost by over 20% versus no repo context. Keep the file short and constraint-focused; serve the changing detail another way." }
+          },
+          {
+            "@type": "Question",
+            "name": "Should I delete my CLAUDE.md?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. Keep a short one for stable, project-wide rules an agent should always follow. The failure mode is the big, auto-generated, everything file, not a tight set of constraints. Trim it to what is always true and current." }
+          },
+          {
+            "@type": "Question",
+            "name": "What replaces a big context file as a project grows?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Retrieval that serves the right slice per task instead of one static file that ages. Index your docs and return the single canonical doc that answers a given query, with a freshness marker, rather than prepending the whole project to every prompt. trovex does this and cuts about 60% of the tokens per lookup." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is this just RAG?",
+            "acceptedAnswer": { "@type": "Answer", "text": "It is retrieval, but tuned for the agent case: one canonical answer per query with a canonical, stale, or duplicate marker, section-level, not a pile of similar chunks. The point is to hand the agent the current source of truth, not more candidates to sift." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Why context files stop scaling
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-20">20 June 2026</time></p>
+    <h1>Why do AGENTS.md / CLAUDE.md context files stop scaling?</h1>
+
+    <div class="verdict">
+      <div class="l">Direct answer</div>
+      <p>A context file that helps at 5 docs <strong>works against you at 50</strong>. The agent has finite attention, so a long overview buries the few lines that matter under the ones that don't. A 2026 ETH Zurich study found that adding repository context files <strong>tended to reduce task success and raised inference cost by over 20%</strong> versus no repo context. Keep the file short and about constraints; serve the changing detail per task, not in one growing file.</p>
+    </div>
+
+    <h2>The file that helped at 5 docs hurts at 50</h2>
+    <p class="lead-answer">A single context file is a fixed prompt prepended to the agent's work. At a small scale that's fine, the whole project fits and the signal is dense. As the project grows, the file grows, and now every task pays to read architecture it doesn't need to answer the question in front of it. Worse, the few relevant lines sit in the middle of a long document, where models attend least (the "lost in the middle" effect). You're paying more tokens for a worse signal.</p>
+
+    <h2>What the ETH Zurich study found</h2>
+    <p class="lead-answer">In <a href="https://arxiv.org/abs/2602.11988" rel="nofollow">Evaluating AGENTS.md</a> (Gloaguen et al., 2026), researchers tested coding agents with and without repository context files on SWE-bench and a fresh issue set. Their finding, in their words: <em>"context files tend to reduce task success rates compared to providing no repository context, while also increasing inference cost by over 20%."</em> The exception was telling: only <strong>short, human-written files that state minimal constraints</strong> helped. Big, auto-generated overviews hurt. The problem isn't context; it's naive context.</p>
+
+    <h2>Keep the file short; serve the rest</h2>
+    <p class="lead-answer">The fix is two layers, not one bloated file:</p>
+    <ul>
+      <li><strong>A short context file</strong> for the stable, always-true rules, conventions, the review bar, the things every task should respect. Keep it tight and current.</li>
+      <li><strong>Retrieval for the rest.</strong> Index the changing doc set and serve the one canonical doc that answers a given query, with a freshness marker, instead of prepending everything. The agent gets the right slice for this task, not the whole project every time.</li>
+    </ul>
+
+    <h2>How trovex does it</h2>
+    <p class="lead-answer"><a href="/">trovex</a> is an open-source, local-first MCP server that handles the second layer. It indexes your repo's markdown and answers a query with the single current doc (a <code>path:line</code> pointer, marked canonical, stale, or duplicate, down to the section), so the agent reads one right answer instead of sifting candidates or carrying your whole project in its prompt. It runs on your machine (vectors in SQLite, ONNX embeddings, no cloud or API keys) and cuts about <strong>60% of the tokens per lookup</strong>. See the measured breakdown in <a href="/answers/token-cost-of-agent-context/">what context costs your agents</a>.</p>
+    <div class="cmd mono" style="display:inline-block;margin-top:14px;">$ uv run trovex index /path/to/repo</div>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/token-cost-of-agent-context/">What does context cost your coding agents? Measured, by scenario.</a></li>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/why-agents-pick-stale-docs/">Why do AI coding agents pick stale or outdated docs?</a></li>
+        <li><a href="/vs/claude-md/">trovex vs CLAUDE.md / AGENTS.md</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Do AGENTS.md / CLAUDE.md files help coding agents?</p>
+        <p class="faq-a">At a small scale, a short human-written file of stable rules helps. As the doc set grows, a single file works against you: a 2026 ETH Zurich study found that adding repository context files tended to reduce task success and raised inference cost by over 20% versus no repo context. Keep the file short and constraint-focused; serve the changing detail another way.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Should I delete my CLAUDE.md?</p>
+        <p class="faq-a">No. Keep a short one for stable, project-wide rules an agent should always follow. The failure mode is the big, auto-generated, everything file, not a tight set of constraints. Trim it to what is always true and current.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What replaces a big context file as a project grows?</p>
+        <p class="faq-a">Retrieval that serves the right slice per task instead of one static file that ages. Index your docs and return the single canonical doc that answers a given query, with a freshness marker, rather than prepending the whole project to every prompt. trovex does this and cuts about 60% of the tokens per lookup.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Is this just RAG?</p>
+        <p class="faq-a">It is retrieval, but tuned for the agent case: one canonical answer per query with a canonical, stale, or duplicate marker, section-level, not a pile of similar chunks. The point is to hand the agent the current source of truth, not more candidates to sift.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Keep the file short. Serve the rest.</h2>
+      <p>Point trovex at your docs and let your agents pull the one current answer per task.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine. Running agents across a team in production? <a href="https://tsukumo.ch/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting">tsukumo</a> (the team behind trovex) helps you operate them.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+</body>
+</html>

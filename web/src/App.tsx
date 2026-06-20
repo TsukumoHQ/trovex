@@ -241,6 +241,8 @@ const FEATURES = [
 
 // trovex is open source + public beta — the install command is the conversion.
 const GITHUB = 'https://github.com/TsukumoHQ/trovex'
+// Public-beta support channel (one redirect everyone links — tsukumo.ch/slack).
+const SLACK_URL = 'https://tsukumo.ch/slack'
 
 export default function App() {
   useReveal()
@@ -367,6 +369,10 @@ export default function App() {
                 <a className="btn btn-primary" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick()}>star on GitHub</a>
               </div>
               <p className="cta-note">No cloud, no API keys. Your docs never leave your machine.</p>
+              <p className="cta-note">
+                Questions, or stuck on setup?{' '}
+                <a href={SLACK_URL} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'slack', location: 'start' })}>Join the Slack →</a>
+              </p>
             </div>
           </div>
         </section>
@@ -400,6 +406,7 @@ export default function App() {
             <a href="/answers/" onClick={() => track('answers_clicked', { location: 'footer' })}>Answers</a>
             <a href="/blog/" onClick={() => track('cta_clicked', { cta_id: 'blog', location: 'footer' })}>Blog</a>
             <a href="/for/" onClick={() => track('setup_clicked', { location: 'footer' })}>Setup</a>
+            <a href={SLACK_URL} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'slack', location: 'footer' })}>Slack</a>
             <a
               href="https://tsukumo.ch/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting"
               target="_blank"

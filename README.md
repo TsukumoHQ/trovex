@@ -26,7 +26,7 @@ no `pip install` step — `uv tool install` builds it straight from git and puts
 your PATH:
 
 ```bash
-uv tool install git+https://github.com/my-project/trovex   # one-time, no clone
+uv tool install git+https://github.com/Synergix-lab/trovex   # one-time, no clone
 
 trovex index /path/to/your/repo        # index your markdown (~1 min)
 trovex search "how do we roll back a deploy?"   # ask — prints the tokens it saved
@@ -41,7 +41,7 @@ prints how many tokens that saved versus reading the top few candidates. Once tr
 wired into your agent over MCP, the same numbers accumulate on the savings dashboard at
 `http://localhost:8765/savings`.
 
-> Prefer not to install anything yet? `uvx --from git+https://github.com/my-project/trovex trovex search "..."`
+> Prefer not to install anything yet? `uvx --from git+https://github.com/Synergix-lab/trovex trovex search "..."`
 > runs a single command in a throwaway environment. After the public launch, that shortens
 > to `uvx trovex`.
 

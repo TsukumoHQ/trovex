@@ -24,6 +24,7 @@ import {
   trackShareClicked,
   trackTsukumoClick,
 } from '../analytics'
+import { downloadReceiptCard } from './receiptCard'
 
 const GITHUB = 'https://github.com/TsukumoHQ/trovex'
 const INSTALL_HREF = `${GITHUB}?utm_source=trovex&utm_medium=tool&utm_campaign=savings-calculator`
@@ -178,6 +179,26 @@ export default function Savings() {
     }
   }
 
+  // Save the receipt as a PNG (drags straight into a post). Honesty-gated inside
+  // downloadReceiptCard — no-op when the saving isn't worth a card.
+  async function saveCard() {
+    try {
+      const ok = await downloadReceiptCard({
+        pct,
+        ratio: m.ratio,
+        tokensPerMonth: m.tokensPerMonth,
+        tokensLabel: humanTokens(m.tokensPerMonth),
+        moneyLabel: money(m.dollarsPerMonth),
+      })
+      if (!ok) return
+      setCopied('card')
+      trackShareClicked('card')
+      window.setTimeout(() => setCopied(''), 1800)
+    } catch {
+      /* canvas/image render blocked — no-op; the copy-link/post paths still work */
+    }
+  }
+
   const set = (k: keyof Inputs) => (e: ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value)
     setInp((s) => ({ ...s, [k]: Number.isFinite(v) ? v : s[k] }))
@@ -259,6 +280,9 @@ same model as the product (src/trovex/savings.py). every input above is editable
             </button>
             <button type="button" className="sv-share-btn mono" onClick={() => copy(badge, 'badge')}>
               {copied === 'badge' ? 'copied ✓' : 'copy README badge'}
+            </button>
+            <button type="button" className="sv-share-btn mono" onClick={saveCard}>
+              {copied === 'card' ? 'saved ✓' : 'save card (png)'}
             </button>
           </div>
         </section>

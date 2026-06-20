@@ -25,7 +25,7 @@ media (`kind:carousel`, `slug:<slug>`). Audience drives the default CTA, but eve
   (Synergix conflict, record 0b61b80f).
 - **COMPANY account (6430498) / tsukumo.ch** → assessment CTA (`tsukumo.ch/assessment`).
 
-## Batch 1 — 6 net-new carousels
+## Batch 1 — 6 carousels (study evidence + counter-pillar)
 
 | Spec file | Audience | CTA route | Source post (link in caption / first comment) |
 |---|---|---|---|
@@ -35,6 +35,16 @@ media (`kind:carousel`, `slug:<slug>`). Audience drives the default CTA, but eve
 | `study-stanford-codebase.json` | company | /assessment | `tsukumo.ch/blog/ai-productivity-clean-code` |
 | `study-eth-context.json` | **founder** | trovex.dev | `tsukumo.ch/blog/do-agents-md-context-files-help-coding-agents` |
 | `five-levers.json` | company | /assessment | `tsukumo.ch/blog/how-to-make-ai-work-for-your-dev-team` |
+
+## Batch 2 — added to the stream
+
+| Spec file | Audience | CTA route | Source post (link in caption / first comment) |
+|---|---|---|---|
+| `study-apple-reasoning-cliff.json` | company | /assessment | `tsukumo.ch/blog/ai-reasoning-complexity-cliff` |
+| `copilot-operator-gap.json` | company | /assessment | `tsukumo.ch/blog/the-copilot-operator-gap` |
+
+Apple ('Illusion of Thinking') completes the earned-evidence study set. copilot-operator-gap
+is the positioning wedge (seats ≠ operating model), routing to /assessment.
 
 **ETH Zurich runs on the founder account on purpose:** the AGENTS.md / context-file finding
 is the cleanest builder bridge to trovex (serve the currently-correct doc), so it earns a

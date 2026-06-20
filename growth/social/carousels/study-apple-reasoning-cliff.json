@@ -1,0 +1,38 @@
+{
+  "slug": "study-apple-reasoning-cliff",
+  "audience": "company",
+  "kicker": "the research — Apple",
+  "cover": {
+    "title": "AI reasoning has a cliff",
+    "accent": "a cliff",
+    "sub": "Apple's 2025 'Illusion of Thinking' tested frontier reasoning models on puzzles of rising complexity. Accuracy fell off."
+  },
+  "slides": [
+    {
+      "title": "near-zero past a threshold",
+      "accent": "near-zero",
+      "body": "Past a complexity threshold, accuracy collapsed to almost nothing. A sharp cliff, not a gentle decline."
+    },
+    {
+      "title": "even handed the algorithm",
+      "accent": "the algorithm",
+      "body": "Given the exact steps to follow, the models still fell apart on hard instances. It isn't a knowledge gap."
+    },
+    {
+      "title": "three regimes, not one",
+      "accent": "three regimes",
+      "body": "Plain models win simple tasks, reasoning models win medium, both collapse on hard. Match the tool to the complexity."
+    },
+    {
+      "title": "your hardest problems are the edge",
+      "accent": "the edge",
+      "body": "The critics have a point about the puzzle setup. The practical lesson survives: above a complexity line, agents need a human operator."
+    }
+  ],
+  "cta": {
+    "title": "find your complexity line",
+    "accent": "complexity line",
+    "sub": "A straight read of your agent setup in your real repo, sources and method included. The prioritized plan is yours to keep.",
+    "foot": "tsukumo.ch/assessment"
+  }
+}

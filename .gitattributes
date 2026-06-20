@@ -1,0 +1,5 @@
+# Keep Unix-targeted files LF so the trovex-md-guard hook + shell scripts parse correctly
+# (repo-wide autocrlf=true was rewriting these to CRLF and breaking pattern matching).
+.trovexignore text eol=lf
+deploy/hooks/*.sh text eol=lf
+*.sh text eol=lf

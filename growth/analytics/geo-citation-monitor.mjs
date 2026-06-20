@@ -179,7 +179,7 @@ const ENGINES = {
   gemini: {
     label: "Gemini (grounded w/ google_search)",
     envKey: "GEMINI_API_KEY",
-    model: "gemini-flash-latest",
+    model: "gemini-2.5-flash", // 2.0/flash-latest 404 on this account; 2.5-flash verified 200 (owner enabled billing 2026-06-20)
     async probe(key, q) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
       const res = await fetch(url, {

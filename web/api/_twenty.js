@@ -91,17 +91,22 @@ async function attachSourceNote(c, personId, lead) {
   ].filter(Boolean)
   const body = lines.join('\n')
 
+  // Twenty's note body is the RICH_TEXT field `bodyV2` (NOT `body` — that field does
+  // not exist; a `body` payload 400s). Pass the composite { markdown } sub-field.
   const noteRes = await twentyFetch(c, '/rest/notes', {
     method: 'POST',
-    body: JSON.stringify({ title: 'Lead source — trovex waitlist', body }),
+    body: JSON.stringify({ title: 'Lead source — trovex waitlist', bodyV2: { markdown: body } }),
   })
   if (!noteRes || !noteRes.ok) return
   const noteJson = await noteRes.json().catch(() => null)
   const noteId = noteJson?.data?.createNote?.id || noteJson?.data?.id
   if (!noteId) return
+  // noteTarget links the note to a person via the morph field `targetPerson`, so the
+  // REST FK is `targetPersonId` (NOT `personId` — that's silently ignored, leaving the
+  // source note unlinked to the lead).
   await twentyFetch(c, '/rest/noteTargets', {
     method: 'POST',
-    body: JSON.stringify({ noteId, personId }),
+    body: JSON.stringify({ noteId, targetPersonId: personId }),
   })
 }
 

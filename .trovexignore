@@ -12,3 +12,7 @@ LICENSE*
 #
 # Blog articles stay publishable source files (they ship as web pages):
 **/blog/**
+#
+# Social drafts: copy-paste-ready files a human fires (specs, calendars, atoms, seeds),
+# not centralized docs. Owned by social-lead, live on disk in growth/social/.
+growth/social/**

@@ -81,6 +81,24 @@ const evAgg = (sid, w, name, extra = "") =>
   plausible(`aggregate?site_id=${sid}&period=custom&date=${w.start},${w.end}&metrics=events&filters=event:name==${name}${extra}`)
     .then((d) => d.results?.events?.value ?? 0).catch(() => null);
 
+// Twenty CRM = the deduped consulting SYSTEM OF RECORD (Supabase `leads` is raw capture, junk and
+// all). Snapshot of the qualified pipeline: opportunities past NEW, suite = pointOfContact.source
+// OSS_SUITE. Returns {total, qualified, suiteQual} or null (→ n/a). No window: pipeline is a state.
+async function twentyPipeline() {
+  const url = process.env.TWENTY_BASE_URL, key = process.env.TWENTY_API_KEY;
+  if (!url || !key) return null;
+  const get = async (p) => {
+    try { const r = await fetch(`${url}${p}`, { headers: { Authorization: `Bearer ${key}` } }); return r.ok ? (await r.json()).data : null; } catch { return null; }
+  };
+  const [oppsD, pplD] = await Promise.all([get("/rest/opportunities?limit=100"), get("/rest/people?limit=100")]);
+  if (!oppsD || !pplD) return null;
+  const opps = oppsD.opportunities || oppsD || [], ppl = pplD.people || pplD || [];
+  const QUALIFIED = new Set(["SCREENING", "MEETING", "PROPOSAL", "CUSTOMER"]);
+  const srcOf = (id) => (ppl.find((p) => p.id === id) || {}).source || null;
+  const qual = opps.filter((o) => QUALIFIED.has(o.stage));
+  return { total: opps.length, qualified: qual.length, suiteQual: qual.filter((o) => srcOf(o.pointOfContactId) === "OSS_SUITE").length };
+}
+
 async function main() {
   const need = ["PLAUSIBLE_STATS_API_KEY", "PLAUSIBLE_SITE_ID", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
   const missing = need.filter((k) => !process.env[k]);
@@ -104,16 +122,20 @@ async function main() {
   ]);
   const geo = await plausible(`breakdown?site_id=${sid}&period=custom&date=${w.start},${w.end}&property=event:props:geo_source&filters=event:name==tsukumo_visit&metrics=events`).then((d) => d.results || []).catch(() => []);
 
-  // --- Supabase: leads (non-PII) + qualified bands + waitlist ---
-  let leads = [], wl = [];
-  try { leads = await supabase(`leads?project=eq.tsukumo&created_at=gte.${w.start}&select=lead_band,channel,how_heard`); } catch { leads = null; }
+  // --- Supabase: waitlist + newsletter (counts only) ---
+  let wl = [];
   try { wl = await supabase(`waitlist?created_at=gte.${w.start}&select=project`); } catch { wl = null; }
   let nl = null;
   try { nl = (await supabase(`newsletter?project=eq.tsukumo&created_at=gte.${w.start}&select=project`)).length; } catch { nl = null; }
-  const isSuite = (l) => l.channel === "oss_suite" || ["wraith", "trovex", "yoru"].includes((l.how_heard || "").toLowerCase());
-  const band = (b) => (leads ? leads.filter((l) => l.lead_band === b).length : null);
-  const qualified = leads ? leads.filter((l) => l.lead_band === "hot" || l.lead_band === "warm").length : null;
-  const qualifiedSuite = leads ? leads.filter((l) => (l.lead_band === "hot" || l.lead_band === "warm") && isSuite(l)).length : null;
+  // Qualified pipeline comes from Twenty (deduped system of record), NOT Supabase `leads` (raw
+  // capture — once carried a 'klklkl/poipoipoi' junk row that read as a real qualified suite lead).
+  const pipe = await twentyPipeline();
+  // Supabase `leads` kept only as a raw-capture cross-check with a test-row flag.
+  const isTestRow = (l) => /(^|@)(example\.com|y\.com|test|eeid\.ch)/i.test(l.email || "") || /probe/i.test(l.email || "") || /^(test|klk|asdf|qwer|poip|xxx)/i.test((l.name || "").toLowerCase());
+  let rawLeads = null;
+  try { rawLeads = await supabase(`leads?project=eq.tsukumo&select=email,name`); } catch { rawLeads = null; }
+  const rawTotal = rawLeads ? rawLeads.length : null;
+  const rawTest = rawLeads ? rawLeads.filter(isTestRow).length : null;
 
   const reach = ghReach();
   const cite = latestCitationShare();
@@ -125,11 +147,12 @@ async function main() {
   const md = [
     `# Suite → Agency — Weekly Digest (auto), ${date}`,
     ``,
-    `*Auto-assembled by \`weekly-digest-runner.mjs\` · window ${w.start}→${w.end} · Plausible + Supabase (live). No fabricated data; \`n/a\` = source unavailable. North star = \`assessment_request\` where \`source=suite\`.*`,
+    `*Auto-assembled by \`weekly-digest-runner.mjs\` · window ${w.start}→${w.end} · Twenty CRM (pipeline) + Plausible + Supabase (live). No fabricated data; \`n/a\` = source unavailable. North star = qualified, suite-sourced consulting leads (Twenty).*`,
     ``,
     `## Headline`,
-    `- **North star — suite-sourced assessment requests: ${n(assessSuite)}.** All assessment requests: ${n(assessAll)}.`,
-    `- **Qualified leads (hot+warm): ${n(qualified)}** (suite-attributed: ${n(qualifiedSuite)}). Bands — hot ${n(band("hot"))} · warm ${n(band("warm"))} · cold ${n(band("cold"))}.`,
+    `- **North star — qualified, suite-sourced consulting leads: ${pipe ? pipe.suiteQual : "n/a"}** (of ${pipe ? pipe.qualified : "n/a"} qualified, ${pipe ? pipe.total : "n/a"} total opportunities in the Twenty pipeline). _Qualified = opportunity past NEW; suite = source OSS_SUITE._`,
+    `- **On-site \`assessment_request\`: ${n(assessAll)}** (suite ${n(assessSuite)}) — Plausible events; Twenty (above) is the durable record.`,
+    `- **Raw-capture cross-check (Supabase \`leads\`): ${rawTotal == null ? "n/a" : `${rawTotal} rows, ${rawTest} test/junk → ${rawTotal - rawTest} real`}.** Twenty is the deduped system of record.`,
     `- **Waitlist signups (all projects): ${wl ? wl.length : "n/a"}.**`,
     citeLine,
     ``,
@@ -150,7 +173,7 @@ async function main() {
     `| **★ Conversion** | assessment_request | ${n(assessAll)} |`,
     `| — suite-sourced (north star) | source=suite | ${n(assessSuite)} |`,
     ``,
-    `**Rates:** visit→assessment ${rate(assessAll, visit)} · visit→qualified ${qualified == null || !visit ? "n/a" : rate(qualified, visit)}.`,
+    `**Rates:** visit→assessment ${rate(assessAll, visit)} · visit→qualified ${!pipe || !visit ? "n/a" : rate(pipe.qualified, visit)} _(qualified = Twenty pipeline, a state not a windowed count)_.`,
     ``,
     `## GEO / channel (tsukumo_visit by geo_source)`,
     geo.length ? `| geo_source | visits |\n|------------|------:|\n${geo.map((g) => `| ${g.geo_source} | ${g.events} |`).join("\n")}` : `_no visits in window_`,
@@ -179,7 +202,7 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
   const outPath = join(outDir, `agency-digest-${date}.md`);
   writeFileSync(outPath, md + "\n");
-  console.log(`wrote ${outPath} — north-star(suite) ${n(assessSuite)}, qualified ${n(qualified)}, visits ${n(visit)}`);
+  console.log(`wrote ${outPath} — north-star(suite-qualified) ${pipe ? pipe.suiteQual : "n/a"}, qualified ${pipe ? pipe.qualified : "n/a"}, visits ${n(visit)}`);
 }
 
 main();

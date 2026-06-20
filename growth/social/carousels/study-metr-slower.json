@@ -1,0 +1,38 @@
+{
+  "slug": "study-metr-slower",
+  "audience": "company",
+  "kicker": "the research — METR",
+  "cover": {
+    "title": "devs felt faster. the clock disagreed.",
+    "accent": "the clock",
+    "sub": "METR ran the randomized trial most teams skip: 16 experienced devs, 246 real issues, on their own repos."
+  },
+  "slides": [
+    {
+      "title": "about 19% slower with AI",
+      "accent": "19% slower",
+      "body": "On repositories they knew well. The most rigorous trial we have on AI and developer speed, and it points down."
+    },
+    {
+      "title": "they predicted a 24% speedup",
+      "accent": "24% speedup",
+      "body": "Going in. After living through the slowdown, the same devs still believed AI had sped them up by about 20%."
+    },
+    {
+      "title": "felt speed isn't measured speed",
+      "accent": "isn't measured",
+      "body": "The gap between the vibe and the clock is the real risk. It's a management problem before it's a tooling one."
+    },
+    {
+      "title": "the slowdown is fixable",
+      "accent": "fixable",
+      "body": "METR named the causes: stale prompts, weak context, no review gates. That's the operating model, not the model."
+    }
+  ],
+  "cta": {
+    "title": "measure it on your own team",
+    "accent": "your own team",
+    "sub": "A straight read of your agent setup in your real repo, sources and method included. The prioritized plan is yours to keep.",
+    "foot": "tsukumo.ch/assessment"
+  }
+}

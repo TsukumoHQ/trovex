@@ -1,0 +1,38 @@
+{
+  "slug": "study-eth-context",
+  "audience": "founder",
+  "kicker": "the research — ETH Zurich",
+  "cover": {
+    "title": "more context isn't better",
+    "accent": "isn't better",
+    "sub": "A 2026 ETH Zurich study benchmarked repo context files (AGENTS.md) across current agents. They lost."
+  },
+  "slides": [
+    {
+      "title": "context files cut success ~3%",
+      "accent": "~3%",
+      "body": "On average, adding repository context files made agents less likely to finish the task. The opposite of the pitch."
+    },
+    {
+      "title": "and raised cost over 20%",
+      "accent": "over 20%",
+      "body": "A long auto-generated file dilutes the model's attention and pushes it to explore more. Lower success, higher spend."
+    },
+    {
+      "title": "the answer isn't no context",
+      "accent": "no context",
+      "body": "Short, human-written files that state what's true beat long auto-generated ones. The right context is the harder problem."
+    },
+    {
+      "title": "serve the currently-correct doc",
+      "accent": "currently-correct",
+      "body": "Per query, path:line, marked canonical or stale. That's what trovex does, and it cuts roughly 60% of the tokens per lookup."
+    }
+  ],
+  "cta": {
+    "title": "try trovex on your repo",
+    "accent": "your repo",
+    "sub": "Serves your coding agent the one canonical doc per query, local and open source, ~60% fewer tokens. Read the teardown, star it.",
+    "foot": "trovex.dev"
+  }
+}

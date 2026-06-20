@@ -1,0 +1,43 @@
+{
+  "slug": "five-levers",
+  "audience": "company",
+  "kicker": "make AI actually work",
+  "cover": {
+    "title": "5 levers separate gains from rework",
+    "accent": "5 levers",
+    "sub": "The research is clear AI underdelivers by default. It's just as clear about why. None of these is a better model."
+  },
+  "slides": [
+    {
+      "title": "point AI at the right work",
+      "accent": "the right work",
+      "body": "Stanford measured 35-40% gains on clean code and single digits on complex legacy. Where you aim it decides most of the result."
+    },
+    {
+      "title": "keep batches small",
+      "accent": "batches small",
+      "body": "AI makes big change sets easy, and DORA tied bigger batches to a 7.2% stability drop. Make review mean something again."
+    },
+    {
+      "title": "measure outcomes, not output",
+      "accent": "not output",
+      "body": "Track cycle time, change-failure rate, rework. Lines shipped and percent-AI-code tell you nothing true."
+    },
+    {
+      "title": "serve the agent trusted context",
+      "accent": "trusted context",
+      "body": "Stale context is a root cause under METR and ETH Zurich's findings. Give the agent the currently-correct doc, not a stale file."
+    },
+    {
+      "title": "invest in codebase cleanliness",
+      "accent": "codebase cleanliness",
+      "body": "Net AI productivity rose with tests, types, docs, modularity. The lever leaders underrate because it looks like maintenance."
+    }
+  ],
+  "cta": {
+    "title": "score your team on all five",
+    "accent": "all five",
+    "sub": "A straight read of your agent setup in your real repo. We map which of the five levers is costing you most, plan yours to keep.",
+    "foot": "tsukumo.ch/assessment"
+  }
+}

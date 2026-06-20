@@ -1,0 +1,38 @@
+{
+  "slug": "study-stanford-codebase",
+  "audience": "company",
+  "kicker": "the research — Stanford",
+  "cover": {
+    "title": "where AI helps depends on your code",
+    "accent": "your code",
+    "sub": "Stanford studied 100,000+ developers across 600+ companies. The gains split hard by where the work happens."
+  },
+  "slides": [
+    {
+      "title": "35-40% on greenfield",
+      "accent": "35-40%",
+      "body": "Clean, low-complexity, new code. This is the number the demos show you."
+    },
+    {
+      "title": "single digits on brownfield",
+      "accent": "single digits",
+      "body": "0-10% on the complex, legacy code where most teams actually live. Some teams went net-negative as rework ate the gain."
+    },
+    {
+      "title": "one case: 2.5x more rework",
+      "accent": "2.5x",
+      "body": "The speedup got eaten and then some. Adoption is not improvement when it's pointed at the wrong code."
+    },
+    {
+      "title": "the lever is your codebase",
+      "accent": "your codebase",
+      "body": "Net AI productivity rose with test coverage, types, docs, and modularity. The state of your code, which you can change."
+    }
+  ],
+  "cta": {
+    "title": "find where AI is costing you",
+    "accent": "costing you",
+    "sub": "A straight read of your agent setup in your real repo, sources and method included. The prioritized plan is yours to keep.",
+    "foot": "tsukumo.ch/assessment"
+  }
+}

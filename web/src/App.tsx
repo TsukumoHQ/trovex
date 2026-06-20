@@ -301,7 +301,7 @@ export default function App() {
             </div>
             <div className="trust-card">
               <div className="trust-h">Open source, AGPL-3.0</div>
-              <p>Read the code, run it yourself, fork it. Nothing hidden, no lock-in. The CLI is MIT.</p>
+              <p>Read the code and run it yourself. Fork it if you want. No lock-in. The CLI is MIT.</p>
             </div>
             <div className="trust-card">
               <div className="trust-h">~60% fewer tokens, measured</div>

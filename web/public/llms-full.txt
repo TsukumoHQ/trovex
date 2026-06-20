@@ -8,7 +8,7 @@
 
 - Website: https://trovex.dev
 - Access: private beta — request access at https://trovex.dev/#waitlist (the install steps below work once you're in)
-- Repository: https://github.com/Synergix-lab/trovex (private during the beta)
+- Repository: https://github.com/TsukumoHQ/trovex (private during the beta)
 - License: core AGPL-3.0, CLIs MIT
 - Category: context / memory infrastructure for AI coding agents
 - Interface: Model Context Protocol (MCP) server (local, streamable-HTTP at http://localhost:8765/mcp) + CLI

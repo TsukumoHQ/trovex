@@ -51,7 +51,7 @@
 ## Links
 - [Request beta access](https://trovex.dev/#waitlist): the private-beta waitlist.
 - [Website](https://trovex.dev): the landing page.
-- [Repository](https://github.com/Synergix-lab/trovex): source (private during the beta; core AGPL-3.0, CLIs MIT).
+- [Repository](https://github.com/TsukumoHQ/trovex): source (private during the beta; core AGPL-3.0, CLIs MIT).
 - [llms-full.txt](https://trovex.dev/llms-full.txt): the full extractable content in one file.
 
 ## Facts

@@ -5,7 +5,7 @@
 > batch before anything arms.
 
 Repurposes content already published + anti-slop-PASSED on `tsukumo.ch/blog` into the
-carousel format (design generator `brand/_tools/gen_carousel.mjs`, spec shape per #376/#378).
+carousel format (design generator `growth/assets/_tools/gen_carousel.mjs`).
 Low slop risk (no net-new claims), high leverage (the study data travels).
 
 ## How design renders these
@@ -13,7 +13,7 @@ Each `.json` here is a complete, generator-ready spec (slug · audience · kicke
 slides · cta). Per file:
 
 ```
-node brand/_tools/gen_carousel.mjs growth/social/carousels/<file>.json
+node growth/assets/_tools/gen_carousel.mjs growth/social/carousels/<file>.json
 ```
 
 → portrait (LinkedIn 1080×1350) + square (X 1080×1080) PNGs per slide, uploaded to Supabase

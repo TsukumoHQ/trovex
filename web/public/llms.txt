@@ -45,13 +45,15 @@
 - [All clients](https://trovex.dev/for/)
 
 ## Access
-- Status: private beta. The repository is currently private; access is by invitation.
-- Request access: https://trovex.dev/#waitlist (the install commands below work once you're in the beta).
+- Status: public beta. The repository is public; install it and run it on your own repo.
+- Install: `uv tool install git+https://github.com/TsukumoHQ/trovex` (a GitHub star helps other devs find it).
+- Community: questions or comparing setups, join the Slack at https://tsukumo.ch/slack.
 
 ## Links
-- [Request beta access](https://trovex.dev/#waitlist): the private-beta waitlist.
+- [GitHub repository](https://github.com/TsukumoHQ/trovex): public; install it and a star helps.
+- [Community Slack](https://tsukumo.ch/slack): questions and setup help.
 - [Website](https://trovex.dev): the landing page.
-- [Repository](https://github.com/TsukumoHQ/trovex): source (private during the beta; core AGPL-3.0, CLIs MIT).
+- [Repository](https://github.com/TsukumoHQ/trovex): source (public; core AGPL-3.0, CLIs MIT).
 - [llms-full.txt](https://trovex.dev/llms-full.txt): the full extractable content in one file.
 
 ## Facts
@@ -59,5 +61,5 @@
 - Interface: Model Context Protocol (MCP) server (local, streamable-HTTP at http://localhost:8765/mcp) + CLI.
 - Works with: Claude Code, Cursor, Windsurf, Cline, Zed, and any MCP client.
 - License: core AGPL-3.0, CLIs MIT.
-- Access: private beta — request at https://trovex.dev/#waitlist.
-- Install (once in the beta): `uv run trovex index /path/to/repo` then `uv run trovex serve`.
+- Access: public beta — the repository is public at github.com/TsukumoHQ/trovex.
+- Install: `uv tool install git+https://github.com/TsukumoHQ/trovex`, then `trovex index /path/to/repo` and `trovex serve`.

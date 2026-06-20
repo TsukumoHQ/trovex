@@ -9,8 +9,8 @@
  *
  * Canonical footer: `© 2026 trovex · one source of truth for your agents' docs`.
  *
- * Allowed exception: the GitHub org token in github.com/Synergix-lab URLs and the
- * io.github.synergix-lab MCP-registry namespace (unavoidable technical identifiers).
+ * Allowed exception: the GitHub org token in github.com/TsukumoHQ URLs and the
+ * io.github.tsukumohq MCP-registry namespace (unavoidable technical identifiers).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,7 +18,7 @@ import { join } from 'node:path'
 const ROOTS = ['public', 'src', 'index.html']
 const SCAN = /\.(html|txt|json|webmanifest|tsx?|jsx?|css)$/
 // Strip the allowed technical identifiers before scanning for the brand word.
-const ALLOW = /(github\.com\/Synergix-lab|Synergix-lab\/[\w.-]+|io\.github\.synergix-lab)/gi
+const ALLOW = /(github\.com\/TsukumoHQ|TsukumoHQ\/[\w.-]+|io\.github\.tsukumohq)/gi
 const offenders = []
 
 function scan(p) {
@@ -41,7 +41,7 @@ for (const r of ROOTS) scan(r)
 if (offenders.length) {
   console.error('\n✗ Brand guard FAILED: "Synergix" found on a public surface.')
   console.error('  trovex is the only public brand. Use "trovex" (canonical footer: "© 2026 trovex").')
-  console.error('  Only allowed use is the github.com/Synergix-lab repo URL / io.github.synergix-lab namespace.\n')
+  console.error('  Only allowed use is the github.com/TsukumoHQ repo URL / io.github.tsukumohq namespace.\n')
   for (const o of offenders) console.error('  ' + o)
   console.error('')
   process.exit(1)

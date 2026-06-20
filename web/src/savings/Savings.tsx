@@ -25,7 +25,7 @@ import {
   trackTsukumoClick,
 } from '../analytics'
 
-const GITHUB = 'https://github.com/Synergix-lab/trovex'
+const GITHUB = 'https://github.com/TsukumoHQ/trovex'
 const INSTALL_HREF = `${GITHUB}?utm_source=trovex&utm_medium=tool&utm_campaign=savings-calculator`
 const CONSULT_HREF =
   'https://tsukumo.ch/assessment?utm_source=trovex&utm_medium=tool&utm_campaign=savings-calculator-consult'

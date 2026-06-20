@@ -1,0 +1,324 @@
+#!/usr/bin/env node
+/**
+ * NORTH-STAR SCOREBOARD — the owner's one-screen launch readout: reach → consulting leads.
+ *
+ * This sits ABOVE the operator dashboards (weekly-digest, plausible-snapshot, geo-citation-monitor)
+ * and consolidates their headline numbers into three panels the owner reads at a glance:
+ *
+ *   PANEL A — Consulting (the money end): inquiries by source PROPERTY (trovex / WRAI.TH / yoru /
+ *             referral / direct) × channel, with the qualified (hot+warm) split. North star =
+ *             QUALIFIED, SUITE-SOURCED consulting leads — not raw count, not vanity reach.
+ *   PANEL B — trovex waitlist funnel (beta primary conversion): landing → request-access → submit,
+ *             plus signups by source. The waitlist STORE (Supabase) is the source of truth for the
+ *             count; the Plausible web-funnel rates need the trovex site id (else honest n/a).
+ *   PANEL C — 4-engine AI-citation panel (awareness, top of funnel): suite citation share per engine,
+ *             read from the latest geo-citation-monitor report (no live engine calls here — the panel
+ *             run is separate and rate-limited). A snapshot, never a guaranteed rank.
+ *
+ * HONESTY is the contract. Every panel degrades to `n/a` when its key/source is missing — NEVER a
+ * fabricated number. A real zero reads `0`. Reach (stars, visits, citations) is the input; the only
+ * number that "wins" is a qualified consulting lead. We say openly which engine/source was unavailable.
+ *
+ * Keys (out-of-git, env only — never printed/committed). Load what you have; missing → n/a:
+ *   set -a; . ~/.config/trovex-growth/plausible.env; . ~/.config/trovex-growth/supabase.env; set +a
+ *   - PLAUSIBLE_STATS_API_KEY            (read-only Stats API)
+ *   - TSUKUMO_PLAUSIBLE_SITE_ID || PLAUSIBLE_SITE_ID   (tsukumo.ch — consulting funnel)
+ *   - TROVEX_PLAUSIBLE_SITE_ID           (trovex.dev — waitlist funnel; OPTIONAL, n/a if absent)
+ *   - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY          (leads + waitlist; NON-PII columns only)
+ * The 4-engine panel reads reports parsed from `geo-citation-monitor.mjs` output (run + saved separately).
+ *
+ * Output: prints the report to STDOUT (owner rule: "rien en md, tout dans trovex" — pipe into
+ * trovex_write to centralize). Progress/summary → stderr. `--save` is an opt-in disk escape hatch
+ * (off by default; we do NOT write disk reports).
+ *
+ * Hygiene: pre-launch traffic is crawler + e2e-verification noise (traffic-hygiene.md). `--since
+ * <launch-date>` starts the window at launch day; default = the hygiene floor (cumulative launch read).
+ *
+ * Usage:  node north-star-scoreboard.mjs                       # cumulative since launch floor
+ *         node north-star-scoreboard.mjs --since 2026-07-01    # since launch day
+ *         node north-star-scoreboard.mjs --window 7            # rolling last-7-days instead
+ *         node north-star-scoreboard.mjs --citations reports/geo-citations-2026-06-19.md  # pin a panel file
+ */
+import { writeFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const ymd = (d) => d.toISOString().slice(0, 10);
+
+// Launch hygiene floor — before this, traffic is crawler + our own verification, not demand
+// (traffic-hygiene.md). Bump to the real distribution date once launch fires. Mirrors plausible-snapshot.
+const HYGIENE_START = "2026-06-18";
+
+function arg(name) {
+  const i = process.argv.indexOf(name);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+
+function window_() {
+  const end = new Date();
+  const win = arg("--window");
+  const since = arg("--since");
+  if (win) return { start: ymd(new Date(end.getTime() - Number(win) * 86400_000)), end: ymd(end), label: `rolling ${win}d` };
+  const start = since || HYGIENE_START;
+  return { start, end: ymd(end), label: since ? `since ${since}` : `cumulative since launch floor ${HYGIENE_START}` };
+}
+
+// ---- data adapters (each returns data or null; null → n/a, never fabricated) ----
+async function plausible(site, path) {
+  const key = process.env.PLAUSIBLE_STATS_API_KEY;
+  if (!key || !site) return null;
+  try {
+    const r = await fetch(`https://plausible.io/api/v1/stats/${path}&site_id=${site}`, { headers: { Authorization: `Bearer ${key}` } });
+    if (!r.ok) return null;
+    return r.json();
+  } catch { return null; }
+}
+const evAgg = (site, w, name, extra = "") =>
+  plausible(site, `aggregate?period=custom&date=${w.start},${w.end}&metrics=events&filters=event:name==${name}${extra}`)
+    .then((d) => (d ? d.results?.events?.value ?? 0 : null));
+
+async function supabase(query) {
+  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  try {
+    const r = await fetch(`${url}/rest/v1/${query}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    if (!r.ok) return null;
+    return r.json();
+  } catch { return null; }
+}
+
+// Source PROPERTY of a consulting lead: which OSS surface (or non-suite channel) sent it.
+// Maps the captured `how_heard` / `channel` to a coarse, legible property bucket.
+function sourceProperty(l) {
+  const h = (l.how_heard || "").toLowerCase();
+  if (l.channel === "oss_suite" || ["wraith", "trovex", "yoru"].includes(h)) {
+    if (h === "trovex") return "trovex";
+    if (h === "wraith") return "WRAI.TH";
+    if (h === "yoru") return "yoru";
+    return "suite (unattributed)";
+  }
+  if (h === "referral") return "referral";
+  if (["ai_assistant", "ai_engine", "search"].includes(h)) return "content/search";
+  return "direct/other";
+}
+const isSuiteProp = (p) => ["trovex", "WRAI.TH", "yoru", "suite (unattributed)"].includes(p);
+
+// ---- 4-engine citation panel: parse the latest geo-citation-monitor report ----
+// The monitor writes per-engine rows like:
+//   | ChatGPT (OpenAI web_search) | live | **5/10 (50%)** | ... |
+//   | Perplexity (sonar) | n/a (no PERPLEXITY_API_KEY) | — | ... |
+//   | **UNION (any engine)** | — | **7/10 (70%)** | ... |
+// We surface the four target engines (ChatGPT, Perplexity, Gemini, Google AIO) + the union.
+function citationPanel() {
+  const pinned = arg("--citations");
+  let txt, srcDate, srcFile;
+  try {
+    if (pinned) {
+      srcFile = pinned;
+      txt = readFileSync(pinned, "utf8");
+      const m = pinned.match(/(\d{4}-\d{2}-\d{2})/);
+      srcDate = m ? m[1] : "unknown";
+    } else {
+      const dir = join(__dir, "reports");
+      const files = readdirSync(dir).filter((f) => /^geo-citations-\d{4}-\d{2}-\d{2}\.md$/.test(f)).sort();
+      if (!files.length) return null;
+      srcFile = `reports/${files[files.length - 1]}`;
+      srcDate = files[files.length - 1].slice("geo-citations-".length, -3);
+      txt = readFileSync(join(dir, files[files.length - 1]), "utf8");
+    }
+  } catch { return null; }
+
+  const ENGINES = [
+    { name: "ChatGPT", match: /chatgpt/i },
+    { name: "Perplexity", match: /perplexity/i },
+    { name: "Gemini", match: /gemini/i },
+    { name: "Google AI Overviews", match: /google ai overview/i },
+  ];
+  const rows = txt.split("\n").filter((l) => l.trim().startsWith("|"));
+  const cellAll = (line) => {
+    // 3rd pipe-cell is the "All" column; strip ** and whitespace.
+    const cols = line.split("|").map((c) => c.trim());
+    return cols[3] ? cols[3].replace(/\*\*/g, "") : "—";
+  };
+  const engines = ENGINES.map((e) => {
+    const line = rows.find((l) => e.match.test(l));
+    if (!line) return { name: e.name, status: "n/a", share: "n/a (engine row absent)" };
+    const statusCol = line.split("|").map((c) => c.trim())[2] || "";
+    const live = /live/i.test(statusCol);
+    if (!live) return { name: e.name, status: "n/a", share: statusCol };
+    const share = cellAll(line);
+    // A `0/0` "All" cell = zero valid samples (every query errored, e.g. 429 quota) — NOT a real 0%.
+    if (/^0\s*\/\s*0\b/.test(share)) return { name: e.name, status: "n/a", share: "n/a (all queries errored — see panel)" };
+    return { name: e.name, status: "live", share };
+  });
+  const unionLine = rows.find((l) => /UNION/i.test(l));
+  const union = unionLine ? cellAll(unionLine) : "n/a";
+  return { srcDate, srcFile, engines, union };
+}
+
+async function main() {
+  const w = window_();
+  const n = (v) => (v == null ? "n/a" : String(v));
+  const rate = (a, b) => (a == null || b == null || !b ? "n/a" : `${Math.round((a / b) * 100)}%`);
+
+  const tsukumoSite = process.env.TSUKUMO_PLAUSIBLE_SITE_ID || process.env.PLAUSIBLE_SITE_ID;
+  const trovexSite = process.env.TROVEX_PLAUSIBLE_SITE_ID;
+
+  // ===== PANEL A — Consulting (the money end) =====
+  // Supabase leads (non-PII: lead_band/channel/how_heard) = the durable record.
+  const leads = await supabase(`leads?project=eq.tsukumo&created_at=gte.${w.start}&select=lead_band,channel,how_heard`);
+  // Plausible cross-check: assessment_request total + suite-sourced.
+  const [assessAll, assessSuite] = await Promise.all([
+    evAgg(tsukumoSite, w, "assessment_request"),
+    evAgg(tsukumoSite, w, "assessment_request", ";event:props:source==suite"),
+  ]);
+
+  let propRows = null, totalInq = null, totalQual = null, suiteQual = null;
+  if (leads) {
+    const by = new Map();
+    for (const l of leads) {
+      const p = sourceProperty(l);
+      const cur = by.get(p) || { property: p, inquiries: 0, qualified: 0, suite: isSuiteProp(p) };
+      cur.inquiries++;
+      if (l.lead_band === "hot" || l.lead_band === "warm") cur.qualified++;
+      by.set(p, cur);
+    }
+    propRows = [...by.values()].sort((a, b) => b.qualified - a.qualified || b.inquiries - a.inquiries);
+    totalInq = leads.length;
+    totalQual = propRows.reduce((s, r) => s + r.qualified, 0);
+    suiteQual = propRows.filter((r) => r.suite).reduce((s, r) => s + r.qualified, 0);
+  }
+
+  // ===== PANEL B — trovex waitlist funnel (beta primary conversion) =====
+  // Store (Supabase) = source of truth for the COUNT. Count and source-breakdown are queried
+  // SEPARATELY so a missing attribution column can't nuke the count (select * narrows nothing,
+  // but channel/geo_source may not exist on every deploy → degrade the breakdown to n/a only).
+  const wlCountRows = await supabase(`waitlist?project=eq.trovex&created_at=gte.${w.start}&select=created_at`);
+  let wlCount = wlCountRows ? wlCountRows.length : null;
+  // Cross-property fallback: if no project='trovex' rows, count all waitlist (single-property beta).
+  if (wlCountRows && wlCountRows.length === 0) {
+    const wlAny = await supabase(`waitlist?created_at=gte.${w.start}&select=created_at`);
+    if (wlAny) wlCount = wlAny.length;
+  }
+  // Source attribution lives in the `source` column (geo_source/channel persisted at signup, PR #102),
+  // with `referer` host as the dark-social fallback. NON-PII (no email/utm pulled into the report).
+  let wlBySource = null;
+  if (wlCount) {
+    const wl = await supabase(`waitlist?project=eq.trovex&created_at=gte.${w.start}&select=source,referer`);
+    if (wl && wl.length) {
+      const by = new Map();
+      for (const r of wl) {
+        const k = r.source || r.referer || "direct/unknown";
+        by.set(k, (by.get(k) || 0) + 1);
+      }
+      wlBySource = [...by.entries()].sort((a, b) => b[1] - a[1]);
+    }
+  }
+  const [tvLanding, tvCta, tvSubmit] = trovexSite
+    ? await Promise.all([
+        evAgg(trovexSite, w, "landing_view"),
+        evAgg(trovexSite, w, "request_access_clicked"),
+        evAgg(trovexSite, w, "waitlist_submitted"),
+      ])
+    : [null, null, null];
+
+  // ===== PANEL C — 4-engine citation panel =====
+  const cite = citationPanel();
+
+  // ---- assemble ----
+  const date = ymd(new Date());
+  const md = [];
+  const P = (s) => md.push(s);
+
+  P(`# Trovex North-Star Scoreboard — reach → consulting leads — ${date}`);
+  P(``);
+  P(`*Owner-facing launch scoreboard · window: ${w.label} (${w.start}→${w.end}) · auto-assembled by \`north-star-scoreboard.mjs\` from live Plausible + Supabase + the latest citation panel. No fabricated data — \`n/a\` = source/key unavailable, \`0\` = a real zero. The only number that wins is a **qualified consulting lead**; reach is the input.*`);
+  P(``);
+
+  // Headline
+  P(`## ★ Headline`);
+  P(`- **North star — qualified, suite-sourced consulting leads: ${n(suiteQual)}** (of ${n(totalQual)} qualified, ${n(totalInq)} total inquiries). _Qualified = hot+warm band (lead-scoring); suite = trovex/WRAI.TH/yoru-sourced._`);
+  P(`- **trovex waitlist signups (beta primary conversion): ${n(wlCount)}.**`);
+  P(`- **Suite AI-citation share (any engine): ${cite ? cite.union : "n/a"}** ${cite ? `_(snapshot ${cite.srcDate})_` : "_(no citation panel run yet)_"}.`);
+  P(`- **Consulting (Plausible \`assessment_request\`):** ${n(assessAll)} total${assessSuite == null ? "" : ` · ${n(assessSuite)} suite-sourced`} — the on-site event count (the store record in Panel A is the durable truth; the two reconcile there).`);
+  P(``);
+
+  // Panel A
+  P(`## A · Consulting inquiries by source property × channel — the money end`);
+  if (!propRows) {
+    P(`_Supabase \`leads\` unavailable (no key or no rows) → **n/a**. Cannot fabricate consulting volume._`);
+  } else if (!propRows.length) {
+    P(`_0 consulting inquiries in window — a real zero, reported honestly._`);
+  } else {
+    P(`| Source property | Inquiries | Qualified (hot+warm) | Suite? |`);
+    P(`|-----------------|----------:|---------------------:|:------:|`);
+    for (const r of propRows) P(`| ${r.property} | ${r.inquiries} | ${r.qualified} | ${r.suite ? "✅" : "—"} |`);
+    P(`| **Total** | **${totalInq}** | **${totalQual}** (suite: **${suiteQual}**) | |`);
+  }
+  P(``);
+  P(`**Cross-check (Plausible \`assessment_request\`):** all = ${n(assessAll)} · source=suite = ${n(assessSuite)}. Store (left) is the durable record; Plausible catches the event even if a lead later changes channel. Detail + qualified-rate: weekly-digest + lead-scoring docs.`);
+  P(``);
+
+  // Panel B
+  P(`## B · trovex waitlist funnel — beta primary conversion`);
+  P(`| Stage | Event (trovex.dev) | Count |`);
+  P(`|-------|--------------------|------:|`);
+  P(`| Reach | landing_view | ${n(tvLanding)} |`);
+  P(`| Intent | request_access_clicked | ${n(tvCta)} |`);
+  P(`| **★ Conversion** | waitlist_submitted | ${n(tvSubmit)} |`);
+  P(``);
+  P(`**Rates:** reach→CTA ${rate(tvCta, tvLanding)} · CTA→submit ${rate(tvSubmit, tvCta)} · reach→submit ${rate(tvSubmit, tvLanding)}.`);
+  if (!trovexSite) P(`> Web-funnel = **n/a**: no \`TROVEX_PLAUSIBLE_SITE_ID\` set (trovex.dev is a separate Plausible site). The **signup count above is the store's truth** (Supabase) regardless.`);
+  P(``);
+  if (wlBySource) {
+    P(`**Signups by source (waitlist store — source of truth for the count):**`);
+    P(``);
+    P(`| Source | Signups |`);
+    P(`|--------|--------:|`);
+    for (const [k, v] of wlBySource) P(`| ${k} | ${v} |`);
+  } else {
+    P(`_Signups-by-source: ${wlCount == null ? "n/a (Supabase \`waitlist\` unavailable)" : wlCount === 0 ? "0 signups in window (real zero)" : "no source attribution captured on rows yet"}._`);
+  }
+  P(``);
+
+  // Panel C
+  P(`## C · 4-engine AI-citation panel — awareness, top of funnel`);
+  if (!cite) {
+    P(`_No \`reports/geo-citations-*.md\` found → **n/a**. Run \`geo-citation-monitor.mjs --save\` to populate the panel. AI citation has no rank API; it's a sampled snapshot, never fabricated._`);
+  } else {
+    P(`*Source: \`${cite.srcFile}\` (snapshot ${cite.srcDate}). Each engine is its own surface (~11% overlap); AI answers are non-deterministic — the TREND is the signal, not one run.*`);
+    P(``);
+    P(`| Engine | Status | Suite cited (all queries) |`);
+    P(`|--------|--------|---------------------------|`);
+    for (const e of cite.engines) P(`| ${e.name} | ${e.status} | ${e.share} |`);
+    P(`| **Union (any engine)** | — | **${cite.union}** |`);
+    P(``);
+    P(`> An engine reading \`n/a\` has no key provisioned **or** every query errored (e.g. quota/429) — a zero sample, never a fabricated 0%. Fix the key/quota and re-run \`geo-citation-monitor.mjs\`.`);
+  }
+  P(``);
+
+  // Availability legend
+  P(`## Data availability (no fabrication)`);
+  P(`| Source | Status |`);
+  P(`|--------|--------|`);
+  P(`| Plausible — tsukumo.ch (consulting) | ${tsukumoSite && process.env.PLAUSIBLE_STATS_API_KEY ? "live" : "n/a (key/site missing)"} |`);
+  P(`| Plausible — trovex.dev (waitlist web-funnel) | ${trovexSite && process.env.PLAUSIBLE_STATS_API_KEY ? "live" : "n/a (TROVEX_PLAUSIBLE_SITE_ID missing)"} |`);
+  P(`| Supabase — leads + waitlist (non-PII counts) | ${process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? "live" : "n/a (key missing)"} |`);
+  P(`| AI-citation panel (geo-citation-monitor report) | ${cite ? `live (${cite.srcDate})` : "n/a (no report)"} |`);
+  P(``);
+  P(`*Privacy: Supabase reads select only non-PII columns (lead_band/channel/how_heard, waitlist source) — no email ever leaves the DB or enters this report. Reach metrics (citations, visits, stars) are inputs; the north star is qualified consulting leads. Detail lives in the operator docs (weekly-digest, waitlist-funnel-report, geo-citation panel) — this scoreboard is the one-screen roll-up.*`);
+
+  const out = md.join("\n");
+  console.log(out);
+  process.stderr.write(`scoreboard: north-star(suite-qualified) ${n(suiteQual)}, waitlist ${n(wlCount)}, citation-union ${cite ? cite.union : "n/a"}\n`);
+  if (process.argv.includes("--save")) {
+    const dir = join(__dir, "reports");
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, `north-star-scoreboard-${date}.md`);
+    writeFileSync(path, out + "\n");
+    process.stderr.write(`also saved ${path} (--save)\n`);
+  }
+}
+
+main().catch((e) => { console.error(String(e)); process.exit(1); });

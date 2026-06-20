@@ -363,6 +363,8 @@ a { color: inherit; text-decoration: none; }
 .footer .lks { display: flex; gap: 20px; font-size: 14px; color: var(--fg-muted); }
 .footer .lks a:hover { color: var(--accent); }
 .footer small { color: var(--fg-subtle); font-family: var(--font-mono); font-size: 12px; flex-basis: 100%; }
+.footer-suite a { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 3px; }
+.footer-suite a:hover { color: var(--accent); }
 
 /* reveal */
 .reveal { opacity: 0; transform: translateY(20px); transition: opacity .7s var(--ease), transform .7s var(--ease); }

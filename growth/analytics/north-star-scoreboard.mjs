@@ -88,21 +88,32 @@ async function supabase(query) {
   } catch { return null; }
 }
 
-// Source PROPERTY of a consulting lead: which OSS surface (or non-suite channel) sent it.
-// Maps the captured `how_heard` / `channel` to a coarse, legible property bucket.
-function sourceProperty(l) {
-  const h = (l.how_heard || "").toLowerCase();
-  if (l.channel === "oss_suite" || ["wraith", "trovex", "yoru"].includes(h)) {
-    if (h === "trovex") return "trovex";
-    if (h === "wraith") return "WRAI.TH";
-    if (h === "yoru") return "yoru";
-    return "suite (unattributed)";
-  }
-  if (h === "referral") return "referral";
-  if (["ai_assistant", "ai_engine", "search"].includes(h)) return "content/search";
-  return "direct/other";
+// Twenty CRM (tsukumo.twenty.com) — the consulting lead SYSTEM OF RECORD (Supabase `leads` is now
+// just raw capture). Returns parsed REST data or null (→ n/a). Read-only; PII stays in the CRM.
+async function twenty(path) {
+  const url = process.env.TWENTY_BASE_URL, key = process.env.TWENTY_API_KEY;
+  if (!url || !key) return null;
+  try {
+    const r = await fetch(`${url}${path}`, { headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j.data || null;
+  } catch { return null; }
 }
-const isSuiteProp = (p) => ["trovex", "WRAI.TH", "yoru", "suite (unattributed)"].includes(p);
+
+// An Opportunity past NEW = a qualified consulting lead (a real conversation is moving).
+const QUALIFIED_STAGES = new Set(["SCREENING", "MEETING", "PROPOSAL", "CUSTOMER"]);
+// Twenty person.source → coarse property bucket. suite = the OSS funnel (the north-star source).
+function twentySourceBucket(source) {
+  switch (source) {
+    case "OSS_SUITE": return { label: "OSS suite (trovex/WRAI.TH/yoru)", suite: true };
+    case "WAITLIST": case "SEARCH": case "AI_ENGINE": case "SOCIAL": return { label: source === "WAITLIST" ? "waitlist" : "content/search", suite: false };
+    case "REFERRAL": return { label: "referral", suite: false };
+    case "IN_PERSON": return { label: "in-person", suite: false };
+    case "DIRECT": return { label: "direct", suite: false };
+    default: return { label: source ? source.toLowerCase() : "untagged", suite: false };
+  }
+}
 
 // ---- 4-engine citation panel: parse the latest geo-citation-monitor report ----
 // The monitor writes per-engine rows like:
@@ -165,30 +176,47 @@ async function main() {
   const tsukumoSite = process.env.TSUKUMO_PLAUSIBLE_SITE_ID || process.env.PLAUSIBLE_SITE_ID;
   const trovexSite = process.env.TROVEX_PLAUSIBLE_SITE_ID;
 
-  // ===== PANEL A — Consulting (the money end) =====
-  // Supabase leads (non-PII: lead_band/channel/how_heard) = the durable record.
-  const leads = await supabase(`leads?project=eq.tsukumo&created_at=gte.${w.start}&select=lead_band,channel,how_heard`);
+  // ===== PANEL A — Consulting (the money end) — Twenty CRM is the SYSTEM OF RECORD =====
+  // Pipeline = Opportunities joined to their pointOfContact's source. Qualified = stage past NEW.
+  // North star = qualified opportunities whose source is the OSS suite.
+  const [twOpps, twPpl] = await Promise.all([
+    twenty(`/rest/opportunities?limit=100`),
+    twenty(`/rest/people?limit=100`),
+  ]);
+  let propRows = null, totalInq = null, totalQual = null, suiteQual = null, twPersons = null;
+  if (twOpps && twPpl) {
+    const opps = twOpps.opportunities || twOpps || [];
+    const ppl = twPpl.people || twPpl || [];
+    twPersons = ppl.length;
+    const srcOf = (id) => (ppl.find((p) => p.id === id) || {}).source || null;
+    const by = new Map();
+    for (const o of opps) {
+      const { label, suite } = twentySourceBucket(srcOf(o.pointOfContactId));
+      const cur = by.get(label) || { property: label, inquiries: 0, qualified: 0, suite };
+      cur.inquiries++;
+      if (QUALIFIED_STAGES.has(o.stage)) cur.qualified++;
+      by.set(label, cur);
+    }
+    propRows = [...by.values()].sort((a, b) => b.qualified - a.qualified || b.inquiries - a.inquiries);
+    totalInq = opps.length;
+    totalQual = propRows.reduce((s, r) => s + r.qualified, 0);
+    suiteQual = propRows.filter((r) => r.suite).reduce((s, r) => s + r.qualified, 0);
+  }
+
+  // Supabase `leads` = RAW capture cross-check (now secondary to Twenty). Flag obvious test rows so
+  // junk can't masquerade as a real lead (a 'klklkl/poipoipoi' row once inflated the north star).
+  const rawLeads = await supabase(`leads?project=eq.tsukumo&select=lead_band,channel,how_heard,email,name`);
+  const isTestRow = (l) => /(^|@)(example\.com|y\.com|test|eeid\.ch)/i.test(l.email || "") ||
+    /^(test|klk|asdf|qwer|poip|xxx)/i.test((l.name || "").toLowerCase()) || /probe/i.test(l.email || "");
+  const rawTotal = rawLeads ? rawLeads.length : null;
+  const rawTest = rawLeads ? rawLeads.filter(isTestRow).length : null;
+  const rawReal = rawLeads ? rawTotal - rawTest : null;
+
   // Plausible cross-check: assessment_request total + suite-sourced.
   const [assessAll, assessSuite] = await Promise.all([
     evAgg(tsukumoSite, w, "assessment_request"),
     evAgg(tsukumoSite, w, "assessment_request", ";event:props:source==suite"),
   ]);
-
-  let propRows = null, totalInq = null, totalQual = null, suiteQual = null;
-  if (leads) {
-    const by = new Map();
-    for (const l of leads) {
-      const p = sourceProperty(l);
-      const cur = by.get(p) || { property: p, inquiries: 0, qualified: 0, suite: isSuiteProp(p) };
-      cur.inquiries++;
-      if (l.lead_band === "hot" || l.lead_band === "warm") cur.qualified++;
-      by.set(p, cur);
-    }
-    propRows = [...by.values()].sort((a, b) => b.qualified - a.qualified || b.inquiries - a.inquiries);
-    totalInq = leads.length;
-    totalQual = propRows.reduce((s, r) => s + r.qualified, 0);
-    suiteQual = propRows.filter((r) => r.suite).reduce((s, r) => s + r.qualified, 0);
-  }
 
   // ===== PANEL B — trovex waitlist funnel (beta primary conversion) =====
   // Store (Supabase) = source of truth for the COUNT. Count and source-breakdown are queried
@@ -233,31 +261,33 @@ async function main() {
 
   P(`# Trovex North-Star Scoreboard — reach → consulting leads — ${date}`);
   P(``);
-  P(`*Owner-facing launch scoreboard · window: ${w.label} (${w.start}→${w.end}) · auto-assembled by \`north-star-scoreboard.mjs\` from live Plausible + Supabase + the latest citation panel. No fabricated data — \`n/a\` = source/key unavailable, \`0\` = a real zero. The only number that wins is a **qualified consulting lead**; reach is the input.*`);
+  P(`*Owner-facing launch scoreboard · window: ${w.label} (${w.start}→${w.end}) · auto-assembled by \`north-star-scoreboard.mjs\` from Twenty CRM (consulting pipeline) + live Plausible + Supabase + the latest citation panel. No fabricated data — \`n/a\` = source/key unavailable, \`0\` = a real zero. The only number that wins is a **qualified consulting lead**; reach is the input.*`);
   P(``);
 
   // Headline
   P(`## ★ Headline`);
-  P(`- **North star — qualified, suite-sourced consulting leads: ${n(suiteQual)}** (of ${n(totalQual)} qualified, ${n(totalInq)} total inquiries). _Qualified = hot+warm band (lead-scoring); suite = trovex/WRAI.TH/yoru-sourced._`);
+  P(`- **North star — qualified, suite-sourced consulting leads: ${n(suiteQual)}** (of ${n(totalQual)} qualified, ${n(totalInq)} total opportunities in the Twenty pipeline). _Qualified = opportunity past the NEW stage; suite = OSS-funnel sourced._`);
   P(`- **trovex waitlist signups (beta primary conversion): ${n(wlCount)}.**`);
   P(`- **Suite AI-citation share (any engine): ${cite ? cite.union : "n/a"}** ${cite ? `_(snapshot ${cite.srcDate})_` : "_(no citation panel run yet)_"}.`);
-  P(`- **Consulting (Plausible \`assessment_request\`):** ${n(assessAll)} total${assessSuite == null ? "" : ` · ${n(assessSuite)} suite-sourced`} — the on-site event count (the store record in Panel A is the durable truth; the two reconcile there).`);
+  P(`- **Consulting (Plausible \`assessment_request\`):** ${n(assessAll)} total${assessSuite == null ? "" : ` · ${n(assessSuite)} suite-sourced`} — on-site events; the Twenty pipeline (Panel A) is the durable record.`);
   P(``);
 
-  // Panel A
-  P(`## A · Consulting inquiries by source property × channel — the money end`);
+  // Panel A — Twenty CRM = system of record
+  P(`## A · Consulting pipeline by source property — the money end (Twenty CRM)`);
   if (!propRows) {
-    P(`_Supabase \`leads\` unavailable (no key or no rows) → **n/a**. Cannot fabricate consulting volume._`);
+    P(`_Twenty CRM unavailable (no \`TWENTY_API_KEY\`/\`TWENTY_BASE_URL\`) → **n/a**. Cannot fabricate consulting volume._`);
   } else if (!propRows.length) {
-    P(`_0 consulting inquiries in window — a real zero, reported honestly._`);
+    P(`_0 opportunities in the pipeline — a real zero, reported honestly._`);
   } else {
-    P(`| Source property | Inquiries | Qualified (hot+warm) | Suite? |`);
-    P(`|-----------------|----------:|---------------------:|:------:|`);
+    P(`*Source of record: Twenty (${twPersons} persons). Qualified = opportunity past NEW (stages: NEW→SCREENING→MEETING→PROPOSAL→CUSTOMER).*`);
+    P(``);
+    P(`| Source property | Opportunities | Qualified | Suite? |`);
+    P(`|-----------------|--------------:|----------:|:------:|`);
     for (const r of propRows) P(`| ${r.property} | ${r.inquiries} | ${r.qualified} | ${r.suite ? "✅" : "—"} |`);
     P(`| **Total** | **${totalInq}** | **${totalQual}** (suite: **${suiteQual}**) | |`);
   }
   P(``);
-  P(`**Cross-check (Plausible \`assessment_request\`):** all = ${n(assessAll)} · source=suite = ${n(assessSuite)}. Store (left) is the durable record; Plausible catches the event even if a lead later changes channel. Detail + qualified-rate: weekly-digest + lead-scoring docs.`);
+  P(`**Raw-capture cross-check (Supabase \`leads\`):** ${rawTotal == null ? "n/a" : `${rawTotal} rows, of which ${rawTest} are test/junk → ${rawReal} real`}. Twenty (above) is the deduped system of record; Supabase stays the raw inbound capture. **Plausible \`assessment_request\`:** all ${n(assessAll)} · suite ${n(assessSuite)}.`);
   P(``);
 
   // Panel B
@@ -302,12 +332,13 @@ async function main() {
   P(`## Data availability (no fabrication)`);
   P(`| Source | Status |`);
   P(`|--------|--------|`);
-  P(`| Plausible — tsukumo.ch (consulting) | ${tsukumoSite && process.env.PLAUSIBLE_STATS_API_KEY ? "live" : "n/a (key/site missing)"} |`);
+  P(`| Twenty CRM — consulting pipeline (system of record) | ${process.env.TWENTY_API_KEY && process.env.TWENTY_BASE_URL ? "live" : "n/a (key missing)"} |`);
+  P(`| Plausible — tsukumo.ch (consulting events) | ${tsukumoSite && process.env.PLAUSIBLE_STATS_API_KEY ? "live" : "n/a (key/site missing)"} |`);
   P(`| Plausible — trovex.dev (waitlist web-funnel) | ${trovexSite && process.env.PLAUSIBLE_STATS_API_KEY ? "live" : "n/a (TROVEX_PLAUSIBLE_SITE_ID missing)"} |`);
-  P(`| Supabase — leads + waitlist (non-PII counts) | ${process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? "live" : "n/a (key missing)"} |`);
+  P(`| Supabase — leads (raw capture) + waitlist | ${process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? "live" : "n/a (key missing)"} |`);
   P(`| AI-citation panel (geo-citation-monitor report) | ${cite ? `live (${cite.srcDate})` : "n/a (no report)"} |`);
   P(``);
-  P(`*Privacy: Supabase reads select only non-PII columns (lead_band/channel/how_heard, waitlist source) — no email ever leaves the DB or enters this report. Reach metrics (citations, visits, stars) are inputs; the north star is qualified consulting leads. Detail lives in the operator docs (weekly-digest, waitlist-funnel-report, geo-citation panel) — this scoreboard is the one-screen roll-up.*`);
+  P(`*Privacy: PII (names/emails) lives in Twenty (the CRM) where it belongs; this report surfaces only counts + coarse source/stage. Supabase analytics reads stay non-PII. Reach metrics (citations, visits, stars) are inputs; the north star is qualified consulting leads. Detail lives in the operator docs (weekly-digest, waitlist-funnel-report, geo-citation panel) — this scoreboard is the one-screen roll-up.*`);
 
   const out = md.join("\n");
   console.log(out);

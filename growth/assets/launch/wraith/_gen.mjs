@@ -80,8 +80,8 @@ function slide5() {
         h("div", { style: { width: "14px", height: "14px", backgroundColor: W.accent } }), h("span", {}, f)))),
     h("div", { style: { display: "flex", flexDirection: "column", gap: "18px" } },
       h("div", { style: { fontSize: "21px", color: W.accent, border: `1px solid ${W.border}`, backgroundColor: W.card, borderRadius: "10px", padding: "18px 22px" } },
-        "curl -fsSL https://raw.githubusercontent.com/Synergix-lab/WRAI.TH/main/install.sh | bash"),
-      h("div", { style: { fontSize: "20px", color: W.muted } }, "github.com/Synergix-lab/WRAI.TH")),
+        "curl -fsSL https://raw.githubusercontent.com/TsukumoHQ/WRAI.TH/main/install.sh | bash"),
+      h("div", { style: { fontSize: "20px", color: W.muted } }, "github.com/TsukumoHQ/WRAI.TH")),
   ]);
 }
 
@@ -94,7 +94,7 @@ function og() {
         h("span", {}, "mission control for your\u00a0"), h("span", { style: { color: W.accent } }, "AI agent fleet")),
       h("div", { style: { fontSize: "27px", color: W.muted } }, "memory · messaging · tasks · one dashboard. local, open source.")),
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
-      h("div", { style: { fontSize: "21px", color: W.accent } }, "github.com/Synergix-lab/WRAI.TH"),
+      h("div", { style: { fontSize: "21px", color: W.accent } }, "github.com/TsukumoHQ/WRAI.TH"),
       h("div", { style: { fontSize: "20px", color: W.muted } }, "AGPL · MCP-native")),
   ], 72);
 }

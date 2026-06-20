@@ -150,6 +150,26 @@
       </ul>
     </div>
 
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How much does context cost a coding agent?</p>
+        <p class="faq-a">In trovex's model, 40 to 65% of the tokens spent on a doc lookup go to rereading candidate files to work out which one is canonical. The common case (a few small-to-mid docs) lands near 60%. The exact figure depends on how many files the agent would otherwise read and how big they are.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does the saving depend on which coding agent or client I use?</p>
+        <p class="faq-a">No. trovex serves the same one canonical answer per query whether the client is Claude Code, Cursor, Windsurf, Cline, or another MCP client, so the token saving is client-agnostic. What changes the number is the repo shape (how many candidate docs exist and how large they are), not the agent.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does a bigger context window make this cheaper?</p>
+        <p class="faq-a">No. A bigger window lets the agent read more files; it does not stop it rereading them. You still pay per token for every candidate it opens to guess which doc is current. Cutting the rereads, not enlarging the window, is what cuts the cost.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How is the ~60% number measured?</p>
+        <p class="faq-a">saved = tokens the agent would have read (the top candidate files) minus the one canonical doc trovex returns minus the ~80-token pointer response. ratio = saved / would-have-read. The table on this page shows the computation for each scenario; the model is trovex's open-source savings.py.</p>
+      </div>
+    </section>
+
     <div class="cta">
       <h2>Measure it on your own repo.</h2>
       <p>Point trovex at your docs, serve your agents one current answer per query, and read the tokens it saves you.</p>

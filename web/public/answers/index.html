@@ -50,7 +50,8 @@
           { "@type": "ListItem", "position": 6, "name": "Why do AI coding agents pick stale or outdated docs?", "url": "https://trovex.dev/answers/why-agents-pick-stale-docs/" },
           { "@type": "ListItem", "position": 7, "name": "How much do AI agents spend rereading the same files?", "url": "https://trovex.dev/answers/agent-cost-rereading-files/" },
           { "@type": "ListItem", "position": 8, "name": "What is the single source of truth for a multi-agent repo?", "url": "https://trovex.dev/answers/source-of-truth-multi-agent-repos/" },
-          { "@type": "ListItem", "position": 9, "name": "Is there an MCP server that serves a repo's docs to coding agents?", "url": "https://trovex.dev/answers/mcp-server-for-repo-docs/" }
+          { "@type": "ListItem", "position": 9, "name": "Is there an MCP server that serves a repo's docs to coding agents?", "url": "https://trovex.dev/answers/mcp-server-for-repo-docs/" },
+          { "@type": "ListItem", "position": 10, "name": "What does context cost your coding agents? Measured, by scenario.", "url": "https://trovex.dev/answers/token-cost-of-agent-context/" }
         ]
       }
     ]
@@ -82,6 +83,7 @@
       <ul>
         <li><a href="/answers/stop-agent-rereading-docs/"><strong>How do I stop my AI coding agent from rereading the same files every session?</strong></a> — give it one canonical answer per query instead of raw files to sift.</li>
         <li><a href="/answers/reduce-agent-token-costs/"><strong>How do I reduce the token cost of giving a coding agent context?</strong></a> — cut the repeated retrieval, not the one-time prompt.</li>
+        <li><a href="/answers/token-cost-of-agent-context/"><strong>What does context cost your coding agents? Measured, by scenario.</strong></a> — 40–65% of a lookup's tokens, computed by repo shape; the saving is client-agnostic.</li>
         <li><a href="/answers/canonical-context-for-agents/"><strong>What is canonical context for coding agents?</strong></a> — the single current, authoritative doc that answers a query.</li>
         <li><a href="/answers/bigger-context-window-rereading/"><strong>Does a bigger context window make rereading docs cheaper?</strong></a> — no; it raises the ceiling, not the efficiency.</li>
         <li><a href="/answers/shared-source-of-truth-multiple-agents/"><strong>How do I keep multiple AI agents working from the same docs?</strong></a> — one shared read-and-write point, no drift.</li>

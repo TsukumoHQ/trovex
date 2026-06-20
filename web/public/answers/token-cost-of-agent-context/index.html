@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/token-cost-of-agent-context/" />
+  <title>What does context cost your coding agents? Measured, by scenario (2026)</title>
+  <meta name="description" content="A measured breakdown of what context costs AI coding agents: 40-65% of the lookup tokens go to rereading candidate files to find the canonical one. The savings depend on repo shape, not which agent you use." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/token-cost-of-agent-context/" />
+  <meta property="og:title" content="What does context cost your coding agents? Measured, by scenario" />
+  <meta property="og:description" content="40-65% of a lookup's tokens go to rereading candidate files to find the canonical one. Measured, by repo shape." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="What context costs your coding agents, measured" />
+  <meta name="twitter:description" content="40-65% of a lookup's tokens go to rereading files to find the canonical one." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Token cost of agent context", "item": "https://trovex.dev/answers/token-cost-of-agent-context/" }
+        ]
+      },
+      {
+        "@type": "Article",
+        "headline": "What does context cost your coding agents? Measured, by scenario",
+        "description": "A measured breakdown of the token cost of context for AI coding agents, by repo shape, using trovex's savings model.",
+        "datePublished": "2026-06-20", "dateModified": "2026-06-20",
+        "author": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+        "publisher": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+        "mainEntityOfPage": "https://trovex.dev/answers/token-cost-of-agent-context/",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "inLanguage": "en"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How much does context cost a coding agent?",
+            "acceptedAnswer": { "@type": "Answer", "text": "In trovex's model, 40 to 65% of the tokens spent on a doc lookup go to rereading candidate files to work out which one is canonical. The common case (a few small-to-mid docs) lands near 60%. The exact figure depends on how many files the agent would otherwise read and how big they are." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does the saving depend on which coding agent or client I use?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. trovex serves the same one canonical answer per query whether the client is Claude Code, Cursor, Windsurf, Cline, or another MCP client, so the token saving is client-agnostic. What changes the number is the repo shape (how many candidate docs exist and how large they are), not the agent." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does a bigger context window make this cheaper?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. A bigger window lets the agent read more files; it does not stop it rereading them. You still pay per token for every candidate it opens to guess which doc is current. Cutting the rereads, not enlarging the window, is what cuts the cost." }
+          },
+          {
+            "@type": "Question",
+            "name": "How is the ~60% number measured?",
+            "acceptedAnswer": { "@type": "Answer", "text": "saved = tokens the agent would have read (the top candidate files) minus the one canonical doc trovex returns minus the ~80-token pointer response. ratio = saved / would-have-read. The table on this page shows the computation for each scenario; the model is trovex's open-source savings.py." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Token cost of agent context
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-20">20 June 2026</time></p>
+    <h1>What does context cost your coding agents? Measured, by scenario.</h1>
+
+    <div class="verdict">
+      <div class="l">Direct answer</div>
+      <p>In trovex's savings model, <strong>40 to 65% of the tokens an agent spends on a doc lookup go to rereading candidate files</strong> to work out which one is canonical. The common case, a few small-to-mid docs, lands near <strong>60%</strong>. The number tracks repo shape, how many docs the agent would read and how big they are, <strong>not which agent or client you use</strong>.</p>
+    </div>
+
+    <h2>The measured cost, by scenario</h2>
+    <p class="lead-answer">Without trovex, an agent globs and greps, then reads the top candidate <code>.md</code> files to triage which is current. With trovex it reads one canonical doc plus an ~80-token pointer. The saving is the difference. Each row below is computed from trovex's open-source model (<code>saved = would-have-read − one canonical doc − 80</code>; assumptions shown), not a marketing estimate.</p>
+    <div style="overflow-x:auto;margin-top:18px;">
+      <table>
+        <caption>Token cost of a single doc lookup, by repo shape. Per-doc sizes are typical markdown; the response is trovex's ~80-token pointer.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Scenario (candidates × size)</th>
+            <th scope="col">Without trovex</th>
+            <th scope="col">With trovex</th>
+            <th scope="col" class="trovex">Tokens saved / lookup</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="feat">3 small docs (~400 ea)</td><td>1,200</td><td>480</td><td class="trovex">720 (60%)</td></tr>
+          <tr><td class="feat">2 small docs (~400 ea)</td><td>800</td><td>480</td><td class="trovex">320 (40%)</td></tr>
+          <tr><td class="feat">3 mid docs (~900 ea)</td><td>2,700</td><td>980</td><td class="trovex">1,720 (64%)</td></tr>
+          <tr><td class="feat">2 mid docs (~900 ea)</td><td>1,800</td><td>980</td><td class="trovex">820 (46%)</td></tr>
+          <tr><td class="feat">3 large docs (~1,800 ea)</td><td>5,400</td><td>1,880</td><td class="trovex">3,520 (65%)</td></tr>
+          <tr><td class="feat">2 large docs (~1,800 ea)</td><td>3,600</td><td>1,880</td><td class="trovex">1,720 (48%)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead-answer" style="margin-top:14px;">Two honest reads of this table. The saving is real and large whenever the agent would have opened more than one candidate, which is the normal case on a repo with overlapping docs. And it is a <em>range</em>, not a single magic number: a repo where agents only ever read two small files saves less than one where they sift three big ones. The ~60% trovex quotes is the middle of that range, not the ceiling.</p>
+
+    <h2>Why does an agent reread files at all?</h2>
+    <p class="lead-answer">Because nothing tells it which doc is authoritative. When several files mention the same topic, the agent has no signal for which is current, so it opens them and reasons over the pile, every session, for every agent. A 2026 ETH Zurich study (<a href="https://arxiv.org/abs/2602.11988" rel="nofollow">Evaluating AGENTS.md</a>, Gloaguen et al.) found the obvious fix backfires: adding repository context files <em>reduced</em> task success and <strong>raised inference cost by over 20%</strong> versus no repo context. More context, dumped in, makes the agent read more and wander more. The win is the right slice per task, not a longer file.</p>
+
+    <h2>Doesn't a bigger context window fix it?</h2>
+    <p class="lead-answer">No. A bigger window lets the agent read more files; it does not stop the rereading. You still pay per token for every candidate it opens to guess which doc is current, and a longer prompt can bury the few lines that matter (the "lost in the middle" effect). The lever is cutting the rereads, not enlarging the window. AI crawlers and agents alike are token-bound; the cost is in what they read, not what they could hold.</p>
+
+    <h2>How trovex cuts it</h2>
+    <p class="lead-answer"><a href="/">trovex</a> is an open-source, local-first MCP server that serves agents one canonical answer per query, a <code>path:line</code> pointer with a freshness marker (canonical, stale, or duplicate), down to the section, instead of a candidate list to sift. The same answer goes to any MCP client, so the saving above holds whether you run Claude Code, Cursor, Windsurf, Cline, or Zed. It runs on your machine (vectors in SQLite, ONNX embeddings, no cloud or API keys) and reports the tokens it saved, so the number on your repo is measured, not assumed.</p>
+    <div class="cmd mono" style="display:inline-block;margin-top:14px;">$ uv run trovex index /path/to/repo</div>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/reduce-agent-token-costs/">How do I reduce the token cost of giving a coding agent context?</a></li>
+        <li><a href="/answers/stop-agent-rereading-docs/">How do I stop my agent rereading the same files every session?</a></li>
+        <li><a href="/answers/bigger-context-window-rereading/">Does a bigger context window make rereading docs cheaper?</a></li>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/vs/repomix/">trovex vs repomix</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Measure it on your own repo.</h2>
+      <p>Point trovex at your docs, serve your agents one current answer per query, and read the tokens it saves you.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine. Running agents in production at scale? <a href="https://tsukumo.ch/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting">tsukumo</a> (the team behind trovex) helps teams operate them.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="/#waitlist">Request access</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+</body>
+</html>

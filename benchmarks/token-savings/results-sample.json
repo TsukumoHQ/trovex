@@ -1,0 +1,214 @@
+{
+  "repo": "/Users/loic/Projects/trovex/.worktrees/fullstack-lead",
+  "model": "BAAI/bge-small-en-v1.5",
+  "docs_indexed": 145,
+  "queries_total": 20,
+  "queries_scored": 20,
+  "median_ratio": 0.7112,
+  "mean_ratio": 0.6714,
+  "pooled_ratio": 0.666,
+  "total_would_have_read": 89585,
+  "total_saved": 59668,
+  "per_query": [
+    {
+      "query": "how do I install and set up trovex",
+      "results": 5,
+      "top_doc": "growth/launch/show-hn.md",
+      "would_have_read": 6823,
+      "actual_read": 3651,
+      "response": 70,
+      "saved": 3102,
+      "ratio": 0.4546
+    },
+    {
+      "query": "quickstart getting started guide",
+      "results": 5,
+      "top_doc": "growth/process/launch.md",
+      "would_have_read": 6609,
+      "actual_read": 1317,
+      "response": 64,
+      "saved": 5228,
+      "ratio": 0.791
+    },
+    {
+      "query": "how is the token savings number calculated",
+      "results": 5,
+      "top_doc": "growth/cro/savings-methodology.md",
+      "would_have_read": 3813,
+      "actual_read": 1074,
+      "response": 66,
+      "saved": 2673,
+      "ratio": 0.701
+    },
+    {
+      "query": "configure the embedding model",
+      "results": 5,
+      "top_doc": "source.md",
+      "would_have_read": 4199,
+      "actual_read": 1577,
+      "response": 70,
+      "saved": 2552,
+      "ratio": 0.6078
+    },
+    {
+      "query": "which embedder does it use by default",
+      "results": 5,
+      "top_doc": "growth/social/forum-seed-reddit-localllama.md",
+      "would_have_read": 2402,
+      "actual_read": 765,
+      "response": 71,
+      "saved": 1566,
+      "ratio": 0.652
+    },
+    {
+      "query": "submit to the mcp registry",
+      "results": 5,
+      "top_doc": "growth/launch/directory-submissions.md",
+      "would_have_read": 7570,
+      "actual_read": 3859,
+      "response": 63,
+      "saved": 3648,
+      "ratio": 0.4819
+    },
+    {
+      "query": "how do I deploy and host it",
+      "results": 5,
+      "top_doc": "growth/launch/venue-final-posts.md",
+      "would_have_read": 4815,
+      "actual_read": 1857,
+      "response": 63,
+      "saved": 2895,
+      "ratio": 0.6012
+    },
+    {
+      "query": "how does reranking the results work",
+      "results": 5,
+      "top_doc": "growth/process/geo.md",
+      "would_have_read": 3730,
+      "actual_read": 1185,
+      "response": 69,
+      "saved": 2476,
+      "ratio": 0.6638
+    },
+    {
+      "query": "how does indexing the docs work",
+      "results": 5,
+      "top_doc": "README.md",
+      "would_have_read": 3543,
+      "actual_read": 927,
+      "response": 70,
+      "saved": 2546,
+      "ratio": 0.7186
+    },
+    {
+      "query": "vector search with sqlite",
+      "results": 5,
+      "top_doc": "growth/analytics/reports/geo-citations-2026-06-18.md",
+      "would_have_read": 2884,
+      "actual_read": 772,
+      "response": 78,
+      "saved": 2034,
+      "ratio": 0.7053
+    },
+    {
+      "query": "beta welcome and onboarding steps",
+      "results": 5,
+      "top_doc": "growth/process/launch.md",
+      "would_have_read": 5814,
+      "actual_read": 1317,
+      "response": 61,
+      "saved": 4436,
+      "ratio": 0.763
+    },
+    {
+      "query": "frequently asked questions",
+      "results": 5,
+      "top_doc": "growth/social/forum-seed-reddit-localllama.md",
+      "would_have_read": 2955,
+      "actual_read": 765,
+      "response": 71,
+      "saved": 2119,
+      "ratio": 0.7171
+    },
+    {
+      "query": "run the mcp server locally",
+      "results": 5,
+      "top_doc": "growth/social/forum-seed-reddit-localllama.md",
+      "would_have_read": 3939,
+      "actual_read": 765,
+      "response": 69,
+      "saved": 3105,
+      "ratio": 0.7883
+    },
+    {
+      "query": "chunking long markdown documents",
+      "results": 5,
+      "top_doc": "source.md",
+      "would_have_read": 3527,
+      "actual_read": 1577,
+      "response": 71,
+      "saved": 1879,
+      "ratio": 0.5327
+    },
+    {
+      "query": "measure token consumption before and after",
+      "results": 5,
+      "top_doc": "growth/cro/savings-methodology.md",
+      "would_have_read": 4153,
+      "actual_read": 1074,
+      "response": 81,
+      "saved": 2998,
+      "ratio": 0.7219
+    },
+    {
+      "query": "write token and authentication",
+      "results": 5,
+      "top_doc": "growth/content/lead-magnet-token-audit.md",
+      "would_have_read": 5083,
+      "actual_read": 1265,
+      "response": 70,
+      "saved": 3748,
+      "ratio": 0.7374
+    },
+    {
+      "query": "query result caching and invalidation",
+      "results": 5,
+      "top_doc": "growth/analytics/reports/blog-performance-2026-06-17.md",
+      "would_have_read": 4264,
+      "actual_read": 989,
+      "response": 81,
+      "saved": 3194,
+      "ratio": 0.7491
+    },
+    {
+      "query": "stale and duplicate doc detection",
+      "results": 5,
+      "top_doc": "growth/launch/registry-variants.md",
+      "would_have_read": 3450,
+      "actual_read": 1534,
+      "response": 82,
+      "saved": 1834,
+      "ratio": 0.5316
+    },
+    {
+      "query": "multi source configuration",
+      "results": 5,
+      "top_doc": "growth/process/launch.md",
+      "would_have_read": 6347,
+      "actual_read": 1317,
+      "response": 63,
+      "saved": 4967,
+      "ratio": 0.7826
+    },
+    {
+      "query": "how do agents query trovex",
+      "results": 5,
+      "top_doc": "README.md",
+      "would_have_read": 3665,
+      "actual_read": 927,
+      "response": 70,
+      "saved": 2668,
+      "ratio": 0.728
+    }
+  ]
+}

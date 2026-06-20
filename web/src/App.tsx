@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { track, trackLandingView, trackInstallClick, trackTsukumoClick } from './analytics'
+import { track, trackLandingView, trackInstallClick, trackTsukumoClick, trackNewsletterSignup, getAttribution } from './analytics'
 
 // trovex is public beta: the primary action is install + a GitHub star. The consult band
 // is the suite→agency handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so
@@ -245,6 +245,101 @@ const GITHUB = 'https://github.com/TsukumoHQ/trovex'
 const SLACK_URL = 'https://tsukumo.ch/slack'
 // Sibling OSS tool in the tsukumo suite — now has its own landing (live).
 const WRAITH_URL = 'https://tsukumo.ch/wraith?utm_source=trovex&utm_medium=oss-suite&utm_campaign=wraith'
+// Shared newsletter hub — ONE Resend audience across the suite (fullstack contract).
+// source_site routes attribution; CORS allows trovex.dev. Privacy controller = tsukumo.
+const NEWSLETTER_API = 'https://tsukumo.ch/api/newsletter'
+const PRIVACY_URL = 'https://tsukumo.ch/privacy'
+
+/* ── Newsletter capture: low-key, double-opt-in, GDPR-clean ──────────
+ * One email field + explicit opt-in (unchecked, gates submit) + honeypot. Posts to the
+ * shared hub; fires newsletter_signup only on a genuine new insert (no email in analytics,
+ * no bot/dup inflation). Not above the fold — the install stays the one primary action. */
+type NewsState = 'idle' | 'submitting' | 'ok' | 'already' | 'error'
+function NewsletterBand() {
+  const [email, setEmail] = useState('')
+  const [optIn, setOptIn] = useState(false)
+  const [website, setWebsite] = useState('') // honeypot
+  const [state, setState] = useState<NewsState>('idle')
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (state === 'submitting' || !optIn) return
+    setState('submitting')
+    try {
+      const res = await fetch(NEWSLETTER_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, website, source_site: 'trovex', ...getAttribution() }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.ok) {
+        if (body.new) trackNewsletterSignup('trovex_landing') // only a real new signup counts
+        setState(body.status === 'confirmed' && !body.new ? 'already' : 'ok')
+        return
+      }
+      setState('error')
+    } catch {
+      setState('error')
+    }
+  }
+
+  return (
+    <section className="news-band">
+      <div className="wrap news-in">
+        <div className="news-copy">
+          <div className="news-eyebrow">Newsletter</div>
+          <h2 className="news-h">Field notes on running agents in production</h2>
+          <p className="news-deck">When we ship or learn something real about running AI coding agents in production. No filler, no fixed schedule.</p>
+        </div>
+        {state === 'ok' ? (
+          <p className="news-status" role="status">Check your inbox — confirm the link to finish subscribing.</p>
+        ) : state === 'already' ? (
+          <p className="news-status" role="status">You&apos;re already on the list.</p>
+        ) : (
+          <form className="news-form" onSubmit={onSubmit} noValidate>
+            <div className="news-row">
+              <input
+                className="news-input"
+                type="email"
+                required
+                value={email}
+                autoComplete="email"
+                placeholder="your@email.com"
+                aria-label="Email"
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <button className="btn btn-primary news-btn" type="submit" disabled={state === 'submitting' || !optIn}>
+                {state === 'submitting' ? 'Sending…' : 'Subscribe'}
+              </button>
+            </div>
+            <label className="news-optin">
+              <input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} />
+              <span>Yes, email me the newsletter. I can unsubscribe anytime.</span>
+            </label>
+            {/* honeypot */}
+            <input
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              className="news-hp"
+            />
+            <p className="news-note">
+              Occasional, no spam, never shared. See the{' '}
+              <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">privacy policy</a>.
+            </p>
+            <div aria-live="polite" aria-atomic="true">
+              {state === 'error' && <p className="news-note news-err">Something broke on our end. Try again in a minute.</p>}
+            </div>
+          </form>
+        )}
+      </div>
+    </section>
+  )
+}
 
 export default function App() {
   useReveal()
@@ -395,6 +490,9 @@ export default function App() {
             </p>
           </div>
         </section>
+
+        {/* Newsletter — quiet email capture, below the install. Not a competing CTA. */}
+        <NewsletterBand />
 
       </main>
 

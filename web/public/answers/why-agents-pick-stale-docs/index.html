@@ -37,8 +37,24 @@
         ]
       },
       {
+        "@type": "DefinedTerm",
+        "@id": "https://trovex.dev/answers/why-agents-pick-stale-docs/#term",
+        "name": "freshness marker",
+        "description": "A per-result label (canonical, stale, or duplicate) attached to a retrieved doc that tells a coding agent which copy is the current source of truth, so it reads the canonical doc and skips outdated or duplicate copies, instead of trusting whichever text is most similar.",
+        "inDefinedTermSet": "https://trovex.dev/answers/"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Why does my agent pick an old doc over the current one?", "acceptedAnswer": { "@type": "Answer", "text": "Retrieval ranks by similarity, not freshness. An old postmortem and the current runbook read alike, so the stale one scores just as high. Without a freshness signal, nothing tells the agent which copy is current." } },
+          { "@type": "Question", "name": "What is a freshness marker?", "acceptedAnswer": { "@type": "Answer", "text": "A per-result label (canonical, stale, or duplicate) that tells an agent which doc is the current source of truth, so it reads the canonical one and skips outdated or duplicate copies." } },
+          { "@type": "Question", "name": "Does a newer file timestamp fix this?", "acceptedAnswer": { "@type": "Answer", "text": "Not reliably. A file's modified time changes on any edit, including to a doc that is still stale in content, and similarity search ignores the timestamp anyway. Freshness has to be a signal in the retrieval result, not just a filesystem date." } },
+          { "@type": "Question", "name": "How do I stop agents reading stale docs?", "acceptedAnswer": { "@type": "Answer", "text": "Return one canonical doc per query with a freshness marker and keep stale or duplicate copies out of the agent's context. trovex does this locally, returning a path:line pointer marked canonical, stale, or duplicate." } }
+        ]
+      },
+      {
         "@type": "QAPage",
-        "datePublished": "2026-06-17", "dateModified": "2026-06-19",
+        "datePublished": "2026-06-17", "dateModified": "2026-06-20",
         "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
         "mainEntity": {
           "@type": "Question",
@@ -76,7 +92,7 @@
       <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Why agents pick stale docs
     </nav>
 
-    <p class="updated">Updated <time datetime="2026-06-19">19 June 2026</time></p>
+    <p class="updated">Updated <time datetime="2026-06-20">20 June 2026</time></p>
     <h1>Why do AI coding agents pick stale or outdated docs?</h1>
 
     <div class="verdict">
@@ -94,6 +110,9 @@
       <li><strong>Skip duplicates</strong> instead of sending the agent two copies of the same thing.</li>
     </ul>
 
+    <h2>Why a newer file timestamp isn't the fix</h2>
+    <p class="lead-answer">The obvious patch, "prefer the most recently modified file," doesn't hold. A file's modified time changes on any edit, including a typo fix to a doc whose content is still wrong, so recency and correctness drift apart. And the similarity ranker ignores the timestamp entirely. Freshness has to be a signal carried in the retrieval result (this doc is canonical, that one is stale), not a filesystem date the agent never sees. It also compounds: every stale and duplicate copy the agent reads is tokens spent reasoning over the wrong source. The cost of that is laid out in <a href="/answers/token-cost-of-agent-context/">what context costs your agents</a>.</p>
+
     <h2>How trovex handles it</h2>
     <p class="lead-answer"><a href="/">trovex</a> indexes your repo's markdown and answers a query with the single current doc that addresses it — a <code>path:line</code> pointer with a freshness marker. Stale and duplicate copies are skipped, not ranked. Same answers, about <strong>60% fewer tokens per lookup</strong>. It runs locally (SQLite + ONNX, no cloud or keys).</p>
 
@@ -101,10 +120,32 @@
       <div class="l">Related questions</div>
       <ul>
         <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/token-cost-of-agent-context/">What does context cost your coding agents? Measured, by scenario.</a></li>
+        <li><a href="/answers/why-context-files-dont-scale/">Why do AGENTS.md / CLAUDE.md context files stop scaling?</a></li>
         <li><a href="/answers/stop-agent-rereading-docs/">How do I stop my agent rereading the same files every session?</a></li>
         <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Why does my agent pick an old doc over the current one?</p>
+        <p class="faq-a">Retrieval ranks by similarity, not freshness. An old postmortem and the current runbook read alike, so the stale one scores just as high. Without a freshness signal, nothing tells the agent which copy is current.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What is a freshness marker?</p>
+        <p class="faq-a">A per-result label (canonical, stale, or duplicate) that tells an agent which doc is the current source of truth, so it reads the canonical one and skips outdated or duplicate copies.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does a newer file timestamp fix this?</p>
+        <p class="faq-a">Not reliably. A file's modified time changes on any edit, including to a doc that is still stale in content, and similarity search ignores the timestamp anyway. Freshness has to be a signal in the retrieval result, not just a filesystem date.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How do I stop agents reading stale docs?</p>
+        <p class="faq-a">Return one canonical doc per query with a freshness marker and keep stale or duplicate copies out of the agent's context. trovex does this locally, returning a path:line pointer marked canonical, stale, or duplicate.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>Skip the stale copies.</h2>

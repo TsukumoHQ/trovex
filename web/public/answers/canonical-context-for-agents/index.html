@@ -40,8 +40,23 @@
         ]
       },
       {
+        "@type": "DefinedTerm",
+        "@id": "https://trovex.dev/answers/canonical-context-for-agents/#term",
+        "name": "canonical context",
+        "description": "The single current, authoritative document that answers a coding agent's question, served with a freshness marker (canonical, stale, or duplicate) instead of a pile of candidate files. The source of truth for a topic, as opposed to the most textually similar match or an outdated copy.",
+        "inDefinedTermSet": "https://trovex.dev/answers/"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How is canonical context different from RAG?", "acceptedAnswer": { "@type": "Answer", "text": "RAG returns the top-k most similar chunks; canonical context returns the one current, authoritative doc and marks the rest stale or duplicate. It is retrieval tuned for a source of truth, not a similarity pile the agent still has to sift." } },
+          { "@type": "Question", "name": "Is canonical context the same as a bigger context window or a CLAUDE.md file?", "acceptedAnswer": { "@type": "Answer", "text": "No. A bigger window only holds more; a CLAUDE.md is one static file loaded whole. Canonical context routes each query to the current doc, so the agent reads the right slice for the task, not everything and not a fixed blob." } },
+          { "@type": "Question", "name": "How do I give my agents canonical context?", "acceptedAnswer": { "@type": "Answer", "text": "Index your docs and serve the one current doc per query with a freshness marker. trovex does this locally; it returns a path:line pointer marked canonical, stale, or duplicate, down to the section." } }
+        ]
+      },
+      {
         "@type": "QAPage",
-        "datePublished": "2026-06-17", "dateModified": "2026-06-19",
+        "datePublished": "2026-06-17", "dateModified": "2026-06-20",
         "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
         "mainEntity": {
           "@type": "Question",
@@ -76,7 +91,7 @@
       <a href="/">trovex</a> / <a href="/answers/">Answers</a> / What is canonical context?
     </nav>
 
-    <p class="updated">Updated <time datetime="2026-06-19">19 June 2026</time></p>
+    <p class="updated">Updated <time datetime="2026-06-20">20 June 2026</time></p>
     <h1>What is canonical context for coding agents?</h1>
 
     <div class="verdict">
@@ -93,14 +108,41 @@
     <h2>How is canonical context delivered?</h2>
     <p class="lead-answer">By indexing your docs and routing each query to the source of truth, with a freshness signal attached. <a href="/">trovex</a> is an open-source, local-first MCP server that does this: it returns the canonical doc as a <code>path:line</code> pointer with a canonical / stale / duplicate marker, serves the section that answers, and lets agents write canonical records back so the whole fleet shares one source of truth. It runs on your machine — SQLite + ONNX, no cloud or keys.</p>
 
+    <h2>Canonical context vs the alternatives</h2>
+    <p class="lead-answer">It's easy to confuse canonical context with three things it isn't:</p>
+    <ul>
+      <li><strong>vs RAG.</strong> A plain RAG stack returns the top-k most similar chunks and leaves the agent to sift them. Canonical context returns the one current, authoritative doc and marks the rest stale or duplicate. Same retrieval machinery, a source-of-truth answer instead of a similarity pile.</li>
+      <li><strong>vs a bigger context window.</strong> A bigger window only lets the agent hold more; it doesn't tell it which doc is current, so it still rereads candidates. See <a href="/answers/token-cost-of-agent-context/">what context costs your agents</a> for the measured difference.</li>
+      <li><strong>vs a CLAUDE.md / AGENTS.md.</strong> A single static file is loaded whole every session and ages the day it ships. Canonical context routes each query to the current doc instead. A 2026 ETH Zurich study found big context files cut task success and raised cost over 20%; <a href="/answers/why-context-files-dont-scale/">why context files stop scaling</a> covers it.</li>
+    </ul>
+
     <div class="related">
       <div class="l">Related questions</div>
       <ul>
         <li><a href="/answers/stop-agent-rereading-docs/">How do I stop my agent rereading the same files every session?</a></li>
+        <li><a href="/answers/token-cost-of-agent-context/">What does context cost your coding agents? Measured, by scenario.</a></li>
+        <li><a href="/answers/why-context-files-dont-scale/">Why do AGENTS.md / CLAUDE.md context files stop scaling?</a></li>
+        <li><a href="/answers/local-first-context-for-agents/">Can you give coding agents canonical context without a cloud?</a></li>
         <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
         <li><a href="/vs/context-hub/">trovex vs context-hub (CTX)</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How is canonical context different from RAG?</p>
+        <p class="faq-a">RAG returns the top-k most similar chunks; canonical context returns the one current, authoritative doc and marks the rest stale or duplicate. It is retrieval tuned for a source of truth, not a similarity pile the agent still has to sift.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Is canonical context the same as a bigger context window or a CLAUDE.md file?</p>
+        <p class="faq-a">No. A bigger window only holds more; a CLAUDE.md is one static file loaded whole. Canonical context routes each query to the current doc, so the agent reads the right slice for the task, not everything and not a fixed blob.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How do I give my agents canonical context?</p>
+        <p class="faq-a">Index your docs and serve the one current doc per query with a freshness marker. trovex does this locally; it returns a path:line pointer marked canonical, stale, or duplicate, down to the section.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>Serve your agents canonical context.</h2>

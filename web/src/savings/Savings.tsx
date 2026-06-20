@@ -194,7 +194,7 @@ export default function Savings() {
         <p className="sv-sub">
           Every session, your coding agents reread the same docs to work out which one is current.
           trovex keeps the canonical copy and hands them a single answer. Estimate the difference on
-          your own numbers — no install needed, nothing leaves this page.
+          your own numbers. No install needed, nothing leaves this page.
         </p>
       </header>
 

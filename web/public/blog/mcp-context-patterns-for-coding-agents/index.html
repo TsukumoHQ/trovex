@@ -80,6 +80,8 @@
     <p class="updated">Updated <time datetime="2026-06-20">20 June 2026</time></p>
     <h1>MCP context patterns for coding agents: dump, retrieve, or answer</h1>
 
+    <img class="post-hero" src="/blog/mcp-context-patterns-for-coding-agents/hero.webp" width="1200" height="800" loading="eager" decoding="async" alt="Three routes to one node: a flooded grey band, a scattered grey pile, and one clean green line reaching the node directly." />
+
     <div class="verdict">
       <div class="l">Short version</div>
       <p>When you wire project knowledge into a coding agent over MCP, you're choosing one of three patterns: dump everything into the window, return a set of candidate chunks to rank, or serve the single canonical doc that answers the query. They trade off cost, accuracy, and how much the agent has to do. For doc-heavy repos and multi-session work, the answer pattern wins on tokens (about 60% fewer per lookup) and on getting the <em>current</em> doc. The others have their place. Here's how to pick.</p>

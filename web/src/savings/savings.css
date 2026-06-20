@@ -1,0 +1,190 @@
+/* /savings — token-savings calculator. Reuses the product tokens from index.css
+   (:root vars: --accent #22c55e, --bg-card, --fg, Fira). Calm, dense, dev-native;
+   no cinematic stage — this is a tool, not the landing. */
+
+.sv-wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 56px 24px 96px;
+}
+
+.sv-head {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.sv-brand {
+  display: inline-block;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--fg-muted);
+  margin-bottom: 20px;
+}
+.sv-brand span { color: var(--accent); }
+.sv-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  color: var(--accent);
+  margin: 0 0 12px;
+}
+.sv-h1 {
+  font-size: clamp(26px, 4vw, 38px);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 auto 14px;
+  max-width: 18ch;
+}
+.sv-sub {
+  color: var(--fg-muted);
+  font-size: 16px;
+  max-width: 56ch;
+  margin: 0 auto;
+}
+
+.sv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .sv-grid { grid-template-columns: 1fr; }
+}
+
+.sv-inputs {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sv-field { display: flex; flex-direction: column; gap: 6px; }
+.sv-field-label { font-size: 13px; color: var(--fg-muted); }
+.sv-field-hint { color: var(--fg-faint); font-style: normal; }
+.sv-field-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: 15px;
+  padding: 9px 11px;
+  width: 100%;
+}
+.sv-field-input:focus { border-color: var(--accent-line); outline: none; }
+.sv-reset {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--fg-subtle);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.sv-reset:hover { color: var(--fg-muted); }
+
+.sv-result {
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  padding: 26px 22px;
+  text-align: center;
+}
+.sv-result-pct {
+  font-size: clamp(48px, 9vw, 68px);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+}
+.sv-result-label { color: var(--fg-muted); font-size: 15px; margin-top: 6px; }
+.sv-result-roll {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin: 18px 0 14px;
+  font-size: 15px;
+  color: var(--fg);
+}
+.sv-result-roll b { color: var(--accent); font-weight: 600; }
+.sv-estimate { color: var(--fg-subtle); font-size: 13px; max-width: 42ch; margin: 0 auto 20px; }
+
+.sv-cta {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: 15px;
+  padding: 11px 22px;
+  border-radius: var(--radius);
+  transition: filter 0.15s var(--ease);
+}
+.sv-cta:hover { filter: brightness(1.08); }
+
+.sv-math-toggle {
+  display: block;
+  margin: 18px auto 0;
+  background: none;
+  border: none;
+  color: var(--fg-subtle);
+  font-size: 13px;
+  cursor: pointer;
+}
+.sv-math-toggle:hover { color: var(--fg-muted); }
+.sv-math {
+  text-align: left;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 14px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--fg-muted);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.sv-share { text-align: center; margin-top: 36px; }
+.sv-h2 { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+.sv-share-sub { color: var(--fg-subtle); font-size: 14px; margin: 0 0 16px; }
+.sv-share-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.sv-share-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--fg);
+  font-size: 13px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease);
+}
+.sv-share-btn:hover { border-color: var(--accent-line); }
+
+.sv-consult {
+  text-align: center;
+  margin-top: 30px;
+  color: var(--fg-subtle);
+  font-size: 14px;
+}
+.sv-consult a { color: var(--accent); border-bottom: 1px solid var(--accent-line); }
+.sv-consult a:hover { border-color: var(--accent); }
+
+.sv-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-faint);
+  font-size: 12.5px;
+}
+.sv-foot a { color: var(--fg-subtle); }
+.sv-foot a:hover { color: var(--fg-muted); }

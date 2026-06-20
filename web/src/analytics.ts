@@ -44,6 +44,13 @@ export type EventName =
   | 'oss_surface_view'
   | 'oss_adopt'
   | 'suite_to_agency_click'
+  // /savings token-savings calculator (spec b9866d6a §5; names confirmed w/ analytics-lead).
+  // No PII: only coarse buckets + closed-enum location/trigger props. install-intent REUSES
+  // github_clicked{location:'savings_calculator'} — no parallel event (one funnel).
+  | 'calculator_run'
+  | 'math_shown'
+  | 'share_clicked'
+  | 'consult_signal_shown'
 
 type Props = Record<string, string>
 
@@ -252,4 +259,48 @@ export function trackSectionViews(): () => void {
   )
   sections.forEach((s) => io.observe(s))
   return () => io.disconnect()
+}
+
+/* ── /savings token-savings calculator ───────────────────────────────────────
+ * Helpers for the calculator surface (spec b9866d6a §5 + team-CTA f07e80b7).
+ * All props are coarse + closed-enum — NEVER repo names, file paths, or raw
+ * inputs. `result_pct` is a bucket, not the exact ratio. */
+
+/** Bucket a 0–1 savings ratio into a coarse label so the event carries no fine-grained
+ *  (re-identifiable) value — just the band. */
+export function pctBucket(ratio: number): string {
+  const p = Math.round(ratio * 100)
+  if (p <= 0) return '0'
+  if (p < 25) return '1-24'
+  if (p < 50) return '25-49'
+  if (p < 65) return '50-64'
+  if (p < 80) return '65-79'
+  return '80+'
+}
+
+/** Fire once when the calculator produces a result (debounced by the caller). Coarse only. */
+export function trackCalculatorRun(resultBucket: string): void {
+  track('calculator_run', { mode: 'inputs', result_pct: resultBucket })
+}
+
+/** "show the math" toggle opened. */
+export function trackMathShown(): void {
+  track('math_shown')
+}
+
+/** A share artifact was copied (link | tweet | badge). */
+export function trackShareClicked(format: string): void {
+  track('share_clicked', { format })
+}
+
+/** Install-intent from the calculator → REUSE github_clicked, segmented by location
+ *  (spec §5: one funnel, no parallel to_install_click). */
+export function trackInstallClick(): void {
+  track('github_clicked', { location: 'savings_calculator' })
+}
+
+/** The team-scale consulting micro-CTA rendered (honest threshold met). Measures show→click
+ *  against the canonical suite_to_agency_click fired by trackTsukumoClick on the link. */
+export function trackConsultSignalShown(trigger: string): void {
+  track('consult_signal_shown', { location: 'savings_calculator', trigger })
 }

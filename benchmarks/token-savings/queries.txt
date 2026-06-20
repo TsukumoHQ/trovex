@@ -1,0 +1,24 @@
+# Realistic doc-lookup queries an AI coding agent fires while working a repo.
+# One natural-language question per line. '#' lines are ignored.
+# Edit / extend freely — the benchmark re-runs against whatever is here.
+
+how do I install and set up trovex
+quickstart getting started guide
+how is the token savings number calculated
+configure the embedding model
+which embedder does it use by default
+submit to the mcp registry
+how do I deploy and host it
+how does reranking the results work
+how does indexing the docs work
+vector search with sqlite
+beta welcome and onboarding steps
+frequently asked questions
+run the mcp server locally
+chunking long markdown documents
+measure token consumption before and after
+write token and authentication
+query result caching and invalidation
+stale and duplicate doc detection
+multi source configuration
+how do agents query trovex

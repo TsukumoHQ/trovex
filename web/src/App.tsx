@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { track, trackLandingView, trackRequestAccessClick, trackWaitlistSubmitted, trackTsukumoClick, getAttribution } from './analytics'
+import { track, trackLandingView, trackInstallClick, trackTsukumoClick } from './analytics'
 
-// The beta CTA funnels to the in-page waitlist. The consult band is the suite→agency
-// handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so tsukumo reads
-// it as source=suite and the loop closes to assessment_request.
+// trovex is public beta: the primary action is install + a GitHub star. The consult band
+// is the suite→agency handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so
+// tsukumo reads it as source=suite and the loop closes to assessment_request.
 const CONSULT_URL =
   'https://tsukumo.ch/consulting?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting'
 const reduceMotion =
@@ -239,66 +239,8 @@ const FEATURES = [
   { no: '03', kicker: 'Share', title: 'Keep what one agent learns', body: 'One agent figures something out and saves it once. Every other agent, and your teammates, read it back instead of working it out again.', shot: <StoreShot />, flip: false },
 ]
 
-/* ── Waitlist: the private-beta conversion. First-party capture via /api/waitlist. ── */
-function WaitlistForm({ location = 'waitlist' }: { location?: string }) {
-  const [email, setEmail] = useState('')
-  const [company, setCompany] = useState('') // honeypot — humans never see this
-  const [state, setState] = useState<'idle' | 'submitting' | 'ok' | 'soon' | 'error'>('idle')
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (state === 'submitting') return
-    setState('submitting')
-    try {
-      const res = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // attribution = closed-enum source props (no PII); lets the endpoint store
-        // signups-by-source. The email is the only PII and is handled server-side.
-        body: JSON.stringify({ email, company, ...getAttribution() }),
-      })
-      if (res.ok) { setState('ok'); trackWaitlistSubmitted(location); return }
-      setState(res.status === 503 ? 'soon' : 'error')
-    } catch {
-      setState('error')
-    }
-  }
-
-  if (state === 'ok') {
-    return (
-      <div className="wl-done" role="status">
-        <p className="wl-done-t">You're on the list.</p>
-        <p className="wl-done-s">We're letting people in as spots open and we'll email your invite then — one note, no spam, no list-selling. We won't promise a date; the beta is small on purpose.</p>
-        <p className="wl-done-s">While you wait, <a href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'waitlist-done' })}>see how it works ↓</a></p>
-      </div>
-    )
-  }
-
-  return (
-    <form className="wl-form" onSubmit={onSubmit} noValidate>
-      <input
-        className="wl-input" type="email" required value={email} placeholder="you@company.com"
-        autoComplete="email" aria-label="Email address"
-        onChange={(e) => setEmail(e.target.value)}
-        onFocus={() => trackRequestAccessClick(location)}
-      />
-      {/* honeypot: off-screen, bots fill it, humans don't */}
-      <input
-        className="wl-hp" tabIndex={-1} autoComplete="off" aria-hidden="true"
-        value={company} onChange={(e) => setCompany(e.target.value)}
-      />
-      <button className="btn btn-primary" type="submit" disabled={state === 'submitting'}>
-        {state === 'submitting' ? 'sending…' : 'Request beta access'}
-      </button>
-      {state === 'soon' && (
-        <p className="wl-msg">The beta list isn't open for sign-ups just yet — check back in a few days.</p>
-      )}
-      {state === 'error' && (
-        <p className="wl-msg wl-err">Something went wrong on our end. Please try again in a moment.</p>
-      )}
-    </form>
-  )
-}
+// trovex is open source + public beta — the install command is the conversion.
+const GITHUB = 'https://github.com/TsukumoHQ/trovex'
 
 export default function App() {
   useReveal()
@@ -313,7 +255,8 @@ export default function App() {
           <a className="brand" href="/">trovex</a>
           <span className="sp" />
           <a className="lk hide" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'nav' })}>Product</a>
-          <a className="btn btn-primary nav-cta" href="#waitlist" onClick={() => trackRequestAccessClick('nav')}>Request access</a>
+          <a className="lk hide" href="#start" onClick={() => track('cta_clicked', { cta_id: 'quickstart', location: 'nav' })}>Quickstart</a>
+          <a className="btn btn-primary nav-cta" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick()}>star on GitHub</a>
         </div>
       </nav>
 
@@ -329,7 +272,8 @@ export default function App() {
               <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
             </p>
             <div className="hero-cta">
-              <a className="btn btn-primary" href="#waitlist" onClick={() => trackRequestAccessClick('hero')}>Request beta access</a>
+              <a className="btn btn-primary" href="#start" onClick={() => track('cta_clicked', { cta_id: 'get-started', location: 'hero' })}>get started</a>
+              <a className="btn btn-ghost" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick()}>star on GitHub</a>
             </div>
             <a className="hero-see" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'hero' })}>see it work ↓</a>
           </div>
@@ -408,13 +352,20 @@ export default function App() {
           </div>
         </section>
 
-        {/* Waitlist — the private-beta conversion */}
-        <section className="section" id="waitlist">
+        {/* Get started — public beta, the install is the conversion */}
+        <section className="section" id="start">
           <div className="wrap">
             <div className="cta reveal">
-              <h2>Request beta access.</h2>
-              <p>trovex is in a private beta. Leave your email and we'll send an invite as spots open.</p>
-              <WaitlistForm location="cta" />
+              <h2>Get started.</h2>
+              <p>trovex is open source and in public beta. Install it, point your agent at it, and you're running in about a minute. No account, no keys.</p>
+              <ol className="start-steps">
+                <li><code>uv tool install git+https://github.com/TsukumoHQ/trovex</code></li>
+                <li><code>trovex index /path/to/your/repo</code></li>
+                <li><code>trovex search "how do we roll back a deploy?"</code> and it prints the tokens it saved.</li>
+              </ol>
+              <div className="hero-cta">
+                <a className="btn btn-primary" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick()}>star on GitHub</a>
+              </div>
               <p className="cta-note">No cloud, no API keys. Your docs never leave your machine.</p>
             </div>
           </div>

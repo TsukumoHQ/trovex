@@ -129,7 +129,7 @@ construction. trovex implements this with a shared write path.
 
 ## FAQ
 
-**Why not just a CLAUDE.md or AGENTS.md?** Those are one static file. They go stale, don't scale
+**Why not a CLAUDE.md or AGENTS.md?** Those are one static file. They go stale, don't scale
 past a handful of topics, and can't route a question to the right doc or section. trovex keeps
 many docs canonical and serves the one that answers.
 

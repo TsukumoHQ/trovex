@@ -9,14 +9,14 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 
 const PUBLISHED = "2026-06-17"; // pages first shipped
-const MODIFIED = "2026-06-19"; // this freshness pass
-const MODIFIED_HUMAN = "19 June 2026";
+const MODIFIED = "2026-06-21"; // this freshness pass
+const MODIFIED_HUMAN = "21 June 2026";
 const SPEAKABLE = `"speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] }`;
 const DATES = `"datePublished": "${PUBLISHED}", "dateModified": "${MODIFIED}"`;
 const STAMP = `<p class="updated">Updated <time datetime="${MODIFIED}">${MODIFIED_HUMAN}</time></p>`;
 
 const dirs = [];
-for (const sec of ["answers", "vs", "for"]) {
+for (const sec of ["answers", "vs", "for", "glossary"]) {
   const base = `public/${sec}`;
   for (const slug of readdirSync(base, { withFileTypes: true })) {
     if (!slug.isDirectory()) continue;

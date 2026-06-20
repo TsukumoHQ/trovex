@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/glossary/ssot-for-agents/" />
+  <title>What is an SSOT for agents? | trovex glossary</title>
+  <meta name="description" content="An SSOT for agents is one shared store that every agent and teammate reads from and writes to, so the whole fleet works from the same current knowledge instead of scattered, drifting copies." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/glossary/ssot-for-agents/" />
+  <meta property="og:title" content="What is an SSOT for agents? | trovex glossary" />
+  <meta property="og:description" content="An SSOT for agents is one shared store that every agent and teammate reads from and writes to, so the whole fleet works from the same current knowledge instead of scattered, drifting copies." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="What is an SSOT for agents? | trovex glossary" />
+  <meta name="twitter:description" content="An SSOT for agents is one shared store that every agent and teammate reads from and writes to, so the whole fleet works from the same current knowledge instead of scattered, drifting copies." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "trovex",
+          "item": "https://trovex.dev/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Glossary",
+          "item": "https://trovex.dev/glossary/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "SSOT for agents",
+          "item": "https://trovex.dev/glossary/ssot-for-agents/"
+        }
+      ]
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://trovex.dev/glossary/ssot-for-agents/#term",
+      "name": "SSOT for agents",
+      "description": "An SSOT for agents is one shared store that every agent and teammate reads from and writes to, so the whole fleet works from the same current knowledge instead of scattered, drifting copies.",
+      "inDefinedTermSet": "https://trovex.dev/glossary/"
+    },
+    {
+      "@type": "QAPage",
+      "datePublished": "2026-06-21",
+      "dateModified": "2026-06-21",
+      "speakable": {
+        "@type": "SpeakableSpecification",
+        "cssSelector": [
+          "h1",
+          ".verdict p"
+        ]
+      },
+      "mainEntity": {
+        "@type": "Question",
+        "name": "What is an SSOT for agents?",
+        "text": "What does single source of truth (SSOT) mean for a fleet of coding agents?",
+        "answerCount": 1,
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "url": "https://trovex.dev/glossary/ssot-for-agents/",
+          "text": "An SSOT for agents is one shared store that every agent and teammate reads from and writes to, so the whole fleet works from the same current knowledge instead of scattered, drifting copies."
+        }
+      }
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/glossary/">Glossary</a> / SSOT for agents
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-21">21 June 2026</time></p>
+    <h1>What is an SSOT for agents?</h1>
+
+    <div class="verdict">
+      <div class="l">Definition</div>
+      <p><strong>An SSOT for agents is</strong> one shared store that every agent and teammate reads from and writes to, so the whole fleet works from the same current knowledge instead of scattered, drifting copies.</p>
+    </div>
+
+    <p class="lead-answer">Without it, each agent re-derives the same answers and saves notes into its own files, which drift out of sync. An SSOT closes that loop: an agent saves what it learns once, through one shared point, and the next agent or teammate reads it back.</p>
+    <p class="lead-answer"><a href="/">trovex</a> implements this with a shared read/write path and freshness-marked canonical docs, so single source of truth holds by construction rather than by discipline.</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/source-of-truth-multi-agent-repos/">What is a source of truth for multi-agent repos?</a></li>
+      </ul>
+    </div>
+
+    <div class="related">
+      <div class="l">Related terms</div>
+      <ul>
+        <li><a href="/glossary/canonical-doc/">canonical doc</a></li>
+        <li><a href="/glossary/record/">record</a></li>
+        <li><a href="/glossary/re-derivation/">re-derivation</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Give your agents one source of truth.</h2>
+      <p>One current answer per query, with a freshness marker, in about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#waitlist">Request beta access</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="/#waitlist">Request access</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+</body>
+</html>

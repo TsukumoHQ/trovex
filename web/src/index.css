@@ -356,6 +356,28 @@ a { color: inherit; text-decoration: none; }
 .consult a { color: var(--fg-muted); border-bottom: 1px solid var(--border-strong); padding-bottom: 1px; transition: color .15s, border-color .15s; }
 .consult a:hover { color: var(--accent); border-color: var(--accent); }
 
+/* newsletter band — quiet email capture, below the install (not a competing CTA) */
+.news-band { padding: clamp(48px, 7vw, 88px) 0 0; }
+.news-in { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(28px, 5vw, 64px); align-items: center; padding: clamp(28px, 4vw, 44px) clamp(24px, 4vw, 48px); border: 1px solid var(--border); border-radius: var(--radius-lg); background: linear-gradient(180deg, var(--accent-soft), transparent 70%), var(--stage-2); }
+.news-eyebrow { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg-subtle); }
+.news-h { font-size: clamp(22px, 2.8vw, 30px); font-weight: 600; letter-spacing: -0.02em; margin: 12px 0 0; }
+.news-deck { color: var(--fg-muted); font-size: 15.5px; line-height: 1.55; margin: 12px 0 0; max-width: 42ch; }
+.news-form { display: flex; flex-direction: column; gap: 14px; }
+.news-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.news-input { flex: 1; min-width: 0; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--fg); font-family: var(--font-sans); font-size: 15px; padding: 12px 14px; }
+.news-input::placeholder { color: var(--fg-faint); }
+.news-btn { flex-shrink: 0; }
+.news-btn:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
+.news-optin { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--fg-muted); line-height: 1.45; cursor: pointer; }
+.news-optin input { margin-top: 2px; width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
+.news-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.news-note { font-size: 12.5px; color: var(--fg-subtle); margin: 0; line-height: 1.5; }
+.news-note a { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 3px; }
+.news-note a:hover { color: var(--accent); }
+.news-err { color: var(--fg-muted); }
+.news-status { font-size: 15px; color: var(--accent); margin: 0; line-height: 1.5; }
+@media (max-width: 720px) { .news-in { grid-template-columns: 1fr; } }
+
 /* footer */
 .footer { border-top: 1px solid var(--border); padding: 40px 0 64px; margin-top: clamp(72px, 10vw, 120px); }
 .footer-in { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }

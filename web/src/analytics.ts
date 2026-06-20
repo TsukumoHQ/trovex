@@ -39,6 +39,7 @@ export type EventName =
   | 'section_viewed'
   | 'request_access_clicked'
   | 'waitlist_submitted'
+  | 'newsletter_signup'
   // canonical cross-property suite→agency funnel (funnel-event-taxonomy memory).
   // trovex = reference impl; wrai.th/yoru inherit this module + fire the same events.
   | 'oss_surface_view'
@@ -211,6 +212,13 @@ export function trackRequestAccessClick(location: string): void {
 export function trackWaitlistSubmitted(location = 'waitlist'): void {
   track('waitlist_submitted', { location })
   trackOssAdopt('waitlist')
+}
+
+/** Fire on a genuinely NEW newsletter signup (server returns body.new). The shared hub
+ *  (tsukumo.ch/api/newsletter) dedups; we only count a real insert so bots/duplicates don't
+ *  inflate the funnel. No email / no PII — source attribution + location only. */
+export function trackNewsletterSignup(location = 'footer'): void {
+  track('newsletter_signup', { location })
 }
 
 /** Canonical cross-property adoption event. kind = how the dev adopted trovex. Call

@@ -9,7 +9,8 @@
     "check:sitemap": "node scripts/check-sitemap.mjs",
     "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "indexnow": "node scripts/indexnow-ping.mjs"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",

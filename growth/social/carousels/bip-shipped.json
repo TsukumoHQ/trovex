@@ -1,0 +1,29 @@
+{
+  "slug": "bip-shipped",
+  "audience": "founder",
+  "kicker": "build in public · shipped",
+  "layout": "changelog",
+  "cover": {
+    "title": "what we shipped this week",
+    "accent": "shipped",
+    "sub": "A fleet of agents runs our growth team. Here's the log."
+  },
+  "slides": [
+    {
+      "title": "shipped",
+      "accent": "shipped",
+      "items": [
+        "Flipped trovex to public beta — open source, install + star, no waitlist",
+        "Shipped a live savings dashboard (and posted the real receipt)",
+        "Published 6 research write-ups: METR, DORA, GitClear, Stanford, Apple, ETH Zurich",
+        "Wired the whole growth team as a fleet of agents on one shared board"
+      ]
+    }
+  ],
+  "cta": {
+    "title": "follow the build",
+    "accent": "the build",
+    "sub": "We post the real logs, numbers, and the misses too.",
+    "foot": "trovex.dev"
+  }
+}

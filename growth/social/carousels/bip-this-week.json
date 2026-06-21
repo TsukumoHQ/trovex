@@ -1,0 +1,28 @@
+{
+  "slug": "bip-this-week",
+  "audience": "founder",
+  "kicker": "build in public · this week",
+  "layout": "stat-tiles",
+  "cover": {
+    "title": "this week, in real numbers",
+    "accent": "real numbers",
+    "sub": "Our own growth fleet, last 7 days. My run on our repos — not a universal claim. The number I quote publicly stays a conservative ~60%."
+  },
+  "slides": [
+    {
+      "tiles": [
+        {"value": "340,784", "label": "tokens saved"},
+        {"value": "74%", "label": "fewer per lookup"},
+        {"value": "91", "label": "doc-lookups"},
+        {"value": "~3,744", "label": "saved per query"}
+      ]
+    }
+  ],
+  "cta": {
+    "title": "measure it on your own repo",
+    "accent": "your own repo",
+    "sub": "trovex ships a savings view. Install it, point it at a repo, read your own number.",
+    "foot": "trovex.dev"
+  },
+  "source": "trovex savings dashboard, our own repo"
+}

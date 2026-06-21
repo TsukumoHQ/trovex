@@ -7,7 +7,7 @@
     "dev": "vite",
     "check:brand": "node scripts/check-brand.mjs",
     "check:sitemap": "node scripts/check-sitemap.mjs",
-    "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && tsc -b && vite build",
+    "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && tsc -b && vite build && node scripts/gen-md-twins.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "indexnow": "node scripts/indexnow-ping.mjs"

@@ -153,6 +153,58 @@ def stats() -> None:
 
 
 @app.command()
+def prune(
+    status: str = typer.Option("duplicate", help="Doc status to prune."),
+    execute: bool = typer.Option(False, "--execute", help="Actually delete (default: dry-run)."),
+) -> None:
+    """Prune docs by status (default: near-duplicates) via the proper cascade delete.
+
+    Dry-run by default: lists each doomed doc + the canonical it duplicates, so you
+    can sanity-check the kept set first. Pass --execute to delete each via the store's
+    cascade (chunks, vec_chunks, chunks_fts, doc_versions, vec_docs, docs) — no orphan
+    vec rows. Near-dupes won't be recreated by a re-index (they matched existing canon).
+    Take a backup first (cp data_dir/trovex.db ...).
+    """
+    from .store import SqliteStore
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    rows = store.db.execute(
+        """SELECT d.id, d.ext_id, d.title,
+                  c.id AS canon_id, c.title AS canon_title
+           FROM docs d LEFT JOIN docs c ON c.id = d.dup_of_id
+           WHERE d.status = ?
+           ORDER BY d.id""",
+        (status,),
+    ).fetchall()
+    if not rows:
+        console.print(f"[green]No docs with status='{status}'. Nothing to prune.[/green]")
+        return
+
+    console.print(f"[bold]{len(rows)} doc(s) with status='{status}'[/bold] (each → its canonical):")
+    orphans = 0
+    for r in rows:
+        if r["canon_id"]:
+            canon = f"#{r['canon_id']} [dim]{(r['canon_title'] or '')[:40]}[/dim]"
+        else:
+            canon = "[red]NO canonical (dup_of_id null/missing)[/red]"
+            orphans += 1
+        console.print(f"  #{r['id']} {r['ext_id'] or '[dim](no ext_id)[/dim]'}  [dim]{(r['title'] or '')[:40]}[/dim]  → {canon}")
+    if orphans:
+        console.print(f"[yellow]{orphans} have no resolvable canonical — review before --execute.[/yellow]")
+
+    if not execute:
+        console.print(f"\n[yellow]DRY-RUN.[/yellow] Re-run with [cyan]--execute[/cyan] to delete these {len(rows)}.")
+        return
+
+    deleted = 0
+    for r in rows:
+        if store.delete_by_id(r["id"]):
+            deleted += 1
+    console.print(f"[green]Deleted {deleted}/{len(rows)} '{status}' docs.[/green] Run [cyan]trovex stats[/cyan] to verify.")
+
+
+@app.command()
 def migrate(
     source: str = typer.Option(None, "--source", help="Only this source id (else all file sources)."),
     execute: bool = typer.Option(False, "--execute", help="Write to the store (default: dry-run)."),
@@ -222,6 +274,171 @@ def migrate(
     if not execute:
         console.print("[dim]Re-run with --execute to write, then drop the source(s) "
                       "from sources.yaml.[/dim]")
+
+
+def _fmt_date(ts: float) -> str:
+    return time.strftime("%Y-%m-%d", time.localtime(ts))
+
+
+def _scan_dir(settings, root: Path, label: str):
+    """Gather + resolve every .md under root. Returns (paths, files, skipped)."""
+    from . import onboarding
+    paths = onboarding.gather(
+        root, set(settings.ignore_dirs), max_bytes=settings.max_file_size_bytes)
+    files = []
+    for p in paths:
+        f = onboarding.build(p, root, label)
+        if f is not None:
+            files.append(f)
+    return paths, files, len(paths) - len(files)
+
+
+def _print_scan(files, skipped: int) -> None:
+    """The date/source summary shared by `import` preview and the `onboard` wizard."""
+    dates = sorted(f.mtime for f in files)
+    by_source: dict[str, int] = {}
+    for f in files:
+        by_source[f.date_source] = by_source.get(f.date_source, 0) + 1
+    console.print(
+        f"[bold]{len(files)}[/bold] docs · dated "
+        f"[cyan]{_fmt_date(dates[0])}[/cyan] → [cyan]{_fmt_date(dates[-1])}[/cyan]  "
+        f"[dim](skipped {skipped} empty/unreadable)[/dim]")
+    console.print(
+        "  dates from: " + "  ".join(
+            f"{src}={n}" for src, n in sorted(by_source.items(), key=lambda x: -x[1])))
+
+
+def _write_files(settings, files, kind: str, chunk: int) -> int:
+    """Embed + write resolved files into the store in batches. Returns count written."""
+    from .store import SqliteStore
+    store = SqliteStore(settings)
+    buf: list[dict] = []
+    written = 0
+    for f in files:
+        buf.append({
+            "content": f.content, "kind": kind or None, "ext_id": f.ext_id,
+            "title": f.title, "mtime": f.mtime, "tags": f.tags,
+        })
+        if len(buf) >= chunk:
+            store.put_batch(buf, embed_chunks=True)
+            written += len(buf)
+            buf.clear()
+            console.print(f"[dim]  …{written}/{len(files)}[/dim]")
+    if buf:
+        store.put_batch(buf, embed_chunks=True)
+        written += len(buf)
+    return written
+
+
+@app.command(name="import")
+def import_(
+    root: Path = typer.Argument(..., help="Directory to import all .md from."),
+    source: str = typer.Option(
+        None, "--source", help="Source label / tag (default: the directory name)."),
+    kind: str = typer.Option(
+        "reference", "--kind", help="Lifecycle kind for imported docs ('' for living)."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Preview what would import (dates, counts) — write nothing."),
+    chunk: int = typer.Option(100, help="Embedding batch size."),
+) -> None:
+    """Import every .md under ROOT into the trovex store, dated from its history.
+
+    Non-interactive / scriptable — for the guided first-run flow use `onboard`.
+    Resolves each file's real date (git first-commit → frontmatter date → file
+    mtime), tags it from its folder path, writes it into the trovex-owned store.
+    Re-runnable: ext_id is derived from the path, so re-importing updates in place.
+    """
+    root = root.expanduser().resolve()
+    if not root.is_dir():
+        console.print(f"[red]Not a directory:[/red] {root}")
+        raise typer.Exit(1)
+    label = (source or root.name).strip().strip("/").lower() or "import"
+
+    settings = Settings()
+    console.print(
+        f"[bold]Import[/bold] {root}  →  store (source [cyan]{label}[/cyan])  "
+        f"{'[yellow]dry-run[/yellow]' if dry_run else ''}")
+    paths, files, skipped = _scan_dir(settings, root, label)
+    console.print(f"[dim]Found {len(paths)} markdown files. Resolving dates…[/dim]")
+
+    if not files:
+        console.print("[yellow]Nothing to import[/yellow] (no readable, non-empty .md).")
+        return
+    _print_scan(files, skipped)
+
+    if dry_run:
+        console.print("\n[dim]Sample (newest first):[/dim]")
+        for f in sorted(files, key=lambda x: -x.mtime)[:8]:
+            console.print(
+                f"  [cyan]{_fmt_date(f.mtime)}[/cyan] [dim]{f.date_source:11}[/dim] {f.rel}")
+        console.print("\n[dim]Re-run without --dry-run to write to the store.[/dim]")
+        return
+
+    written = _write_files(settings, files, kind, chunk)
+    console.print(
+        f"\n[green]Imported {written} docs[/green] into the store, dated + tagged + queryable.")
+    console.print(
+        '[bold]Next[/bold] — query them: '
+        '[cyan]uv run trovex search "..."[/cyan]  '
+        "[dim]or browse at[/dim] [cyan]uv run trovex serve[/cyan] → http://localhost:8765")
+
+
+@app.command()
+def onboard() -> None:
+    """Guided first run: pick a folder, preview the dated docs, import, start serving.
+
+    The friendly front door to `import` — walks you through choosing a directory,
+    shows what would land (count, date range, where each date came from), confirms
+    before writing, then offers to launch the server. Everything it does is also
+    available non-interactively via `import` / `serve`.
+    """
+    console.print("[bold]trovex onboard[/bold] — import your markdown, dated from its history.\n")
+    settings = Settings()
+
+    while True:
+        raw = typer.prompt("Folder to import .md from", default=str(Path.cwd()))
+        root = Path(raw).expanduser().resolve()
+        if root.is_dir():
+            break
+        console.print(f"[red]Not a directory:[/red] {root}")
+
+    default_label = (root.name or "import").strip().strip("/").lower()
+    label = (typer.prompt("Source label (tag)", default=default_label)
+             ).strip().strip("/").lower() or default_label
+
+    console.print(f"\n[dim]Scanning {root} …[/dim]")
+    paths, files, skipped = _scan_dir(settings, root, label)
+    if not files:
+        console.print("[yellow]No readable, non-empty .md found here.[/yellow] Nothing to do.")
+        return
+    console.print(f"[dim]Found {len(paths)} files.[/dim]")
+    _print_scan(files, skipped)
+    console.print("\n[dim]Newest first:[/dim]")
+    for f in sorted(files, key=lambda x: -x.mtime)[:8]:
+        console.print(
+            f"  [cyan]{_fmt_date(f.mtime)}[/cyan] [dim]{f.date_source:11}[/dim] {f.rel}")
+
+    if not typer.confirm(f"\nImport these {len(files)} docs into the store?", default=True):
+        console.print("[dim]Aborted — nothing written.[/dim]")
+        return
+    kind = (typer.prompt(
+        "Kind (lifecycle tag, blank for living docs)", default="reference")).strip()
+
+    console.print()
+    written = _write_files(settings, files, kind, 100)
+    console.print(f"\n[green]Imported {written} docs[/green], dated + tagged + queryable.")
+
+    if not typer.confirm("Start the server now?", default=True):
+        console.print(
+            "[dim]Later:[/dim] [cyan]uv run trovex serve[/cyan] → http://localhost:8765")
+        return
+    console.print(
+        f"[dim]Serving at[/dim] [cyan]http://localhost:{settings.port}[/cyan] "
+        "[dim](Ctrl-C to stop)…[/dim]")
+    import uvicorn
+
+    from .server import build_app
+    uvicorn.run(build_app(), host=settings.host, port=settings.port)
 
 
 @app.command(name="backfill-chunks")

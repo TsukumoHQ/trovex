@@ -188,40 +188,69 @@ class SqliteStore:
         ).fetchone()["c"]
 
     def delete(self, ext_id: str) -> bool:
-        """Remove a trovex-owned doc (row + its embedding). True if it existed."""
+        """Remove a trovex-owned doc (row + its embedding) by ext_id. True if it existed."""
         with self._lock:
             row = self.db.execute(
                 "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
             ).fetchone()
             if not row:
                 return False
-            for c in self.db.execute(
-                "SELECT id FROM chunks WHERE doc_id = ?", (row["id"],)
-            ).fetchall():
-                self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
-                self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
-            self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (row["id"],))
-            self.db.execute("DELETE FROM doc_versions WHERE doc_id = ?", (row["id"],))
-            self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (row["id"],))
-            self.db.execute("DELETE FROM docs WHERE id = ?", (row["id"],))
+            self._delete_cascade_locked(row["id"])
             self.db.commit()
             return True
 
-    def put_batch(self, items: list[dict]) -> list[str]:
-        """Bulk insert/update + a single batched embed call. For migrations.
+    def delete_by_id(self, doc_id: int) -> bool:
+        """Remove a doc by its internal id (handles rows with a NULL ext_id, e.g.
+        agent/MCP-written docs). Same cascade as delete(). True if it existed."""
+        with self._lock:
+            row = self.db.execute(
+                "SELECT id FROM docs WHERE id = ?", (doc_id,)
+            ).fetchone()
+            if not row:
+                return False
+            self._delete_cascade_locked(doc_id)
+            self.db.commit()
+            return True
 
-        Each item: {content, kind?, ext_id?, title?}. Embeds all texts in one
-        go (the embedder batches internally) — far faster than per-doc put().
+    def _delete_cascade_locked(self, doc_id: int) -> None:
+        """Proper cascade delete by internal id — no orphan vec rows. Caller holds _lock
+        and commits. Removes chunks (+ vec_chunks/chunks_fts), doc_versions, vec_docs, docs."""
+        for c in self.db.execute(
+            "SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)
+        ).fetchall():
+            self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+            self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
+        self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+        self.db.execute("DELETE FROM doc_versions WHERE doc_id = ?", (doc_id,))
+        self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
+        self.db.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
+
+    def put_batch(self, items: list[dict], *, embed_chunks: bool = False) -> list[str]:
+        """Bulk insert/update + a single batched embed call. For migrations + import.
+
+        Each item: {content, kind?, ext_id?, title?, mtime?, tags?}. ``mtime`` (a
+        unix timestamp) sets the doc's date — used by ``import`` to preserve a
+        file's real creation date (git/frontmatter) instead of stamping ``now``;
+        omit it to default to now. ``tags`` are attached after insert (the
+        ``kind/<kind>`` facet is added automatically, matching put()).
+
+        Embeds all doc texts in one go (the embedder batches internally) — far
+        faster than per-doc put(). Pass ``embed_chunks=True`` to also (re)chunk +
+        embed every doc for chunk-level retrieval, so the import is queryable
+        without a separate backfill-chunks pass.
         """
         now = time.time()
         to_embed: list[tuple[int, str]] = []
         ext_ids: list[str] = []
+        tag_jobs: list[tuple[int, list[str]]] = []
+        chunk_pairs: list[tuple[int, str]] = []
         with self._lock:
             for it in items:
                 content = it["content"]
                 ext_id = it.get("ext_id") or uuid.uuid4().hex
                 title = it.get("title") or _extract_title(content)
                 kind = it.get("kind")
+                mtime = float(it.get("mtime") or now)
                 size = len(content.encode("utf-8"))
                 tok = len(content) // 4
                 existing = self.db.execute(
@@ -232,7 +261,7 @@ class SqliteStore:
                     self.db.execute(
                         """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
                                size_bytes=?, mtime=?, last_indexed=? WHERE id=?""",
-                        (content, title, kind, tok, size, now, now, doc_id),
+                        (content, title, kind, tok, size, mtime, now, doc_id),
                     )
                 else:
                     cur = self.db.execute(
@@ -241,13 +270,20 @@ class SqliteStore:
                                 size_bytes, tokens_est, mtime, first_indexed,
                                 last_indexed, title, content, ext_id, kind)
                            VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (TROVEX_SOURCE_ID, ext_id, size, tok, now, now, now,
+                        (TROVEX_SOURCE_ID, ext_id, size, tok, mtime, mtime, now,
                          title, content, ext_id, kind),
                     )
                     doc_id = cur.lastrowid
                 ext_ids.append(ext_id)
                 text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
                 to_embed.append((doc_id, text))
+                if it.get("tags") is not None or kind:
+                    tags = list(it.get("tags") or [])
+                    if kind:
+                        tags.append(f"kind/{kind}")
+                    tag_jobs.append((doc_id, tags))
+                if embed_chunks:
+                    chunk_pairs.extend(self._insert_chunks(doc_id, content, title))
 
             embeddings = list(self.embedder.embed([t for _, t in to_embed]))
             for (doc_id, _), emb in zip(to_embed, embeddings, strict=True):
@@ -256,6 +292,9 @@ class SqliteStore:
                     "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)",
                     (doc_id, sqlite_vec.serialize_float32(emb.tolist())),
                 )
+            for doc_id, tags in tag_jobs:
+                self._set_tags(doc_id, tags)
+            self._embed_chunks(chunk_pairs)
             self.db.commit()
         return ext_ids
 

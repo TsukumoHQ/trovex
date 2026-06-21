@@ -119,8 +119,9 @@ a { color: inherit; text-decoration: none; }
 .hero .deck { margin: 26px auto 0; max-width: 52ch; font-size: clamp(16px, 2vw, 20px); color: var(--fg-muted); line-height: 1.55; }
 .hero-install { display: inline-flex; align-items: center; gap: 12px; margin: 32px auto 0; padding: 11px 14px; background: var(--bg-input); border: 1px solid var(--accent-line); border-radius: var(--radius); max-width: min(100%, 580px); }
 .hero-install-lab { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); flex-shrink: 0; }
-.hero-install .cmd-row { flex: 1; justify-content: space-between; }
-.hero-install .cmd-row code { font-size: 14px; color: var(--fg); }
+.hero-install .cmd-row { flex: 1; min-width: 0; justify-content: space-between; }
+.hero-install .cmd-row code { font-size: 14px; color: var(--fg); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .hero-install { flex-direction: column; align-items: stretch; gap: 8px; } .hero-install-lab { text-align: left; } }
 .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
 .hero-see { display: inline-block; margin-top: 18px; font-size: 13px; color: var(--fg-subtle); text-decoration: none; letter-spacing: 0.01em; transition: color .15s; }
 .hero-see:hover { color: var(--fg-muted); }

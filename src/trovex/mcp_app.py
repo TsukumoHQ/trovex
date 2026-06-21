@@ -143,7 +143,7 @@ def _as_taglist(v) -> list[str]:
 
 @mcp.tool()
 def trovex_write(content: str, kind: str = "", doc_id: str = "",
-              tags: list[str] | None = None, ticket: str = "") -> str:
+              tags: list[str] | None = None, ticket: str = "", force: bool = False) -> str:
     """Store a doc INSIDE trovex so every agent of every dev can read it.
 
     For records / memory / coordination notes (incidents, decisions, plans) —
@@ -152,11 +152,17 @@ def trovex_write(content: str, kind: str = "", doc_id: str = "",
     re-deriving it. Returns an opaque id; pass it back to `trovex_write` (as
     doc_id) to update the same doc.
 
+    ONE CANONICAL DOC PER TOPIC (that's trovex's whole pitch). On a CREATE, if the
+    content near-duplicates an existing canonical doc, this BLOCKS and points you at
+    it — UPDATE that doc (pass its id as doc_id) instead of creating a near-copy.
+    Pass force=true only for a genuinely new doc. (Updates — doc_id set — never block.)
+
     Args:
         content: The markdown body to store.
         kind: Lifecycle hint. "record" = event-anchored, never goes stale by
             age. Default "" = a normal living doc.
         doc_id: Omit to create; pass an existing id to overwrite that doc.
+        force: On create, override the near-duplicate block to store a new doc anyway.
         tags: List of tags (free or hierarchical "a/b/c"), e.g.
             ["type/report", "owner/cto", "domain/accounting"]. `kind/<kind>`
             is auto-added. A comma string is also accepted.
@@ -168,6 +174,19 @@ def trovex_write(content: str, kind: str = "", doc_id: str = "",
     if not _authorized():
         return _DENY
     state = get_state()
+    # Write-time dedup guard: on a CREATE (no doc_id) without force, block-and-point
+    # if this near-duplicates an existing canonical — stops the 'one topic, N near-copies'
+    # bloat at the source (the store was 43% dupes). Updates + force bypass it.
+    if not doc_id and not force:
+        dup = state.store.check_duplicate(content)
+        if dup:
+            pct = round(dup["similarity"] * 100)
+            return (
+                f"⚠ Not stored — this looks like a duplicate of doc {dup['ext_id']} "
+                f"(\"{dup['title']}\", ~{pct}% similar). One canonical doc per topic: "
+                f"UPDATE that doc instead — call trovex_write again with "
+                f"doc_id=\"{dup['ext_id']}\". For a genuinely new doc, pass force=true."
+            )
     taglist = _as_taglist(tags)
     if ticket.strip():
         taglist.append(f"ticket/{ticket.strip()}")

@@ -120,7 +120,7 @@ function frame(S, headerRight, kids, footL, footR) {
   return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"22px"}},
       kids.mark, headerRight || h("div",{},"")),
-    h("div",{style:{display:"flex",flexDirection:"column",gap:"26px",flex:1,justifyContent:"center"}}, ...kids.body),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:"26px",flex:1,justifyContent:kids.align||"center",paddingTop:kids.align==="flex-start"?"48px":"0"}}, ...kids.body),
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.rule}`,paddingTop:"22px"}},
       h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.soft}}, footL||""),
       h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:footR && footR.accent ? C.green : C.ink}}, footR ? footR.text : "")));
@@ -140,9 +140,11 @@ function coverCard(spec, S) {
 }
 function slideCard(spec, slide, S) {
   const ac = accentFor(spec.audience);
+  const dataLed = !!(slide.tiles || slide.items || slide.pairs);
   return frame(S, eyebrow(spec.kicker, S.eb), {
     mark: wordmark(brandFor(spec.audience), S.mark),
     body: layoutBody(spec, slide, S, ac),
+    align: dataLed ? "flex-start" : "center", // top-1% rhythm: data/list cards pin content high, not floating mid-card
   }, footerSource(spec, slide), { text: spec.cta.foot, accent:false });
 }
 function ctaCard(spec, S) {

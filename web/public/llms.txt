@@ -1,5 +1,7 @@
 # trovex
 
+> trovex — one canonical doc for your coding agents, ~60% fewer tokens.
+>
 > trovex is the canonical doc store for AI coding agents. It indexes a repo's
 > markdown and serves an agent the single current doc that answers a query — a
 > path:line pointer with a freshness marker — instead of letting it reread the

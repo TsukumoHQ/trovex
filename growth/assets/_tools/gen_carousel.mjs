@@ -44,6 +44,8 @@ const C = { bg:"#0c0d10", panel:"#101216", ink:"#f3f0e9", soft:"#8b8f98", faint:
 // AUTO-POST = GREEN uniformly (owner-locked autopost-green-antislop). Red dropped:
 // legacy tones red/redGhost map to green / muted-soft so old data blocks stay valid.
 const TONE = { red:C.green, redGhost:C.soft, green:C.green, soft:C.soft, ink:C.ink };
+// faint dot-grid texture on the dark canvas (teardown refinement #2: kills the flat-void feel, Linear-style restraint)
+const DOT = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><circle cx="2" cy="2" r="1.3" fill="#ffffff" fill-opacity="0.028"/></svg>').toString("base64")}`;
 const h = (t, p, ...k) => ({ type: t, props: { ...p, children: k.length <= 1 ? k[0] : k } });
 
 const SHAPES = {
@@ -117,7 +119,7 @@ function layoutBody(spec, slide, S, ac) {
 const tfs = (S, str) => { const b=S.big; if(str.length>40) return b-30; if(str.length>26) return b-16; return b; };
 
 function frame(S, headerRight, kids, footL, footR) {
-  return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
+  return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,backgroundImage:`url(${DOT})`,backgroundRepeat:"repeat",padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"22px"}},
       kids.mark, headerRight || h("div",{},"")),
     h("div",{style:{display:"flex",flexDirection:"column",gap:"26px",flex:1,justifyContent:kids.align||"center",paddingTop:kids.align==="flex-start"?"48px":"0"}}, ...kids.body),

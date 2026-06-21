@@ -89,7 +89,7 @@ function bars(data) {
 // stat-tiles: slide.tiles=[{value,label}]  ·  changelog: slide.items=["…"]  ·  before-after: slide.pairs=[{broke,fix}]
 function tilesEl(tiles) {
   return h("div",{style:{display:"flex",flexWrap:"wrap",gap:"20px"}},
-    ...tiles.map(t => h("div",{style:{display:"flex",flexDirection:"column",gap:"6px",width:"calc(50% - 10px)",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"12px",padding:"26px 28px"}},
+    ...tiles.map(t => h("div",{style:{display:"flex",flexDirection:"column",gap:"6px",width:"47%",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"12px",padding:"26px 28px"}},
       h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"58px",color:C.green,letterSpacing:"-0.03em",lineHeight:1}}, t.value),
       h("div",{style:{fontFamily:"Fira Code",fontSize:"20px",color:C.soft}}, t.label))));
 }

@@ -23,6 +23,8 @@ const fonts = [
   { name: "Fira Code", data: await readFile(join(F, "FiraCode-Regular.ttf")), weight: 400, style: "normal" },
 ];
 const C = { bg: "#0c0d10", ink: "#f3f0e9", soft: "#8b8f98", subtle: "#74808f", accent: "#22c55e", rule: "#23262d" };
+const DOT = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><circle cx="2" cy="2" r="1.3" fill="#ffffff" fill-opacity="0.028"/></svg>').toString("base64")}`;
+
 const h = (type, props, ...kids) => ({ type, props: { ...props, children: kids.length <= 1 ? kids[0] : kids } });
 
 // [slug, preTitle, accentTitle] — accent is the green tail (trovex's accent).
@@ -37,7 +39,7 @@ const tfs = (str) => { const n = str.length; if (n > 56) return 50; if (n > 40) 
 
 function card(pre, accent) {
   const full = pre.replace(/\s+$/, "") + " " + accent;
-  return h("div", { style: { width: "1200px", height: "630px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: C.bg, color: C.ink, padding: "60px 64px", fontFamily: "Fira Sans" } },
+  return h("div", { style: { width: "1200px", height: "630px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: C.bg, backgroundImage: `url(${DOT})`, backgroundRepeat: "repeat", color: C.ink, padding: "60px 64px", fontFamily: "Fira Sans" } },
     // header: wordmark + eyebrow, hairline under
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.rule}`, paddingBottom: "22px" } },
       h("div", { style: { display: "flex", alignItems: "center", gap: "12px", fontFamily: "Fira Code", fontSize: "26px", color: C.ink } },

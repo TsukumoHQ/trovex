@@ -8,9 +8,12 @@
  *   PANEL A — Consulting (the money end): inquiries by source PROPERTY (trovex / WRAI.TH / yoru /
  *             referral / direct) × channel, with the qualified (hot+warm) split. North star =
  *             QUALIFIED, SUITE-SOURCED consulting leads — not raw count, not vanity reach.
- *   PANEL B — trovex waitlist funnel (beta primary conversion): landing → request-access → submit,
- *             plus signups by source. The waitlist STORE (Supabase) is the source of truth for the
- *             count; the Plausible web-funnel rates need the trovex site id (else honest n/a).
+ *   PANEL B — trovex activation funnel (PUBLIC BETA: install = the conversion): landing_view →
+ *             github_clicked (install-intent). Waitlist events are dormant by design (no waitlist
+ *             UI) and read a real 0. Needs the trovex site id (else honest n/a).
+ *   PANEL B2 — GEO attribution: which AI engine / channel sent the landing sessions, broken down
+ *             from the geo_source/channel props on landing_view. A floor, not a census (AI referrers
+ *             are stripped → direct/unknown; UTM'd links are the only reliable AI-engine signal).
  *   PANEL C — 4-engine AI-citation panel (awareness, top of funnel): suite citation share per engine,
  *             read from the latest geo-citation-monitor report (no live engine calls here — the panel
  *             run is separate and rate-limited). A snapshot, never a guaranteed rank.
@@ -77,6 +80,18 @@ async function plausible(site, path) {
 const evAgg = (site, w, name, extra = "") =>
   plausible(site, `aggregate?period=custom&date=${w.start},${w.end}&metrics=events&filters=event:name==${name}${extra}`)
     .then((d) => (d ? d.results?.events?.value ?? 0 : null));
+
+// Break an event down by one of its custom props (e.g. geo_source / channel) → rows of
+// { value, visitors, events } sorted desc by visitors. null = source/key unavailable (→ n/a);
+// [] = a real zero (event fired, but the prop was never present / window empty).
+const evBreakdown = (site, w, prop, evName) =>
+  plausible(site, `breakdown?period=custom&date=${w.start},${w.end}&property=event:props:${prop}&metrics=visitors,events&filters=event:name==${evName}&limit=30`)
+    .then((d) => {
+      if (!d) return null;
+      const rows = d.results ?? [];
+      return rows.map((r) => ({ value: r[prop] ?? r.value ?? "(none)", visitors: r.visitors ?? 0, events: r.events ?? 0 }))
+        .sort((a, b) => b.visitors - a.visitors);
+    });
 
 async function supabase(query) {
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -243,13 +258,19 @@ async function main() {
       wlBySource = [...by.entries()].sort((a, b) => b[1] - a[1]);
     }
   }
-  const [tvLanding, tvCta, tvSubmit] = trovexSite
+  // Public-beta conversion = install-intent (github_clicked), NOT waitlist. The waitlist events
+  // (request_access_clicked / waitlist_submitted) are DORMANT by design — no waitlist UI on the
+  // public-beta landing — so they read 0/n/a, not a gap. We still fetch them as a dormancy check.
+  const [tvLanding, tvInstall, tvCta, tvSubmit, geoRows, chanRows] = trovexSite
     ? await Promise.all([
         evAgg(trovexSite, w, "landing_view"),
+        evAgg(trovexSite, w, "github_clicked"),
         evAgg(trovexSite, w, "request_access_clicked"),
         evAgg(trovexSite, w, "waitlist_submitted"),
+        evBreakdown(trovexSite, w, "geo_source", "landing_view"),
+        evBreakdown(trovexSite, w, "channel", "landing_view"),
       ])
-    : [null, null, null];
+    : [null, null, null, null, null, null];
 
   // ===== PANEL C — 4-engine citation panel =====
   const cite = citationPanel();
@@ -267,7 +288,7 @@ async function main() {
   // Headline
   P(`## ★ Headline`);
   P(`- **North star — qualified, suite-sourced consulting leads: ${n(suiteQual)}** (of ${n(totalQual)} qualified, ${n(totalInq)} total opportunities in the Twenty pipeline). _Qualified = opportunity past the NEW stage; suite = OSS-funnel sourced._`);
-  P(`- **trovex waitlist signups (beta primary conversion): ${n(wlCount)}.**`);
+  P(`- **trovex public-beta conversion — install-intent (github_clicked): ${n(tvInstall)}** of ${n(tvLanding)} landing views (${rate(tvInstall, tvLanding)}). _Waitlist is dormant by design; install is the conversion._`);
   P(`- **Suite AI-citation share (any engine): ${cite ? cite.union : "n/a"}** ${cite ? `_(snapshot ${cite.srcDate})_` : "_(no citation panel run yet)_"}.`);
   P(`- **Consulting (Plausible \`assessment_request\`):** ${n(assessAll)} total${assessSuite == null ? "" : ` · ${n(assessSuite)} suite-sourced`} — on-site events; the Twenty pipeline (Panel A) is the durable record.`);
   P(``);
@@ -290,25 +311,39 @@ async function main() {
   P(`**Raw-capture cross-check (Supabase \`leads\`):** ${rawTotal == null ? "n/a" : `${rawTotal} rows, of which ${rawTest} are test/junk → ${rawReal} real`}. Twenty (above) is the deduped system of record; Supabase stays the raw inbound capture. **Plausible \`assessment_request\`:** all ${n(assessAll)} · suite ${n(assessSuite)}.`);
   P(``);
 
-  // Panel B
-  P(`## B · trovex waitlist funnel — beta primary conversion`);
+  // Panel B — public-beta activation funnel (install = the conversion)
+  P(`## B · trovex activation funnel — public beta (install = the conversion)`);
   P(`| Stage | Event (trovex.dev) | Count |`);
   P(`|-------|--------------------|------:|`);
   P(`| Reach | landing_view | ${n(tvLanding)} |`);
-  P(`| Intent | request_access_clicked | ${n(tvCta)} |`);
-  P(`| **★ Conversion** | waitlist_submitted | ${n(tvSubmit)} |`);
+  P(`| **★ Conversion** | github_clicked (install-intent / star) | ${n(tvInstall)} |`);
   P(``);
-  P(`**Rates:** reach→CTA ${rate(tvCta, tvLanding)} · CTA→submit ${rate(tvSubmit, tvCta)} · reach→submit ${rate(tvSubmit, tvLanding)}.`);
-  if (!trovexSite) P(`> Web-funnel = **n/a**: no \`TROVEX_PLAUSIBLE_SITE_ID\` set (trovex.dev is a separate Plausible site). The **signup count above is the store's truth** (Supabase) regardless.`);
+  P(`**Rate:** reach→install-intent ${rate(tvInstall, tvLanding)}.`);
+  if (!trovexSite) P(`> Web-funnel = **n/a**: no \`TROVEX_PLAUSIBLE_SITE_ID\` set (trovex.dev is a separate Plausible site).`);
+  P(`> Positioning is **public beta** — install/GitHub-star is the conversion. The waitlist events are **dormant by design** (no waitlist UI on the landing): request_access_clicked ${n(tvCta)} · waitlist_submitted ${n(tvSubmit)} — a real zero, not a gap. Helpers + \`/api/waitlist\` + Twenty mirror stay ready if the GTM flips.`);
   P(``);
-  if (wlBySource) {
-    P(`**Signups by source (waitlist store — source of truth for the count):**`);
-    P(``);
-    P(`| Source | Signups |`);
-    P(`|--------|--------:|`);
-    for (const [k, v] of wlBySource) P(`| ${k} | ${v} |`);
+
+  // Panel B2 — GEO attribution: which engine/channel sends the landing sessions
+  P(`## B2 · GEO attribution — which engine/channel sends sessions (trovex.dev landing)`);
+  P(`*Derived client-side from referrer host + UTM, merged onto every \`landing_view\`. **A floor, not a census:** AI-engine referrers are often stripped, so those sessions land in \`direct\`/\`unknown\` — a self-reported UTM (links WE tag) is the only reliable AI-engine signal. Read the TREND + the UTM'd share, not the absolute engine split.*`);
+  P(``);
+  const AI_ENGINES = new Set(["chatgpt", "perplexity", "claude", "gemini", "copilot"]);
+  if (!trovexSite || geoRows == null) {
+    P(`_GEO breakdown = **n/a**: ${!trovexSite ? "no `TROVEX_PLAUSIBLE_SITE_ID`" : "Plausible custom-prop breakdown unavailable"}. Cannot fabricate a source split._`);
+  } else if (!geoRows.length) {
+    P(`_0 \`landing_view\` events with a \`geo_source\` prop in this window — a real zero (no traffic yet, or events pre-date the geo-attribution deploy)._`);
   } else {
-    P(`_Signups-by-source: ${wlCount == null ? "n/a (Supabase \`waitlist\` unavailable)" : wlCount === 0 ? "0 signups in window (real zero)" : "no source attribution captured on rows yet"}._`);
+    const totalV = geoRows.reduce((s, r) => s + r.visitors, 0) || 1;
+    const aiV = geoRows.filter((r) => AI_ENGINES.has(r.value)).reduce((s, r) => s + r.visitors, 0);
+    P(`**AI-engine-sent sessions: ${aiV} of ${geoRows.reduce((s, r) => s + r.visitors, 0)} (${Math.round((aiV / totalV) * 100)}%)** — the GEO bet's on-site read.`);
+    P(``);
+    P(`| geo_source | Sessions | Share | AI engine? |`);
+    P(`|-----------|---------:|------:|:----------:|`);
+    for (const r of geoRows) P(`| ${r.value} | ${r.visitors} | ${Math.round((r.visitors / totalV) * 100)}% | ${AI_ENGINES.has(r.value) ? "✅" : "—"} |`);
+    if (chanRows && chanRows.length) {
+      P(``);
+      P(`**By channel:** ${chanRows.map((r) => `${r.value} ${r.visitors}`).join(" · ")}.`);
+    }
   }
   P(``);
 

@@ -76,6 +76,27 @@ function useInView(ref: React.RefObject<HTMLElement | null>, threshold = 0.3) {
   return on
 }
 
+/* Copyable install command — kills time-to-aha: one click to run, no hand-typing.
+ * Fires command_copied (closed-enum id, no PII) so install-intent is measurable. */
+function CopyCmd({ cmd, id }: { cmd: string; id: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard?.writeText(cmd).then(() => {
+      setCopied(true)
+      track('command_copied', { command: id })
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
+  return (
+    <span className="cmd-row">
+      <code>{cmd}</code>
+      <button type="button" className="cmd-copy" onClick={copy} aria-label={`Copy: ${cmd}`}>
+        {copied ? 'copied' : 'copy'}
+      </button>
+    </span>
+  )
+}
+
 const Chrome = ({ url }: { url: string }) => (
   <div className="win-chrome">
     <div className="dots"><i /><i /><i /></div>
@@ -460,9 +481,9 @@ export default function App() {
               <h2>Get started.</h2>
               <p>trovex is open source and in public beta. Install it, point your agent at it, and you're running in about a minute. No account, no keys.</p>
               <ol className="start-steps">
-                <li><code>uv tool install git+https://github.com/TsukumoHQ/trovex</code></li>
-                <li><code>trovex index /path/to/your/repo</code></li>
-                <li><code>trovex search "how do we roll back a deploy?"</code> and it prints the tokens it saved.</li>
+                <li><CopyCmd cmd="uv tool install git+https://github.com/TsukumoHQ/trovex" id="install" /></li>
+                <li><CopyCmd cmd="trovex index /path/to/your/repo" id="index" /></li>
+                <li><CopyCmd cmd={'trovex search "how do we roll back a deploy?"'} id="search" /> and it prints the tokens it saved.</li>
               </ol>
               <div className="hero-cta">
                 <a className="btn btn-primary" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick('start')}>star on GitHub</a>

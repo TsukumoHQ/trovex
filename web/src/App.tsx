@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { track, trackLandingView, trackInstallClick, trackTsukumoClick, trackNewsletterSignup, getAttribution } from './analytics'
+import { track, trackLandingView, trackSectionViews, trackInstallClick, trackTsukumoClick, trackNewsletterSignup, getAttribution } from './analytics'
 
 // trovex is public beta: the primary action is install + a GitHub star. The consult band
 // is the suite→agency handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so
@@ -343,7 +343,9 @@ function NewsletterBand() {
 
 export default function App() {
   useReveal()
-  useEffect(() => { trackLandingView() }, [])
+  // Mount: landing_view + scroll-depth (section_viewed) so the funnel's
+  // progression (hero → tour → start → consult) is measurable, not just the top.
+  useEffect(() => { trackLandingView(); return trackSectionViews() }, [])
   return (
     <>
       <div className="stage-glow" />

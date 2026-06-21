@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="growth/assets/brand/readme-hero.png" alt="trovex — one canonical doc for your coding agents. Same answers, about 60% fewer tokens." width="100%">
+  <img src="growth/assets/brand/readme-hero.png" alt="trovex — one canonical doc for your coding agents, ~60% fewer tokens." width="100%">
 </p>
 
 # trovex
 
-**One source of truth for your coding agents' docs. Same answers, about 60% fewer tokens.**
+**trovex — one canonical doc for your coding agents, ~60% fewer tokens.**
 
 Your coding agents (Claude Code, Cursor, Windsurf, Zed, any MCP client) reread the repo
 every session to work out which `.md` is current, then answer from a guess. You pay for

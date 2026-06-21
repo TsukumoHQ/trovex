@@ -355,7 +355,7 @@ export default function App() {
           <span className="sp" />
           <a className="lk hide" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'nav' })}>Product</a>
           <a className="lk hide" href="#start" onClick={() => track('cta_clicked', { cta_id: 'quickstart', location: 'nav' })}>Quickstart</a>
-          <a className="btn btn-primary nav-cta" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick()}>star on GitHub</a>
+          <a className="btn btn-primary nav-cta" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick('nav')}>star on GitHub</a>
         </div>
       </nav>
 
@@ -372,7 +372,7 @@ export default function App() {
             </p>
             <div className="hero-cta">
               <a className="btn btn-primary" href="#start" onClick={() => track('cta_clicked', { cta_id: 'get-started', location: 'hero' })}>get started</a>
-              <a className="btn btn-ghost" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick()}>star on GitHub</a>
+              <a className="btn btn-ghost" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick('hero')}>star on GitHub</a>
             </div>
             <a className="hero-see" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'hero' })}>see it work ↓</a>
           </div>
@@ -463,7 +463,7 @@ export default function App() {
                 <li><code>trovex search "how do we roll back a deploy?"</code> and it prints the tokens it saved.</li>
               </ol>
               <div className="hero-cta">
-                <a className="btn btn-primary" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick()}>star on GitHub</a>
+                <a className="btn btn-primary" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick('start')}>star on GitHub</a>
               </div>
               <p className="cta-note">No cloud, no API keys. Your docs never leave your machine.</p>
               <p className="cta-note">

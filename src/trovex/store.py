@@ -133,6 +133,38 @@ class SqliteStore:
                 pass
         return ext_id
 
+    def check_duplicate(self, content: str, title: str | None = None) -> dict | None:
+        """Pre-insert near-duplicate check for the interactive write path.
+
+        Embeds `content` TRANSIENTLY (no insert) and returns the nearest existing
+        CANONICAL doc within the cosine threshold — so trovex_write can block-and-point
+        ('this duplicates <id> — update it or pass force') instead of creating another
+        near-copy (43% of the store was such bloat). Returns {ext_id, title, similarity}
+        or None. Mirrors detect_duplicate_for's threshold; never raises into the caller.
+        """
+        try:
+            text = f"{title or ''}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
+            emb = next(iter(self.embedder.embed([text])))
+            qv = sqlite_vec.serialize_float32(emb.tolist())
+            threshold = self.settings.dup_cosine_threshold
+            with self._lock:
+                neighbours = self.db.execute(
+                    """SELECT v.rowid, v.distance, d.ext_id, d.title, d.kind, d.status
+                       FROM vec_docs v JOIN docs d ON d.id = v.rowid
+                       WHERE v.embedding MATCH ? AND k = 3 ORDER BY v.distance""",
+                    (qv,),
+                ).fetchall()
+            for nb in neighbours:
+                if nb["kind"] == "record" or nb["status"] not in ("canonical", "plan"):
+                    continue
+                similarity = 1.0 - nb["distance"] / 2
+                if similarity < threshold:
+                    break  # neighbours sorted by distance asc → none closer remain
+                return {"ext_id": nb["ext_id"], "title": nb["title"], "similarity": round(similarity, 4)}
+        except Exception:
+            return None  # a guard failure must never block a legit write
+        return None
+
     def get(self, ext_id: str) -> StoredDoc | None:
         row = self.db.execute(
             """SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,

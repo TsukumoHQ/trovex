@@ -315,6 +315,9 @@ a { color: inherit; text-decoration: none; }
 .cta-note { margin-top: 16px; font-family: var(--font-mono); font-size: 12.5px; color: var(--fg-subtle); }
 .start-steps { list-style: decimal; text-align: left; max-width: 60ch; margin: 0 auto 28px; padding-left: 1.4em; display: grid; gap: 12px; color: var(--fg-muted); font-size: 15px; }
 .start-steps code { font-size: 13px; }
+.cmd-row { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cmd-copy { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 2px 7px; cursor: pointer; transition: color .15s, border-color .15s; }
+.cmd-copy:hover { color: var(--accent); border-color: var(--accent); }
 
 /* trust band */
 .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }

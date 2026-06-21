@@ -393,8 +393,14 @@ export default function App() {
               with a freshness marker, instead of rereading the repo to guess. Same answers, about{' '}
               <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
             </p>
+            {/* The install command IS the primary action (uv pattern): copy + run,
+                no scroll, no signup. command_copied = the install-intent signal. */}
+            <div className="hero-install">
+              <span className="hero-install-lab">install</span>
+              <CopyCmd cmd="uv tool install git+https://github.com/TsukumoHQ/trovex" id="hero-install" />
+            </div>
             <div className="hero-cta">
-              <a className="btn btn-primary" href="#start" onClick={() => track('cta_clicked', { cta_id: 'get-started', location: 'hero' })}>get started</a>
+              <a className="btn btn-ghost" href="#start" onClick={() => track('cta_clicked', { cta_id: 'quickstart', location: 'hero' })}>quickstart</a>
               <a className="btn btn-ghost" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick('hero')}>star on GitHub</a>
             </div>
             <a className="hero-see" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'hero' })}>see it work ↓</a>

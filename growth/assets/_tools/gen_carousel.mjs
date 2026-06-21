@@ -40,8 +40,10 @@ const fonts = [
   { name: "Fira Sans", data: await readFile(join(SYS, "FiraSans-Medium.otf")), weight: 500, style: "normal" },
   { name: "Fira Code", data: await readFile(join(SYS, "FiraCode-Regular.ttf")), weight: 400, style: "normal" },
 ];
-const C = { bg:"#0c0d10", panel:"#101216", ink:"#f3f0e9", soft:"#8b8f98", faint:"#5f636b", rule:"#23262d", track:"#181a1f", red:"#e2674f", redGhost:"#7c4339", green:"#22c55e" };
-const TONE = { red:C.red, redGhost:C.redGhost, green:C.green, soft:C.soft, ink:C.ink };
+const C = { bg:"#0c0d10", panel:"#101216", ink:"#f3f0e9", soft:"#8b8f98", faint:"#5f636b", rule:"#23262d", track:"#181a1f", green:"#22c55e" };
+// AUTO-POST = GREEN uniformly (owner-locked autopost-green-antislop). Red dropped:
+// legacy tones red/redGhost map to green / muted-soft so old data blocks stay valid.
+const TONE = { red:C.green, redGhost:C.soft, green:C.green, soft:C.soft, ink:C.ink };
 const h = (t, p, ...k) => ({ type: t, props: { ...p, children: k.length <= 1 ? k[0] : k } });
 
 const SHAPES = {
@@ -50,7 +52,7 @@ const SHAPES = {
 };
 const brandFor = (a) => (a === "founder" ? "trovex" : "tsukumo");
 const propertyFor = (a) => (a === "founder" ? "trovex" : "tsukumo");
-const accentFor = (a) => (a === "founder" ? C.green : C.red); // founder/product=green, company/evidence=red
+const accentFor = () => C.green; // GREEN for all auto-post (owner-locked). violet stays only on the wrai.th SITE (gen_brand_gallery), never auto-post.
 const deMood = (s) => (s || "").replace(/\s*[—–-]\s*/g, " · "); // kill em-dash mood-dash in eyebrows
 
 function wordmark(word, fs) {
@@ -81,6 +83,37 @@ function bars(data) {
         h("div",{style:{width:`${Math.max(3,Math.min(100,d.pct))}%`,backgroundColor:TONE[d.tone]||C.soft,borderRadius:"2px"}})))));
 }
 
+// ---- BIP layouts (owner build-in-public lane). Set spec.layout + per-slide fields. ----
+// stat-tiles: slide.tiles=[{value,label}]  ·  changelog: slide.items=["…"]  ·  before-after: slide.pairs=[{broke,fix}]
+function tilesEl(tiles) {
+  return h("div",{style:{display:"flex",flexWrap:"wrap",gap:"20px"}},
+    ...tiles.map(t => h("div",{style:{display:"flex",flexDirection:"column",gap:"6px",width:"calc(50% - 10px)",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"12px",padding:"26px 28px"}},
+      h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"58px",color:C.green,letterSpacing:"-0.03em",lineHeight:1}}, t.value),
+      h("div",{style:{fontFamily:"Fira Code",fontSize:"20px",color:C.soft}}, t.label))));
+}
+function changelogEl(items) {
+  return h("div",{style:{display:"flex",flexDirection:"column",gap:"18px"}},
+    ...items.map(it => h("div",{style:{display:"flex",alignItems:"flex-start",gap:"18px"}},
+      h("div",{style:{width:"14px",height:"14px",backgroundColor:C.green,marginTop:"10px",flexShrink:0}}),
+      h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"33px",color:C.ink,lineHeight:1.25}}, it))));
+}
+function pairsEl(pairs) {
+  return h("div",{style:{display:"flex",flexDirection:"column",gap:"24px"}},
+    ...pairs.map(p => h("div",{style:{display:"flex",alignItems:"stretch",gap:"22px"}},
+      h("div",{style:{display:"flex",flexDirection:"column",gap:"8px",flex:1,border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"10px",padding:"22px 24px"}},
+        h("div",{style:{fontFamily:"Fira Code",fontSize:"18px",color:C.soft}},"broke"), h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"25px",color:C.soft}}, p.broke)),
+      h("div",{style:{display:"flex",alignItems:"center",color:C.green,fontSize:"34px"}},"→"),
+      h("div",{style:{display:"flex",flexDirection:"column",gap:"8px",flex:1,border:`1px solid ${C.green}`,backgroundColor:"rgba(34,197,94,0.06)",borderRadius:"10px",padding:"22px 24px"}},
+        h("div",{style:{fontFamily:"Fira Code",fontSize:"18px",color:C.green}},"the fix"), h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"25px",color:C.ink}}, p.fix)))));
+}
+function layoutBody(spec, slide, S, ac) {
+  const t = slide.title ? [titleEl(slide.title, slide.accent, tfs(S, slide.title), ac)] : [];
+  if (slide.tiles) return [...t, tilesEl(slide.tiles)];
+  if (slide.items) return [...t, changelogEl(slide.items)];
+  if (slide.pairs) return [...t, pairsEl(slide.pairs)];
+  return [titleEl(slide.title, slide.accent, tfs(S, slide.title), ac), body(slide.body, S.sub), ...(slide.data ? [bars(slide.data)] : [])];
+}
+
 const tfs = (S, str) => { const b=S.big; if(str.length>40) return b-30; if(str.length>26) return b-16; return b; };
 
 function frame(S, headerRight, kids, footL, footR) {
@@ -109,7 +142,7 @@ function slideCard(spec, slide, S) {
   const ac = accentFor(spec.audience);
   return frame(S, eyebrow(spec.kicker, S.eb), {
     mark: wordmark(brandFor(spec.audience), S.mark),
-    body: [ titleEl(slide.title, slide.accent, tfs(S, slide.title), ac), body(slide.body, S.sub), ...(slide.data ? [bars(slide.data)] : []) ],
+    body: layoutBody(spec, slide, S, ac),
   }, footerSource(spec, slide), { text: spec.cta.foot, accent:false });
 }
 function ctaCard(spec, S) {

@@ -11,7 +11,27 @@
     {
       "title": "+25% adoption, −7.2% stability",
       "accent": "−7.2% stability",
-      "body": "Rising AI adoption tracked with a 7.2% drop in delivery stability and a 1.5% drop in throughput. ~76% of teams were already using AI."
+      "body": "Rising AI adoption tracked with a 7.2% drop in delivery stability and a 1.5% drop in throughput. ~76% of teams were already using AI.",
+      "data": [
+        {
+          "label": "AI adoption",
+          "value": "+25%",
+          "pct": 100,
+          "tone": "soft"
+        },
+        {
+          "label": "delivery stability",
+          "value": "-7.2%",
+          "pct": 29,
+          "tone": "red"
+        },
+        {
+          "label": "throughput",
+          "value": "-1.5%",
+          "pct": 8,
+          "tone": "red"
+        }
+      ]
     },
     {
       "title": "the cause isn't bad AI code",
@@ -34,5 +54,6 @@
     "accent": "weakest lever",
     "sub": "A scoped read of your agent setup in your real repo, sources and method included. The prioritized plan is yours to keep.",
     "foot": "tsukumo.ch/assessment"
-  }
+  },
+  "source": "Google DORA 2024"
 }

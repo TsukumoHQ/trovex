@@ -16,7 +16,21 @@
     {
       "title": "refactoring fell 24.1% to 9.5%",
       "accent": "24.1% to 9.5%",
-      "body": "Moved (refactored) lines collapsed. In 2024, pasted code passed refactored code for the first time GitClear has measured."
+      "body": "Moved (refactored) lines collapsed. In 2024, pasted code passed refactored code for the first time GitClear has measured.",
+      "data": [
+        {
+          "label": "refactored lines, 2020",
+          "value": "24.1%",
+          "pct": 100,
+          "tone": "soft"
+        },
+        {
+          "label": "refactored lines, 2024",
+          "value": "9.5%",
+          "pct": 39,
+          "tone": "red"
+        }
+      ]
     },
     {
       "title": "churn climbed 3.1% to 5.7%",
@@ -34,5 +48,6 @@
     "accent": "your duplication trend",
     "sub": "A straight read of your agent setup in your real repo, sources and method included. The prioritized plan is yours to keep.",
     "foot": "tsukumo.ch/assessment"
-  }
+  },
+  "source": "GitClear, 211M lines"
 }

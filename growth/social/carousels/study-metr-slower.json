@@ -5,7 +5,21 @@
   "cover": {
     "title": "devs felt faster. the clock disagreed.",
     "accent": "the clock",
-    "sub": "METR ran the randomized trial most teams skip: 16 experienced devs, 246 real issues, on their own repos."
+    "sub": "METR ran the randomized trial most teams skip: 16 experienced devs, 246 real issues, on their own repos.",
+    "data": [
+      {
+        "label": "expected speedup, going in",
+        "value": "+24%",
+        "pct": 62,
+        "tone": "redGhost"
+      },
+      {
+        "label": "measured, with AI",
+        "value": "-19%",
+        "pct": 48,
+        "tone": "red"
+      }
+    ]
   },
   "slides": [
     {
@@ -34,5 +48,6 @@
     "accent": "your own team",
     "sub": "A straight read of your agent setup in your real repo, sources and method included. The prioritized plan is yours to keep.",
     "foot": "tsukumo.ch/assessment"
-  }
+  },
+  "source": "METR, n=16, 246 tasks"
 }

@@ -301,10 +301,12 @@ export function trackShareClicked(format: string): void {
   track('share_clicked', { format })
 }
 
-/** Install-intent from the calculator → REUSE github_clicked, segmented by location
- *  (spec §5: one funnel, no parallel to_install_click). */
-export function trackInstallClick(): void {
-  track('github_clicked', { location: 'savings_calculator' })
+/** Install-intent (a "star on GitHub" / install CTA click) → github_clicked, segmented by
+ *  `location` so the landing's install funnel reads apart from the calculator's (spec §5:
+ *  one funnel, no parallel to_install_click). Defaults to 'savings_calculator' for the
+ *  calculator call sites that pass nothing; landing CTAs pass their own location. */
+export function trackInstallClick(location = 'savings_calculator'): void {
+  track('github_clicked', { location })
 }
 
 /** The team-scale consulting micro-CTA rendered (honest threshold met). Measures show→click

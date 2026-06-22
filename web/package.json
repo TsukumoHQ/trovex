@@ -10,10 +10,11 @@
     "check:links": "node scripts/check-internal-links.mjs",
     "check:silo": "node scripts/check-silo-schema.mjs",
     "check:no-blog": "node scripts/check-no-blog.mjs",
+    "check:voice": "node scripts/check-voice.mjs",
     "typecheck:api": "tsc -p tsconfig.api.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && node scripts/check-no-blog.mjs && node scripts/check-internal-links.mjs && node scripts/check-silo-schema.mjs && node scripts/check-install-cta.mjs && npm run lint && npm run typecheck:api && tsc -b && vitest run && vite build && node scripts/gen-md-twins.mjs",
+    "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && node scripts/check-no-blog.mjs && node scripts/check-voice.mjs && node scripts/check-internal-links.mjs && node scripts/check-silo-schema.mjs && node scripts/check-install-cta.mjs && npm run lint && npm run typecheck:api && tsc -b && vitest run && vite build && node scripts/gen-md-twins.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "indexnow": "node scripts/indexnow-ping.mjs"

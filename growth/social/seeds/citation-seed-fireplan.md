@@ -36,6 +36,20 @@ snippet doesn't genuinely answer the thread, don't post it. Never a link-drop, n
 **Comparison snippets (11–14) are the highest-citation format** — prioritize them; the engines
 reach for repomix/cursor/mem0/claude.md on our category queries (GEO panel 9e9c78ab).
 
+## Venue priority (2026 GEO data — lane base f3260b49)
+AI engines cite from a **wider pool than the organic SERP**: >40% of AI-Overview citations don't
+rank top-10, and the cited pool leans Reddit / Quora / YouTube transcripts / docs. So seed where
+the engines actually retrieve, in this order:
+1. **Reddit** — primary. The subreddits already mapped per snippet above (r/ChatGPTCoding, r/ClaudeAI,
+   r/LocalLLaMA, r/AI_Agents, r/selfhosted). Highest citation pull for our category questions.
+2. **Quora** — primary. Definitional / "what is X" / "how do I X" snippets (1, 3, 4, 7–9) fit Quora's
+   evergreen Q&A surface, which the engines retrieve heavily. ⚠️ `utm_source=quora` NOT yet mapped in
+   analytics — request pending (see UTM note); hold Quora links until mapped or the click decays to unknown.
+3. **HN** — keep, but for the **dev-credibility** hit (real builders reading), not citation volume. The
+   comparison snippets (11–14) and cost/mechanism threads play best here.
+The off-site lever is the binding constraint on citations (owned-domain = 0/4, on-page maxed) — the
+venue is the move, not more on-page work.
+
 ## Pace (don't get the domain flagged)
 - **≤1–2 seeds / week per account**, staggered across days. Never two in the same subreddit in a
   week. Build/keep real account history (~9:1 give:promote).
@@ -46,8 +60,9 @@ reach for repomix/cursor/mem0/claude.md on our category queries (GEO panel 9e9c7
 ## UTM (every link)
 `utm_source=<hackernews|reddit>` (CLOSED list — mapped), `utm_medium=community`,
 `utm_campaign=geo-seed`, `utm_content=<snippet-slug>` (already on each link in f334c83e).
-**Lobsters / Discord are NOT mapped** in analytics.ts → ping analytics before using those as a
-source, or the click decays to unknown. `threads` also unmapped (request pending).
+**Lobsters / Discord / Quora are NOT mapped** in analytics.ts → ping analytics before using those as a
+source, or the click decays to unknown. `threads` also unmapped. Quora mapping requested 2026-06-22
+(needed to promote Quora to a primary venue per the priority section above).
 
 ## Status
 DRAFT fire-plan. Snippets ready in f334c83e. Human fires per this cadence; I coordinate venues

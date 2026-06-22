@@ -18,21 +18,71 @@
   .side-link:hover { background: var(--bg-hover); color: var(--fg); }
   .side-link.active { background: var(--accent-soft); color: var(--accent); }
   .side-link .count { color: var(--fg-faint); font-size: var(--t-11); }
+  /* Collection rows carry an inline delete affordance, revealed on hover/focus. */
+  .side-col { display: flex; align-items: center; gap: 2px; }
+  .side-col .side-link { flex: 1; min-width: 0; }
+  .side-col .side-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .col-del { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; background: transparent; border: 0; cursor: pointer;
+    color: var(--fg-faint); border-radius: var(--radius-sm); opacity: 0;
+    transition: opacity var(--duration), color var(--duration), background var(--duration); }
+  .side-col:hover .col-del, .col-del:focus-visible { opacity: 1; }
+  .col-del:hover { color: var(--stale); background: var(--stale-bg); }
   .side-btn { display: flex; align-items: center; gap: 6px; margin-top: var(--s-2); width: 100%;
     text-align: left; background: transparent;
     border: 1px dashed var(--border); color: var(--fg-subtle); border-radius: var(--radius-sm);
     padding: 4px var(--s-2); cursor: pointer; font-family: var(--font-mono); font-size: var(--t-11); }
   .side-btn:hover { color: var(--accent); border-color: var(--accent-line); }
+  .side-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .side-btn:disabled:hover { color: var(--fg-subtle); border-color: var(--border); }
+
+  /* ── Store readout: a freshness + composition instrument over the result set ── */
+  .store-readout { margin-bottom: var(--s-5); }
+  .readout-stats { display: grid; gap: var(--s-3);
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-bottom: var(--s-4); }
+  .readout-stat { padding: var(--s-3) var(--s-4); background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    border-left: 2px solid var(--stat-line, var(--border-strong)); }
+  .readout-stat-label { display: flex; align-items: center; gap: 5px; font-size: var(--t-11);
+    color: var(--fg-subtle); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .readout-stat-label .icon { color: var(--fg-faint); }
+  .readout-stat-value { font-family: var(--font-mono); font-size: var(--t-22); font-weight: 500;
+    line-height: 1; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .readout-stat-value .unit { font-size: var(--t-12); color: var(--fg-subtle); font-weight: 400; }
+  .readout-stat.is-warn .readout-stat-value { color: var(--stale); }
+  .readout-stat.is-warn { border-left-color: var(--stale); }
+
+  /* Composition bar — reuses the shared .dist visual language */
+  .dist-track .dist-seg-canonical { background: var(--canonical); }
+  .dist-track .dist-seg-plan      { background: var(--plan); }
+  .dist-track .dist-seg-stale     { background: var(--stale); }
+  .dist-track .dist-seg-duplicate { background: var(--duplicate); }
+  .swatch-canonical { background: var(--canonical); }
+  .swatch-plan      { background: var(--plan); }
+  .swatch-stale     { background: var(--stale); }
+  .swatch-duplicate { background: var(--duplicate); }
+  .dist-legend-item .legend-n { color: var(--fg); font-variant-numeric: tabular-nums; }
 
   .filter-banner { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-4);
     padding: var(--s-2) var(--s-3); background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius); font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted); }
+    border-left: 2px solid var(--accent-line); border-radius: var(--radius);
+    font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted); }
+  .filter-banner .icon { color: var(--accent); }
   .filter-banner a { color: var(--accent); margin-left: auto; }
 
   .store-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-  .doc-card { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); min-height: 132px;
+  /* Freshness rail: a 2px status spine down the card's leading edge (color + label, never color alone). */
+  .doc-card { position: relative; display: flex; flex-direction: column; gap: var(--s-3);
+    padding: var(--s-4); padding-left: calc(var(--s-4) + 2px); min-height: 132px;
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
     transition: border-color var(--duration), transform var(--duration); }
+  .doc-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: var(--spine, transparent);
+    border-radius: var(--radius) 0 0 var(--radius); }
+  .doc-card.spine-canonical { --spine: var(--canonical); }
+  .doc-card.spine-plan      { --spine: var(--plan); }
+  .doc-card.spine-stale     { --spine: var(--stale); }
+  .doc-card.spine-duplicate { --spine: var(--duplicate); }
   .doc-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
   .doc-card-title { font-size: var(--t-16); font-weight: 600; color: var(--fg); letter-spacing: -0.01em;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -49,7 +99,10 @@
     padding-top: var(--s-3); border-top: 1px solid var(--border);
     font-family: var(--font-mono); font-size: var(--t-11); color: var(--fg-subtle); }
   .doc-card-foot .icon { color: var(--fg-faint); }
-  .foot-item { display: inline-flex; align-items: center; gap: 4px; }
+  .foot-item { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+  /* Stale docs earn a louder freshness chip — the operator's "fix me" cue. */
+  .foot-item.is-stale { color: var(--stale); }
+  .foot-item.is-stale .icon { color: var(--stale); }
   .store-empty-icon { color: var(--fg-faint); margin-bottom: var(--s-3); }
   .pager { display: flex; align-items: center; justify-content: center; gap: var(--s-4);
     margin-top: var(--s-6); font-family: var(--font-mono); font-size: var(--t-12); }
@@ -96,20 +149,21 @@
     <div class="side-section">
       <div class="side-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bookmark"></use></svg> Collections</div>
       {% for col in collections %}
-      <a href="/store?collection={{ col.name | urlencode }}" class="side-link {% if active_collection == col.name %}active{% endif %}">{{ col.name }}</a>
+      <div class="side-col">
+        <a href="/store?collection={{ col.name | urlencode }}" class="side-link {% if active_collection == col.name %}active{% endif %}"><span>{{ col.name }}</span></a>
+        <button type="button" class="col-del" data-collection="{{ col.name }}"
+                aria-label="Delete collection {{ col.name }}" title="Delete collection">
+          <svg class="icon icon-sm" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg>
+        </button>
+      </div>
+      {% else %}
+      <div class="subtle mono" style="font-size: var(--t-11); padding: 3px var(--s-2);">none saved yet</div>
       {% endfor %}
       <button class="side-btn" id="save-collection"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bookmark"></use></svg> save current filter</button>
     </div>
   </aside>
 
   <div class="store-main">
-    {% if active_tag or active_kind or active_collection %}
-    <div class="filter-banner">
-      <span>Filtered{% if active_collection %} · collection <b>{{ active_collection }}</b>{% endif %}{% if active_kind %} · kind <b>{{ active_kind }}</b>{% endif %}{% if active_tag %} · tag <b>{{ active_tag }}</b>{% endif %}</span>
-      <a href="/store">clear</a>
-    </div>
-    {% endif %}
-
     <div class="section-head" style="margin-bottom: var(--s-4);">
       <div>
         <h1 style="margin-bottom: 2px;">Store</h1>
@@ -118,6 +172,65 @@
         </div>
       </div>
     </div>
+
+    {% if active_tag or active_kind or active_collection %}
+    <div class="filter-banner" role="status">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"></use></svg>
+      <span>Filtered{% if active_collection %} · collection <b>{{ active_collection }}</b>{% endif %}{% if active_kind %} · kind <b>{{ active_kind }}</b>{% endif %}{% if active_tag %} · tag <b>{{ active_tag }}</b>{% endif %}</span>
+      <a href="/store">clear filter</a>
+    </div>
+    {% endif %}
+
+    {# ── Freshness + composition readout over the current view ──────────── #}
+    {% if items %}
+    {% set canonical_n = items | selectattr('status', 'equalto', 'canonical') | list | length %}
+    {% set plan_n      = items | selectattr('status', 'equalto', 'plan') | list | length %}
+    {% set stale_n     = items | selectattr('status', 'equalto', 'stale') | list | length %}
+    {% set duplicate_n = items | selectattr('status', 'equalto', 'duplicate') | list | length %}
+    {% set aging_n = items | selectattr('age_days', 'ge', 30) | list | length %}
+    {% set seg_total = (canonical_n + plan_n + stale_n + duplicate_n) or 1 %}
+    <section class="store-readout" aria-label="Store composition for the current view">
+      <div class="readout-stats">
+        <div class="readout-stat" style="--stat-line: var(--accent-line);">
+          <div class="readout-stat-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-file"></use></svg> in view</div>
+          <div class="readout-stat-value">{{ total }} <span class="unit">{{ 'doc' if total == 1 else 'docs' }}</span></div>
+        </div>
+        <div class="readout-stat" style="--stat-line: var(--canonical);">
+          <div class="readout-stat-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"></use></svg> canonical</div>
+          <div class="readout-stat-value">{{ canonical_n }}<span class="unit"> / {{ items | length }}</span></div>
+        </div>
+        <div class="readout-stat {% if stale_n %}is-warn{% endif %}" style="--stat-line: var(--stale);">
+          <div class="readout-stat-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg> stale</div>
+          <div class="readout-stat-value">{{ stale_n }}</div>
+        </div>
+        <div class="readout-stat {% if aging_n %}is-warn{% endif %}" style="--stat-line: var(--duplicate);">
+          <div class="readout-stat-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"></use></svg> aging 30d+</div>
+          <div class="readout-stat-value">{{ aging_n }}</div>
+        </div>
+        <div class="readout-stat" style="--stat-line: var(--plan);">
+          <div class="readout-stat-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-zap"></use></svg> tokens</div>
+          <div class="readout-stat-value">{{ "{:,}".format(total_tokens) }}</div>
+        </div>
+      </div>
+      {% if canonical_n or plan_n or stale_n or duplicate_n %}
+      <div class="dist">
+        <div class="dist-track" role="img"
+             aria-label="Status mix on this page: {{ canonical_n }} canonical, {{ plan_n }} plan, {{ stale_n }} stale, {{ duplicate_n }} duplicate">
+          {% if canonical_n %}<div class="dist-seg dist-seg-canonical" style="width: {{ (canonical_n / seg_total * 100) | round(2) }}%" title="canonical · {{ canonical_n }}"></div>{% endif %}
+          {% if plan_n %}<div class="dist-seg dist-seg-plan" style="width: {{ (plan_n / seg_total * 100) | round(2) }}%" title="plan · {{ plan_n }}"></div>{% endif %}
+          {% if stale_n %}<div class="dist-seg dist-seg-stale" style="width: {{ (stale_n / seg_total * 100) | round(2) }}%" title="stale · {{ stale_n }}"></div>{% endif %}
+          {% if duplicate_n %}<div class="dist-seg dist-seg-duplicate" style="width: {{ (duplicate_n / seg_total * 100) | round(2) }}%" title="duplicate · {{ duplicate_n }}"></div>{% endif %}
+        </div>
+        <div class="dist-legend">
+          {% if canonical_n %}<span class="dist-legend-item"><span class="dist-legend-swatch swatch-canonical"></span>canonical <span class="legend-n">{{ canonical_n }}</span></span>{% endif %}
+          {% if plan_n %}<span class="dist-legend-item"><span class="dist-legend-swatch swatch-plan"></span>plan <span class="legend-n">{{ plan_n }}</span></span>{% endif %}
+          {% if stale_n %}<span class="dist-legend-item"><span class="dist-legend-swatch swatch-stale"></span>stale <span class="legend-n">{{ stale_n }}</span></span>{% endif %}
+          {% if duplicate_n %}<span class="dist-legend-item"><span class="dist-legend-swatch swatch-duplicate"></span>duplicate <span class="legend-n">{{ duplicate_n }}</span></span>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
 
     <form action="/store" method="get" style="margin-bottom: var(--s-4);">
       <div class="search-shell">
@@ -142,7 +255,8 @@
     {% if items %}
     <div class="store-grid">
       {% for d in items %}
-      <div class="doc-card">
+      {% set is_stale = d.status == 'stale' or d.age_days >= 90 %}
+      <div class="doc-card spine-{{ d.status }}">
         <a class="doc-card-title" href="/doc/{{ d.ext_id }}">{{ d.title }}</a>
         <div class="doc-card-badges">
           {% if d.kind %}<span class="pill pill-plan">{{ d.kind }}</span>{% endif %}
@@ -155,7 +269,9 @@
         </div>
         {% endif %}
         <div class="doc-card-foot">
-          <span class="foot-item"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"></use></svg>{{ fresh_label(d.age_days) }}</span>
+          <span class="foot-item {% if is_stale %}is-stale{% endif %}"
+                title="last written {{ fresh_label(d.age_days) }} ago{% if is_stale %} — review for freshness{% endif %}">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"></use></svg>{{ fresh_label(d.age_days) }}</span>
           <span class="foot-item"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-zap"></use></svg>~{{ "{:,}".format(d.tokens_est) }} tok</span>
         </div>
       </div>
@@ -183,17 +299,46 @@
 </div>
 
 <script>
-  document.getElementById('save-collection')?.addEventListener('click', async function () {
-    const name = prompt('Collection name for the current filter?');
-    if (!name) return;
-    const p = new URLSearchParams(location.search);
-    const r = await fetch('/api/collections', {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, trovexWriteHeaders()),
-      body: JSON.stringify({ name: name, tag: p.get('tag') || '', kind: p.get('kind') || '' }),
+  (function () {
+    const params = new URLSearchParams(location.search);
+    const hasFilter = !!(params.get('tag') || params.get('kind'));
+
+    // Save current filter as a named collection. Only meaningful with a tag/kind active.
+    const saveBtn = document.getElementById('save-collection');
+    if (saveBtn) {
+      if (!hasFilter) {
+        saveBtn.disabled = true;
+        saveBtn.title = 'Apply a tag or kind filter first, then save it as a collection';
+      }
+      saveBtn.addEventListener('click', async function () {
+        const name = prompt('Collection name for the current filter?');
+        if (!name) return;
+        const r = await fetch('/api/collections', {
+          method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, trovexWriteHeaders()),
+          body: JSON.stringify({ name: name, tag: params.get('tag') || '', kind: params.get('kind') || '' }),
+        });
+        if (r.ok) location.href = '/store?collection=' + encodeURIComponent(name);
+        else if (r.status === 403) alert('Unauthorized — set a write token on /settings to manage collections.');
+        else alert('Save failed');
+      });
+    }
+
+    // Delete a saved collection (write-token gated, same as create).
+    document.querySelectorAll('.col-del').forEach(function (btn) {
+      btn.addEventListener('click', async function (e) {
+        e.preventDefault();
+        const name = btn.dataset.collection;
+        if (!name || !confirm('Delete collection "' + name + '"? Docs are not affected.')) return;
+        const r = await fetch('/api/collections/' + encodeURIComponent(name), {
+          method: 'DELETE',
+          headers: trovexWriteHeaders(),
+        });
+        if (r.ok) location.href = '/store';
+        else if (r.status === 403) alert('Unauthorized — set a write token on /settings to manage collections.');
+        else alert('Delete failed');
+      });
     });
-    if (r.ok) location.href = '/store?collection=' + encodeURIComponent(name);
-    else alert('Save failed');
-  });
+  })();
 </script>
 {% endblock %}

@@ -6,7 +6,7 @@
 {% block head %}
 <style>{{ pygments_css | safe }}</style>
 <style>
-  /* ── Doc reader ─────────────────────────────────────── */
+  /* ── Doc reader layout ──────────────────────────────── */
   .reader {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 220px;
@@ -14,24 +14,71 @@
     align-items: start;
   }
 
-  .doc-head { margin-bottom: var(--s-6); }
   .doc-back {
     display: inline-flex; align-items: center; gap: 6px;
     font-family: var(--font-mono); font-size: var(--t-12);
-    color: var(--fg-subtle); margin-bottom: var(--s-3);
+    color: var(--fg-subtle); margin-bottom: var(--s-4);
+    min-height: 28px;
   }
   .doc-back:hover { color: var(--accent); }
-  .doc-title { font-size: var(--t-28); margin-bottom: var(--s-3); line-height: 1.2; }
-  .doc-meta {
-    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
-    font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted);
+
+  /* ── Identity header (the "what agents are pointed to") ── */
+  .doc-head {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--s-5) var(--s-5) var(--s-4);
+    margin-bottom: var(--s-8);
+    /* brutalist seam: accent ledger line on the canonical edge */
+    border-left: 2px solid var(--accent-line);
   }
-  .doc-id {
+
+  .doc-statusline {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: var(--s-2) var(--s-3);
+    margin-bottom: var(--s-3);
+  }
+  /* keep destructive action visually + spatially separated */
+  .doc-statusline .danger-btn { margin-left: auto; }
+
+  .doc-title {
+    font-size: var(--t-28); line-height: 1.2;
+    margin: 0 0 var(--s-4);
+    overflow-wrap: anywhere;
+  }
+
+  /* identity grid: source-of-truth coordinates for agents */
+  .doc-ident {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--s-1) var(--s-5);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--border);
+  }
+  .ident-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .ident-key {
+    font-family: var(--font-mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-subtle);
+  }
+  .ident-val {
+    font-family: var(--font-mono); font-size: var(--t-13);
+    color: var(--fg); font-variant-numeric: tabular-nums;
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 2px 6px 2px 8px;
-    background: var(--bg-input); border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    overflow-wrap: anywhere;
   }
+  .ident-val .icon { color: var(--fg-subtle); }
+  .ident-val.origin { color: var(--fg-muted); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+
+  /* copyable id chip */
+  .doc-id {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 4px 1px 7px;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); max-width: 100%;
+  }
+  .doc-id > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .copy-btn {
     display: inline-flex; align-items: center; justify-content: center;
     width: 24px; height: 24px; padding: 0;
@@ -43,11 +90,10 @@
   .copy-btn svg { width: 14px; height: 14px; }
   .copy-btn.copied { color: var(--accent); }
 
-  /* destructive action — visually separated (pushed right) and danger-colored */
+  /* destructive action — danger-colored, comfortable hit area */
   .danger-btn {
-    margin-left: auto;
     display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 9px; min-height: 28px;
+    padding: 5px 10px; min-height: 30px;
     font-family: var(--font-mono); font-size: var(--t-11);
     color: var(--stale); background: transparent;
     border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -56,19 +102,32 @@
   .danger-btn:hover { border-color: var(--stale); background: var(--stale-bg); }
   .danger-btn svg { width: 13px; height: 13px; }
 
-  .doc-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-3); align-items: center; }
+  /* ── Tags ───────────────────────────────────────────── */
+  .doc-tags {
+    display: flex; flex-wrap: wrap; gap: var(--s-2);
+    margin-top: var(--s-4); padding-top: var(--s-4);
+    border-top: 1px solid var(--border);
+    align-items: center;
+  }
+  .doc-tags .tags-label {
+    font-family: var(--font-mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-subtle); margin-right: var(--s-1);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
   .tagx { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono);
     font-size: 11px; padding: 2px 4px 2px 8px; border-radius: 999px;
     background: var(--bg-input); border: 1px solid var(--border); color: var(--fg-muted); }
   .tagx button { background: none; border: none; color: var(--fg-subtle); cursor: pointer;
-    font-size: 13px; line-height: 1; padding: 0 2px; }
+    font-size: 14px; line-height: 1; padding: 2px 4px; min-width: 22px; min-height: 22px; }
   .tagx button:hover { color: var(--stale); }
   .tag-input { background: transparent; border: 1px dashed var(--border); border-radius: 999px;
-    color: var(--fg); font-family: var(--font-mono); font-size: 11px; padding: 2px 10px;
-    width: 70px; transition: width var(--duration), border-color var(--duration); }
-  .tag-input:focus { border-color: var(--accent-line); width: 130px; }
+    color: var(--fg); font-family: var(--font-mono); font-size: 11px; padding: 3px 10px;
+    min-height: 26px; width: 76px; transition: width var(--duration), border-color var(--duration); }
+  .tag-input::placeholder { color: var(--fg-subtle); }
+  .tag-input:focus { border-color: var(--accent-line); width: 136px; }
 
-  /* TOC */
+  /* ── Table of contents ──────────────────────────────── */
   .toc {
     position: sticky; top: calc(52px + var(--s-6));
     font-family: var(--font-mono); font-size: var(--t-12);
@@ -87,7 +146,7 @@
   .toc a.lvl-2 { padding-left: var(--s-3); }
   .toc a.lvl-3 { padding-left: var(--s-5); color: var(--fg-subtle); }
 
-  /* Prose */
+  /* ── Prose (rendered markdown — server-sanitized) ───── */
   .prose {
     max-width: 72ch;
     font-size: var(--t-16); line-height: 1.7; color: var(--fg);
@@ -165,20 +224,53 @@
   .prose .footnotes { margin-top: var(--s-8); border-top: 1px solid var(--border);
     padding-top: var(--s-4); font-size: var(--t-12); color: var(--fg-muted); }
 
-  .doc-history { margin-top: var(--s-8); border-top: 1px solid var(--border); padding-top: var(--s-4); }
-  .doc-history summary { cursor: pointer; font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted); }
-  .doc-history summary:hover { color: var(--accent); }
-  .history-row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0;
+  /* ── Version history ────────────────────────────────── */
+  .doc-history {
+    margin-top: var(--s-10);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .doc-history summary {
+    list-style: none;
+    cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: var(--s-2);
+    padding: var(--s-3) var(--s-4); min-height: 44px;
     font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted);
-    border-top: 1px solid var(--border); }
+    transition: color var(--duration);
+  }
+  .doc-history summary::-webkit-details-marker { display: none; }
+  .doc-history summary:hover { color: var(--accent); }
+  .doc-history summary .chev {
+    width: 14px; height: 14px; color: var(--fg-subtle);
+    transition: transform var(--duration);
+  }
+  .doc-history[open] summary .chev { transform: rotate(90deg); }
+  .doc-history summary .hist-hint {
+    margin-left: auto; color: var(--fg-subtle); font-size: var(--t-11);
+  }
+  .history-body {
+    padding: 0 var(--s-4) var(--s-2);
+    border-top: 1px solid var(--border);
+    color: var(--fg-muted); font-family: var(--font-mono); font-size: var(--t-12);
+  }
+  .history-row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0;
+    font-family: var(--font-mono); font-size: var(--t-12); color: var(--fg-muted);
+    font-variant-numeric: tabular-nums; }
+  .history-row + .history-row { border-top: 1px solid var(--border); }
   .history-row .restore { margin-left: auto; background: transparent; border: 1px solid var(--border);
-    color: var(--fg-subtle); border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer;
-    font-family: var(--font-mono); font-size: 11px; }
+    color: var(--fg-subtle); border-radius: var(--radius-sm); padding: 5px 10px;
+    min-height: 30px; cursor: pointer; font-family: var(--font-mono); font-size: 11px;
+    transition: color var(--duration), border-color var(--duration); }
   .history-row .restore:hover { color: var(--accent); border-color: var(--accent-line); }
 
   @media (max-width: 1024px) {
     .reader { grid-template-columns: minmax(0, 1fr); }
     .toc { display: none; }
+  }
+  @media (max-width: 640px) {
+    .doc-head { padding: var(--s-4); }
+    .doc-title { font-size: var(--t-22); }
   }
 </style>
 {% endblock %}
@@ -186,29 +278,16 @@
 {% block content %}
 <div class="reader">
   <article>
+    <a href="/store" class="doc-back">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      store
+    </a>
+
     <header class="doc-head">
-      <a href="/store" class="doc-back">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-        store
-      </a>
-      <h1 class="doc-title">{{ doc.title }}</h1>
-      <div class="doc-meta">
+      <div class="doc-statusline">
         <span class="pill pill-source">@trovex</span>
         {% if doc.kind %}<span class="pill pill-plan">{{ doc.kind }}</span>{% endif %}
         {{ status_pill(doc.status) }}
-        <span class="doc-id">
-          <span>{{ doc.ext_id }}</span>
-          <button class="copy-btn" type="button"
-                  aria-label="Copy document id"
-                  data-copy="{{ doc.ext_id }}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="9" y="9" width="13" height="13" rx="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-          </button>
-        </span>
-        <span>~{{ "{:,}".format(doc.tokens_est) }} tok</span>
-        {% if doc.origin %}<span class="mono" style="color: var(--fg-subtle);" title="original source path">from {{ doc.origin }}</span>{% endif %}
         <button class="danger-btn" type="button"
                 data-delete="{{ doc.ext_id }}" aria-label="Delete this document">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -217,7 +296,59 @@
           delete
         </button>
       </div>
+
+      <h1 class="doc-title">{{ doc.title }}</h1>
+
+      <div class="doc-ident">
+        <div class="ident-cell">
+          <span class="ident-key">canonical id</span>
+          <span class="ident-val">
+            <span class="doc-id">
+              <span>{{ doc.ext_id }}</span>
+              <button class="copy-btn" type="button"
+                      aria-label="Copy document id"
+                      data-copy="{{ doc.ext_id }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
+            </span>
+          </span>
+        </div>
+
+        <div class="ident-cell">
+          <span class="ident-key">context cost</span>
+          <span class="ident-val">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-zap"></use></svg>
+            ~{{ "{:,}".format(doc.tokens_est) }} tok
+          </span>
+        </div>
+
+        <div class="ident-cell">
+          <span class="ident-key">last updated</span>
+          <span class="ident-val">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"></use></svg>
+            <time data-ts="{{ doc.mtime | int }}">…</time>
+          </span>
+        </div>
+
+        {% if doc.origin %}
+        <div class="ident-cell">
+          <span class="ident-key">source</span>
+          <span class="ident-val origin" title="original source path: {{ doc.origin }}">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-file"></use></svg>
+            {{ doc.origin }}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+
       <div class="doc-tags" data-doc="{{ doc.ext_id }}">
+        <span class="tags-label">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-tag"></use></svg>
+          tags
+        </span>
         {% for t in doc.tags %}
         <span class="tagx" data-tag="{{ t }}">{{ t }}<button type="button" aria-label="Remove tag {{ t }}">×</button></span>
         {% endfor %}
@@ -228,7 +359,11 @@
     <div class="prose">{{ body_html | safe }}</div>
 
     <details class="doc-history">
-      <summary>History</summary>
+      <summary>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+        Version history
+        <span class="hist-hint">snapshots from prior writes &amp; restores</span>
+      </summary>
       <div class="history-body" data-doc="{{ doc.ext_id }}">…</div>
     </details>
   </article>
@@ -244,6 +379,20 @@
 </div>
 
 <script>
+  // Render the "last updated" timestamp from epoch seconds (locale-aware,
+  // matches how the version-history rows format their dates).
+  document.querySelectorAll('time[data-ts]').forEach(function (el) {
+    var ts = parseInt(el.dataset.ts, 10);
+    if (!ts) { el.textContent = '—'; return; }
+    var d = new Date(ts * 1000);
+    el.dateTime = d.toISOString();
+    el.textContent = d.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+    el.title = d.toString();
+  });
+
   document.querySelectorAll('.copy-btn[data-copy]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       navigator.clipboard.writeText(btn.dataset.copy).then(function () {

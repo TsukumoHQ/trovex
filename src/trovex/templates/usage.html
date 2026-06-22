@@ -7,6 +7,28 @@
   <span class="mono">{{ total_queries }} queries · {{ unique_users }} users</span>
 {% endblock %}
 
+{# ── Derive an aggregate volume series from the per-user sparklines ──── #}
+{# Route already passes 24-bucket sparklines per user; summing them is a   #}
+{# view-side roll-up, not invented data.                                   #}
+{% set ns = namespace(buckets=[], total=0, peak=0) %}
+{% if per_user %}
+  {% set first_len = (per_user | map(attribute='sparkline') | select | map('length') | list) %}
+  {% if first_len %}
+    {% set width = first_len | max %}
+    {% for i in range(width) %}
+      {% set col = namespace(sum=0) %}
+      {% for u in per_user %}
+        {% if u.sparkline and i < (u.sparkline | length) %}
+          {% set col.sum = col.sum + u.sparkline[i] %}
+        {% endif %}
+      {% endfor %}
+      {% set _ = ns.buckets.append(col.sum) %}
+      {% set ns.total = ns.total + col.sum %}
+      {% if col.sum > ns.peak %}{% set ns.peak = col.sum %}{% endif %}
+    {% endfor %}
+  {% endif %}
+{% endif %}
+
 {% block content %}
 <div class="section-head" style="margin-bottom: var(--s-5);">
   <div>
@@ -36,10 +58,57 @@
   </div>
   <div class="kpi">
     <div class="kpi-label">avg latency</div>
-    <div class="kpi-value mono" style="font-size: var(--t-22);">{{ avg_elapsed }}ms</div>
+    <div class="kpi-value mono" style="font-size: var(--t-22);">{{ avg_elapsed }}<span class="kpi-unit">ms</span></div>
     <div class="kpi-sub">embed + search</div>
   </div>
 </div>
+
+{# ── Query volume over the window (SVG area + line) ───── #}
+{% if ns.total > 0 and ns.buckets | length > 1 %}
+{% set n = ns.buckets | length %}
+{% set vmax = [ns.peak, 1] | max %}
+<div class="volume card">
+  <div class="volume-head">
+    <div>
+      <div class="kpi-label">query volume</div>
+      <div class="volume-sub mono">
+        {{ "{:,}".format(ns.total) }} over {{ days }}d ·
+        <span class="cell-faint">peak {{ ns.peak }}/bucket</span>
+      </div>
+    </div>
+    <div class="volume-axis mono" aria-hidden="true">
+      <span>{{ days }}d ago</span><span>now</span>
+    </div>
+  </div>
+  <svg class="volume-svg" viewBox="0 0 100 30" preserveAspectRatio="none"
+       role="img" aria-label="Query volume across {{ n }} time buckets over the last {{ days }} days, peaking at {{ ns.peak }} queries.">
+    <defs>
+      <linearGradient id="vol-fill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.22"/>
+        <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    {# baseline #}
+    <line x1="0" y1="29.6" x2="100" y2="29.6" class="volume-base"/>
+    {# area path #}
+    <path class="volume-area" fill="url(#vol-fill)"
+          d="M0,30
+             {%- for v in ns.buckets -%}
+               {%- set x = (loop.index0 / (n - 1) * 100) | round(3) -%}
+               {%- set y = (29.5 - (v / vmax) * 27) | round(3) -%}
+               L{{ x }},{{ y }}
+             {%- endfor -%}
+             L100,30 Z"/>
+    {# stroke line #}
+    <path class="volume-line" fill="none"
+          d="M{% for v in ns.buckets -%}
+               {%- set x = (loop.index0 / (n - 1) * 100) | round(3) -%}
+               {%- set y = (29.5 - (v / vmax) * 27) | round(3) -%}
+               {%- if not loop.first %}L{% endif %}{{ x }},{{ y }}{{ ' ' }}
+             {%- endfor %}"/>
+  </svg>
+</div>
+{% endif %}
 
 {# ── Filter bar ──────────────────────────────────────── #}
 <form action="/usage" method="get" autocomplete="off" class="filter-bar">
@@ -63,24 +132,43 @@
   </div>
 </form>
 
-{# ── Per-user lanes ──────────────────────────────────── #}
+{# ── Per-user leaderboard ────────────────────────────── #}
 {% if per_user %}
+{% set top_q = (per_user | map(attribute='queries') | list | max) or 1 %}
 <div class="section" style="margin-top: var(--s-6);">
-  <h3 style="margin-bottom: var(--s-3);">Activity per user</h3>
+  <div class="section-head">
+    <h3 style="margin: 0;">Activity per user</h3>
+    <span class="subtle mono" style="font-size: var(--t-11);">
+      {{ per_user | length }} ranked by volume
+    </span>
+  </div>
   <div class="user-lanes">
     {% for u in per_user %}
     <div class="user-lane" data-user="{{ u.user }}">
       <div class="user-lane-head">
+        <span class="user-rank mono" aria-hidden="true">{{ "%02d"|format(loop.index) }}</span>
         {{ avatar(u.user, 32) }}
         <div class="user-lane-info">
           <div class="user-lane-name">{{ u.user }}</div>
           <div class="user-lane-meta">
-            {{ u.queries }} queries · {{ "{:,}".format(u.resp_tokens) }} tokens ·
             <span class="cell-faint">{{ u.last_seen_label }}</span>
           </div>
         </div>
         <a href="/usage?user={{ u.user | urlencode }}&days={{ days }}" class="user-lane-link mono">filter →</a>
       </div>
+
+      {# share-of-volume bar — borrows the .dist visual language #}
+      <div class="user-share-track" role="img"
+           aria-label="{{ u.queries }} queries, {{ (u.queries / top_q * 100) | round }}% of the busiest user">
+        <div class="user-share-fill" style="width: {{ (u.queries / top_q * 100) | round(1) }}%;"></div>
+      </div>
+
+      <div class="user-stats mono">
+        <span class="user-stat"><b>{{ "{:,}".format(u.queries) }}</b> queries</span>
+        <span class="user-stat"><b>{{ "{:,}".format(u.resp_tokens) }}</b> tokens</span>
+        <span class="user-stat"><b>{{ u.avg_elapsed_ms | round | int }}</b>ms avg</span>
+      </div>
+
       {% if u.sparkline %}
       <div class="sparkline" role="img" aria-label="Activity over {{ days }} days">
         {% set spmax = u.sparkline | max %}
@@ -141,7 +229,7 @@
             </div>
             <button class="feed-copy" type="button"
                     onclick="trovexCopy(this, '{{ r.query | escape | replace("'", "\\'") }}')"
-                    title="copy query">
+                    title="copy query" aria-label="Copy query to clipboard">
               <span class="feed-copy-icon">⧉</span>
             </button>
           </li>
@@ -153,7 +241,54 @@
   {% endif %}
 </div>
 
+<script>
+  window.trovexCopy = function (btn, text) {
+    navigator.clipboard.writeText(text).then(function () {
+      btn.dataset.copied = '1';
+      setTimeout(function () { delete btn.dataset.copied; }, 1500);
+    });
+  };
+</script>
+{% endblock %}
+
+{% block head %}
 <style>
+  /* ── KPI unit suffix ─────────────────────────────────── */
+  .kpi-unit { font-size: var(--t-14); color: var(--fg-subtle); margin-left: 1px; }
+
+  /* ── Query volume chart ──────────────────────────────── */
+  .volume {
+    padding: var(--s-4);
+    margin: var(--s-5) 0 var(--s-2);
+  }
+  .volume-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: var(--s-3); margin-bottom: var(--s-3);
+  }
+  .volume-sub {
+    font-size: var(--t-12); color: var(--fg-muted);
+    margin-top: 4px; font-variant-numeric: tabular-nums;
+  }
+  .volume-axis {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+    font-size: var(--t-11); color: var(--fg-subtle);
+  }
+  .volume-axis {
+    flex-direction: row; align-self: flex-end;
+    gap: 0; width: 100%; justify-content: space-between;
+    max-width: 220px;
+  }
+  .volume-svg {
+    display: block; width: 100%; height: 84px;
+    overflow: visible;
+  }
+  .volume-base { stroke: var(--border); stroke-width: 0.4; vector-effect: non-scaling-stroke; }
+  .volume-line {
+    stroke: var(--accent); stroke-width: 1.5;
+    stroke-linejoin: round; stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+
   /* ── Filter bar ──────────────────────────────────────── */
   .filter-bar {
     display: flex;
@@ -192,12 +327,12 @@
   }
   .filter-pill:hover { color: var(--fg); background: var(--bg-hover); }
   .filter-pill.active {
-    color: var(--bg);
+    color: var(--on-accent);
     background: var(--accent);
   }
-  .filter-pill.active:hover { color: var(--bg); }
+  .filter-pill.active:hover { color: var(--on-accent); }
 
-  /* ── User lanes ──────────────────────────────────────── */
+  /* ── User lanes / leaderboard ────────────────────────── */
   .user-lanes {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -214,6 +349,13 @@
   .user-lane-head {
     display: flex; align-items: center; gap: var(--s-3);
     margin-bottom: var(--s-3);
+  }
+  .user-rank {
+    font-size: var(--t-12);
+    color: var(--fg-faint);
+    font-variant-numeric: tabular-nums;
+    width: 1.6em; text-align: right;
+    flex-shrink: 0;
   }
   .user-lane-info { flex: 1; min-width: 0; }
   .user-lane-name {
@@ -234,11 +376,37 @@
     padding: 2px 8px;
     border-radius: var(--radius-sm);
     transition: all var(--duration);
+    flex-shrink: 0;
   }
   .user-lane-link:hover {
     color: var(--accent);
     background: var(--accent-soft);
   }
+
+  .user-share-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--bg-input);
+    overflow: hidden;
+    margin-bottom: var(--s-3);
+  }
+  .user-share-fill {
+    height: 100%;
+    background: var(--accent-line);
+    border-radius: 999px;
+    transition: width var(--duration) var(--ease);
+  }
+  .user-lane:hover .user-share-fill { background: var(--accent); }
+
+  .user-stats {
+    display: flex; flex-wrap: wrap;
+    gap: var(--s-1) var(--s-4);
+    font-size: var(--t-11);
+    color: var(--fg-subtle);
+    margin-bottom: var(--s-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .user-stat b { color: var(--fg); font-weight: 500; }
 
   .sparkline {
     display: flex;
@@ -324,6 +492,7 @@
     color: var(--fg-subtle);
     font-size: var(--t-11);
     margin-top: 2px;
+    font-variant-numeric: tabular-nums;
   }
   .feed-copy {
     opacity: 0;
@@ -344,15 +513,7 @@
     .feed-item { grid-template-columns: 40px 22px 1fr; }
     .feed-copy { display: none; }
     .user-lanes { grid-template-columns: 1fr; }
+    .volume-axis { max-width: none; }
   }
 </style>
-
-<script>
-  window.trovexCopy = function (btn, text) {
-    navigator.clipboard.writeText(text).then(function () {
-      btn.dataset.copied = '1';
-      setTimeout(function () { delete btn.dataset.copied; }, 1500);
-    });
-  };
-</script>
 {% endblock %}

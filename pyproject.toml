@@ -6,6 +6,20 @@ readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "Synergix"}]
 license = "AGPL-3.0-or-later"
+keywords = ["mcp", "llm", "context", "coding-agents", "embeddings", "rag", "documentation", "token-efficiency"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 
 dependencies = [
     "fastapi>=0.115",
@@ -37,12 +51,25 @@ dev = [
 [project.scripts]
 trovex = "trovex.cli:app"
 
+[project.urls]
+Homepage = "https://trovex.dev"
+Repository = "https://github.com/TsukumoHQ/trovex"
+Issues = "https://github.com/TsukumoHQ/trovex/issues"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/trovex"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/trovex"]
+include = [
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
 
 [tool.ruff]
 line-length = 100

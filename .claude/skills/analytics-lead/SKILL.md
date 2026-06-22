@@ -46,6 +46,27 @@ feeding a consulting funnel.
 - **revops** — WHEN: defining the **activation funnel** (landing → install → index → first
   query) and **install → repeat** retention, plus the reach → lead lifecycle. Build the
   **north-star dashboard**: reach (visits/stars/AI citations) → activations → consulting leads.
+- **Twenty CRM = the consulting-lead system of record (you own it).** Every qualified
+  consulting lead (the north-star end) gets logged in Twenty (`tsukumo.twenty.com`); the
+  north-star scoreboard reads the pipeline from it. You both **write** new leads and **read**
+  the pipeline for reporting. Inbound leads (in-person, email, referral) are logged by hand;
+  web signups sync via `web/api/_twenty.js`. PII (name/email) lives in the CRM where it
+  belongs — reports surface only counts + coarse source/stage.
+
+  **Twenty REST contract (live, verified — re-uses `web/api/_twenty.js`):**
+  - Creds out-of-git: `~/.config/trovex-growth/twenty.env` → `TWENTY_BASE_URL`
+    (`https://tsukumo.twenty.com`) + `TWENTY_API_KEY` (Bearer). Load:
+    `set -a; . ~/.config/trovex-growth/twenty.env; set +a`.
+  - Cloudflare blocks non-browser User-Agents (Error 1010) → send a Mozilla UA.
+  - Person: `POST /rest/people` with `{ name:{firstName,lastName}, emails:{primaryEmail},
+    jobTitle?, linkedinLink:{primaryLinkUrl}? }`. **No `city` field exists** (400s).
+    Idempotent on email: `GET /rest/people?filter=emails.primaryEmail[eq]:<email>` first.
+  - Source note: body is the RICH_TEXT field **`bodyV2:{markdown}`** (a plain `body` 400s).
+    `POST /rest/notes { title, bodyV2:{markdown} }`, then link with
+    `POST /rest/noteTargets { noteId, targetPersonId }` (**`targetPersonId`**, not
+    `personId` — the latter is silently ignored, leaving the note unlinked).
+  - Never fabricate a lead or an email. No email yet → create the Person, mark
+    `EMAIL: PENDING` in the note, get it from the owner to dedup/complete.
 - **ab-test-setup** — WHEN: a change is worth proving. Design the test (hypothesis +
   single success metric + sample size) and maintain an **ICE-scored experiment backlog**,
   each entry a hypothesis + success metric. Never run an A/B test before tracking is live.

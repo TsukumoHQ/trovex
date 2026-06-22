@@ -55,7 +55,11 @@ feeding a consulting funnel.
   surface only counts + coarse source/stage.
 
   **The follow-up loop (do ALL of it for a real lead — not just a bare Person):**
-  1. **Person** — dedup on email first. Set the lead fields: `source`
+  0. **Dedup FIRST, properly.** `?filter=emails.primaryEmail[eq]:<email>` works; a name
+     `[ilike]` filter on the FULL_NAME subfields silently returns empty (REST quirk) — do
+     NOT trust it. With no email, `GET /rest/people?limit=200` and match firstName+lastName
+     client-side before creating. Skipping this = duplicate Person + Opportunity + Note.
+  1. **Person** — set the lead fields: `source`
      (REFERRAL|IN_PERSON|WAITLIST|OSS_SUITE|SEARCH|AI_ENGINE|SOCIAL|DIRECT|NEWSLETTER),
      `sourceSite` (TROVEX|TSUKUMO|WRAITH|YORU), `teamIntent` (bool — wants help running agents
      across a team), `newsletter` (bool). Don't leave a lead unattributed.

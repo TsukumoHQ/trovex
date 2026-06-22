@@ -72,6 +72,16 @@ async function createPerson(c, lead) {
   const body = { name: { firstName, lastName }, emails: { primaryEmail: lead.email } }
   if (lead.role) body.jobTitle = String(lead.role).slice(0, 120)
   if (lead.linkedin) body.linkedinLink = { primaryLinkUrl: String(lead.linkedin).slice(0, 256) }
+  // Structured attribution — so a captured lead is NOT 'untagged' in the pipeline.
+  // This sink is the trovex.dev OSS property, so every lead it creates is, by
+  // definition, OSS-suite sourced (the north-star "qualified, suite-sourced lead"
+  // signal the scoreboard buckets on) and lives on the TROVEX property. The finer
+  // CHANNEL (which AI engine / search / social drove the visit) is free-text only
+  // — Person has no structured UTM field — so it stays in the source note below.
+  body.source = 'OSS_SUITE'
+  body.sourceSite = 'TROVEX'
+  if (typeof lead.teamIntent === 'boolean') body.teamIntent = lead.teamIntent
+  if (typeof lead.newsletter === 'boolean') body.newsletter = lead.newsletter
   const res = await twentyFetch(c, '/rest/people', { method: 'POST', body: JSON.stringify(body) })
   if (!res || !res.ok) return null
   const json = /** @type {any} */ (await res.json().catch(() => null))

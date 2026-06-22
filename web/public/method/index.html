@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/method/" />
+  <title>The Canonical Context Method — trovex</title>
+  <meta name="description" content="Practices for running coding agents on real work. The model is the part you can't control; the context you feed it is the part you can. Nine principles for keeping that context one current, canonical answer instead of a pile of candidates the agent has to guess from." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/method/" />
+  <meta property="og:title" content="The Canonical Context Method" />
+  <meta property="og:description" content="Nine principles for running coding agents on one current, canonical answer instead of a pile of candidates to guess from." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="The Canonical Context Method" />
+  <meta name="twitter:description" content="Nine principles for running coding agents on one current, canonical answer." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Method", "item": "https://trovex.dev/method/" }
+        ]
+      },
+      {
+        "@type": "Article",
+        "headline": "The Canonical Context Method",
+        "description": "Nine principles for running coding agents on one current, canonical answer instead of a pile of candidates the agent has to guess from.",
+        "url": "https://trovex.dev/method/",
+        "author": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+        "publisher": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+        "datePublished": "2026-06-22",
+        "about": ["AI coding agents", "canonical context", "single source of truth"]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / Method
+    </nav>
+
+    <h1>The Canonical Context <span class="ac">Method</span></h1>
+    <p class="deck"><strong>Practices for running coding agents on real work.</strong></p>
+    <p class="deck">An agent's output is a function of two things: the model, and the context you feed it. You can only rent the first. You own the second. Most teams spend their attention on the part they can't control and neglect the part they can.</p>
+    <p class="deck">This is the method we use, and the one trovex is built to support. It isn't about a smarter model. It's about handing the agent one current, canonical answer instead of a pile of candidates to rank. Nine principles, in three parts.</p>
+
+    <section style="margin-top:44px;">
+      <h2>Direction</h2>
+
+      <h3>1. One question, one canonical answer</h3>
+      <p>For any question an agent asks your repo ("how do we deploy?", "what's the auth flow?"), there should be exactly one doc that answers it, and everyone should know which one. Parallel near-copies are the root cause of drift. When two docs answer the same question, the agent picks one at random, and half the time it's the wrong one.</p>
+
+      <h3>2. Current beats complete</h3>
+      <p>Retrieval ranks docs by similarity, and a stale doc is exactly as similar to a query as the current one. Without a freshness signal the agent has no way to prefer the doc that's still true. A short, current answer beats an exhaustive, out-of-date one. Mark what's current; let the rest age out of the way.</p>
+
+      <h3>3. Write the answer where every agent reads</h3>
+      <p>A canonical answer that lives in one agent's session memory isn't canonical. It's a private note. The answer has to live on a shared read/write path that every agent and every teammate reads from and writes to, or each one re-derives it and the copies drift apart.</p>
+    </section>
+
+    <section style="margin-top:36px;">
+      <h2>Building</h2>
+
+      <h3>4. Don't make the agent re-derive</h3>
+      <p>Before an agent does anything useful, it reads candidate files to find which one is current. That work is pure overhead, and it repeats every session, every agent, every teammate. Locate the answer once, serve it, and stop paying to re-find it. Serving one canonical answer instead of read-and-rank is about <strong>60% fewer tokens per lookup</strong> (measured, not asserted).</p>
+
+      <h3>5. Ground before you reason</h3>
+      <p>When an agent gets real work wrong, the failure is usually procedural, not a reasoning gap: it worked from a stale runbook and reasoned perfectly from a wrong premise. Fix the premise first. Grounding the agent in the current constraints moves the outcome more than a model upgrade, and costs nothing in model spend.</p>
+
+      <h3>6. Verify against the canon, not the vibe</h3>
+      <p>"It felt better" hides regressions. Before an agent's answer ships, check it against the canonical doc it should have used. If the answer and the canon disagree, one of them is wrong, and you want to know which before the agent acts on it.</p>
+
+      <h3>7. Keep it local</h3>
+      <p>The context an agent reads on every call should be served from where it works, not fetched across a network round-trip each time. Local is faster, it's cheaper, and it keeps your docs your docs.</p>
+    </section>
+
+    <section style="margin-top:36px;">
+      <h2>Maintenance</h2>
+
+      <h3>8. Prune to keep one source of truth</h3>
+      <p>A source of truth degrades the moment a second copy appears. Before you write a new doc, search for the one that already covers the question and update that instead. Pruning duplicates isn't cleanup you do later; it's how the canon stays canonical.</p>
+
+      <h3>9. Measure the tax</h3>
+      <p>The cost of an agent re-finding docs is invisible because you meet it one cheap lookup at a time. It only shows up at the end of the month as "why is our spend creeping up." Measure the doc-locating slice directly so you can watch it shrink when you fix it.</p>
+    </section>
+
+    <div class="cta">
+      <h2>One canonical answer per query.</h2>
+      <p>Point trovex at your repo. Your agents stop rereading it in about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/answers/">Read the answers</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

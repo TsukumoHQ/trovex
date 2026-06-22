@@ -158,10 +158,15 @@ function slideCard(spec, slide, S) {
   }, footerSource(spec, slide), { text: spec.cta.foot, accent:false });
 }
 function ctaCard(spec, S) {
+  // LADDER ENDPLATE (brand-channel-direction v1.1, LOCKED — design = visual SSOT): product
+  // decks (trovex/wraith/yoru) carry a small faint 'a tsukumo product' cue on the CTA card
+  // ONLY — the tsukumo ladder is a footer, never a repaint. Institutional (tsukumo) decks
+  // ARE tsukumo, so no endplate. Renders in frame's left footer (C.soft mono, S.foot).
+  const endplate = brandFor(spec.audience) === "tsukumo" ? "" : "a tsukumo product";
   return frame(S, h("div",{}), {
     mark: wordmark(brandFor(spec.audience), S.mark),
     body: [ titleEl(spec.cta.title, spec.cta.accent, tfs(S, spec.cta.title), C.green), body(spec.cta.sub, S.sub) ],
-  }, "", { text: spec.cta.foot, accent:true });
+  }, endplate, { text: spec.cta.foot, accent:true });
 }
 
 function cardsFor(spec) {

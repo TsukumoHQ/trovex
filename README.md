@@ -109,5 +109,5 @@ requires you to share your changes.
 trovex is free to run yourself. If your team is rolling out coding agents at scale and wants
 hands-on help doing it well, or to embed and host a modified trovex privately without the
 AGPL's copyleft obligations, that's what the consulting is for.
-[Reach out](https://tsukumo.ch/consulting/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting):
+[Reach out](https://tsukumo.ch/consulting/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting&utm_content=readme):
 tsukumo, the team behind trovex.

@@ -40,7 +40,11 @@ Run it every poll. **A relay message does NOT wake a sleeping session — only t
 (memory `relay-msg-no-session-wake`), so the `ScheduleWakeup` line below is what keeps the loop alive.
 
 Each poll:
-1. **Re-poll** `get_inbox` (unread) + `list_tasks` (geo-lead, active). Mark read / ack what you action.
+1. **Re-poll** `get_inbox` (unread) + `list_tasks` (geo-lead, active) + **`list_conversations`** (unread
+   counts — crisis cells / multi-lead threads live here, NOT in get_inbox). Read + reply in any cell you're a
+   member of; `get_conversation_messages` to catch up, then post to it. **conversation_id has NO `conv:` prefix**
+   (use the bare id from `list_conversations`, e.g. `a11aa127-…`, or the send fails with "not a member"). Mark
+   read / ack what you action.
 2. **Work-loop** — if a claimable/in-progress geo-lead task: claim → `start_task` → do the work in
    `.worktrees/geo-lead` on a `growth/geo-<slug>` branch → `/pr-review-self` → PR (merge if low-risk
    per autonomy-rules) → `complete_task` → next. **NEVER stop or ask the user**; blockers → **cmo** via

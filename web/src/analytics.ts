@@ -110,6 +110,19 @@ const UTM_SOURCE: Record<string, GeoSource> = {
   discord: 'social',
   'mcp-registry': 'referral',
   newsletter: 'referral',
+  // Layer-split account variants (founder vs amplifier) — keep the channel correct
+  // (social) while utm_source's RAW value preserves the LAYER for the consulting-funnel
+  // readout (founder=personal accounts, company=@tsukumohq, suite=cross-property links).
+  // Without these, a layer-tagged link would derive geo_source='unknown'. The layer
+  // itself is parsed from the raw utm_source downstream — see utm-convention doc 6d8fd05c.
+  'linkedin-org': 'social', // @tsukumohq LinkedIn (company amplifier)
+  'x-tsukumohq': 'social', // @tsukumohq X (company amplifier)
+  'threads-tsukumohq': 'social', // @tsukumohq Threads (company amplifier)
+  'threads-heliosmarket': 'social', // @heliosmarket Threads (founder)
+  // Suite cross-property amplification (one OSS tool linking to another).
+  wraith: 'referral',
+  trovex: 'referral',
+  yoru: 'referral',
 }
 
 const AI_ENGINES: GeoSource[] = ['chatgpt', 'perplexity', 'claude', 'gemini', 'copilot']

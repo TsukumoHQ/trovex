@@ -1,37 +1,37 @@
 [
   {
     "id": "founder-x-rag-writepath",
-    "brand": "founder", "network": "twitter", "pillar": "howto", "format": "thread",
+    "brand": "founder", "network": "twitter", "pillar": "howto", "role": "reach", "format": "thread",
     "text": "rag gave my agents better recall, and they still drifted. retrieval finds a doc that looks relevant. it can't tell you which one is current, and it never writes back what the agent just figured out.\n\nmemory isn't search. it's a write path.",
     "descendants": [],
-    "link": "trovex.dev/blog/one-source-of-truth-for-a-fleet-of-agents",
+    "link": "tsukumo.ch/blog/one-source-of-truth-for-a-fleet-of-agents",
     "utmCampaign": "public-beta", "utmContentSlug": "founder-x-rag-writepath"
   },
   {
     "id": "founder-x-freshness-tag",
-    "brand": "founder", "network": "twitter", "pillar": "howto", "format": "thread",
+    "brand": "founder", "network": "twitter", "pillar": "howto", "role": "activation", "format": "thread",
     "text": "the unsexy detail that makes trovex work: every result comes tagged canonical / stale / duplicate. relevance isn't currency. the current doc has to win, or your agent cites a dead file that just matched on keywords.",
     "link": "trovex.dev/", "utmCampaign": "public-beta", "utmContentSlug": "founder-x-freshness-tag"
   },
   {
     "id": "founder-x-coordination-game",
-    "brand": "founder", "network": "twitter", "pillar": "bip", "format": "thread",
+    "brand": "founder", "network": "twitter", "pillar": "bip", "role": "reach", "format": "thread",
     "text": "a fleet of agents runs our growth team. the lesson keeps repeating: the model is rarely the bottleneck, coordination is. shared memory, one source of truth read before writing, atomic task claims. boring infra. it's the whole game past one agent.",
     "link": "trovex.dev/", "utmCampaign": "public-beta", "utmContentSlug": "founder-x-coordination-game"
   },
   {
     "id": "founder-th-drift-story",
-    "brand": "founder", "network": "threads", "pillar": "bip", "format": "single",
+    "brand": "founder", "network": "threads", "pillar": "bip", "role": "reach", "format": "single",
     "text": "watched two of our own agents 'fix' the same bug an hour apart, from different context. one read the current runbook, one read a stale wiki nobody deleted. both totally confident.\n\nthe model was fine. what was missing: a shared memory to write the fix back to.\n\ngithub.com/TsukumoHQ/trovex"
   },
   {
     "id": "founder-th-receipt-bip",
-    "brand": "founder", "network": "threads", "pillar": "proof", "format": "single",
+    "brand": "founder", "network": "threads", "pillar": "proof", "role": "activation", "format": "single",
     "text": "build-in-public moment: we shipped a savings view inside trovex this week so you can see what the context layer actually saves, per lookup. ran it on a fresh repo for 48h — 340,784 tokens, 74% fewer per query. i quote ~60% publicly as the conservative floor. don't take my number, read your own.\n\ngithub.com/TsukumoHQ/trovex"
   },
   {
     "id": "founder-li-bip-shipped",
-    "brand": "founder", "network": "linkedin", "pillar": "bip", "format": "carousel",
+    "brand": "founder", "network": "linkedin", "pillar": "bip", "role": "reach", "format": "carousel",
     "carouselSlug": "bip-shipped", "cards": 3,
     "text": "a fleet of agents runs our growth team. every week i post the log — shipped, broke, learned. here's what shipped (swipe).\n\nthe pattern under all of it: the work was coordination, not the model.",
     "firstComment": "the rails are open source — trovex: github.com/TsukumoHQ/trovex · public beta: {{link}}",
@@ -39,24 +39,24 @@
   },
   {
     "id": "company-x-rag-not-memory",
-    "brand": "company", "network": "twitter", "pillar": "authority", "format": "thread",
+    "brand": "company", "network": "twitter", "pillar": "authority", "role": "convert", "format": "thread",
     "text": "a lot of teams bolt rag onto their agents and call it memory. it isn't. retrieval ranks what looks relevant, so a stale doc scores as high as the live one, and the agent answers from last quarter with full confidence.",
     "link": "tsukumo.ch/assessment", "utmCampaign": "agency-launch", "utmContentSlug": "company_x_rag_not_memory"
   },
   {
     "id": "company-x-metr-slower",
-    "brand": "company", "network": "twitter", "pillar": "evidence", "format": "thread",
+    "brand": "company", "network": "twitter", "pillar": "evidence", "role": "reach", "format": "thread",
     "text": "METR ran the trial most teams skip: 16 experienced devs, 246 real issues, on their own repos. measured ~19% slower with AI, while the same devs felt ~20% faster. the gap between felt speed and measured speed is the management problem, not the model.",
     "link": "tsukumo.ch/blog/does-ai-make-developers-faster", "utmCampaign": "agency-launch", "utmContentSlug": "company_x_metr_slower"
   },
   {
     "id": "company-th-context-bottleneck",
-    "brand": "company", "network": "threads", "pillar": "authority", "format": "single",
+    "brand": "company", "network": "threads", "pillar": "authority", "role": "convert", "format": "single",
     "text": "the thing slowing your agents in production usually isn't the model. it's what they read before they act: stale context, six readmes with no signal for which is current, no shared memory across the fleet. a smarter model reasons better over bad context. it doesn't fix it.\n\na straight read on where yours breaks: tsukumo.ch/assessment"
   },
   {
     "id": "company-li-study-metr",
-    "brand": "company", "network": "linkedin", "pillar": "evidence", "format": "carousel",
+    "brand": "company", "network": "linkedin", "pillar": "evidence", "role": "reach", "format": "carousel",
     "carouselSlug": "study-metr-slower", "cards": 6,
     "text": "METR ran the randomized trial most teams skip: 16 experienced devs across 246 real issues, on repos they knew. result — about 19% slower with AI, while the same devs believed they were ~20% faster. the slowdown is fixable: it's the operating model, not the model. (swipe)",
     "firstComment": "breakdown + source: {{link}}",

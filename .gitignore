@@ -34,3 +34,7 @@ secrets/
 # Vercel CLI local link
 .vercel
 .fastembed_cache/
+
+# analytics monitor local state (not for git)
+growth/analytics/reports/.simap-seen.json
+growth/analytics/reports/.simap-cookies.tmp

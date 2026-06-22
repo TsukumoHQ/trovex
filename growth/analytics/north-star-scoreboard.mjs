@@ -227,6 +227,54 @@ async function main() {
   const rawTest = rawLeads ? rawLeads.filter(isTestRow).length : null;
   const rawReal = rawLeads ? rawTotal - rawTest : null;
 
+  // ---- Dark funnel: self-report (how_heard) vs auto-attribution (channel) ----
+  // A lead's `channel` is what our auto-attribution captured (UTM/referrer at submit);
+  // `how_heard` is what the lead SELF-REPORTS. Where they disagree — or auto is blind to a
+  // real source the lead named — that's the dark funnel (AI engines + dark social strip the
+  // referrer; offline/word-of-mouth never had one). We surface the size of that gap so the
+  // pipeline isn't read as if auto-attribution were complete. Honest: n/a with no leads.
+  // Map a free-text how_heard to a coarse acquisition class (or a non-channel marker).
+  const heardClass = (h) => {
+    const s = (h || "").toLowerCase().trim();
+    if (!s) return "none"; // no self-report → can't compare
+    if (/(yoru|wraith|trovex|suite|oss)/.test(s)) return "suite";
+    if (/(chatgpt|gpt|openai|perplexity|claude|anthropic|gemini|copilot|\bai\b)/.test(s)) return "ai_engine";
+    if (/(google|search|bing|seo)/.test(s)) return "search";
+    if (/(linkedin|twitter|\bx\b|threads|reddit|social|youtube|hn|hacker)/.test(s)) return "social";
+    if (/(referr|friend|colleag|word|network|recommend)/.test(s)) return "referral";
+    // booking/call/email/in-person/event = a conversion MECHANISM, not an acquisition channel
+    // — auto-attribution legitimately can't see it, so it's NOT counted as a dark miss.
+    if (/(booking|calendly|call|email|in.?person|event|meet)/.test(s)) return "offline";
+    return "other";
+  };
+  // Normalize the auto channel to the same vocabulary; null/empty/unknown = auto blind.
+  const autoClass = (c) => {
+    const s = (c || "").toLowerCase().trim();
+    if (!s || s === "unknown" || s === "none") return "missing";
+    if (s === "ai_engine" || s === "ai") return "ai_engine";
+    return s; // direct | search | social | referral | suite | …
+  };
+  let dark = null;
+  if (rawLeads) {
+    const real = rawLeads.filter((l) => !isTestRow(l));
+    const acc = { compared: 0, agree: 0, disagree: 0, autoBlind: 0, offlineOrDirect: 0, noSelfReport: 0 };
+    for (const l of real) {
+      const self = heardClass(l.how_heard);
+      const auto = autoClass(l.channel);
+      if (self === "none") { acc.noSelfReport++; continue; }
+      acc.compared++;
+      const autoVisible = auto !== "missing" && auto !== "direct";
+      if (self === "offline" || self === "other") { acc.offlineOrDirect++; continue; } // not a comparable acquisition source
+      if (!autoVisible) { acc.autoBlind++; continue; } // lead named a real source; auto missed it = dark
+      if (auto === self) acc.agree++; else acc.disagree++;
+    }
+    // Dark = auto blind to a named source + auto/self disagree, over comparable leads.
+    const denom = acc.agree + acc.disagree + acc.autoBlind;
+    acc.darkCount = acc.disagree + acc.autoBlind;
+    acc.darkRate = denom > 0 ? Math.round((acc.darkCount / denom) * 100) : null;
+    dark = acc;
+  }
+
   // Plausible cross-check: assessment_request total + suite-sourced.
   const [assessAll, assessSuite] = await Promise.all([
     evAgg(tsukumoSite, w, "assessment_request"),
@@ -360,6 +408,27 @@ async function main() {
     P(`| **Union (any engine)** | — | **${cite.union}** |`);
     P(``);
     P(`> An engine reading \`n/a\` has no key provisioned **or** every query errored (e.g. quota/429) — a zero sample, never a fabricated 0%. Fix the key/quota and re-run \`geo-citation-monitor.mjs\`.`);
+  }
+  P(``);
+
+  // Panel D — dark funnel: self-report vs auto-attribution
+  P(`## D · Dark funnel — self-report (\`how_heard\`) vs auto-attribution (\`channel\`)`);
+  if (!dark) {
+    P(`_Supabase \`leads\` unavailable → **n/a**. Cannot measure the self-report↔auto gap._`);
+  } else if (dark.compared === 0) {
+    P(`_No real lead carries a self-report yet → **n/a**. (${n(dark.noSelfReport)} lead(s) with no \`how_heard\`.)_`);
+  } else {
+    P(`*Per-lead reconciliation on Supabase \`leads\` (non-PII columns). \`channel\` = what auto-attribution captured at submit (UTM/referrer); \`how_heard\` = what the lead self-reports. **Dark funnel** = auto blind to a real source the lead named, or the two disagree — the share of pipeline whose true origin auto-attribution missed.*`);
+    P(``);
+    P(`| Reconciliation | Leads |`);
+    P(`|----------------|------:|`);
+    P(`| Auto agrees with self-report | ${dark.agree} |`);
+    P(`| Auto disagrees with self-report | ${dark.disagree} |`);
+    P(`| Auto blind (self-report names a real source) | ${dark.autoBlind} |`);
+    P(`| Offline / direct self-report (auto can't attribute) | ${dark.offlineOrDirect} |`);
+    P(`| No self-report (not comparable) | ${dark.noSelfReport} |`);
+    P(``);
+    P(`**Dark-funnel rate: ${dark.darkRate == null ? "n/a" : `${dark.darkRate}%`}** (${dark.darkCount} of ${dark.agree + dark.disagree + dark.autoBlind} comparable leads). _A high rate means auto-attribution is under-counting; at thin volume \`how_heard\` is the more reliable source signal — weight it, and tighten UTM coverage to shrink the gap._`);
   }
   P(``);
 

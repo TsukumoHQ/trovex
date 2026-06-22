@@ -26,6 +26,14 @@ GEN="$1"; shift
 [ -f "$ROOT/growth/assets/_tools/$GEN" ] || { echo "no such gen: $GEN" >&2; exit 1; }
 
 cd "$ROOT"
+
+# preflight: carousel specs go through the deterministic copy lint first (de-em-dash,
+# public-beta phrasing, no Synergix). A bad spec fails BEFORE it renders + uploads.
+if [ "$GEN" = "gen_carousel.mjs" ]; then
+  specs=(); for a in "$@"; do [ "${a##*.}" = "json" ] && specs+=("$a"); done
+  [ ${#specs[@]} -gt 0 ] && node "growth/assets/_tools/lint_spec.mjs" "${specs[@]}"
+fi
+
 ln -sfn "$DEPS" ./node_modules
 trap 'rm -f ./node_modules' EXIT
 

@@ -64,7 +64,7 @@ function card(q, accent, a) {
       h("div", { style: { fontFamily: "Fira Sans", fontWeight: 500, fontSize: "26px", lineHeight: 1.38, color: C.soft, maxWidth: "980px" } }, a)),
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "Fira Code", fontSize: "20px", borderTop: `1px solid ${C.rule}`, paddingTop: "20px" } },
       h("span", { style: { color: C.green } }, "trovex.dev/answers"),
-      h("span", { style: { color: C.subtle } }, "the canonical doc store for coding agents")),
+      h("span", { style: { color: C.subtle } }, "one canonical doc for your coding agents, ~60% fewer tokens")),
   );
 }
 

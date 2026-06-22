@@ -25,7 +25,6 @@
  *   node growth/analytics/ship-log-monitor.mjs --save       # also write a disk report
  */
 import { writeFileSync, mkdirSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,11 +47,24 @@ function windowStart() {
   return ymd(new Date(Date.now() - days * 86400_000));
 }
 
-function gh(path) {
+// GitHub REST via native fetch — no `gh` CLI dependency, so this runs unchanged in a bare dokan
+// node container. PUBLIC repos need no auth (the suite is public OSS; ~6 calls/run/day << the 60/hr
+// unauthenticated limit). A GITHUB_TOKEN env (optional) raises the limit for heavy local runs and
+// lets a private repo resolve; without it a private/missing repo → null → reported n/a, never faked.
+const GH_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
+async function gh(path) {
   try {
-    return JSON.parse(execSync(`gh api ${path} 2>/dev/null`, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 }));
+    const res = await fetch(`https://api.github.com/${path}`, {
+      headers: {
+        "User-Agent": "trovex-ship-log-monitor",
+        Accept: "application/vnd.github+json",
+        ...(GH_TOKEN ? { Authorization: `Bearer ${GH_TOKEN}` } : {}),
+      },
+    });
+    if (!res.ok) return null; // missing / no access / rate-limited → n/a, never fabricate
+    return await res.json();
   } catch {
-    return null; // repo missing / no access / rate-limited → report n/a, never fabricate
+    return null;
   }
 }
 
@@ -89,10 +101,10 @@ function classify(title) {
   return { ship: true, kind: "other" };
 }
 
-function shipsForRepo(repo, start) {
+async function shipsForRepo(repo, start) {
   // Closed PRs, newest first; filter to merged within the window. (List API avoids the search
   // rate limit; 100 most-recent closed PRs comfortably covers a 7-day window at our volume.)
-  const prs = gh(`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100`);
+  const prs = await gh(`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100`);
   if (prs == null) return { repo, missing: true };
   const ships = [];
   let dropped = 0, confidential = 0;
@@ -106,18 +118,23 @@ function shipsForRepo(repo, start) {
     ships.push({ num: p.number, title, kind: c.kind, mergedAt: p.merged_at.slice(0, 10), author: p.user?.login || "?" });
   }
   // Published releases in the window.
-  const rels = gh(`repos/${repo}/releases?per_page=20`) || [];
+  const rels = (await gh(`repos/${repo}/releases?per_page=20`)) || [];
   const releases = rels
     .filter((r) => !r.draft && r.published_at && r.published_at.slice(0, 10) >= start && !isConfidential(r.name || r.tag_name))
     .map((r) => ({ tag: r.tag_name, name: (r.name || "").trim(), date: r.published_at.slice(0, 10) }));
   ships.sort((a, b) => (a.mergedAt < b.mergedAt ? 1 : -1));
-  return { repo, ships, releases, dropped, confidential };
+  // The PR list is capped at the 100 most-recently-updated closed PRs. If that page is full AND its
+  // oldest PR is still inside the window, older in-window merges may be beyond the cap → count is a
+  // floor (honest, never inflated). Fine for the daily cadence; flagged for a long --days window.
+  const oldest = prs.length ? prs[prs.length - 1].updated_at?.slice(0, 10) : null;
+  const capped = prs.length >= 100 && oldest && oldest >= start;
+  return { repo, ships, releases, dropped, confidential, capped };
 }
 
 const start = windowStart();
 const today = ymd(new Date());
 const repoName = (r) => r.split("/")[1];
-const results = REPOS.map((r) => shipsForRepo(r, start));
+const results = await Promise.all(REPOS.map((r) => shipsForRepo(r, start)));
 
 const md = [];
 const P = (s) => md.push(s);
@@ -131,7 +148,7 @@ for (const r of results) {
   if (r.missing) { anyMissing = true; P(`## ${repoName(r.repo)}`); P(`_GitHub API unavailable for \`${r.repo}\` (missing/no-access/rate-limited) → **n/a**._`); P(``); continue; }
   totalShips += r.ships.length;
   totalReleases += r.releases.length;
-  P(`## ${repoName(r.repo)} — ${r.ships.length} ship${r.ships.length === 1 ? "" : "s"}${r.releases.length ? ` · ${r.releases.length} release${r.releases.length === 1 ? "" : "s"}` : ""}`);
+  P(`## ${repoName(r.repo)} — ${r.ships.length} ship${r.ships.length === 1 ? "" : "s"}${r.releases.length ? ` · ${r.releases.length} release${r.releases.length === 1 ? "" : "s"}` : ""}${r.capped ? " _(floor — 100-PR page full; older in-window merges may be uncounted, narrow the window)_" : ""}`);
   if (r.releases.length) {
     for (const rel of r.releases) P(`- 🏷️ **Release ${rel.tag}**${rel.name && rel.name !== rel.tag ? ` — ${rel.name}` : ""} (${rel.date})`);
   }

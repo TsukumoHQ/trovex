@@ -7,7 +7,10 @@
     "dev": "vite",
     "check:brand": "node scripts/check-brand.mjs",
     "check:sitemap": "node scripts/check-sitemap.mjs",
-    "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && tsc -b && vite build && node scripts/gen-md-twins.mjs",
+    "typecheck:api": "tsc -p tsconfig.api.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && npm run lint && npm run typecheck:api && tsc -b && vitest run && vite build && node scripts/gen-md-twins.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "indexnow": "node scripts/indexnow-ping.mjs"
@@ -33,6 +36,7 @@
     "globals": "^17.6.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^3.2.6"
   }
 }

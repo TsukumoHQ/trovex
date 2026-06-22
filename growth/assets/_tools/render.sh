@@ -29,7 +29,7 @@ cd "$ROOT"
 
 # preflight: carousel specs go through the deterministic copy lint first (de-em-dash,
 # public-beta phrasing, no Synergix). A bad spec fails BEFORE it renders + uploads.
-if [ "$GEN" = "gen_carousel.mjs" ]; then
+if [ "$GEN" = "gen_carousel.mjs" ] || [ "$GEN" = "gen_card.mjs" ]; then
   specs=(); for a in "$@"; do [ "${a##*.}" = "json" ] && specs+=("$a"); done
   [ ${#specs[@]} -gt 0 ] && node "growth/assets/_tools/lint_spec.mjs" "${specs[@]}"
 fi

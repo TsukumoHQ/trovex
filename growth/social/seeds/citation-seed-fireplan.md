@@ -64,6 +64,53 @@ venue is the move, not more on-page work.
 source, or the click decays to unknown. `threads` also unmapped. Quora mapping requested 2026-06-22
 (needed to promote Quora to a primary venue per the priority section above).
 
+## Batch 3 — study-led seeds (2026-06-22, copywriter #430/#453 live)
+
+Two new earned-evidence blog pieces (tech-copywriter, cmo-gated). These LEAD WITH THE INDEPENDENT
+STUDY, not us — the study finding is the value; the blog link is the citation. arXiv links carry
+NO UTM (just the id). Third-party numbers are theirs, stated as theirs. Honest framing only.
+Builder/neutral voice, NO consulting CTA. Human fires; verify the snippet genuinely fits the thread.
+
+### #430 · pre-PR-coordination → `tsukumo.ch/blog/pre-pull-request-agent-coordination`
+Study: Sarkar et al., arXiv:2606.19616 — redundant rework in multi-agent setups ~78% → ~0% once a
+pre-PR coordination step is added; the failure is UPSTREAM of the PR (agents duplicate work because
+nothing says what's already claimed/done). Venues: **r/AI_Agents** (the live "four things that
+silently break in production AI agents" thread fits), **r/LLMDevs**, **HN**.
+
+> **Reddit:** A recent study (Sarkar et al., arXiv 2606.19616) maps where multi-agent coordination
+> actually fails, and it's not where most people look: most redundant work happens *before* the PR —
+> agents re-deriving the same context and duplicating effort because they never coordinated up front.
+> Adding a pre-PR coordination step took redundant rework from ~78% to ~0% in their setup. The bit
+> that stuck with me: "agents stepping on each other" is a missing-coordination problem, not a model
+> one — they need a shared place to claim work and read what others already did. Pattern + how we run
+> it: tsukumo.ch/blog/pre-pull-request-agent-coordination?utm_source=reddit&utm_medium=community&utm_campaign=geo-seed&utm_content=pre-pr-coordination (their numbers, not ours).
+
+> **HN:** Sarkar et al. (arXiv:2606.19616) measured redundant rework in multi-agent setups dropping
+> ~78% → ~0% once a pre-PR coordination step was added. The failure is upstream of the PR — agents
+> duplicate work because nothing tells them what's already claimed/done. Writeup of the pattern:
+> tsukumo.ch/blog/pre-pull-request-agent-coordination?utm_source=hackernews&utm_medium=community&utm_campaign=geo-seed&utm_content=pre-pr-coordination
+
+### #453 · orchestration-at-scale → `tsukumo.ch/blog/multi-agent-orchestration-at-scale`
+Study: Dhanyamraju et al., arXiv:2606.20058 — a 200-agent benchmark; at scale multi-agent systems
+break on DISCOVERY (finding the right context/peer/prior work), not task difficulty; coordination
+cost grows faster than the work. Venues: **r/AI_Agents** ("agent loops" thread), **r/LangChain**
+("multi-model review chain" thread), **HN**.
+
+> **Reddit:** A 200-agent benchmark (Dhanyamraju et al., arXiv 2606.20058) found something
+> counterintuitive: at scale, multi-agent systems break on *discovery*, not task difficulty. The wall
+> isn't "can an agent do the task" — it's agents being unable to find the right context, the right
+> peer, or what's already done, and coordination overhead dominating. Matches what we see running our
+> own fleet: past a handful of agents the hard part is a shared index + a task board with atomic
+> claims, not a smarter model. Breakdown: tsukumo.ch/blog/multi-agent-orchestration-at-scale?utm_source=reddit&utm_medium=community&utm_campaign=geo-seed&utm_content=orchestration-at-scale (their benchmark, their numbers).
+
+> **HN:** Dhanyamraju et al. (arXiv:2606.20058) ran a 200-agent benchmark; the scaling wall was
+> discovery, not difficulty — agents couldn't efficiently find context/peers/prior work and
+> coordination overhead dominated. Practical implication: at scale you invest in a shared memory +
+> discovery layer before a better model. Notes: tsukumo.ch/blog/multi-agent-orchestration-at-scale?utm_source=hackernews&utm_medium=community&utm_campaign=geo-seed&utm_content=orchestration-at-scale
+
+Cadence: same ≤1–2/week/account, staggered; reply in the first hour. Both are study-led so they
+clear the value bar easily — but only fire into a thread the finding actually answers.
+
 ## Status
-DRAFT fire-plan. Snippets ready in f334c83e. Human fires per this cadence; I coordinate venues
-with geo-lead and flag rewords. Nothing auto-posted — forum answers are not an autoPublish lane.
+DRAFT fire-plan. Snippets ready in f334c83e (+ Batch 3 above). Human fires per this cadence; I coordinate
+venues with geo-lead and flag rewords. Nothing auto-posted — forum answers are not an autoPublish lane.

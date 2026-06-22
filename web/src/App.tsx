@@ -49,6 +49,8 @@ function useTilt(ref: React.RefObject<HTMLDivElement | null>) {
 function useCount(to: number, on: boolean) {
   const [n, setN] = useState(reduceMotion ? to : 0)
   useEffect(() => {
+    // Reduced-motion / off: snap straight to the final value (no animation).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional sync to the target, not a cascading render
     if (!on || reduceMotion) { setN(to); return }
     let raf = 0
     const start = performance.now()

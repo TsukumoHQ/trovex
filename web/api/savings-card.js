@@ -55,8 +55,8 @@ const h = (type, props, ...kids) => ({
 function card(m) {
   const worthy = m && isShareworthy(m)
   const headline = worthy ? `~${pct(m)}%` : '~60%'
-  // nbsp ( ) around the colored figures — satori collapses normal whitespace
-  // at flex-item boundaries, which would glue "87.6Mtokens" / "~$263/ month".
+  // Non-breaking spaces around the colored figures — satori collapses normal
+  // whitespace at flex-item boundaries, which would glue "87.6Mtokens" / "~$263/ month".
   const roll = worthy
     ? h(
         'div',
@@ -153,7 +153,8 @@ function card(m) {
 
 async function buildSvg(m) {
   const { default: satori } = await import('satori')
-  return satori(card(m), { width: 1200, height: 630, fonts: FONTS })
+  // card() builds a satori hyperscript tree, not a React element — satori accepts it.
+  return satori(/** @type {any} */ (card(m)), { width: 1200, height: 630, fonts: /** @type {any} */ (FONTS) })
 }
 
 async function svgToPng(svg) {

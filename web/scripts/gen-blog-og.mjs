@@ -57,7 +57,7 @@ function card(pre, accent) {
 }
 
 for (const [slug, pre, accent] of POSTS) {
-  const svg = await satori(card(pre, accent), { width: 1200, height: 630, fonts });
+  const svg = await satori(/** @type {any} */ (card(pre, accent)), { width: 1200, height: 630, fonts: /** @type {any} */ (fonts) });
   const png = new Resvg(svg, { fitTo: { mode: "width", value: 1200 } }).render().asPng();
   const dir = join(PUBLIC, slug);
   await mkdir(dir, { recursive: true });

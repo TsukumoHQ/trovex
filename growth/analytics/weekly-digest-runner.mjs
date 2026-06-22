@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 // Suite GitHub reach (top-of-funnel for the CLI repos with no landing — see
 // github-suite-reach.mjs / suite-reach-measurement.md). Uses the gh CLI; n/a if unavailable.
-const SUITE_REPOS = ["Synergix-lab/WRAI.TH", "Synergix-lab/trovex", "Synergix-lab/yoru"];
+const SUITE_REPOS = ["TsukumoHQ/WRAI.TH", "TsukumoHQ/trovex", "TsukumoHQ/yoru"];
 function ghReach() {
   return SUITE_REPOS.map((r) => {
     const j = (p) => { try { return JSON.parse(execSync(`gh api ${p} 2>/dev/null`, { encoding: "utf8" })); } catch { return null; } };

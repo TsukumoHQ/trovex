@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ymd = (d) => d.toISOString().slice(0, 10);
-const REPOS = ["Synergix-lab/WRAI.TH", "Synergix-lab/trovex", "Synergix-lab/yoru"];
+const REPOS = ["TsukumoHQ/WRAI.TH", "TsukumoHQ/trovex", "TsukumoHQ/yoru"];
 
 function gh(path) {
   try {

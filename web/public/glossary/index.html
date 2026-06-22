@@ -70,6 +70,13 @@
         },
         {
           "@type": "DefinedTerm",
+          "@id": "https://trovex.dev/glossary/context-rot/#term",
+          "name": "context rot",
+          "description": "Context rot is the quality drop a model suffers as its context window fills: with more tokens competing for attention, it loses track of earlier instructions and facts. Past a point, extra tokens add noise rather than signal.",
+          "url": "https://trovex.dev/glossary/context-rot/"
+        },
+        {
+          "@type": "DefinedTerm",
           "@id": "https://trovex.dev/glossary/canonical-doc/#term",
           "name": "canonical doc",
           "description": "A canonical doc is the single current, authoritative document for a topic, the one a coding agent should treat as the source of truth when several files cover the same ground.",
@@ -157,6 +164,10 @@
       <div class="faq-item">
         <p class="faq-q"><a href="/glossary/context-window/">context window</a></p>
         <p class="faq-a">A context window is the maximum amount of text — measured in tokens — a model can consider at once: the prompt, any retrieved docs, and its own output combined. When it fills, older content is dropped or degraded, so a bigger window raises the ceiling but does not make rereading docs cheaper.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q"><a href="/glossary/context-rot/">context rot</a></p>
+        <p class="faq-a">Context rot is the quality drop a model suffers as its context window fills: with more tokens competing for attention, it loses track of earlier instructions and facts. More context is not always better — past a point, extra tokens add noise rather than signal.</p>
       </div>
       <div class="faq-item">
         <p class="faq-q"><a href="/glossary/canonical-doc/">canonical doc</a></p>

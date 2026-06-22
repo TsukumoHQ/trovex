@@ -229,6 +229,12 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://trovex.dev/glossary/context-rot/</loc>
+    <lastmod>2026-06-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://trovex.dev/glossary/canonical-doc/</loc>
     <lastmod>2026-06-21</lastmod>
     <changefreq>monthly</changefreq>

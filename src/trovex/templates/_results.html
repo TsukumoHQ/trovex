@@ -38,9 +38,17 @@
     {% endif %}
   </div>
 {% else %}
+  {% set n_canonical = results | selectattr('status', 'equalto', 'canonical') | list | length %}
+  {% set n_stale = results | selectattr('status', 'equalto', 'stale') | list | length %}
+  {% set n_dup = results | selectattr('status', 'equalto', 'duplicate') | list | length %}
   <div class="results-bar mono">
     <span class="subtle">
       {{ total_results }} result{{ '' if total_results == 1 else 's' }}{% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}{% if elapsed_ms %} · {{ elapsed_ms }}ms{% endif %}
+    </span>
+    <span class="results-bar-status">
+      {% if n_canonical %}<span class="rbs rbs-canonical"><span class="rbs-dot"></span>{{ n_canonical }} canonical</span>{% endif %}
+      {% if n_stale %}<span class="rbs rbs-stale"><span class="rbs-dot"></span>{{ n_stale }} stale</span>{% endif %}
+      {% if n_dup %}<span class="rbs rbs-duplicate"><span class="rbs-dot"></span>{{ n_dup }} duplicate</span>{% endif %}
     </span>
   </div>
   {% if facets %}
@@ -51,8 +59,15 @@
   {% endif %}
   <ul class="result-list" role="listbox" aria-label="Search results">
   {% for r in results %}
+    {% set tier = 'high' if r.score >= 0.66 else ('mid' if r.score >= 0.33 else 'low') %}
     <li>
-    <article class="result" data-href="/doc/{{ r.ext_id }}">
+    <article class="result" data-href="/doc/{{ r.ext_id }}" data-status="{{ r.status }}">
+      {% if r.status == 'canonical' %}
+      <div class="canonical-flag">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"></use></svg>
+        canonical source of truth — serve this to agents
+      </div>
+      {% endif %}
       {# Whole content block is one link → click anywhere opens the doc. #}
       <a class="result-main" href="/doc/{{ r.ext_id }}" title="{{ r.title }}">
         <div class="result-head">
@@ -72,11 +87,12 @@
         <span><b>{{ "{:,}".format(r.tokens_est) }}</b> tokens</span>
         <span><b>{{ "%.0f"|format(r.age_days) }}</b>d old</span>
       </div>
-      <div class="score-bar" aria-label="Relevance score">
+      <div class="score-bar" aria-label="Relevance score {{ '%.0f'|format(r.score * 100) }}%">
+        <span class="subtle">match</span>
         <div class="score-track">
-          <div class="score-fill" style="width: {{ (r.score * 100) | round(1) }}%;"></div>
+          <div class="score-fill" data-tier="{{ tier }}" style="width: {{ (r.score * 100) | round(1) }}%;"></div>
         </div>
-        <span style="width: 40px; text-align: right;">{{ "%.2f"|format(r.score) }}</span>
+        <span class="score-num">{{ "%.0f"|format(r.score * 100) }}%</span>
       </div>
       {% if r.tags %}
       <div class="chips result-chips">

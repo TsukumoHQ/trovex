@@ -46,15 +46,48 @@
     <div class="step-head">
       <h2 id="step-1-title">Connect the MCP <span class="step-tag step-tag-required">required</span></h2>
       <p class="step-sub">
-        Adds a single entry to your <code>~/.claude/settings.json</code>.
-        No filesystem changes, no shell scripts, no sudo.
+        Pick your coding agent. trovex speaks the Model Context Protocol over HTTP,
+        so any MCP client connects to the <span class="endpoint-pill mono">/mcp/</span>
+        endpoint with one config entry — no filesystem changes, no shell scripts, no sudo.
       </p>
     </div>
 
-    <div class="step-action">
+    {# ── Client switcher ── #}
+    <div class="client-switch">
+      <div class="client-tabs" role="tablist" aria-label="Choose your coding agent">
+        <button class="client-tab is-active" role="tab" type="button"
+                id="tab-claude" aria-controls="panel-claude" aria-selected="true" tabindex="0"
+                data-client="claude">
+          <svg class="client-glyph" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 4 6.5v11L12 22l8-4.5v-11L12 2Zm0 2.3 5.6 3.15L12 10.6 6.4 7.45 12 4.3Zm-6 4.85 5 2.8v5.85l-5-2.8V9.15Zm12 0v5.85l-5 2.8V11.95l5-2.8Z"/></svg>
+          Claude Code
+        </button>
+        <button class="client-tab" role="tab" type="button"
+                id="tab-cursor" aria-controls="panel-cursor" aria-selected="false" tabindex="-1"
+                data-client="cursor">
+          <svg class="client-glyph" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.2 6.5 3.6L12 11.4 5.5 7.8 12 4.2Zm-7 5.1 6 3.35v6.7l-6-3.35V9.3Z" opacity="0.9"/></svg>
+          Cursor
+        </button>
+        <button class="client-tab" role="tab" type="button"
+                id="tab-windsurf" aria-controls="panel-windsurf" aria-selected="false" tabindex="-1"
+                data-client="windsurf">
+          <svg class="client-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18c3-1 5-4 6-7s2-6 5-7"/><path d="M3 13c2.5-.8 4-3 5-5"/><path d="M14 4l3 3-3 3"/></svg>
+          Windsurf
+        </button>
+        <button class="client-tab" role="tab" type="button"
+                id="tab-zed" aria-controls="panel-zed" aria-selected="false" tabindex="-1"
+                data-client="zed">
+          <svg class="client-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 8h8l-8 8h8"/></svg>
+          Zed
+        </button>
+        <span class="client-tab-note mono">+ any MCP client</span>
+      </div>
+    </div>
+
+    {# ── Panel: Claude Code (default) ── #}
+    <div class="step-action client-panel" role="tabpanel" id="panel-claude" aria-labelledby="tab-claude" tabindex="0">
       <div class="step-action-label">
         <span class="step-action-icon">→</span>
-        Paste this into Claude Code
+        Paste this prompt into Claude Code — it wires itself up
       </div>
       <div class="code-block">
         <div class="code-block-header">
@@ -65,6 +98,74 @@
         </div>
         <pre class="code-block-body" id="prompt-1"><span class="code-line"><span class="code-num">1</span><span class="code-text">Set up the trovex MCP on this machine.</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">1. Read my ~/.claude/settings.json (preserve everything else).</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">2. Detect my handle: run `git config user.email`. Take the part before</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">   the @. If empty or weird, ask me. Confirm with me ([Y/n]) before</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">   proceeding.</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">3. Add this entry to mcpServers (merge, don't replace siblings):</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">     "trovex": {</span></span><span class="code-line"><span class="code-num">10</span><span class="code-text">       "type": "http",</span></span><span class="code-line"><span class="code-num">11</span><span class="code-text">       "url": "https://trovex.prod.synergix.ch/mcp/",</span></span><span class="code-line"><span class="code-num">12</span><span class="code-text">       "headers": { "X-TROVEX-User": "&lt;my-handle&gt;" }</span></span><span class="code-line"><span class="code-num">13</span><span class="code-text">     }</span></span><span class="code-line"><span class="code-num">14</span><span class="code-text"></span></span><span class="code-line"><span class="code-num">15</span><span class="code-text">4. Tell me to restart Claude Code so the MCP loads. Then these tools</span></span><span class="code-line"><span class="code-num">16</span><span class="code-text">   are available: `trovex_search(query)` → relevant passages, `trovex_read`,</span></span><span class="code-line"><span class="code-num">17</span><span class="code-text">   and `trovex_write(content, kind, tags)` to store records into the shared store.</span></span><span class="code-line"><span class="code-num">18</span><span class="code-text">5. To also WRITE to the store, add an "X-TROVEX-Write-Token" header (the</span></span><span class="code-line"><span class="code-num">19</span><span class="code-text">   shared token from your admin) next to X-TROVEX-User, then restart.</span></span></pre>
       </div>
+      <details class="manual-config">
+        <summary>Prefer the CLI / manual edit?</summary>
+        <div class="manual-config-body">
+          <p class="manual-config-hint mono">one-liner — replace <code>&lt;handle&gt;</code></p>
+          <div class="code-block code-block-small">
+            <div class="code-block-header">
+              <span class="code-block-lang mono">~/.claude/settings.json · shell</span>
+              <button class="copy-btn" data-target="cfg-claude" type="button" aria-label="Copy command">
+                <span class="copy-btn-label">Copy</span>
+              </button>
+            </div>
+            <pre class="code-block-body" id="cfg-claude"><span class="code-line"><span class="code-num">1</span><span class="code-text">claude mcp add --transport http trovex \</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text">  https://trovex.prod.synergix.ch/mcp/ \</span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">  --header "X-TROVEX-User: &lt;handle&gt;"</span></span></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    {# ── Panel: Cursor ── #}
+    <div class="step-action client-panel" role="tabpanel" id="panel-cursor" aria-labelledby="tab-cursor" tabindex="0" hidden>
+      <div class="step-action-label">
+        <span class="step-action-icon">→</span>
+        Add to <code>~/.cursor/mcp.json</code> · replace <code>&lt;handle&gt;</code> · restart Cursor
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang mono">~/.cursor/mcp.json</span>
+          <button class="copy-btn" data-target="cfg-cursor" type="button" aria-label="Copy config">
+            <span class="copy-btn-label">Copy</span>
+          </button>
+        </div>
+        <pre class="code-block-body" id="cfg-cursor"><span class="code-line"><span class="code-num">1</span><span class="code-text">{</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text">  "mcpServers": {</span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">    "trovex": {</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">      "url": "https://trovex.prod.synergix.ch/mcp/",</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">      "headers": { "X-TROVEX-User": "&lt;handle&gt;" }</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">    }</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">  }</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text">}</span></span></pre>
+      </div>
+    </div>
+
+    {# ── Panel: Windsurf ── #}
+    <div class="step-action client-panel" role="tabpanel" id="panel-windsurf" aria-labelledby="tab-windsurf" tabindex="0" hidden>
+      <div class="step-action-label">
+        <span class="step-action-icon">→</span>
+        Add to <code>~/.codeium/windsurf/mcp_config.json</code> · then quit &amp; reopen Windsurf
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang mono">~/.codeium/windsurf/mcp_config.json</span>
+          <button class="copy-btn" data-target="cfg-windsurf" type="button" aria-label="Copy config">
+            <span class="copy-btn-label">Copy</span>
+          </button>
+        </div>
+        <pre class="code-block-body" id="cfg-windsurf"><span class="code-line"><span class="code-num">1</span><span class="code-text">{</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text">  "mcpServers": {</span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">    "trovex": {</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">      "serverUrl": "https://trovex.prod.synergix.ch/mcp/",</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">      "headers": { "X-TROVEX-User": "&lt;handle&gt;" }</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">    }</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">  }</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text">}</span></span></pre>
+      </div>
+      <p class="panel-foot mono">Windsurf uses <code>serverUrl</code> (not <code>url</code>) for remote HTTP servers.</p>
+    </div>
+
+    {# ── Panel: Zed ── #}
+    <div class="step-action client-panel" role="tabpanel" id="panel-zed" aria-labelledby="tab-zed" tabindex="0" hidden>
+      <div class="step-action-label">
+        <span class="step-action-icon">→</span>
+        Add to Zed <code>settings.json</code> under <code>context_servers</code> · restart Zed
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang mono">Zed settings.json</span>
+          <button class="copy-btn" data-target="cfg-zed" type="button" aria-label="Copy config">
+            <span class="copy-btn-label">Copy</span>
+          </button>
+        </div>
+        <pre class="code-block-body" id="cfg-zed"><span class="code-line"><span class="code-num">1</span><span class="code-text">{</span></span><span class="code-line"><span class="code-num">2</span><span class="code-text">  "context_servers": {</span></span><span class="code-line"><span class="code-num">3</span><span class="code-text">    "trovex": {</span></span><span class="code-line"><span class="code-num">4</span><span class="code-text">      "source": "custom",</span></span><span class="code-line"><span class="code-num">5</span><span class="code-text">      "url": "https://trovex.prod.synergix.ch/mcp/",</span></span><span class="code-line"><span class="code-num">6</span><span class="code-text">      "headers": { "X-TROVEX-User": "&lt;handle&gt;" }</span></span><span class="code-line"><span class="code-num">7</span><span class="code-text">    }</span></span><span class="code-line"><span class="code-num">8</span><span class="code-text">  }</span></span><span class="code-line"><span class="code-num">9</span><span class="code-text">}</span></span></pre>
+      </div>
+      <p class="panel-foot mono">Any MCP client works — point it at the same HTTP endpoint and send the <code>X-TROVEX-User</code> header.</p>
     </div>
 
     <div class="step-callouts">
@@ -392,6 +493,107 @@
     border-radius: 4px;
     font-size: var(--t-13);
     border: 1px solid var(--border);
+  }
+  .endpoint-pill {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: var(--t-12);
+    white-space: nowrap;
+  }
+
+  /* ── Client switcher (tabs) ──────────────────────────── */
+  .client-switch {
+    padding: var(--s-4) var(--s-5) 0;
+  }
+  .client-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-1);
+    border-bottom: 1px solid var(--border);
+  }
+  .client-tab {
+    display: inline-flex; align-items: center; gap: 7px;
+    min-height: 38px;
+    padding: 8px 14px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: var(--fg-muted);
+    font-family: var(--font-sans);
+    font-size: var(--t-13);
+    font-weight: 500;
+    cursor: pointer;
+    transition: color var(--duration), border-color var(--duration), background var(--duration);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  }
+  .client-tab:hover { color: var(--fg); background: var(--bg-hover); }
+  .client-tab.is-active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .client-glyph {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+  .client-tab.is-active .client-glyph { opacity: 1; }
+  .client-tab-note {
+    margin-left: auto;
+    padding: 0 var(--s-2);
+    color: var(--fg-faint);
+    font-size: var(--t-11);
+    align-self: center;
+  }
+  .client-panel[hidden] { display: none; }
+
+  /* ── Manual / alternate config disclosure ────────────── */
+  .manual-config {
+    margin-top: var(--s-3);
+  }
+  .manual-config > summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    color: var(--fg-subtle);
+    padding: var(--s-1) 0;
+    transition: color var(--duration);
+  }
+  .manual-config > summary::-webkit-details-marker { display: none; }
+  .manual-config > summary::before {
+    content: '+';
+    color: var(--fg-faint);
+    font-weight: 600;
+  }
+  .manual-config[open] > summary::before { content: '−'; }
+  .manual-config > summary:hover { color: var(--fg-muted); }
+  .manual-config-body { margin-top: var(--s-3); }
+  .manual-config-hint {
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    margin: 0 0 var(--s-2) 0;
+  }
+  .manual-config-hint code,
+  .panel-foot code,
+  .step-action-label code {
+    font-family: var(--font-mono);
+    background: var(--bg-input);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--fg);
+    font-size: 0.92em;
+  }
+  .panel-foot {
+    margin: var(--s-3) 0 0;
+    color: var(--fg-subtle);
+    font-size: var(--t-11);
+    line-height: 1.55;
   }
   .install-progress {
     display: inline-flex; align-items: center;
@@ -744,6 +946,9 @@
     .step-head, .step-action { padding: var(--s-4); }
     .step-callouts { padding: 0 var(--s-4) var(--s-4); grid-template-columns: 1fr; }
     .code-num { width: 32px; padding-right: var(--s-2); }
+    .client-switch { padding: var(--s-3) var(--s-4) 0; }
+    .client-tab { padding: 8px 10px; font-size: var(--t-12); }
+    .client-tab-note { display: none; }
   }
 </style>
 
@@ -776,5 +981,35 @@
       });
     });
   });
+
+  // ── Client switcher: tabs control which config panel shows ──
+  (function () {
+    const tabs = Array.from(document.querySelectorAll('.client-tab'));
+    if (!tabs.length) return;
+
+    function activate(tab, focus) {
+      tabs.forEach(function (t) {
+        const selected = t === tab;
+        t.classList.toggle('is-active', selected);
+        t.setAttribute('aria-selected', selected ? 'true' : 'false');
+        t.tabIndex = selected ? 0 : -1;
+        const panel = document.getElementById(t.getAttribute('aria-controls'));
+        if (panel) panel.hidden = !selected;
+      });
+      if (focus) tab.focus();
+    }
+
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener('click', function () { activate(tab, false); });
+      tab.addEventListener('keydown', function (e) {
+        let next = null;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = tabs[(i + 1) % tabs.length];
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = tabs[(i - 1 + tabs.length) % tabs.length];
+        else if (e.key === 'Home') next = tabs[0];
+        else if (e.key === 'End') next = tabs[tabs.length - 1];
+        if (next) { e.preventDefault(); activate(next, true); }
+      });
+    });
+  })();
 </script>
 {% endblock %}

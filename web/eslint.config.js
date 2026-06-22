@@ -19,4 +19,14 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  // The serverless api/ layer, build scripts, and the vitest suite run on Node.
+  // They were previously unlinted — the security-sensitive lead-capture code among
+  // them. Lint them with Node globals and the recommended ruleset.
+  {
+    files: ['api/**/*.js', 'scripts/**/*.mjs', 'test/**/*.js', '*.{js,mjs,ts}'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
 ])

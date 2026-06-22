@@ -1,0 +1,30 @@
+name: web
+
+# Gates the marketing site (web/): lint, the api/ typecheck, the vitest suite, and
+# a full production build (which also runs the brand + sitemap guards). Runs only
+# when web/ changes so the Python core's CI stays independent.
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/web.yml']
+  pull_request:
+    paths: ['web/**', '.github/workflows/web.yml']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck:api
+      - run: npm test
+      - run: npm run build

@@ -11,7 +11,7 @@
  * a cookie, or anything user-identifying.
  */
 
-const POINTER_TOKENS = 80 // the trovex() pointer response size (small, constant)
+export const POINTER_TOKENS = 80 // the trovex() pointer response size (small, constant)
 
 // Honesty gate: below this ratio the saving isn't worth a receipt / a shared card.
 // Mirrors RECEIPT_MIN_RATIO in Savings.tsx.
@@ -37,7 +37,8 @@ export const DEFAULTS = {
 }
 
 // [lo, hi] bounds per field — identical to the <Field> min/max in Savings.tsx.
-const BOUNDS = {
+// Exported (BOUNDS_DOC) so the parity test can assert lockstep with the calculator.
+export const BOUNDS = {
   agents: [1, 500],
   lookupsPerSession: [1, 1000],
   sessionsPerDay: [1, 100],

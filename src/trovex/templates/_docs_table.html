@@ -1,39 +1,87 @@
 {% from "_partials.html" import status_pill, fresh_label, source_pill %}
+{#
+  Partial swapped into #docs-table by hx-get="/docs/partial".
+  Context is exactly {rows, filtered, sources_meta} — do not reference page-only
+  vars (qpath/status/sort/limit/total) here: on an htmx swap they don't exist.
+  The status distribution below is computed over the CURRENT view (rows), so it
+  honestly answers "what's in front of me right now" without new backend data.
+#}
 {% if rows %}
-<div class="table-wrap">
-  <table class="t">
-    <thead>
-      <tr>
-        <th>source</th>
-        <th>path</th>
-        <th>title</th>
-        <th>status</th>
-        <th style="text-align: right;">age</th>
-        <th style="text-align: right;">tokens</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in rows %}
-      <tr>
-        <td>{{ source_pill(r.source_id) }}</td>
-        <td class="path">
-          {% if r.source_id == 'trovex' %}
-          <a href="/doc/{{ r.path }}" title="view trovex-owned doc">{{ r.path[:12] }}…</a>
-          {% else %}
-          <a href="/search?q={{ r.title | urlencode }}" title="search this">{{ r.path }}</a>
-          {% endif %}
-        </td>
-        <td class="cell-faint" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis;">{{ r.title }}</td>
-        <td>{{ status_pill(r.status) }}</td>
-        <td class="num">{{ fresh_label(r.age_days) }}</td>
-        <td class="num">{{ "{:,}".format(r.tokens_est) }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+  {% set shown = rows | length %}
+  {% set n_canonical = rows | selectattr('status', 'equalto', 'canonical') | list | length %}
+  {% set n_plan      = rows | selectattr('status', 'equalto', 'plan')      | list | length %}
+  {% set n_stale     = rows | selectattr('status', 'equalto', 'stale')     | list | length %}
+  {% set n_duplicate = rows | selectattr('status', 'equalto', 'duplicate') | list | length %}
+
+  <div class="docs-readout" role="group" aria-label="Status distribution for the current view">
+    <div class="docs-readout-bar" aria-hidden="true">
+      {% if n_canonical %}<span class="docs-seg seg-canonical" style="flex: {{ n_canonical }}" title="canonical · {{ n_canonical }}"></span>{% endif %}
+      {% if n_plan %}<span class="docs-seg seg-plan" style="flex: {{ n_plan }}" title="plan · {{ n_plan }}"></span>{% endif %}
+      {% if n_stale %}<span class="docs-seg seg-stale" style="flex: {{ n_stale }}" title="stale · {{ n_stale }}"></span>{% endif %}
+      {% if n_duplicate %}<span class="docs-seg seg-duplicate" style="flex: {{ n_duplicate }}" title="duplicate · {{ n_duplicate }}"></span>{% endif %}
+      {% if not (n_canonical or n_plan or n_stale or n_duplicate) %}<span class="docs-seg seg-empty" style="flex: 1"></span>{% endif %}
+    </div>
+    <div class="docs-readout-legend">
+      <span class="docs-stat"><span class="docs-swatch sw-canonical"></span>canonical <b>{{ n_canonical }}</b></span>
+      <span class="docs-stat"><span class="docs-swatch sw-plan"></span>plan <b>{{ n_plan }}</b></span>
+      <span class="docs-stat docs-stat-alert {% if n_stale %}is-on{% endif %}"><span class="docs-swatch sw-stale"></span>stale <b>{{ n_stale }}</b></span>
+      <span class="docs-stat"><span class="docs-swatch sw-duplicate"></span>duplicate <b>{{ n_duplicate }}</b></span>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="t docs-table">
+      <caption class="sr-only">Indexed documents — {{ "{:,}".format(filtered) }} match the current filters, {{ shown }} shown.</caption>
+      <thead>
+        <tr>
+          <th scope="col">source</th>
+          <th scope="col">path</th>
+          <th scope="col">title</th>
+          <th scope="col">status</th>
+          <th scope="col" style="text-align: right;">age</th>
+          <th scope="col" style="text-align: right;">tokens</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        {#- freshness tier drives the dot colour: <7d ok · <30d aging · else stale-cold -#}
+        {% set tier = 'fresh' if r.age_days < 7 else ('aging' if r.age_days < 30 else 'cold') %}
+        <tr class="{% if r.status == 'stale' %}row-stale{% endif %}">
+          <td>{{ source_pill(r.source_id) }}</td>
+          <td class="path">
+            {% if r.source_id == 'trovex' %}
+            <a href="/doc/{{ r.path }}" title="view trovex-owned doc">{{ r.path[:12] }}…</a>
+            {% else %}
+            <a href="/search?q={{ r.title | urlencode }}" title="search this">{{ r.path }}</a>
+            {% endif %}
+          </td>
+          <td class="cell-faint cell-title" title="{{ r.title }}">{{ r.title }}</td>
+          <td>{{ status_pill(r.status) }}</td>
+          <td class="num">
+            <span class="age-cell" title="{{ r.age_days | round(1) }} days old">
+              <span class="age-dot age-{{ tier }}" aria-hidden="true"></span>{{ fresh_label(r.age_days) }}
+            </span>
+          </td>
+          <td class="num">{{ "{:,}".format(r.tokens_est) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% else %}
-<div class="empty">
-  <div class="empty-title mono">no docs match these filters</div>
-</div>
+  <div class="empty">
+    <svg class="icon icon-lg" style="color: var(--fg-faint); margin-bottom: var(--s-3);" aria-hidden="true"><use href="#i-folder"></use></svg>
+    <div class="empty-title mono">no docs match these filters</div>
+    <div class="subtle mono" style="font-size: var(--t-12);">loosen the path filter, or clear status &amp; source to see the full corpus</div>
+    <div class="empty-hint">
+      <button type="button"
+              hx-get="/docs/partial"
+              hx-target="#docs-table"
+              hx-swap="innerHTML"
+              hx-push-url="/docs"
+              onclick="(function(f){ if(!f) return; f.reset(); })(document.getElementById('docs-filters'))">
+        clear all filters
+      </button>
+    </div>
+  </div>
 {% endif %}

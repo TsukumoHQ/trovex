@@ -62,7 +62,7 @@ async function findPersonId(c, email) {
   const q = encodeURIComponent(`emails.primaryEmail[eq]:${email}`)
   const res = await twentyFetch(c, `/rest/people?filter=${q}&limit=1`, { method: 'GET' })
   if (!res || !res.ok) return null
-  const json = await res.json().catch(() => null)
+  const json = /** @type {any} */ (await res.json().catch(() => null))
   const people = json?.data?.people
   return Array.isArray(people) && people[0]?.id ? people[0].id : null
 }
@@ -74,7 +74,7 @@ async function createPerson(c, lead) {
   if (lead.linkedin) body.linkedinLink = { primaryLinkUrl: String(lead.linkedin).slice(0, 256) }
   const res = await twentyFetch(c, '/rest/people', { method: 'POST', body: JSON.stringify(body) })
   if (!res || !res.ok) return null
-  const json = await res.json().catch(() => null)
+  const json = /** @type {any} */ (await res.json().catch(() => null))
   return json?.data?.createPerson?.id || json?.data?.id || null
 }
 
@@ -98,7 +98,7 @@ async function attachSourceNote(c, personId, lead) {
     body: JSON.stringify({ title: 'Lead source — trovex waitlist', bodyV2: { markdown: body } }),
   })
   if (!noteRes || !noteRes.ok) return
-  const noteJson = await noteRes.json().catch(() => null)
+  const noteJson = /** @type {any} */ (await noteRes.json().catch(() => null))
   const noteId = noteJson?.data?.createNote?.id || noteJson?.data?.id
   if (!noteId) return
   // noteTarget links the note to a person via the morph field `targetPerson`, so the

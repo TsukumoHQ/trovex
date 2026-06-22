@@ -17,7 +17,6 @@ import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const PUB = 'public'
-const SILO = ['answers', 'vs', 'glossary'] // sections that must form an internal-link silo
 
 // --- collect every hand-authored page ---
 const htmlFiles = []

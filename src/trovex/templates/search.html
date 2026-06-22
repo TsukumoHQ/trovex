@@ -8,13 +8,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="section-head" style="margin-bottom: var(--s-4);">
-  <div>
-    <h1 style="margin-bottom: 2px;">Search</h1>
-    <div class="subtle mono" style="font-size: var(--t-12);">
-      semantic retrieval across the indexed corpus
-    </div>
-  </div>
+<div class="search-head">
+  <h1 class="search-title">
+    <svg class="icon" aria-hidden="true" style="color: var(--accent); vertical-align:-0.12em;"><use href="#i-search"></use></svg>
+    Ask once, get the canonical answer
+  </h1>
+  <p class="search-lede subtle mono">
+    one source of truth for your agents — semantic retrieval, freshness-aware,
+    ranked by relevance
+  </p>
 </div>
 
 <form id="search-form" action="/search" method="get" autocomplete="off"
@@ -68,13 +70,31 @@
     {% if has_filters %}
     <a class="active-tag clear-all" title="clear all filters" href="{{ clear_url }}">clear all ✕</a>
     {% endif %}
-    <span class="subtle mono" style="font-size: var(--t-11); margin-left: auto;">
+    <span class="subtle mono search-shortcuts" style="font-size: var(--t-11); margin-left: auto;">
       <span class="kbd">esc</span> clear · <span class="kbd">/</span> focus · <span class="kbd">↑↓</span> nav · <span class="kbd">↵</span> open
     </span>
   </div>
 </form>
 
-<div id="results" style="margin-top: var(--s-6);">
+<div class="fresh-legend mono" aria-hidden="true">
+  <span class="fresh-legend-label">freshness</span>
+  <span class="fresh-legend-item" data-s="canonical"><span class="fresh-dot"></span>canonical — trust this</span>
+  <span class="fresh-legend-item" data-s="stale"><span class="fresh-dot"></span>stale — verify before use</span>
+  <span class="fresh-legend-item" data-s="duplicate"><span class="fresh-dot"></span>duplicate — superseded</span>
+</div>
+
+<div class="results-skeleton" style="margin-top: var(--s-6);" aria-hidden="true">
+  {% for _ in range(4) %}
+  <div class="skeleton-item">
+    <div class="sk-line sk-w-40"></div>
+    <div class="sk-line sk-w-90"></div>
+    <div class="sk-line sk-w-70"></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="results" role="region" aria-live="polite" aria-busy="false"
+     style="margin-top: var(--s-6);">
   {% include "_results.html" %}
 </div>
 
@@ -175,7 +195,16 @@
   .clear-all { color: var(--fg-muted); background: var(--bg-input); border-color: var(--border); }
   .clear-all:hover { color: var(--stale); border-color: var(--stale); }
 
-  .results-bar { font-size: var(--t-11); margin-bottom: var(--s-3); }
+  .results-bar {
+    font-size: var(--t-11); margin-bottom: var(--s-3);
+    display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+  }
+  .results-bar-status { display: inline-flex; gap: var(--s-3); flex-wrap: wrap; }
+  .rbs { display: inline-flex; align-items: center; gap: 5px; }
+  .rbs-dot { width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
+  .rbs-canonical { color: var(--canonical); } .rbs-canonical .rbs-dot { background: var(--canonical); }
+  .rbs-stale     { color: var(--stale); }     .rbs-stale .rbs-dot     { background: var(--stale); }
+  .rbs-duplicate { color: var(--duplicate); } .rbs-duplicate .rbs-dot { background: var(--duplicate); }
 
   /* Faceted refine row */
   .facets {
@@ -218,6 +247,99 @@
     font-family: var(--font-mono); font-size: var(--t-12);
     color: var(--accent); background: var(--accent-soft);
     border: 1px solid var(--accent-line); border-radius: var(--radius-sm);
+  }
+
+  /* ── Page header ────────────────────────────────────── */
+  .search-head { margin-bottom: var(--s-5); }
+  .search-title {
+    display: flex; align-items: center; gap: var(--s-3);
+    margin-bottom: var(--s-2);
+  }
+  .search-lede {
+    margin: 0; font-size: var(--t-12); max-width: 60ch; line-height: 1.6;
+  }
+
+  /* ── Freshness legend (teaches the canonical/stale vocabulary) ── */
+  .fresh-legend {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4);
+    margin-top: var(--s-4);
+    font-size: var(--t-11); color: var(--fg-subtle);
+  }
+  .fresh-legend-label {
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-faint);
+  }
+  .fresh-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .fresh-dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
+  .fresh-legend-item[data-s="canonical"] .fresh-dot { background: var(--canonical); box-shadow: 0 0 6px var(--canonical-bg); }
+  .fresh-legend-item[data-s="stale"]     .fresh-dot { background: var(--stale); }
+  .fresh-legend-item[data-s="duplicate"] .fresh-dot { background: var(--duplicate); }
+
+  /* ── Status-keyed left rail on each result ──────────── */
+  .result {
+    position: relative; overflow: hidden;
+    border-left: 2px solid var(--border);
+  }
+  /* color the rail by freshness — pill text/glyph/age remain the primary cue */
+  .result[data-status="canonical"] { border-left-color: var(--accent-line); }
+  .result[data-status="stale"]     { border-left-color: var(--stale); }
+  .result[data-status="duplicate"] { border-left-color: var(--duplicate); }
+  .result[data-status="stale"],
+  .result[data-status="duplicate"] { background: var(--bg-elevated); }
+
+  /* Promote the top canonical hit — "this is the one to trust" */
+  .result-list > li:first-child .result[data-status="canonical"] {
+    border-color: var(--accent-line);
+    box-shadow: inset 2px 0 0 var(--accent), 0 0 0 1px var(--accent-line);
+    background:
+      linear-gradient(90deg, var(--accent-soft), transparent 38%),
+      var(--bg-card);
+  }
+  .canonical-flag {
+    display: none;
+    align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: var(--t-11); font-weight: 500;
+    color: var(--accent); letter-spacing: 0.02em;
+    margin-bottom: var(--s-2);
+  }
+  .result-list > li:first-child .result[data-status="canonical"] .canonical-flag {
+    display: inline-flex;
+  }
+
+  /* ── Score tiers — weak matches read as weak ────────── */
+  .score-fill[data-tier="high"] { background: linear-gradient(90deg, var(--accent-line), var(--accent)); }
+  .score-fill[data-tier="mid"]  { background: linear-gradient(90deg, var(--duplicate-bg), var(--duplicate)); }
+  .score-fill[data-tier="low"]  { background: var(--fg-faint); }
+  .score-bar .score-num { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── Loading skeletons (reserve space, no CLS, >300ms feedback) ── */
+  /* htmx puts .htmx-request on #search-form while the swap is in flight; we
+     reveal the skeleton and dim the stale results until the new ones land. */
+  .results-skeleton { display: none; }
+  #search-form.htmx-request ~ #results { opacity: 0.35; transition: opacity var(--duration); }
+  #search-form.htmx-request ~ .results-skeleton { display: block; }
+  .skeleton-item {
+    padding: var(--s-4);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .skeleton-item + .skeleton-item { margin-top: var(--s-3); }
+  .sk-line {
+    height: 10px; border-radius: 999px;
+    background: linear-gradient(90deg, var(--bg-input) 0%, var(--bg-hover) 50%, var(--bg-input) 100%);
+    background-size: 200% 100%;
+    animation: sk-shimmer 1.2s ease-in-out infinite;
+  }
+  .sk-line + .sk-line { margin-top: var(--s-3); }
+  .sk-w-40 { width: 40%; } .sk-w-70 { width: 70%; } .sk-w-90 { width: 90%; }
+  @keyframes sk-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .sk-line { animation: none; } }
+
+  @media (max-width: 640px) {
+    .search-shortcuts { display: none; }
+    .fresh-legend { gap: var(--s-3); }
   }
 </style>
 

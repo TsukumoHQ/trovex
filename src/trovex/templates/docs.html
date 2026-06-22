@@ -7,57 +7,197 @@
   <span class="mono">{{ "{:,}".format(total) }} docs · {{ "{:,}".format(filtered) }} shown</span>
 {% endblock %}
 
+{% block head %}
+<style>
+  /* ── Docs page — scoped to this surface ────────────────────────────── */
+
+  .docs-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: var(--s-4); flex-wrap: wrap;
+    margin-bottom: var(--s-5);
+  }
+  .docs-head .lede {
+    font-size: var(--t-12); color: var(--fg-subtle);
+    font-family: var(--font-mono); margin-top: 3px;
+  }
+  .docs-count {
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-subtle);
+    display: inline-flex; align-items: center; gap: var(--s-2);
+    white-space: nowrap;
+  }
+  .docs-count b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .docs-count .spin {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    border-top-color: var(--accent);
+    animation: docs-spin 0.7s linear infinite;
+  }
+  @keyframes docs-spin { to { transform: rotate(360deg); } }
+
+  /* ── Filter toolbar ────────────────────────────────────────────────── */
+  .docs-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(4, auto);
+    gap: var(--s-3);
+    align-items: end;
+    margin-bottom: var(--s-5);
+  }
+  .docs-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .docs-field > label {
+    font-size: var(--t-11); color: var(--fg-subtle);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    font-family: var(--font-sans); font-weight: 500;
+  }
+  .docs-field .input { width: 100%; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+  .docs-field select.input { cursor: pointer; }
+
+  .docs-search { position: relative; }
+  .docs-search .icon {
+    position: absolute; left: var(--s-3); top: 50%; transform: translateY(-50%);
+    color: var(--fg-subtle); pointer-events: none;
+  }
+  .docs-search .input { padding-left: 38px; }
+
+  /* The live region writes "filtering…" while htmx is in flight. */
+  .docs-busy { display: none; }
+  .docs-filters.htmx-request .docs-busy { display: inline-flex; }
+  .docs-filters.htmx-request .docs-idle { display: none; }
+
+  /* ── View readout + status distribution (rendered in _docs_table) ──── */
+  .docs-readout {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--s-3) var(--s-4);
+    margin-bottom: var(--s-3);
+  }
+  .docs-readout-bar {
+    display: flex; height: 6px; gap: 2px;
+    border-radius: 999px; overflow: hidden;
+    background: var(--bg-input);
+    margin-bottom: var(--s-3);
+  }
+  .docs-seg { height: 100%; min-width: 3px; transition: opacity var(--duration); }
+  .docs-seg:hover { opacity: 0.8; }
+  .seg-canonical { background: var(--canonical); }
+  .seg-plan      { background: var(--plan); }
+  .seg-stale     { background: var(--stale); }
+  .seg-duplicate { background: var(--duplicate); }
+  .seg-empty     { background: var(--border-strong); }
+
+  .docs-readout-legend {
+    display: flex; flex-wrap: wrap; gap: var(--s-4);
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-muted);
+  }
+  .docs-stat { display: inline-flex; align-items: center; gap: 6px; }
+  .docs-stat b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .docs-swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .sw-canonical { background: var(--canonical); }
+  .sw-plan      { background: var(--plan); }
+  .sw-stale     { background: var(--stale); }
+  .sw-duplicate { background: var(--duplicate); }
+  /* When the current view actually carries stale docs, surface it. */
+  .docs-stat-alert.is-on { color: var(--stale); }
+  .docs-stat-alert.is-on b { color: var(--stale); }
+
+  /* ── Table refinements ─────────────────────────────────────────────── */
+  .docs-table .cell-title { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+  .docs-table tr.row-stale td:first-child { box-shadow: inset 2px 0 0 var(--stale); }
+
+  .age-cell { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  .age-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .age-fresh { background: var(--canonical); }
+  .age-aging { background: var(--duplicate); }
+  .age-cold  { background: var(--fg-faint); }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  @media (max-width: 860px) {
+    .docs-filters { grid-template-columns: 1fr 1fr; }
+    .docs-filters .docs-search { grid-column: 1 / -1; }
+  }
+  @media (max-width: 480px) {
+    .docs-filters { grid-template-columns: 1fr; }
+    .docs-readout-legend { gap: var(--s-3); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="section-head" style="margin-bottom: var(--s-4);">
+<div class="docs-head">
   <div>
     <h1 style="margin-bottom: 2px;">Docs</h1>
-    <div class="subtle mono" style="font-size: var(--t-12);">
-      browse the indexed corpus — filter, sort, triage
-    </div>
+    <div class="lede">the canonical index — one source of truth for your agents · filter, sort, triage</div>
+  </div>
+  <div class="docs-count" aria-live="polite" aria-atomic="true">
+    <span class="docs-idle"><b>{{ "{:,}".format(filtered) }}</b> of {{ "{:,}".format(total) }} docs</span>
+    <span class="docs-busy"><span class="spin" aria-hidden="true"></span>filtering…</span>
   </div>
 </div>
 
-<form action="/docs" method="get" autocomplete="off"
+<form id="docs-filters" class="docs-filters" action="/docs" method="get" autocomplete="off"
       hx-get="/docs/partial"
       hx-target="#docs-table"
       hx-swap="innerHTML"
       hx-trigger="change, keyup changed delay:250ms from:input[name=qpath]"
       hx-push-url="true"
-      style="display: grid; gap: var(--s-3); grid-template-columns: minmax(0, 1fr) auto auto auto auto; margin-bottom: var(--s-4); align-items: center;">
+      hx-indicator="this">
 
-  <input type="text" name="qpath" class="input mono" value="{{ qpath }}"
-         placeholder="filter by path substring"
-         aria-label="Filter by path">
+  <div class="docs-field docs-search">
+    <label for="docs-qpath">path filter</label>
+    <svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"></use></svg>
+    <input type="text" id="docs-qpath" name="qpath" class="input mono" value="{{ qpath }}"
+           placeholder="filter by path substring"
+           aria-label="Filter by path substring">
+  </div>
 
-  <select name="source" class="input mono" style="width: auto;" aria-label="Source filter">
-    <option value="">all sources</option>
-    {% for s in sources_meta %}
-    <option value="{{ s.id }}" {% if source == s.id %}selected{% endif %}>{{ s.id }} ({{ s.count }})</option>
-    {% endfor %}
-  </select>
+  <div class="docs-field">
+    <label for="docs-source">source</label>
+    <select id="docs-source" name="source" class="input mono" aria-label="Filter by source">
+      <option value="">all sources</option>
+      {% for s in sources_meta %}
+      <option value="{{ s.id }}" {% if source == s.id %}selected{% endif %}>{{ s.id }} ({{ s.count }})</option>
+      {% endfor %}
+    </select>
+  </div>
 
-  <select name="status" class="input mono" style="width: auto;" aria-label="Status filter">
-    <option value="">all status</option>
-    {% for s in ['canonical', 'plan', 'stale', 'duplicate'] %}
-    <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
-    {% endfor %}
-  </select>
+  <div class="docs-field">
+    <label for="docs-status">status</label>
+    <select id="docs-status" name="status" class="input mono" aria-label="Filter by status">
+      <option value="">all status</option>
+      {% for s in ['canonical', 'plan', 'stale', 'duplicate'] %}
+      <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
 
-  <select name="sort" class="input mono" style="width: auto;" aria-label="Sort">
-    <option value="recent" {% if sort=='recent' %}selected{% endif %}>recent</option>
-    <option value="oldest" {% if sort=='oldest' %}selected{% endif %}>oldest</option>
-    <option value="largest" {% if sort=='largest' %}selected{% endif %}>largest</option>
-    <option value="path"   {% if sort=='path'   %}selected{% endif %}>path A→Z</option>
-  </select>
+  <div class="docs-field">
+    <label for="docs-sort">sort</label>
+    <select id="docs-sort" name="sort" class="input mono" aria-label="Sort order">
+      <option value="recent" {% if sort=='recent' %}selected{% endif %}>recent</option>
+      <option value="oldest" {% if sort=='oldest' %}selected{% endif %}>oldest</option>
+      <option value="largest" {% if sort=='largest' %}selected{% endif %}>largest</option>
+      <option value="path"   {% if sort=='path'   %}selected{% endif %}>path A→Z</option>
+    </select>
+  </div>
 
-  <select name="limit" class="input mono" style="width: auto;" aria-label="Limit">
-    {% for n in [50, 100, 200, 500] %}
-    <option value="{{ n }}" {% if limit == n %}selected{% endif %}>{{ n }}</option>
-    {% endfor %}
-  </select>
+  <div class="docs-field">
+    <label for="docs-limit">limit</label>
+    <select id="docs-limit" name="limit" class="input mono" aria-label="Rows per page">
+      {% for n in [50, 100, 200, 500] %}
+      <option value="{{ n }}" {% if limit == n %}selected{% endif %}>{{ n }}</option>
+      {% endfor %}
+    </select>
+  </div>
 </form>
 
-<div id="docs-table">
+<div id="docs-table" aria-busy="false">
   {% include "_docs_table.html" %}
 </div>
 {% endblock %}

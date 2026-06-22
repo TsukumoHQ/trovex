@@ -4,88 +4,379 @@
 
 {% block head %}
 <style>
-  .token-row { display: flex; gap: var(--s-2); align-items: center; margin-top: var(--s-2); }
-  .token-row .input { flex: 1; }
-  .btn { padding: var(--s-2) var(--s-4); background: var(--accent); color: var(--bg);
-    border: none; border-radius: var(--radius-sm); font-family: var(--font-mono);
-    font-size: var(--t-12); cursor: pointer; font-weight: 500; }
-  .btn:hover { opacity: 0.85; }
-  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--fg-muted); }
-  .btn-ghost:hover { color: var(--accent); border-color: var(--accent-line); opacity: 1; }
+  /* ── Settings layout ─────────────────────────────────── */
+  .set-stack { display: flex; flex-direction: column; gap: var(--s-6); }
+
+  /* Section heading row above each card group */
+  .set-group-head {
+    display: flex; align-items: baseline; gap: var(--s-3);
+    margin-bottom: var(--s-3);
+  }
+  .set-group-head .num {
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-faint); font-variant-numeric: tabular-nums;
+  }
+  .set-group-head h2 { font-size: var(--t-14); color: var(--fg); }
+  .set-group-head .hint {
+    margin-left: auto;
+    font-family: var(--font-mono); font-size: var(--t-11);
+    color: var(--fg-subtle); letter-spacing: 0.02em;
+  }
+
+  /* ── Buttons (page-scoped, on-system) ────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; gap: var(--s-2);
+    padding: var(--s-2) var(--s-4); min-height: 36px;
+    background: var(--accent); color: var(--on-accent);
+    border: 1px solid transparent; border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: var(--t-12); font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    transition: opacity var(--duration) var(--ease), background var(--duration) var(--ease);
+  }
+  .btn:hover { opacity: 0.88; }
+  .btn:disabled { opacity: 0.45; cursor: progress; }
+  .btn-ghost {
+    background: transparent; border-color: var(--border-strong); color: var(--fg-muted);
+  }
+  .btn-ghost:hover {
+    color: var(--accent); border-color: var(--accent-line);
+    background: var(--accent-soft); opacity: 1;
+  }
+  .btn-ghost:disabled { color: var(--fg-subtle); border-color: var(--border); background: transparent; }
+  .btn .icon { width: 14px; height: 14px; vertical-align: 0; }
+
+  /* ── Write-token form ────────────────────────────────── */
+  .token-row {
+    display: flex; gap: var(--s-2); align-items: stretch;
+    margin-top: var(--s-3); flex-wrap: wrap;
+  }
+  .token-field { position: relative; flex: 1; min-width: 220px; }
+  .token-field .input { width: 100%; padding-right: 44px; }
+  .token-reveal {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; padding: 0;
+    background: transparent; border: none; border-radius: var(--radius-sm);
+    color: var(--fg-subtle); cursor: pointer;
+    transition: color var(--duration) var(--ease);
+  }
+  .token-reveal:hover { color: var(--fg); }
+  .wt-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    align-self: center;
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-subtle); min-height: 36px;
+  }
+  .wt-status[data-state="saved"] { color: var(--accent); }
+  .wt-status[data-state="cleared"] { color: var(--duplicate); }
+  .wt-status .icon { width: 13px; height: 13px; }
+
+  /* Security note panel */
+  .note {
+    display: flex; gap: var(--s-3);
+    margin-top: var(--s-4); padding: var(--s-3) var(--s-4);
+    background: var(--bg-input);
+    border-left: 2px solid var(--accent-line);
+    border-radius: var(--radius-sm);
+    font-size: var(--t-12); color: var(--fg-muted); line-height: 1.6;
+  }
+  .note .icon { width: 15px; height: 15px; color: var(--accent); margin-top: 1px; }
+  .note b { color: var(--fg); font-weight: 500; }
+  .note code {
+    font-size: var(--t-11); color: var(--fg);
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 1px 5px;
+  }
+
+  /* ── Maintenance action rows ─────────────────────────── */
+  .action-row {
+    display: flex; align-items: center; gap: var(--s-4);
+    padding: var(--s-4);
+    flex-wrap: wrap;
+  }
+  .action-row .icon-wrap {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; flex-shrink: 0;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--fg-muted);
+  }
+  .action-row .meta { flex: 1; min-width: 160px; }
+  .action-row .meta .title { font-size: var(--t-13); font-weight: 500; color: var(--fg); }
+  .action-row .meta .desc { font-size: var(--t-12); color: var(--fg-subtle); margin-top: 1px; }
+  .action-out {
+    width: 100%; margin: 0; padding: 0 var(--s-4) var(--s-4) calc(34px + var(--s-4) + var(--s-4));
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-muted); font-variant-numeric: tabular-nums;
+  }
+  .action-out:empty { display: none; }
+  .action-out[data-state="error"] { color: var(--stale); }
+  .action-out[data-state="ok"] { color: var(--accent); }
+
+  @media (max-width: 640px) {
+    .action-out { padding-left: var(--s-4); }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="section-head" style="margin-bottom: var(--s-5);">
+<div class="section-head" style="margin-bottom: var(--s-6);">
   <div>
     <h1 style="margin-bottom: 2px;">Settings</h1>
-    <div class="subtle mono" style="font-size: var(--t-12);">store health · auth · backups</div>
+    <div class="subtle mono" style="font-size: var(--t-12);">local operator console · store health · auth · backups</div>
   </div>
 </div>
 
+<!-- Status strip ────────────────────────────────────────── -->
 <div class="kpi-grid">
-  <div class="kpi"><div class="kpi-label">docs</div><div class="kpi-value">{{ "{:,}".format(doc_count) }}</div></div>
-  <div class="kpi"><div class="kpi-label">chunks</div><div class="kpi-value">{{ "{:,}".format(chunk_count) }}</div></div>
-  <div class="kpi"><div class="kpi-label">db size</div><div class="kpi-value">{{ (db_size / 1048576) | round(1) }}<span style="font-size: var(--t-16);"> MB</span></div></div>
-  <div class="kpi"><div class="kpi-label">write auth</div><div class="kpi-value">
-    {% if auth_on %}<span class="pill pill-canonical">on</span>{% else %}<span class="pill pill-stale">off</span>{% endif %}
-  </div></div>
+  <div class="kpi">
+    <div class="kpi-label">docs</div>
+    <div class="kpi-value">{{ "{:,}".format(doc_count) }}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">chunks</div>
+    <div class="kpi-value">{{ "{:,}".format(chunk_count) }}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">db size</div>
+    <div class="kpi-value">{{ (db_size / 1048576) | round(1) }}<span style="font-size: var(--t-16);"> MB</span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">write auth</div>
+    <div class="kpi-value">
+      {% if auth_on %}
+        <span class="pill pill-canonical"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"></use></svg> required</span>
+      {% else %}
+        <span class="pill pill-stale"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg> open</span>
+      {% endif %}
+    </div>
+  </div>
 </div>
 
-<div class="card" style="margin-bottom: var(--s-6);">
-  <div class="card-header"><h3 style="margin: 0;">Write token</h3></div>
-  <div class="card-body">
-    <div class="subtle" style="font-size: var(--t-13); margin-bottom: var(--s-1);">
-      Paste the shared write token so this browser can delete / tag / back up.
-      Stored locally in this browser only — never sent anywhere but trovex.
-    </div>
-    <div class="token-row">
-      <input class="input mono" id="wt" type="password" placeholder="X-TROVEX-Write-Token" aria-label="Write token" />
-      <button class="btn" id="wt-save" type="button">Save</button>
-      <span class="subtle mono" id="wt-status" style="font-size: var(--t-12);"></span>
-    </div>
-  </div>
-</div>
+<div class="set-stack">
 
-<div class="card">
-  <div class="card-header">
-    <h3 style="margin: 0;">Backups</h3>
-    <span class="subtle mono" style="margin-left: var(--s-3); font-size: var(--t-11);">last {{ backups | length }} · keeps 7</span>
-    <button class="btn btn-ghost" id="backup-now" type="button" style="margin-left: auto;">Backup now</button>
-  </div>
-  {% if backups %}
-  <div class="table-wrap" style="border: none; border-radius: 0;">
-    <table class="t">
-      <thead><tr><th>file</th><th style="text-align: right;">size</th></tr></thead>
-      <tbody>
-        {% for b in backups %}
-        <tr><td class="path mono">{{ b.name }}</td><td class="num">{{ (b.size_bytes / 1048576) | round(1) }} MB</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="card-body subtle mono" style="font-size: var(--t-12);">no backups yet — click "Backup now"</div>
-  {% endif %}
+  <!-- 01 · Write token & security ──────────────────────── -->
+  <section>
+    <div class="set-group-head">
+      <span class="num">01</span>
+      <h2>Authorization</h2>
+      <span class="hint">localStorage · this browser only</span>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 style="margin: 0;">Write token</h3>
+      </div>
+      <div class="card-body">
+        <label for="wt" class="subtle" style="display:block; font-size: var(--t-13); margin-bottom: 2px;">
+          Shared write token
+        </label>
+        <div class="subtle" style="font-size: var(--t-12); line-height: 1.6;">
+          Required to delete, tag, or back up from this UI. Paste the token this trovex
+          instance was started with.
+        </div>
+
+        <div class="token-row">
+          <div class="token-field">
+            <input class="input mono" id="wt" type="password" autocomplete="off"
+                   spellcheck="false" placeholder="X-TROVEX-Write-Token"
+                   aria-label="Write token" aria-describedby="wt-note" />
+            <button class="token-reveal" id="wt-reveal" type="button"
+                    aria-label="Show token" aria-pressed="false" title="Show / hide">
+              <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            </button>
+          </div>
+          <button class="btn" id="wt-save" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+            Save
+          </button>
+          <span class="wt-status mono" id="wt-status" role="status" aria-live="polite"></span>
+        </div>
+
+        <div class="note" id="wt-note">
+          <svg class="icon" aria-hidden="true"><use href="#i-bookmark"></use></svg>
+          <div>
+            <b>Stored locally, never transmitted to anyone but trovex.</b>
+            The token is kept in this browser's <code>localStorage</code> and sent only as the
+            <code>X-TROVEX-Write-Token</code> header on write requests to your local instance.
+            Clearing the field and saving removes it. On a shared machine, clear it when you're done.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 · Maintenance ─────────────────────────────────── -->
+  <section>
+    <div class="set-group-head">
+      <span class="num">02</span>
+      <h2>Maintenance</h2>
+      <span class="hint">store-level actions</span>
+    </div>
+
+    <div class="card">
+      <div class="card-row action-row">
+        <span class="icon-wrap"><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg></span>
+        <div class="meta">
+          <div class="title">Reindex sources</div>
+          <div class="desc">Re-scan project sources and refresh the canonical store. Safe to run anytime.</div>
+        </div>
+        <button class="btn btn-ghost" id="reindex-now" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg>
+          Reindex
+        </button>
+      </div>
+      <p class="action-out mono" id="reindex-out" role="status" aria-live="polite"></p>
+
+      <div class="card-row action-row">
+        <span class="icon-wrap"><svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg></span>
+        <div class="meta">
+          <div class="title">Snapshot the database</div>
+          <div class="desc">Write a point-in-time backup of <code style="font-size:var(--t-11);">trovex.db</code>. Requires the write token above.</div>
+        </div>
+        <button class="btn btn-ghost" id="backup-now" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg>
+          Backup now
+        </button>
+      </div>
+      <p class="action-out mono" id="backup-out" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- 03 · Backups ─────────────────────────────────────── -->
+  <section>
+    <div class="set-group-head">
+      <span class="num">03</span>
+      <h2>Backups</h2>
+      <span class="hint">last {{ backups | length }} · keeps 7</span>
+    </div>
+
+    <div class="card">
+      {% if backups %}
+      <div class="table-wrap" style="border: none; border-radius: 0;">
+        <table class="t">
+          <thead>
+            <tr><th scope="col">file</th><th scope="col" style="text-align: right;">size</th></tr>
+          </thead>
+          <tbody>
+            {% for b in backups %}
+            <tr>
+              <td class="path mono">{{ b.name }}</td>
+              <td class="num">{{ (b.size_bytes / 1048576) | round(1) }} MB</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty">
+        <div class="empty-title">No backups yet</div>
+        <div class="subtle mono" style="font-size: var(--t-12);">
+          Run <b style="color:var(--fg-muted);">Backup now</b> above to write the first snapshot.
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
 </div>
 
 <script>
   (function () {
     var wt = document.getElementById('wt');
     var status = document.getElementById('wt-status');
-    if (localStorage.getItem('trovexWriteToken')) status.textContent = '✓ saved';
+
+    var CHECK = '<svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>';
+
+    function setStatus(text, state) {
+      status.dataset.state = state || '';
+      status.innerHTML = (state === 'saved' ? CHECK : '') + '<span>' + text + '</span>';
+    }
+
+    if (localStorage.getItem('trovexWriteToken')) setStatus('saved', 'saved');
+
+    // Show / hide the token field
+    var reveal = document.getElementById('wt-reveal');
+    reveal.addEventListener('click', function () {
+      var show = wt.type === 'password';
+      wt.type = show ? 'text' : 'password';
+      reveal.setAttribute('aria-pressed', String(show));
+      reveal.setAttribute('aria-label', show ? 'Hide token' : 'Show token');
+    });
+
     document.getElementById('wt-save').addEventListener('click', function () {
       if (wt.value.trim()) {
         localStorage.setItem('trovexWriteToken', wt.value.trim());
-        status.textContent = '✓ saved'; wt.value = '';
-      } else { localStorage.removeItem('trovexWriteToken'); status.textContent = 'cleared'; }
+        setStatus('saved', 'saved');
+        wt.value = '';
+        wt.type = 'password';
+        reveal.setAttribute('aria-pressed', 'false');
+        reveal.setAttribute('aria-label', 'Show token');
+      } else {
+        localStorage.removeItem('trovexWriteToken');
+        setStatus('cleared', 'cleared');
+      }
     });
+    // Enter-to-save inside the field
+    wt.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('wt-save').click(); }
+    });
+
+    // Reindex — no auth required server-side; report the honest diff.
+    var rb = document.getElementById('reindex-now');
+    var ro = document.getElementById('reindex-out');
+    rb.addEventListener('click', async function () {
+      rb.disabled = true;
+      var label = rb.querySelector('svg').outerHTML + ' Reindexing…';
+      rb.innerHTML = label;
+      ro.dataset.state = ''; ro.textContent = 'scanning sources…';
+      try {
+        var r = await fetch('/api/reindex', { method: 'POST', headers: trovexWriteHeaders() });
+        if (r.ok) {
+          var s = await r.json();
+          var secs = (s.duration_sec != null) ? s.duration_sec.toFixed(1) + 's · ' : '';
+          ro.dataset.state = 'ok';
+          ro.textContent = secs + '+' + (s.added || 0) + ' added · '
+            + (s.updated || 0) + ' updated · ' + (s.unchanged || 0) + ' unchanged · '
+            + (s.removed || 0) + ' removed';
+        } else {
+          ro.dataset.state = 'error';
+          ro.textContent = 'Reindex failed (HTTP ' + r.status + ')';
+        }
+      } catch (e) {
+        ro.dataset.state = 'error';
+        ro.textContent = 'Reindex failed — is the server reachable?';
+      } finally {
+        rb.disabled = false;
+        rb.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg> Reindex';
+      }
+    });
+
+    // Backup — requires the write token.
     var bn = document.getElementById('backup-now');
+    var bo = document.getElementById('backup-out');
     bn.addEventListener('click', async function () {
-      bn.textContent = 'backing up…';
-      var r = await fetch('/api/backup', { method: 'POST', headers: trovexWriteHeaders() });
-      if (r.ok) { location.reload(); }
-      else { alert(r.status === 403 ? 'Set the write token first (above)' : 'Backup failed'); bn.textContent = 'Backup now'; }
+      bn.disabled = true;
+      bn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg> Backing up…';
+      bo.dataset.state = ''; bo.textContent = 'writing snapshot…';
+      try {
+        var r = await fetch('/api/backup', { method: 'POST', headers: trovexWriteHeaders() });
+        if (r.ok) {
+          bo.dataset.state = 'ok';
+          bo.textContent = 'snapshot written · refreshing…';
+          location.reload();
+          return;
+        }
+        bo.dataset.state = 'error';
+        bo.textContent = (r.status === 403)
+          ? 'Unauthorized — set the write token above first.'
+          : 'Backup failed (HTTP ' + r.status + ')';
+      } catch (e) {
+        bo.dataset.state = 'error';
+        bo.textContent = 'Backup failed — is the server reachable?';
+      } finally {
+        bn.disabled = false;
+        bn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg> Backup now';
+      }
     });
   })();
 </script>

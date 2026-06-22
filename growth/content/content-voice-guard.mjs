@@ -6,14 +6,15 @@
 // with zero tokens / no agent session.
 //
 // DOKAN_INPUT (optional JSON):
-//   { "surfaces": [{ "name": "README", "url": "..." }], "strict": false }
+//   { "surfaces": [{ "name": "README", "url": "..." }] }
 // Default surfaces = README + the GEO llms files (raw/plain text, clean to scan).
 //
-// Exit semantics:
-//   default (monitor)  -> always exit 0 (the RUN is healthy); findings in report.clean/violations.
-//   strict=true (gate) -> exit 1 if any violation (for CI-style use).
-//
-// dokan: script_id 40, schedule_id 8, cron '0 0 9 * * *' (daily 09:00 UTC).
+// dokan contract (post-upgrade 2026-06-22):
+//   - EXIT CODE = VERDICT (not health): exit 1 = drift found, exit 0 = clean.
+//     A non-zero exit is a finding, not a crash — the runtime does not retry it.
+//   - RESULT CHANNEL: the `::dokan:result:: {json}` line is captured by dokan,
+//     returned via wait_for/read_logs AND posted to the relay (event-driven
+//     alert, no polling). So a drift verdict alerts the team on its own.
 
 // Default = owned, plain-text public surfaces (clean to scan, no HTML noise).
 // llms.txt / llms-full.txt are the GEO surfaces that drifted to trovex.dev/blog
@@ -73,7 +74,6 @@ try {
   if (parsed && typeof parsed === "object") input = parsed;
 } catch (e) { /* default */ }
 const surfaces = (Array.isArray(input.surfaces) && input.surfaces.length) ? input.surfaces : DEFAULT_SURFACES;
-const strict = input.strict === true;
 
 const violations = [];
 for (const s of surfaces) violations.push(...await scan(s));
@@ -85,12 +85,15 @@ const report = {
   violations,
   ts: new Date().toISOString(),
 };
-console.log(JSON.stringify(report, null, 2));
 
+// Machine result for dokan's result channel (captured + posted to the relay).
+console.log("::dokan:result:: " + JSON.stringify(report));
+
+// Exit code = verdict.
 if (violations.length) {
-  console.error("VOICE-GUARD: " + violations.length + " violation(s) found.");
-  if (strict) process.exit(1);
-} else {
-  console.log("VOICE-GUARD: clean.");
+  console.error("VOICE-GUARD: " + violations.length + " violation(s) — " +
+    violations.map((v) => `${v.surface}:${v.line || "?"} ${v.type}`).join(", "));
+  process.exit(1);
 }
+console.error("VOICE-GUARD: clean (" + report.checked.join(", ") + ").");
 process.exit(0);

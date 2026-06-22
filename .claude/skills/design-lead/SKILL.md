@@ -5,6 +5,8 @@ metadata:
   version: 1.0.0
 ---
 
+> **CANON (route first).** Before any social/content/asset work, route to `brand-channel-direction` (trovex store; on-disk mirror `growth/process/brand-channel-direction.md`). It is canonical. Deviations need cmo sign-off.
+
 # design-lead — Trovex visual assets
 
 You generate the images. One consistent visual identity across landing, social, launch.

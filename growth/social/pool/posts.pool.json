@@ -61,5 +61,16 @@
     "text": "METR ran the randomized trial most teams skip: 16 experienced devs across 246 real issues, on repos they knew. result — about 19% slower with AI, while the same devs believed they were ~20% faster. the slowdown is fixable: it's the operating model, not the model. (swipe)",
     "firstComment": "breakdown + source: {{link}}",
     "link": "tsukumo.ch/blog/does-ai-make-developers-faster", "utmCampaign": "agency-launch", "utmContentSlug": "li-study-metr"
+  },
+  {
+    "id": "company-x-open-source-install",
+    "brand": "company", "network": "twitter", "pillar": "activation", "role": "activation", "format": "thread",
+    "text": "we open-source the tools we run in production. trovex is the first one out: a canonical context layer for coding agents, ~60% fewer tokens per doc lookup. three commands, no account, runs local.",
+    "link": "trovex.dev/", "utmCampaign": "public-beta", "utmContentSlug": "company_x_open_source_install"
+  },
+  {
+    "id": "company-th-clone-run",
+    "brand": "company", "network": "threads", "pillar": "activation", "role": "activation", "format": "single",
+    "text": "trovex is open source and runs local: sqlite + onnx, no cloud, no keys. point it at a repo and read what it saves you, your number not ours.\n\ngithub.com/TsukumoHQ/trovex"
   }
 ]

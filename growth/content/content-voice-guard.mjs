@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Voice + canon guard — dokan-ready (node runtime, fetch, no deps).
-// Scans trovex's owned PUBLIC markdown (README) for banned slop words and
-// non-canonical trovex.dev/blog links (the blog lives ONLY at tsukumo.ch/blog),
-// so a dokan cron's run-history flags voice/canon drift with zero tokens / no
-// agent session.
+// Scans trovex's owned PUBLIC plain-text surfaces (README, llms.txt, llms-full.txt)
+// for banned slop words and non-canonical trovex.dev/blog links (the blog lives
+// ONLY at tsukumo.ch/blog), so a dokan cron's run-history flags voice/canon drift
+// with zero tokens / no agent session.
 //
 // DOKAN_INPUT (optional JSON):
 //   { "surfaces": [{ "name": "README", "url": "..." }], "strict": false }
-// Default surface = trovex README (raw GitHub main).
+// Default surfaces = README + the GEO llms files (raw/plain text, clean to scan).
 //
 // Exit semantics:
 //   default (monitor)  -> always exit 0 (the RUN is healthy); findings in report.clean/violations.
@@ -15,8 +15,13 @@
 //
 // dokan: script_id 40, schedule_id 8, cron '0 0 9 * * *' (daily 09:00 UTC).
 
+// Default = owned, plain-text public surfaces (clean to scan, no HTML noise).
+// llms.txt / llms-full.txt are the GEO surfaces that drifted to trovex.dev/blog
+// once already (#347) — monitor them so it can't recur silently.
 const DEFAULT_SURFACES = [
   { name: "README", url: "https://raw.githubusercontent.com/TsukumoHQ/trovex/main/README.md" },
+  { name: "llms.txt", url: "https://trovex.dev/llms.txt" },
+  { name: "llms-full.txt", url: "https://trovex.dev/llms-full.txt" },
 ];
 
 // Banned slop words (voice memory). Cleanly + deterministically detectable only.

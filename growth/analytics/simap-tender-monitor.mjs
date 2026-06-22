@@ -33,7 +33,6 @@
  *   node growth/analytics/simap-tender-monitor.mjs --save
  */
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,34 +61,55 @@ const FIT = /(logiciel|software|applikation|application|informati|intelligence a
 const NOISE = /(piscine|bâtiment|gebäude|wärme|heizung|chauffage|toiture|façade|fassade|fenêtre|fenster|route|strasse|nettoyage|reinigung|catering|mobilier|möbel|sanitaire|électricité gén|baumeister|génie civil|tiefbau|hochbau|architecte|paysag|ascenseur|\blift\b|gerät|appareil|instrument|maschine|mikrobiolog|labor|medizin|medical)/i;
 const ROMANDIE = new Set(["GE", "VD", "VS", "NE", "JU", "FR", "BE"]); // BE bilingual
 
-function fetchJson(url) {
-  // curl with a cookie jar primes the cookie-check gate (-L follows the 302 that sets it), proven
-  // working against this endpoint. Public API, no secrets. Returns parsed JSON or null (→ n/a).
-  const jar = join(__dir, "reports", ".simap-cookies.tmp");
+// In-memory cookie jar — the endpoint sits behind a cookie-check gate (302 → /cookie-check sets a
+// cookie → redirects back). Native fetch has no cookie jar and drops Set-Cookie across redirects,
+// so we follow redirects MANUALLY, stash Set-Cookie, and replay the cookie. Pure node — no curl/
+// shell dependency, so this runs unchanged in a bare dokan node container. Public API, no secrets.
+const jar = {};
+const cookieHeader = () => Object.entries(jar).map(([k, v]) => `${k}=${v}`).join("; ");
+const stashCookies = (res) => {
+  const sc = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];
+  for (const c of sc) {
+    const m = c.match(/^([^=]+)=([^;]+)/);
+    if (m) jar[m[1]] = m[2];
+  }
+};
+async function fetchJson(url) {
   try {
-    const out = execSync(
-      `curl -s -c ${JSON.stringify(jar)} -b ${JSON.stringify(jar)} -L -H ${JSON.stringify("User-Agent: " + UA)} -H "Accept: application/json" ${JSON.stringify(url)}`,
-      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }
-    );
-    return JSON.parse(out);
+    const hdr = () => ({ "User-Agent": UA, Accept: "application/json", ...(Object.keys(jar).length ? { Cookie: cookieHeader() } : {}) });
+    let res = await fetch(url, { headers: hdr(), redirect: "manual" });
+    stashCookies(res);
+    for (let hops = 0; (res.status === 301 || res.status === 302) && hops < 4; hops++) {
+      let loc = res.headers.get("location");
+      if (!loc) break;
+      if (loc.startsWith("/")) loc = "https://www.simap.ch" + loc;
+      res = await fetch(loc, { headers: hdr(), redirect: "manual" });
+      stashCookies(res);
+    }
+    if (!res.ok) return null;
+    return await res.json();
   } catch {
-    return null;
+    return null; // network/gate failure → n/a, never fabricated
   }
 }
 
 const t = (o) => (o ? o.fr || o.de || o.it || o.en || "" : ""); // pick a human title, FR-first
 
-function run() {
-  mkdirSync(join(__dir, "reports"), { recursive: true });
+async function run() {
+  // State (seen project numbers, for the NEW flag) is best-effort: a read-only/ephemeral fs (e.g. a
+  // dokan container) just means each run reads as a first run — the watchlist still prints. No crash.
   const seenPath = join(__dir, "reports", ".simap-seen.json");
-  const seen = existsSync(seenPath) ? new Set(JSON.parse(readFileSync(seenPath, "utf8"))) : new Set();
+  let seen = new Set();
+  try {
+    if (existsSync(seenPath)) seen = new Set(JSON.parse(readFileSync(seenPath, "utf8")));
+  } catch { /* unreadable state → treat as first run */ }
   const firstRun = seen.size === 0;
 
   const byNum = new Map();
   let apiUp = false;
   for (const q of QUERIES) {
     const url = `${API}?search=${encodeURIComponent(q)}&orderAddressCountryOnlySwitzerland=true&page=0&size=50`;
-    const data = fetchJson(url);
+    const data = await fetchJson(url);
     if (!data || !Array.isArray(data.projects)) continue;
     apiUp = true;
     for (const p of data.projects) {
@@ -151,15 +171,22 @@ function run() {
   process.stdout.write(out + "\n");
   process.stderr.write(`simap: ${rows.length} fitting tenders, ${fresh.length} new (queries=${QUERIES.length})\n`);
 
-  // Persist the union of seen numbers so the next run can flag NEW.
-  const merged = new Set([...seen, ...rows.map((r) => r.num)]);
-  writeFileSync(seenPath, JSON.stringify([...merged]));
+  // Persist the union of seen numbers so the next run can flag NEW (best-effort — skipped silently
+  // on a read-only fs like a dokan container).
+  try {
+    mkdirSync(join(__dir, "reports"), { recursive: true });
+    const merged = new Set([...seen, ...rows.map((r) => r.num)]);
+    writeFileSync(seenPath, JSON.stringify([...merged]));
+  } catch { /* ephemeral/read-only fs → no persistence, fine */ }
 
   if (SAVE) {
-    const f = join(__dir, "reports", `simap-tenders-${today}.md`);
-    writeFileSync(f, out + "\n");
-    process.stderr.write(`simap: saved ${f}\n`);
+    try {
+      mkdirSync(join(__dir, "reports"), { recursive: true });
+      const f = join(__dir, "reports", `simap-tenders-${today}.md`);
+      writeFileSync(f, out + "\n");
+      process.stderr.write(`simap: saved ${f}\n`);
+    } catch { process.stderr.write("simap: --save failed (read-only fs)\n"); }
   }
 }
 
-run();
+await run();

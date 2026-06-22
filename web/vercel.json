@@ -6,13 +6,13 @@
   "redirects": [
     { "source": "/beta", "destination": "/", "permanent": true },
     { "source": "/beta/", "destination": "/", "permanent": true },
-    { "source": "/blog", "destination": "https://tsukumo.ch/blog", "permanent": true },
-    { "source": "/blog/(.*)", "destination": "https://tsukumo.ch/blog", "permanent": false }
+    { "source": "/blog", "destination": "https://tsukumo.ch/blog", "permanent": true }
   ],
   "rewrites": [
     { "source": "/js/script.js", "destination": "https://plausible.io/js/script.js" },
     { "source": "/api/event", "destination": "https://plausible.io/api/event" },
-    { "source": "/savings", "destination": "/api/savings" }
+    { "source": "/savings", "destination": "/api/savings" },
+    { "source": "/blog/:path*", "destination": "/api/blog-gone?path=:path*" }
   ],
   "functions": {
     "api/savings-card.js": { "includeFiles": "api/_fonts/**" }

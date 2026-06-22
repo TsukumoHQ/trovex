@@ -13,7 +13,12 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const PUB = 'public'
-const pages = new Set(['/'])
+// Routes served by a vercel rewrite to a function (vercel.json), NOT a public/ file,
+// so the walker below can't see them. They are real, indexable URLs and belong in the
+// sitemap — list them here so the guard treats them as live pages, not dead <loc>s.
+//   /savings → /api/savings (serves the built savings.html calculator shell)
+const REWRITES = ['/savings']
+const pages = new Set(['/', ...REWRITES])
 function walk(dir) {
   for (const e of readdirSync(dir)) {
     const p = join(dir, e)

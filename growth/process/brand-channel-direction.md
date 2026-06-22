@@ -36,11 +36,24 @@ Every piece serves exactly one role. The weekly mix must contain all three.
 
 ## The on-strategy filter
 
-> Does this piece serve REACH, ACTIVATION, or CONVERT — and does the **week's mix** ladder up?
+> Does this piece serve REACH, ACTIVATION, or CONVERT — and does the **week's mix** hit the ratio?
 
-If a piece serves none of the three roles, cut it. If a week has no REACH, it starves; if it has
-no CONVERT, it doesn't ladder. Tag every scheduled piece with its role so the balance is visible
-and enforceable.
+If a piece serves none of the three roles, cut it. Tag every scheduled piece with its role so the
+balance is visible and enforceable.
+
+### Portfolio ratio (locked — the enforceable "ladder up" test)
+
+One number, per account, per week:
+
+| Role | Share |
+|---|---|
+| REACH | **60%** |
+| ACTIVATION | **30%** |
+| CONVERT | **10%** |
+
+We are pre-launch with ~0 audience, so the mix is reach-heavy on purpose: build the top of funnel
+first. This ratio IS the "does the week's mix ladder up" test. Revisit it only with data, never on
+weekly vibes.
 
 ## Cross-domain anti-dupe lock (hard guardrail)
 
@@ -134,6 +147,7 @@ Every post still: anti-slop PASS + channel-native visual (LinkedIn always visual
 text OK for a sharp take) + green + no client names + UTM. Source the volume from **real** material
 (operator-news feed, repurposed published blog atoms, BIP artifacts/carousels, the savings receipt).
 If a day can't hit floor with strong material, fill what you can and flag cmo. Never pad with slop.
+This floor is frozen; revisit only with data, never weekly.
 
 ## Posting matrix (the enforceable grid)
 

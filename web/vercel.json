@@ -12,7 +12,7 @@
     { "source": "/js/script.js", "destination": "https://plausible.io/js/script.js" },
     { "source": "/api/event", "destination": "https://plausible.io/api/event" },
     { "source": "/savings", "destination": "/api/savings" },
-    { "source": "/blog/:path*", "destination": "/api/blog-gone?path=:path*" }
+    { "source": "/blog/(.*)", "destination": "/api/blog-gone?path=$1" }
   ],
   "functions": {
     "api/savings-card.js": { "includeFiles": "api/_fonts/**" }

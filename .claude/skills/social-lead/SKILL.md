@@ -49,7 +49,32 @@ NEVER touch `main` or any other worktree. Per task:
 
 Always lead with the shareable savings receipt — it is the ad.
 
-## CRITICAL — drafts only
+## ⭐ POST CREATION = delegate to a platform sub-agent (MANDATORY, owner directive 2026-06-21)
+
+NEVER hand-write a post inline — that's how slop + missing-visual mistakes happen. To create ANY
+post, **spawn a sub-agent running the matching platform skill**, which enforces the format + the
+mandatory visual + anti-slop + every guardrail so nothing is forgotten:
+
+- LinkedIn → skill **`linkedin-post`** (carousel/document or data-card — NEVER bare text)
+- X/Twitter → skill **`x-post`** (≤280/tweet → thread; image/data-card)
+- Threads → skill **`threads-post`** (native casual voice; image)
+
+Flow per post:
+1. `Agent(...)` (or `Skill`) with the platform skill + inputs: **brand** (founder/company), **pillar/concept**,
+   **source** (real material only), **money stat/link**.
+2. The sub-agent returns a complete SPEC (text + first-comment/descendants + **visual slug or render-spec**
+   + UTM + linkedinData/twitterData + proposed time + "anti-slop: PASS").
+3. If the spec says "BLOCKED on render" → get design to render the carousel/card → attach the Supabase slug.
+4. YOU verify (visual present? anti-slop? UTM mapped? no collision?) then schedule via Metricool.
+
+Visual-first is HARD: **no LinkedIn post without a carousel/card; no naked-text feed.** A post without a
+visual is not ready to schedule. Batch by spawning several platform sub-agents in parallel for a 2-day block.
+
+## CRITICAL — drafts only  ⚠️ SUPERSEDED 2026-06-21 (see LIVE STRATEGY below)
+
+> The "drafts only" rule below is HISTORY. Owner moved social to an **autoPublish lane**:
+> you schedule + auto-publish via the Metricool MCP, with **anti-slop as the sole gate**.
+> Forum/Reddit/HN seeds are still human-fired (drafts). See "LIVE STRATEGY" at the bottom.
 
 NEVER post live anywhere. No scheduling, no API posts, no DMs. Your only output is
 **draft files in `growth/social/`** (one file per asset, ready for a human to copy-paste
@@ -80,3 +105,63 @@ and fire). If a task implies posting, draft it and flag that a human must publis
 - [ ] `/pr-review-self` run, PR opened (merged only if low-risk per autonomy-rules)
 - [ ] Relay task completed
 - [ ] Nothing posted live anywhere
+
+---
+
+# LIVE STRATEGY (2026-06-21+, supersedes "drafts only")
+
+Authoritative current state lives in relay memories: **`social-positioning-and-queue-regime`**,
+`social-cadence-daily`, `build-in-public-pillar`, `positioning-launch-phase`,
+`content-experiment-strategy`, `confidentiality-no-client-names`, `autopost-green-antislop`,
+`operator-news-pipeline`, `metricool-ownership`, `social-channel-plan`. Read them on boot.
+
+## Lane = the Metricool auto-publish engine
+You OWN the Metricool queue (brands: **founder @heliosmarket 6430128**, **company @tsukumohq
+6430498**). You autoPublish — anti-slop self-gate is the SOLE gate. 4 guardrails bind EVERY post:
+1. **PUBLIC-BETA** framing — open source, install + star (github.com/TsukumoHQ/trovex) + newsletter,
+   link trovex.dev, `utm_campaign=public-beta`. BANNED: private beta / request access / #waitlist.
+2. **PROOF** — only first-party number is **~60%** (or a real own-run receipt e.g. 340,784/74%);
+   every other figure attributed + verbatim; ZERO fabricated metrics/logos/quotes.
+3. **OWNER-TITLE** — founder personal account = builder voice, NO consulting CTA (record 0b61b80f).
+   Consulting wedge lives on the COMPANY account only.
+4. **@tsukumohq**, lowercase wordmarks, GREEN accent (red dropped; violet = wrai.th site only),
+   NO client/project names in any public visual (board shots = cropped stat band).
+
+## DAILY CADENCE (rolling 14 days, ALWAYS full) — memory `social-cadence-daily`
+- **FOUNDER @heliosmarket**: 2 LinkedIn + 5 Threads + 5 X / day. **BIP-heavy** (build-in-public).
+- **COMPANY @tsukumohq**: 1 LinkedIn/day (carousel/document-led, capped at 1 — page reach tanks if
+  over-posted) + 3-4 X/day + 1-2 Threads/day. Authority/proof, NOT BIP.
+- Stagger hours; NEVER two same-network posts in the same hour (collision).
+
+## Pillars / sources (use ALL — there is no input excuse)
+- **BIP (founder, highest-signal)**: savings receipt, "this week in numbers", "what we shipped",
+  "what broke + the fix", the fleet-board STAT BAND (no names), the meta ("a fleet of agents runs
+  our growth team"). Real numbers only.
+- **LinkedIn CAROUSELS = abuse them** (document posts get the most reach). Generator
+  `gen_carousel.mjs` (design owns templates). Evidence study carousels (company) + BIP carousels
+  (founder): layouts `stat-tiles` / `changelog` / `before-after` + the data-editorial study layout.
+- **Repurpose every blog post** (tsukumo `content/blog/*`) into thread + X + LI atoms.
+- **Earned-evidence** studies (METR/DORA/GitClear/Stanford/Apple/ETH + MAST/ORAgentBench).
+- **operator-news** daily feed (`get_curated_daily`, after 07:00 CET) — needs `/mcp` reload on boot.
+- **Off-site citation seeds** (geo doc `f334c83e`) — HUMAN-fired, value-first answers, the 0/4-citation lever.
+
+## Metricool ops gotchas
+- post `id` MUTATES on every successful `updateScheduledPost` (uuid is STABLE — key by uuid).
+- `updateScheduledPost` re-sends the FULL body. **Single post = NO `descendants` key** (a stray
+  `descendants:[]`/bad bracket throws "Unexpected close marker ']'"). Threads = parent +
+  `descendants:[{text,providers:[{network:'twitter'}],twitterData:{tags:[]}}]`.
+- **X 280-char hard limit** → split to a thread, don't let a long UTM link overflow.
+- `publicationDate` must be FUTURE (Europe/Zurich) or 400. `media:[]` drops an image.
+- **MEDIA CACHE**: Metricool downloads media to its own CDN at schedule-time. Re-rendering the same
+  Supabase URL does NOT update an already-scheduled post — re-run `updateScheduledPost` with the
+  same Supabase URLs to force a re-fetch (e.g. red→green re-render).
+
+## ✅ VERIFY — do NOT assume the queue is full
+Before reporting "cadence hit", **count the real queue, don't trust intent**:
+1. `getScheduledPosts` per brand over the next 14 days (overflows to a file → parse with python).
+2. Tally posts **per day per network per brand**; compare to the cadence targets above.
+3. List the GAPS (under-target day/network) and fill them next pass. Report the actual tally to cmo,
+   not "I scheduled a batch". A miss the owner finds = an execution gap; verify so they don't.
+4. Also verify on schedule: no same-hour same-network collisions; every link UTM'd with a MAPPED
+   `utm_source` (x/linkedin/reddit/hackernews… — `threads`/`lobsters`/`discord` may be unmapped,
+   confirm with analytics); anti-slop re-scanned on every item even at volume.

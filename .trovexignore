@@ -24,6 +24,7 @@ growth/social/**
 # copy is mirrored to the trovex store (SSOT) per the growth/social precedent.
 growth/process/**
 #
-# Launch registry kit: copy-paste submission payloads + per-registry checklists a
-# human fires by hand, not a centralized doc. Owned by launch-lead.
+# Launch registry kits: copy-paste submission payloads + per-registry checklists a
+# human fires by hand, not centralized docs. Owned by launch-lead.
 growth/launch/mcp-registry-kit.md
+growth/launch/wraith-mcp-registry-kit.md

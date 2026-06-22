@@ -43,6 +43,7 @@ Until both are true, the official-registry `server.json` in §2.1 is a draft you
 | awesome-mcp-servers (PR) | **FIRE-NOW after Glama** | needs the Glama listing first |
 | pkg.go.dev | **ALREADY AUTO** | populates from the tagged module; confirm it resolves |
 | GitHub Release / awesome-go / awesome-ai-agents / awesome-devtools | **FIRE-NOW** | plain repo/release |
+| MCPMarket.com | **FIRE-NOW** | ~10k-server human-browsable directory; plain repo + web submit |
 | Smithery | **DEFERRED** | expects hosted HTTP; wrai.th is local `.mcpb`/stdio |
 
 > **Soft gate on the README-rendering registries (Glama, mcp.so):** they render the repo README, so the README must be **launch-clean** first — scrub `Synergix-lab` → `TsukumoHQ` (fire-sequence doc `844bb5b8` STEP 0) or the verified listing shows the deprecated org. Open thread, owner/eng.
@@ -273,7 +274,18 @@ Same §1 copy + repo URL. One human pass after the top surfaces land.
 
 ---
 
-### 2.8 Smithery — `smithery.ai`  **[DEFERRED]**
+### 2.8 MCPMarket.com — `mcpmarket.com`  **[FIRE-NOW]**
+
+Large human-browsable directory (~10k servers, 23+ categories). Takes a plain repo URL + the §1 copy.
+
+**Checklist (human):**
+- [ ] Submit `https://github.com/TsukumoHQ/WRAI.TH` via the site's submit path — **VERIFY** the exact form/path.
+- [ ] Fill name, tagline, short description, tags from §1; pick the right category (orchestration / multi-agent / developer-tools).
+- [ ] Log it (date, URL, live y/n).
+
+---
+
+### 2.9 Smithery — `smithery.ai`  **[DEFERRED]**
 
 Smithery expects a hosted HTTP endpoint; wrai.th's package is local `.mcpb`/stdio with no hosted endpoint. Revisit only if a hosted, multi-tenant wrai.th (brand-neutral endpoint) becomes a cmo/eng decision.
 

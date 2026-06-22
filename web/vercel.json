@@ -7,7 +7,7 @@
     { "source": "/beta", "destination": "/", "permanent": true },
     { "source": "/beta/", "destination": "/", "permanent": true },
     { "source": "/blog", "destination": "https://tsukumo.ch/blog", "permanent": true },
-    { "source": "/blog/(.*)", "destination": "https://tsukumo.ch/blog/$1", "permanent": true }
+    { "source": "/blog/(.*)", "destination": "https://tsukumo.ch/blog", "permanent": false }
   ],
   "rewrites": [
     { "source": "/js/script.js", "destination": "https://plausible.io/js/script.js" },

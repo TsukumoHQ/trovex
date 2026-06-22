@@ -23,3 +23,7 @@ growth/social/**
 # Process/governance docs: also live on disk for repo-readability; the canonical
 # copy is mirrored to the trovex store (SSOT) per the growth/social precedent.
 growth/process/**
+#
+# Launch registry kit: copy-paste submission payloads + per-registry checklists a
+# human fires by hand, not a centralized doc. Owned by launch-lead.
+growth/launch/mcp-registry-kit.md

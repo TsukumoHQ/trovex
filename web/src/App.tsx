@@ -392,8 +392,12 @@ export default function App() {
             <p className="deck">
               Your coding agents burn tokens hunting for answers scattered across the repo. trovex is
               the canonical doc store: it serves each agent the single current doc that answers a query,
-              with a freshness marker, instead of rereading the repo to guess. Same answers, about{' '}
-              <b style={{ color: 'var(--fg)' }}>60% fewer tokens</b>.
+              with a freshness marker, instead of rereading the repo to guess.
+            </p>
+            {/* Above-fold proof of the aha (the savings number). The dashboard below is the
+                visual proof, but it sits below the fold — this carries the ~60% up top. */}
+            <p className="hero-proof">
+              <b>~60% fewer tokens</b> per lookup · same answers · measured, not marketing
             </p>
             {/* The install command IS the primary action (uv pattern): copy + run,
                 no scroll, no signup. command_copied = the install-intent signal. */}
@@ -401,9 +405,10 @@ export default function App() {
               <span className="hero-install-lab">install</span>
               <CopyCmd cmd="uv tool install git+https://github.com/TsukumoHQ/trovex" id="hero-install" />
             </div>
+            {/* One primary action = the install command above. quickstart is the only
+                secondary; the GitHub star (vanity) lives in the nav + start, not here. */}
             <div className="hero-cta">
               <a className="btn btn-ghost" href="#start" onClick={() => track('cta_clicked', { cta_id: 'quickstart', location: 'hero' })}>quickstart</a>
-              <a className="btn btn-ghost" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick('hero')}>star on GitHub</a>
             </div>
             <a className="hero-see" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'hero' })}>see it work ↓</a>
           </div>

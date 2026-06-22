@@ -114,7 +114,7 @@
       <p><strong>Context rot is</strong> the quality drop a model suffers as its context window fills: with more tokens competing for attention, it loses track of earlier instructions and facts. More context is not always better — past a point, extra tokens add noise rather than signal.</p>
     </div>
 
-    <p class="lead-answer">It's the failure mode behind "the agent forgot what we decided ten steps ago." Dumping the whole repo into a long window doesn't prevent it — it causes it: the more candidate and stale text the agent carries, the harder the current, relevant fact is to attend to. The fix is to load less and load current, not to buy a bigger window.</p>
+    <p class="lead-answer">It's the failure mode behind "the agent forgot what we decided ten steps ago." Dumping the whole repo into a long window doesn't prevent it — it causes it: the more candidate and stale text the agent carries, the harder the current, relevant fact is to attend to — measured work shows models retrieve information from the middle of a long context least reliably, and accuracy falls as the context lengthens (<a href="https://arxiv.org/abs/2307.03172" rel="noopener" target="_blank">Liu et al., <cite>Lost in the Middle</cite>, TACL 2024</a>). The fix is to load less and load current, not to buy a bigger window.</p>
     <p class="lead-answer"><a href="/">trovex</a> works against rot at the source: it serves the one canonical doc that answers a query, at the section level, with a freshness marker, so the agent's window holds the current answer instead of a pile of competing copies — about <strong>60% fewer tokens per lookup</strong>.</p>
 
     <div class="related">

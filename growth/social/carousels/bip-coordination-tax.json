@@ -1,0 +1,33 @@
+{
+  "slug": "bip-coordination-tax",
+  "audience": "founder",
+  "kicker": "build in public · the coordination tax",
+  "layout": "changelog",
+  "cover": {
+    "title": "the coordination tax",
+    "accent": "coordination tax",
+    "sub": "Past one agent, what costs you isn't the model. It's keeping a fleet on the same facts. We learned this running our own growth team as agents."
+  },
+  "slides": [
+    {
+      "title": "what actually costs you",
+      "accent": "actually costs",
+      "items": [
+        "Shared memory: every agent needs the same current facts, or they re-derive and drift apart",
+        "One source of truth: without it, two agents 'fix' the same thing two different ways",
+        "Atomic claims: two agents grabbing one task means duplicate work, or a clobbered file"
+      ]
+    },
+    {
+      "title": "the model was never the bottleneck",
+      "accent": "never the bottleneck",
+      "body": "A bigger model doesn't fix this. It just runs the chaos faster. Coordination is a systems problem: a shared store every agent reads and writes, plus a board that hands each task to exactly one of them."
+    }
+  ],
+  "cta": {
+    "title": "feed your fleet one source of truth",
+    "accent": "one source of truth",
+    "sub": "trovex is the shared doc store: write once, every agent reads the same canonical answer instead of re-deriving it. Open source: install + star.",
+    "foot": "trovex.dev"
+  }
+}

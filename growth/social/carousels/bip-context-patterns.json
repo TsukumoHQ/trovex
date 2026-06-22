@@ -1,0 +1,36 @@
+{
+  "slug": "bip-context-patterns",
+  "audience": "founder",
+  "kicker": "build in public · how to",
+  "layout": "changelog",
+  "cover": {
+    "title": "3 ways to feed an agent your repo",
+    "accent": "3 ways",
+    "sub": "Over MCP you pick one: dump everything, retrieve candidate chunks, or serve the one canonical answer. Same goal, very different token bill."
+  },
+  "slides": [
+    {
+      "title": "1 · dump the repo",
+      "accent": "dump",
+      "body": "Hand the agent the whole slab on every call. Fine for a tiny repo or a one-off. As a default you pay for everything to use a fraction, and a fat window can bury the part that mattered."
+    },
+    {
+      "title": "2 · retrieve top-k",
+      "accent": "top-k",
+      "body": "Embed the query, return the closest chunks to rank. Right for broad recall across mixed sources. But similarity has no notion of current, so a stale chunk ranks right next to a fresh one."
+    },
+    {
+      "title": "3 · serve one answer",
+      "accent": "one answer",
+      "heroValue": "~60%",
+      "heroLabel": "fewer tokens per lookup",
+      "body": "Return the single current doc: path:line + a freshness marker, section-level, no pile. The agent does zero ranking. trovex's default for doc-heavy, multi-agent repos."
+    }
+  ],
+  "cta": {
+    "title": "pick by your repo, not the hype",
+    "accent": "your repo",
+    "sub": "Tiny repo → dump. Broad mixed corpus → retrieve. Doc-heavy fleet that needs the current answer cheaply → trovex. Open source: install + star.",
+    "foot": "trovex.dev"
+  }
+}

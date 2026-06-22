@@ -46,27 +46,46 @@ feeding a consulting funnel.
 - **revops** — WHEN: defining the **activation funnel** (landing → install → index → first
   query) and **install → repeat** retention, plus the reach → lead lifecycle. Build the
   **north-star dashboard**: reach (visits/stars/AI citations) → activations → consulting leads.
-- **Twenty CRM = the consulting-lead system of record (you own it).** Every qualified
-  consulting lead (the north-star end) gets logged in Twenty (`tsukumo.twenty.com`); the
-  north-star scoreboard reads the pipeline from it. You both **write** new leads and **read**
-  the pipeline for reporting. Inbound leads (in-person, email, referral) are logged by hand;
-  web signups sync via `web/api/_twenty.js`. PII (name/email) lives in the CRM where it
-  belongs — reports surface only counts + coarse source/stage.
+- **Twenty CRM = the consulting-lead system of record (you OWN it — write + follow up + read).**
+  Twenty (`tsukumo.twenty.com`) holds the consulting pipeline = the north-star end. Supabase
+  `leads` is raw capture; **Twenty is the deduped system of record.** You log every qualified
+  lead, **keep the follow-up alive** (stage + next-action task), and read the pipeline for the
+  north-star scoreboard. Web signups auto-sync via `web/api/_twenty.js`; **inbound leads
+  (in-person / email / referral) you log + work by hand.** PII stays in the CRM; reports
+  surface only counts + coarse source/stage.
 
-  **Twenty REST contract (live, verified — re-uses `web/api/_twenty.js`):**
+  **The follow-up loop (do ALL of it for a real lead — not just a bare Person):**
+  1. **Person** — dedup on email first. Set the lead fields: `source`
+     (REFERRAL|IN_PERSON|WAITLIST|OSS_SUITE|SEARCH|AI_ENGINE|SOCIAL|DIRECT|NEWSLETTER),
+     `sourceSite` (TROVEX|TSUKUMO|WRAITH|YORU), `teamIntent` (bool — wants help running agents
+     across a team), `newsletter` (bool). Don't leave a lead unattributed.
+  2. **Company** — create/dedup by name; set `domainName`; link the Person (`companyId`).
+  3. **Opportunity** — the pipeline record: `name`, `stage`
+     (**NEW→SCREENING→MEETING→PROPOSAL→CUSTOMER**), `companyId`, `pointOfContactId` (the
+     person). **Advancing the stage is the follow-up** — move it as the conversation moves;
+     don't let it rot in NEW.
+  4. **Follow-up Task** — the relance, so nothing is dropped: `title`, `dueAt` (ISO, a real
+     date), `status` (TODO→IN_PROGRESS→DONE), `bodyV2:{markdown}` checklist; link via
+     `taskTargets {taskId, targetPersonId}` + `{taskId, targetOpportunityId}`. Close it when
+     done and open the next one. **A lead with no open task and no recent stage move = a
+     dropped lead** — that is the failure to avoid.
+  5. **Source note** — context/attribution: `notes` + `noteTargets`, linked to the person AND
+     the opportunity.
+
+  **Twenty REST contract (live, verified — `web/api/_twenty.js` is the reference port):**
   - Creds out-of-git: `~/.config/trovex-growth/twenty.env` → `TWENTY_BASE_URL`
     (`https://tsukumo.twenty.com`) + `TWENTY_API_KEY` (Bearer). Load:
     `set -a; . ~/.config/trovex-growth/twenty.env; set +a`.
   - Cloudflare blocks non-browser User-Agents (Error 1010) → send a Mozilla UA.
-  - Person: `POST /rest/people` with `{ name:{firstName,lastName}, emails:{primaryEmail},
-    jobTitle?, linkedinLink:{primaryLinkUrl}? }`. **No `city` field exists** (400s).
-    Idempotent on email: `GET /rest/people?filter=emails.primaryEmail[eq]:<email>` first.
-  - Source note: body is the RICH_TEXT field **`bodyV2:{markdown}`** (a plain `body` 400s).
-    `POST /rest/notes { title, bodyV2:{markdown} }`, then link with
-    `POST /rest/noteTargets { noteId, targetPersonId }` (**`targetPersonId`**, not
-    `personId` — the latter is silently ignored, leaving the note unlinked).
-  - Never fabricate a lead or an email. No email yet → create the Person, mark
-    `EMAIL: PENDING` in the note, get it from the owner to dedup/complete.
+  - To-one relations: the REST FK is `<field>Id` (`companyId`, `pointOfContactId`,
+    `assigneeId`). `*Target` rows are MORPH: use `targetPersonId` / `targetOpportunityId` /
+    `targetCompanyId` (**never** `personId` — silently ignored → unlinked).
+  - Rich text (note/task body) = **`bodyV2:{markdown}`** (a plain `body` 400s).
+  - **Person has NO `city` field** (400s); address lives on Company.
+  - Read for reporting: `north-star-scoreboard.mjs` / `weekly-digest-runner.mjs` pull the
+    pipeline by stage/source. Read-only there; PII never leaves the CRM.
+  - Never fabricate a lead, email, or stage. No email yet → create the Person, set
+    `EMAIL: PENDING` in the note + a Task to chase it from the owner, then dedup/complete.
 - **ab-test-setup** — WHEN: a change is worth proving. Design the test (hypothesis +
   single success metric + sample size) and maintain an **ICE-scored experiment backlog**,
   each entry a hypothesis + success metric. Never run an A/B test before tracking is live.

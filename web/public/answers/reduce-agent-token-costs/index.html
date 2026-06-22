@@ -85,7 +85,7 @@
     </div>
 
     <h2>Where does the cost actually go?</h2>
-    <p class="lead-answer">Not into the one big prompt people worry about — into the steady drip of lookups. Every session, an agent reopens the same files to re-establish context: which runbook is current, where the deploy steps live, what a past incident decided. Multiply that by every agent and every teammate and the retrieval bill dwarfs the occasional large prompt. The fix is to make each lookup cheap and final, so it isn't re-paid.</p>
+    <p class="lead-answer">Not into the one big prompt people worry about — into the steady drip of lookups. Every session, an agent reopens the same files to re-establish context: which runbook is current, where the deploy steps live, what a past incident decided. Multiply that by every agent and every teammate and the retrieval bill dwarfs the occasional large prompt. Providers added <a href="https://developers.openai.com/api/docs/guides/prompt-caching" rel="noopener" target="_blank">prompt caching</a> because re-sending context each call is a real cost — but caching only discounts the unchanging prefix, not the docs an agent rereads to re-find what's current. The fix is to make each lookup cheap and final, so it isn't re-paid.</p>
 
     <h2>The three levers that move the bill</h2>
     <div class="tbl-wrap">

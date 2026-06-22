@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/for/fleet/" />
+  <title>trovex for a fleet of agents — one shared store, ~60% fewer tokens</title>
+  <meta name="description" content="Run several coding agents on one repo and they each re-derive the same context. Point the whole fleet at one trovex store: what one agent learns, the rest read back instead of working it out again — about 60% fewer tokens, no re-derivation." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/for/fleet/" />
+  <meta property="og:title" content="trovex for a fleet of agents" />
+  <meta property="og:description" content="One shared store for your whole fleet of coding agents. What one learns, the rest read back — about 60% fewer tokens, no re-derivation." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for a fleet of agents" />
+  <meta name="twitter:description" content="One shared store for your whole fleet of coding agents." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "For your MCP client", "item": "https://trovex.dev/for/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex for a fleet of agents", "item": "https://trovex.dev/for/fleet/" }
+        ]
+      },
+      {
+        "@type": "HowTo",
+        "datePublished": "2026-06-22", "dateModified": "2026-06-22",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "name": "Run trovex across a fleet of agents",
+        "description": "Install trovex, index your repo as one shared store, point every agent at it, and the fleet stops re-deriving the same context.",
+        "step": [
+          { "@type": "HowToStep", "name": "Install trovex", "text": "Run `uv tool install git+https://github.com/TsukumoHQ/trovex`." },
+          { "@type": "HowToStep", "name": "Index your repo", "text": "Run `trovex index /path/to/repo` to build the shared store." },
+          { "@type": "HowToStep", "name": "Point every agent at it", "text": "Run `trovex serve`; every agent connects over MCP at http://localhost:8765/mcp." },
+          { "@type": "HowToStep", "name": "See the shared savings", "text": "One agent writes a record once; the rest read it back instead of re-deriving it. The savings compound across the fleet." },
+          { "@type": "HowToStep", "name": "Run it for a team", "text": "Add an API key to share one trovex server so a whole team's agents hit the same store." }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/for/">For your client</a> / A fleet of agents
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-22">22 June 2026</time></p>
+    <h1>trovex for <span class="ac">a fleet of agents</span></h1>
+    <p class="deck">Run several coding agents on one repo — Claude Code, Cursor, your own — and each one re-derives the same context from scratch. Point the whole fleet at one trovex store and what one agent learns, the rest read back. About 60% fewer tokens, and no re-derivation.</p>
+
+    <div class="verdict">
+      <div class="l">The idea</div>
+      <p>trovex is one local store with a shared write path. Every agent reads the same canonical answer and writes records the others pick up — so the fleet behaves like a team with one memory, not a room of strangers each starting from zero.</p>
+    </div>
+
+    <p class="note" style="margin-bottom:2px;">trovex is open source and in public beta. The five steps below run in about a minute — no account, no keys to start.</p>
+    <h2>Quickstart: one store, the whole fleet</h2>
+    <ol class="qs">
+      <li>
+        <div class="qs-h">Install trovex.</div>
+        <div class="qs-cmd"><code>uv tool install git+https://github.com/TsukumoHQ/trovex</code><button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button></div>
+      </li>
+      <li>
+        <div class="qs-h">Index your repo — the shared store.</div>
+        <p class="qs-sub">One index every agent reads from. Embeds your markdown locally (SQLite + ONNX), about a minute.</p>
+        <div class="qs-cmd"><code>trovex index /path/to/repo</code><button class="qs-copy" type="button" data-copy="trovex index /path/to/repo" data-cmd="index" data-label="copy">copy</button></div>
+      </li>
+      <li>
+        <div class="qs-h">Point every agent at it.</div>
+        <p class="qs-sub">Run one server; each agent connects over MCP at <code>http://localhost:8765/mcp</code>. Wire each client with its guide — <a href="/for/claude-code/">Claude Code</a>, <a href="/for/cursor/">Cursor</a>, <a href="/for/windsurf/">Windsurf</a>.</p>
+        <div class="qs-cmd"><code>trovex serve</code><button class="qs-copy" type="button" data-copy="trovex serve" data-cmd="serve" data-label="copy">copy</button></div>
+      </li>
+      <li class="qs-aha">
+        <div class="qs-h">See the shared savings.</div>
+        <p class="qs-sub">One agent figures something out and writes a record once. Every other agent — and your teammates — read it back instead of working it out again. The per-query savings (~60% fewer tokens) compound across the whole fleet. That compounding is the point.</p>
+      </li>
+      <li>
+        <div class="qs-h">Run it for a team.</div>
+        <p class="qs-sub">Local and keyless by default. For a team, add an API key so one shared trovex server backs every developer's agents — same store, same canonical answers. See the <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">README</a> for the team setup.</p>
+      </li>
+    </ol>
+
+    <h2>Why a fleet wants it</h2>
+    <p class="lead-answer">The cost of running many agents is re-derivation: each session, each agent, each teammate re-reads the repo and works out the same answer again. trovex keeps the answer canonical and serves the one current doc — down to the section, with a freshness marker — and lets any agent write a record the rest read back. So the fleet pays for an answer once, not once per agent. See <a href="/blog/one-source-of-truth-for-a-fleet-of-agents/">one source of truth for a fleet of agents</a> for the full pattern.</p>
+
+    <div class="related">
+      <div class="l">trovex for each client</div>
+      <ul>
+        <li><a href="/for/claude-code/">trovex for Claude Code</a></li>
+        <li><a href="/for/cursor/">trovex for Cursor</a></li>
+        <li><a href="/for/windsurf/">trovex for Windsurf</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>One store for the whole fleet.</h2>
+      <p>Install, index once, point every agent at it, watch the savings compound — about a minute.</p>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys to start. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/for/">For your client</a>
+      <a href="/answers/">Answers</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/for/quickstart.js"></script>
+</body>
+</html>

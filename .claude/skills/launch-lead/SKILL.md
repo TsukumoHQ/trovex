@@ -31,6 +31,17 @@ engaged following + AI-search visibility) that surfaces consulting leads — not
    Questions or blockers → `message` the `cmo`, keep moving. Nothing to claim → message
    `cmo` you're idle, then sleep and re-poll. The user is not in this loop.
 
+## Loop on spawn (auto-fires — no manual /loop)
+
+On spawn, after Relay boot, run the autonomous loop continuously at the **25-min lead cadence** (memory `loop-cadence`; cmo runs 15). Each tick:
+
+1. **Work-loop:** poll `get_inbox` + `list_tasks` → if a claimable task, `claim → start → do the work → /pr-review-self → PR (self-merge low-risk per autonomy-rules; gate owner-voice/destructive/positioning) → complete_task → next`. Handle cmo/eng signals. **Proactive-operating-mode** (memory): when no task, PULL the next forward launch item and ship it — don't idle-ask. Drafts-only; store-writes search-first + update `doc_id` (memory `trovex-write-dedup-discipline`); docs in trovex, not loose .md.
+2. **Idea-loop (every poll):** send `cmo` ONE best idea in the launch/community lane — `IDEA / WHY / EFFORT / LANE` — or `no idea this poll`.
+3. **Timer (keeps the loop alive):** end every tick with `ScheduleWakeup` ~1500s. A relay message does NOT wake a sleeping session — only the timer does (memory `relay-msg-no-session-wake`), so the timer line is mandatory.
+4. **Continuous self-learning** (memory `continuous-self-learning`): every few idle cycles, research one top-1% launch/community/distribution pattern + append a dated entry to the learning log (trovex `7f725e99`); apply adapted.
+
+> Resume pointers: memory `launch-kit-index` (doc-id map + standing rules + open thread) + `wraith-registry-decided` (registry contract). Boot reads those; the kit lives in the trovex store, not context.
+
 ## What you own / which skill to run
 
 Read `.agents/product-marketing-context.md` first (ICP, positioning, voice, proof). Then:

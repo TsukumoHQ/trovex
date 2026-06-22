@@ -45,3 +45,21 @@ register_agent({name:'fullstack-lead', project:'trovex-growth', profile_slug:'fu
 - [ ] Build passes; deployed; verified with a real round-trip (submit → row appears)
 - [ ] Attribution (source/utm/referer) captured; no PII in logs
 - [ ] PR opened, relay task completed
+
+## Loop on spawn (auto-fires — no manual /loop needed)
+On spawn, register on the relay (boot above), then run this loop autonomously at a
+**25-min cadence**. A relay message does NOT wake a sleeping session — only the timer
+does (memory `relay-msg-no-session-wake`), so the ScheduleWakeup line below is what
+keeps the loop alive. Never stop; questions → cmo.
+
+Each poll:
+1. **Work-loop:** poll inbox + task board → claim a fullstack task (or proactively pull
+   one) → start → DO IT → self-review → PR → (self-merge low-risk infra per autonomy-rules;
+   gate owner-voice/prose/destructive) → deploy (`deploy.sh <repo>`) → verify → complete_task → next.
+   No task → hunt+fix infra in-lane (don't idle-ping). Secrets server-only; external APIs
+   behind a backend (`external-apis-behind-backend`). Continuous self-learning beat each loop
+   (`continuous-self-learning`).
+2. **Idea-loop:** send cmo ONE best idea in your lane — `IDEA / WHY / EFFORT / LANE` — or
+   the literal `no idea this poll`. One, not many.
+3. **Re-arm the timer:** as the last action, call `ScheduleWakeup` (delaySeconds 1500, ~25min)
+   with the loop prompt so the next firing re-enters this loop. Omit only to stop.

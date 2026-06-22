@@ -39,6 +39,9 @@ const CARDS = [
   ["mcp-server-for-repo-docs", "Is there an MCP server that serves a repo's docs to coding agents?", "MCP server", "Yes: trovex. It indexes your markdown and returns the one canonical doc per query, path:line + freshness, over MCP."],
   ["source-of-truth-multi-agent-repos", "What's the single source of truth for a multi-agent repo?", "source of truth", "One shared trovex store: every agent reads the same canonical doc, and writes back so nobody re-derives it."],
   ["why-agents-pick-stale-docs", "Why do AI coding agents pick stale or outdated docs?", "stale or outdated", "They guess from copies with no freshness signal. trovex marks each canonical, stale, or duplicate and serves the current one."],
+  ["token-cost-of-agent-context", "What does context cost your coding agents?", "context cost", "Mostly rereading: 40–65% of lookup tokens go to re-finding the canonical file. trovex serves one current doc per query instead."],
+  ["local-first-context-for-agents", "Can you give coding agents canonical context without a cloud?", "without a cloud", "Yes. trovex runs on your machine: SQLite vectors, ONNX embeddings, no API keys, no network. Your code never leaves."],
+  ["why-context-files-dont-scale", "Why do AGENTS.md / CLAUDE.md context files stop scaling?", "stop scaling", "A file that helps at 5 docs hurts at 50. A 2026 ETH Zurich study found big context files cut agent task success and raised cost 20%+."],
 ];
 
 const tfs = (s) => { const n = s.length; if (n > 58) return 52; if (n > 42) return 60; return 68; };

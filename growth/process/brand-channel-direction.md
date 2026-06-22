@@ -43,17 +43,20 @@ balance is visible and enforceable.
 
 ### Portfolio ratio (locked — the enforceable "ladder up" test)
 
-One number, per account, per week:
+Per account: **60% REACH / 30% ACTIVATION / 10% CONVERT**, measured as a **2-week rolling average**
+(not per-week — so a launch or authority arc can breathe), with a **hard floor: no single week below
+20% ACTIVATION** on any account.
 
-| Role | Share |
+| Role | Target (2-wk rolling avg) |
 |---|---|
 | REACH | **60%** |
-| ACTIVATION | **30%** |
+| ACTIVATION | **30%** (hard floor **≥20% every week**) |
 | CONVERT | **10%** |
 
 We are pre-launch with ~0 audience, so the mix is reach-heavy on purpose: build the top of funnel
-first. This ratio IS the "does the week's mix ladder up" test. Revisit it only with data, never on
-weekly vibes.
+first. But a 100/0/0 week breaches the floor — if we never seed activation, reach compounds into
+nothing convertible. This ratio IS the "does the mix ladder up" test (role-auditor script checks it).
+Revisit the targets only with data, never on weekly vibes.
 
 ## Cross-domain anti-dupe lock (hard guardrail)
 

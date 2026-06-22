@@ -27,6 +27,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/vs/compare.css" />
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -41,15 +43,16 @@
       },
       {
         "@type": "HowTo",
-        "datePublished": "2026-06-17", "dateModified": "2026-06-19",
+        "datePublished": "2026-06-17", "dateModified": "2026-06-22",
         "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
         "name": "Add trovex to Zed",
-        "description": "Connect trovex (a local HTTP MCP server) to Zed as a context server via the mcp-remote bridge.",
+        "description": "Install trovex, index your repo, run one query to see the tokens it saved, then add it to Zed as a context server via the mcp-remote bridge.",
         "step": [
-          { "@type": "HowToStep", "name": "Index your repo", "text": "Run `uv run trovex index /path/to/repo`." },
-          { "@type": "HowToStep", "name": "Start the server", "text": "Run `uv run trovex serve`. trovex serves MCP at http://localhost:8765/mcp." },
-          { "@type": "HowToStep", "name": "Add a context server", "text": "In Zed's settings.json, add a trovex entry under context_servers that runs mcp-remote against the URL." },
-          { "@type": "HowToStep", "name": "Use it", "text": "Open Zed's agent panel; trovex's tool is available as a context server." }
+          { "@type": "HowToStep", "name": "Install trovex", "text": "Run `uv tool install git+https://github.com/TsukumoHQ/trovex`." },
+          { "@type": "HowToStep", "name": "Index your repo", "text": "Run `trovex index /path/to/repo` (about a minute)." },
+          { "@type": "HowToStep", "name": "Ask a question", "text": "Run `trovex search \"how do we roll back a deploy?\"`." },
+          { "@type": "HowToStep", "name": "See the tokens saved", "text": "trovex prints the one canonical answer and the tokens it saved versus rereading the repo." },
+          { "@type": "HowToStep", "name": "Add it to Zed", "text": "Run `trovex serve`, then add a trovex entry under context_servers in Zed's settings.json that runs mcp-remote against the URL." }
         ]
       }
     ]
@@ -76,7 +79,7 @@
       <a href="/">trovex</a> / <a href="/for/">For your client</a> / Zed
     </nav>
 
-    <p class="updated">Updated <time datetime="2026-06-19">19 June 2026</time></p>
+    <p class="updated">Updated <time datetime="2026-06-22">22 June 2026</time></p>
     <h1>trovex for <span class="ac">Zed</span></h1>
     <p class="deck">Zed keys MCP servers under <code>context_servers</code>. trovex serves over HTTP, so you bridge it with <code>mcp-remote</code> — and the agent gets one canonical doc per query, about 60% fewer tokens.</p>
 
@@ -95,13 +98,41 @@
 }</code></pre>
     </div>
 
-    <p class="note" style="margin-bottom:2px;">trovex is open source and in public beta. Install it; the steps below run in about a minute.</p>
-    <h2>Setup, step by step</h2>
-    <ol>
-      <li><strong>Index your repo.</strong><div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex index /path/to/repo</div></li>
-      <li><strong>Start trovex.</strong> It serves MCP over HTTP at <code>http://localhost:8765/mcp</code>.<div class="cmd mono" style="display:inline-block;margin-top:8px;">$ uv run trovex serve</div></li>
-      <li><strong>Add the context server</strong> to Zed's <code>settings.json</code> — the snippet above. The <code>mcp-remote</code> adapter proxies trovex's HTTP endpoint into the stdio frames Zed expects (no install; <code>npx</code> fetches it).</li>
-      <li><strong>Use it.</strong> Open Zed's agent panel; trovex is available as a context server and exposes the <code>trovex</code> tool.</li>
+    <p class="note" style="margin-bottom:2px;">trovex is open source and in public beta. The five steps below run in about a minute — no account, no keys.</p>
+    <h2>Quickstart: from install to the tokens saved</h2>
+    <ol class="qs">
+      <li>
+        <div class="qs-h">Install trovex.</div>
+        <div class="qs-cmd"><code>uv tool install git+https://github.com/TsukumoHQ/trovex</code><button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button></div>
+      </li>
+      <li>
+        <div class="qs-h">Index your repo.</div>
+        <p class="qs-sub">Embeds your markdown locally (SQLite + ONNX). About a minute on a typical repo.</p>
+        <div class="qs-cmd"><code>trovex index /path/to/repo</code><button class="qs-copy" type="button" data-copy="trovex index /path/to/repo" data-cmd="index" data-label="copy">copy</button></div>
+      </li>
+      <li>
+        <div class="qs-h">Ask a question.</div>
+        <div class="qs-cmd"><code>trovex search "how do we roll back a deploy?"</code><button class="qs-copy" type="button" data-copy='trovex search "how do we roll back a deploy?"' data-cmd="search" data-label="copy">copy</button></div>
+      </li>
+      <li class="qs-aha">
+        <div class="qs-h">See the tokens saved.</div>
+        <p class="qs-sub">trovex returns the single current doc that answers — down to the section — and prints how many tokens that saved versus rereading the top few candidates. That number is the point.</p>
+      </li>
+      <li>
+        <div class="qs-h">Add it to Zed.</div>
+        <p class="qs-sub">Start the server, then add a trovex entry under <code>context_servers</code> in Zed's <code>settings.json</code> using the <code>mcp-remote</code> bridge (it proxies trovex's HTTP endpoint into the stdio Zed expects; <code>npx</code> fetches it).</p>
+        <div class="qs-cmd"><code>trovex serve</code><button class="qs-copy" type="button" data-copy="trovex serve" data-cmd="serve" data-label="copy">copy</button></div>
+        <pre style="margin-top:8px;overflow-x:auto;background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px;"><code>{
+  "context_servers": {
+    "trovex": {
+      "command": {
+        "path": "npx",
+        "args": ["-y", "mcp-remote", "http://localhost:8765/mcp"]
+      }
+    }
+  }
+}</code></pre>
+      </li>
     </ol>
     <p class="note">Zed's MCP support evolves — if a native HTTP option lands, you can drop the bridge. Check Zed's current <a href="https://zed.dev/docs/ai/mcp" target="_blank" rel="noreferrer">MCP docs</a>.</p>
 
@@ -138,5 +169,6 @@
       <small>© 2026 trovex · one source of truth for your agents' docs</small>
     </div>
   </footer>
+  <script defer src="/for/quickstart.js"></script>
 </body>
 </html>

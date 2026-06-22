@@ -52,7 +52,7 @@ function card(pre, accent) {
     // footer (mono), hairline above
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "Fira Code", fontSize: "21px", borderTop: `1px solid ${C.rule}`, paddingTop: "22px" } },
       h("span", { style: { color: C.accent } }, "trovex.dev"),
-      h("span", { style: { color: C.subtle } }, "the canonical doc store for your coding agents")),
+      h("span", { style: { color: C.subtle } }, "one canonical doc for your coding agents, ~60% fewer tokens")),
   );
 }
 

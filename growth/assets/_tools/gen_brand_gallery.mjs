@@ -27,7 +27,7 @@ const C = { bg: "#0c0d10", panel: "#101216", ink: "#f3f0e9", soft: "#8b8f98", su
 const PRODUCTS = {
   trovex: { accent: "#22c55e", word: ["trovex"], domain: "trovex.dev" },
   wraith: { accent: "#6e6bf2", word: ["wrai", ".", "th"], domain: "tsukumo.ch/wraith" },
-  yoru: { accent: "#f5a524", word: ["yoru"], domain: "tsukumo.ch/yoru" },
+  yoru: { accent: "#f59e0b", word: ["yoru"], domain: "yoru.sh" },
 };
 // per-product CONTENT (verbatim, real numbers). shot files are client-safe captures.
 const CONTENT = {

@@ -27,7 +27,7 @@ const C = { bg: "#0c0d10", panel: "#101216", ink: "#f3f0e9", soft: "#8b8f98", su
 const PRODUCTS = {
   trovex: { accent: "#22c55e", word: ["trovex"], domain: "trovex.dev" },
   wraith: { accent: "#6e6bf2", word: ["wrai", ".", "th"], domain: "tsukumo.ch/wraith" },
-  yoru: { accent: "#f5a524", word: ["yoru"], domain: "tsukumo.ch/yoru" },
+  yoru: { accent: "#f59e0b", word: ["yoru"], domain: "yoru.sh" },
 };
 // per-product CONTENT (verbatim, real numbers). shot files are client-safe captures.
 const CONTENT = {
@@ -52,6 +52,8 @@ const CONTENT = {
   },
 };
 
+const DOT = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><circle cx="2" cy="2" r="1.3" fill="#ffffff" fill-opacity="0.028"/></svg>').toString("base64")}`;
+
 const h = (t, p, ...k) => ({ type: t, props: { ...p, children: k.length <= 1 ? k[0] : k } });
 const product = process.argv[2] || "wraith";
 const P = PRODUCTS[product], D = CONTENT[product], A = P.accent;
@@ -73,7 +75,7 @@ function titleEl(full, accent, fs) {
     ...words.map(({ w, a }) => h("span", { style: { color: a ? A : C.ink, marginRight: "0.24em" } }, w)));
 }
 function frame(w, hgt, kids, pad = 64) {
-  return h("div", { style: { width: `${w}px`, height: `${hgt}px`, display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: C.bg, color: C.ink, padding: `${pad}px`, fontFamily: "Fira Sans", position: "relative" } },
+  return h("div", { style: { width: `${w}px`, height: `${hgt}px`, display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: C.bg, backgroundImage: `url(${DOT})`, backgroundRepeat: "repeat", color: C.ink, padding: `${pad}px`, fontFamily: "Fira Sans", position: "relative" } },
     h("div", { style: { position: "absolute", top: 0, left: 0, width: "100%", height: "5px", backgroundColor: A } }), ...kids);
 }
 // fit a shot into a max box, preserve aspect
@@ -113,7 +115,7 @@ function trustSlide() {
   ]);
 }
 function ogCard() {
-  return h("div", { style: { width: "1200px", height: "630px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: C.bg, color: C.ink, padding: "60px 64px", fontFamily: "Fira Sans" } },
+  return h("div", { style: { width: "1200px", height: "630px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: C.bg, backgroundImage: `url(${DOT})`, backgroundRepeat: "repeat", color: C.ink, padding: "60px 64px", fontFamily: "Fira Sans" } },
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.rule}`, paddingBottom: "22px" } }, wordmark(28), eyebrow(D.eyebrow, 20)),
     h("div", { style: { display: "flex", flexDirection: "column", gap: "20px" } },
       titleEl(D.og.title, D.og.accent, 66),

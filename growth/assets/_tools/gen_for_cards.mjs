@@ -23,6 +23,8 @@ const fonts = [
   { name: "Fira Code", data: await readFile(join(F, "FiraCode-Regular.ttf")), weight: 400, style: "normal" },
 ];
 const C = { bg: "#0c0d10", panel: "#101216", ink: "#f3f0e9", soft: "#8b8f98", subtle: "#74808f", rule: "#23262d", green: "#22c55e" };
+const DOT = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><circle cx="2" cy="2" r="1.3" fill="#ffffff" fill-opacity="0.028"/></svg>').toString("base64")}`;
+
 const h = (t, p, ...k) => ({ type: t, props: { ...p, children: k.length <= 1 ? k[0] : k } });
 
 // slug, agent, mechanism sub, MCP wiring line
@@ -34,7 +36,7 @@ const CARDS = [
 ];
 
 function card(agent, sub, connect) {
-  return h("div", { style: { width: "1200px", height: "630px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: C.bg, color: C.ink, padding: "58px 64px", fontFamily: "Fira Sans" } },
+  return h("div", { style: { width: "1200px", height: "630px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: C.bg, backgroundImage: `url(${DOT})`, backgroundRepeat: "repeat", color: C.ink, padding: "58px 64px", fontFamily: "Fira Sans" } },
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.rule}`, paddingBottom: "20px" } },
       h("div", { style: { display: "flex", alignItems: "center", gap: "11px", fontFamily: "Fira Code", fontSize: "26px", color: C.ink } },
         h("div", { style: { width: "16px", height: "16px", backgroundColor: C.green } }), h("span", {}, "trovex")),

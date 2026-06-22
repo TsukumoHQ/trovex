@@ -44,6 +44,8 @@ const C = { bg:"#0c0d10", panel:"#101216", ink:"#f3f0e9", soft:"#8b8f98", faint:
 // AUTO-POST = GREEN uniformly (owner-locked autopost-green-antislop). Red dropped:
 // legacy tones red/redGhost map to green / muted-soft so old data blocks stay valid.
 const TONE = { red:C.green, redGhost:C.soft, green:C.green, soft:C.soft, ink:C.ink };
+// faint dot-grid texture on the dark canvas (teardown refinement #2: kills the flat-void feel, Linear-style restraint)
+const DOT = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><circle cx="2" cy="2" r="1.3" fill="#ffffff" fill-opacity="0.028"/></svg>').toString("base64")}`;
 const h = (t, p, ...k) => ({ type: t, props: { ...p, children: k.length <= 1 ? k[0] : k } });
 
 const SHAPES = {
@@ -87,7 +89,7 @@ function bars(data) {
 // stat-tiles: slide.tiles=[{value,label}]  ·  changelog: slide.items=["…"]  ·  before-after: slide.pairs=[{broke,fix}]
 function tilesEl(tiles) {
   return h("div",{style:{display:"flex",flexWrap:"wrap",gap:"20px"}},
-    ...tiles.map(t => h("div",{style:{display:"flex",flexDirection:"column",gap:"6px",width:"calc(50% - 10px)",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"12px",padding:"26px 28px"}},
+    ...tiles.map(t => h("div",{style:{display:"flex",flexDirection:"column",gap:"6px",width:"47%",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"12px",padding:"26px 28px"}},
       h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"58px",color:C.green,letterSpacing:"-0.03em",lineHeight:1}}, t.value),
       h("div",{style:{fontFamily:"Fira Code",fontSize:"20px",color:C.soft}}, t.label))));
 }
@@ -106,8 +108,16 @@ function pairsEl(pairs) {
       h("div",{style:{display:"flex",flexDirection:"column",gap:"8px",flex:1,border:`1px solid ${C.green}`,backgroundColor:"rgba(34,197,94,0.06)",borderRadius:"10px",padding:"22px 24px"}},
         h("div",{style:{fontFamily:"Fira Code",fontSize:"18px",color:C.green}},"the fix"), h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"25px",color:C.ink}}, p.fix)))));
 }
+// data-as-hero (teardown #3, uv model): one giant number = the largest pixel + a label
+function heroEl(slide, S) {
+  return h("div",{style:{display:"flex",flexDirection:"column",gap:"10px"}},
+    h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:`${S.w===1080?S.h===1350?230:190:200}px`,color:C.green,letterSpacing:"-0.05em",lineHeight:0.86}}, slide.heroValue),
+    h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"50px",color:C.ink,letterSpacing:"-0.02em",lineHeight:1.05,maxWidth:"900px"}}, slide.heroLabel),
+    ...(slide.body ? [body(slide.body, S.sub)] : []));
+}
 function layoutBody(spec, slide, S, ac) {
   const t = slide.title ? [titleEl(slide.title, slide.accent, tfs(S, slide.title), ac)] : [];
+  if (slide.heroValue) return [...t, heroEl(slide, S)];
   if (slide.tiles) return [...t, tilesEl(slide.tiles)];
   if (slide.items) return [...t, changelogEl(slide.items)];
   if (slide.pairs) return [...t, pairsEl(slide.pairs)];
@@ -117,10 +127,10 @@ function layoutBody(spec, slide, S, ac) {
 const tfs = (S, str) => { const b=S.big; if(str.length>40) return b-30; if(str.length>26) return b-16; return b; };
 
 function frame(S, headerRight, kids, footL, footR) {
-  return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
+  return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,backgroundImage:`url(${DOT})`,backgroundRepeat:"repeat",padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"22px"}},
       kids.mark, headerRight || h("div",{},"")),
-    h("div",{style:{display:"flex",flexDirection:"column",gap:"26px",flex:1,justifyContent:"center"}}, ...kids.body),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:"26px",flex:1,justifyContent:kids.align||"center",paddingTop:kids.align==="flex-start"?"48px":"0"}}, ...kids.body),
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.rule}`,paddingTop:"22px"}},
       h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.soft}}, footL||""),
       h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:footR && footR.accent ? C.green : C.ink}}, footR ? footR.text : "")));
@@ -140,9 +150,11 @@ function coverCard(spec, S) {
 }
 function slideCard(spec, slide, S) {
   const ac = accentFor(spec.audience);
+  const dataLed = !!(slide.tiles || slide.items || slide.pairs || slide.heroValue);
   return frame(S, eyebrow(spec.kicker, S.eb), {
     mark: wordmark(brandFor(spec.audience), S.mark),
     body: layoutBody(spec, slide, S, ac),
+    align: dataLed ? "flex-start" : "center", // top-1% rhythm: data/list cards pin content high, not floating mid-card
   }, footerSource(spec, slide), { text: spec.cta.foot, accent:false });
 }
 function ctaCard(spec, S) {

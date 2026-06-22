@@ -1,49 +1,12 @@
 {
-  "slug": "bip-fleet-broke",
-  "audience": "founder",
-  "kicker": "build in public · what broke",
-  "layout": "before-after",
-  "cover": {
-    "title": "3 things that broke running our content team on a fleet of agents",
-    "accent": "broke",
-    "sub": "Not the model. Every failure was coordination — a source-of-truth problem. That's the line between a demo and production. Swipe →"
-  },
-  "slides": [
-    {
-      "title": "1. the pipeline ate the widgets",
-      "accent": "ate the widgets",
-      "pairs": [
-        {"broke": "Pipeline silently dropped widget blocks. Raw syntax shipped live.", "fix": "A silent drop is worse than a loud error. Fail loud, fail in CI — not in front of a reader."}
-      ]
-    },
-    {
-      "title": "2. the fleet wrote from a stale truth",
-      "accent": "stale truth",
-      "pairs": [
-        {"broke": "We changed our positioning. The agents kept writing from the old one — in parallel.", "fix": "One canonical source of truth, read before writing. Felt this from the wrong side."}
-      ]
-    },
-    {
-      "title": "3. eighteen widgets, zero used",
-      "accent": "zero used",
-      "pairs": [
-        {"broke": "18 editorial widgets available. The fleet used 0. We blamed taste.", "fix": "It was reachability, not taste. If an agent can't find the tool, the tool doesn't exist."}
-      ]
-    },
-    {
-      "title": "the money line",
-      "accent": "money line",
-      "body": "A fleet reading a stale source of truth doesn't make one mistake. It makes the same mistake in parallel, everywhere — and you pay for it in review.",
-      "data": [
-        {"label": "tax you pay rereading to rebuild context", "value": 60, "unit": "%"}
-      ]
-    }
+  "slug":"bip-fleet-broke","audience":"founder","kicker":"build in public · what broke","layout":"before-after",
+  "cover":{"title":"what broke running our content on an agent fleet","accent":"broke","sub":"Three real failures this week. None were the model's fault, all were coordination."},
+  "slides":[
+    {"title":"drop","accent":"drop","pairs":[{"broke":"Raw widget syntax shipped live. The pipeline dropped blocks silently.","fix":"A render gate that fails closed on unknown blocks. No silent drops."}]},
+    {"title":"stale","accent":"stale","pairs":[{"broke":"Agents wrote from the old positioning, in parallel. Same wrong answer, everywhere.","fix":"One canonical positioning doc the fleet reads first, before it writes."}]},
+    {"title":"unreachable","accent":"unreachable","pairs":[{"broke":"18 widgets built, 0 emitted. The pipeline couldn't reach them.","fix":"Wire the emitter, add a smoke test before publish. Build less, ship what works."}]},
+    {"title":"the pattern","accent":"the pattern","body":"Every failure was a coordination gap, not a model limit. Serve the fleet one current, canonical source and most of these stop happening.","data":[{"label":"review tax ≈ share of agent reads","value":"~60%","pct":60,"tone":"green"}]}
   ],
-  "cta": {
-    "title": "the fix was a source of truth agents actually read",
-    "accent": "source of truth",
-    "sub": "Full teardown on the blog. trovex is the canonical-context layer we built so a fleet reads one answer, not five stale ones. Open source, public beta.",
-    "foot": "trovex.dev/blog"
-  },
-  "source": "our own content fleet · trovex reread tax ~60% (my run, our repos)"
+  "cta":{"title":"we post the misses too","accent":"the misses","sub":"Real artifacts beat polished claims. Follow the build.","foot":"trovex.dev"},
+  "source":"build in public · our own run"
 }

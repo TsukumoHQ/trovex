@@ -1,0 +1,352 @@
+[
+  {
+    "slug": "what-is-an-agentic-sdlc",
+    "title": "What is an agentic SDLC? A working definition, and what it takes to run one",
+    "accent": "agentic SDLC",
+    "sub": "Agents carry whole tasks; you supervise at the review gates."
+  },
+  {
+    "slug": "from-developer-to-agent-orchestrator",
+    "title": "From developer to agent orchestrator: the job is moving, not ending",
+    "accent": "orchestrator",
+    "sub": "When writing code stops being the main activity, the job moves up a level."
+  },
+  {
+    "slug": "the-copilot-operator-gap",
+    "title": "The copilot-operator gap: why your Claude seats aren't enough",
+    "accent": "gap",
+    "sub": "Seats scale autocomplete. They don't make a team run agents."
+  },
+  {
+    "slug": "why-ai-demos-die-before-production",
+    "title": "Why AI demos die before production",
+    "accent": "die",
+    "sub": "The distance between a clean keynote and your real codebase."
+  },
+  {
+    "slug": "managing-context-for-ai-coding-agents",
+    "title": "Managing context for AI coding agents (why they lose the thread, and the fix)",
+    "accent": "context",
+    "sub": "A bigger window doesn't fix the reread. Serving one canonical answer does.",
+    "source": "trovex, measured on our repos (repo-dependent)"
+  },
+  {
+    "slug": "does-ai-make-developers-faster",
+    "title": "Your developers feel faster with AI. The clock disagrees.",
+    "accent": "clock",
+    "sub": "The gap between the feeling and the measurement is the management problem.",
+    "source": "METR 2025 randomized controlled trial"
+  },
+  {
+    "slug": "does-ai-hurt-code-quality",
+    "title": "AI ships code by copy-paste. GitClear measured the bill.",
+    "accent": "copy-paste",
+    "sub": "Speed is real; so is the maintenance debt it quietly defers.",
+    "source": "GitClear, 211M lines"
+  },
+  {
+    "slug": "ai-adoption-delivery-stability",
+    "title": "AI makes it easy to ship more. DORA's data says that's the problem.",
+    "accent": "DORA",
+    "sub": "The culprit isn't bad AI code. It's batch size.",
+    "source": "Google DORA 2024"
+  },
+  {
+    "slug": "ai-reasoning-complexity-cliff",
+    "title": "AI 'reasoning' has a cliff. Apple went and found the edge.",
+    "accent": "cliff",
+    "sub": "Accuracy fell off a cliff past a complexity threshold, even given the algorithm.",
+    "source": "Apple 2025"
+  },
+  {
+    "slug": "do-agents-md-context-files-help-coding-agents",
+    "title": "More context isn't better: what the ETH Zurich AGENTS.md study means",
+    "accent": "ETH Zurich",
+    "sub": "Adding context files usually made agents worse and pricier. Right context is harder.",
+    "source": "ETH Zurich 2026"
+  },
+  {
+    "slug": "ai-coding-agents-research-2026",
+    "title": "What the research actually says about AI coding agents (2026)",
+    "accent": "the research",
+    "sub": "Six independent studies converge on one finding.",
+    "source": "METR, Stanford, Apple, DORA, GitClear, ETH"
+  },
+  {
+    "slug": "ai-productivity-clean-code",
+    "title": "AI helps most where you need it least",
+    "accent": "least",
+    "sub": "Big gains on greenfield, almost none on the legacy code that hurts.",
+    "source": "Stanford, 100k+ developers"
+  },
+  {
+    "slug": "can-ai-agents-finish-complex-work",
+    "title": "AI agents finished a third of the real work. The demo skips that part.",
+    "accent": "a third",
+    "sub": "Real briefs and constraints, and the part the keynote skips.",
+    "source": "ORAgentBench, 14 agent setups"
+  },
+  {
+    "slug": "multi-agent-orchestration-research-2026",
+    "title": "What the research says about multi-agent AI systems (2026)",
+    "accent": "multi-agent",
+    "sub": "Four studies, four angles, one picture of where fleets break.",
+    "source": "4 independent 2025-2026 studies"
+  },
+  {
+    "slug": "why-multi-agent-ai-systems-fail",
+    "title": "Your multi-agent system isn't failing on the model. Berkeley counted where.",
+    "accent": "Berkeley",
+    "sub": "The problem is coordination, not the model.",
+    "source": "UC Berkeley, 1,600 failed traces"
+  },
+  {
+    "slug": "expose-your-erp-as-mcp",
+    "title": "We exposed our whole back office as MCP: 13 servers, 222 tools",
+    "accent": "222 tools",
+    "sub": "Making an ERP usable by agents is a contract, not an integration."
+  },
+  {
+    "slug": "five-layer-memory-for-an-ai-agent",
+    "title": "A five-layer memory for an AI agent that works a client for nine months",
+    "accent": "five-layer",
+    "sub": "A context window is not memory."
+  },
+  {
+    "slug": "why-ai-coding-agents-cost-so-much",
+    "title": "Why your AI coding agents cost so much (and how to cut it)",
+    "accent": "cost so much",
+    "sub": "The model price isn't the problem; the context you re-pay every call is.",
+    "source": "trovex"
+  },
+  {
+    "slug": "agent-governance-and-safety-in-production",
+    "title": "Governing AI agents in production: control, accountability, and audit",
+    "accent": "accountability",
+    "sub": "Who owns a non-human actor with commit access, and how far a bad one reaches."
+  },
+  {
+    "slug": "agentic-product-development",
+    "title": "What agentic product development actually is (and how it beats a dev shop)",
+    "accent": "dev shop",
+    "sub": "A dev shop hands you a codebase; a studio builds it the way you'll run it."
+  },
+  {
+    "slug": "agentic-studio-fast-and-production-grade",
+    "title": "Fast and production-grade: how an agentic studio ships both",
+    "accent": "production-grade",
+    "sub": "Fast doesn't mean demo-grade, if production is the method."
+  },
+  {
+    "slug": "ai-10x-not-cheaper",
+    "title": "AI that's 10x, not cheaper: what prod-grade agentic output means",
+    "accent": "not cheaper",
+    "sub": "The win is prod-grade output, not the same work for less."
+  },
+  {
+    "slug": "ai-adoption-at-a-scale-up",
+    "title": "Getting AI into production at a scale-up: the in-between problem",
+    "accent": "in-between",
+    "sub": "Thirty engineers, AI everywhere, and delivery still isn't faster."
+  },
+  {
+    "slug": "ai-agent-observability",
+    "title": "AI agent observability: knowing what your agents did, and why",
+    "accent": "observability",
+    "sub": "Agents ran overnight. Can you reconstruct what they actually did?"
+  },
+  {
+    "slug": "ai-operating-model-scorecard",
+    "title": "The AI operating-model scorecard: where your team is losing the gains",
+    "accent": "scorecard",
+    "sub": "AI helps or hurts on five operating levers, not the model."
+  },
+  {
+    "slug": "augment-never-replace-agentic-operators",
+    "title": "Augment, never replace: turning a dev team into agentic operators",
+    "accent": "never replace",
+    "sub": "The replace-fear quietly caps the capability you paid for."
+  },
+  {
+    "slug": "build-vs-buy-your-ai-capability",
+    "title": "Build vs buy your AI capability: the CTO's real decision",
+    "accent": "Build vs buy",
+    "sub": "Buying gives access, not capability; building alone burns senior quarters."
+  },
+  {
+    "slug": "building-a-senior-colleague-ai",
+    "title": "Building a senior-colleague AI: versioned skills and gated tools",
+    "accent": "senior-colleague",
+    "sub": "Put the judgment in versioned, fail-closed skills and gated tools."
+  },
+  {
+    "slug": "compliance-as-architecture-constraint",
+    "title": "Compliance as an architecture constraint: AI for a Swiss fiduciary",
+    "accent": "constraint",
+    "sub": "In a regulated business, compliance decides the architecture, not the reverse."
+  },
+  {
+    "slug": "custom-jwt-claims-supabase-auth-hooks",
+    "title": "Custom JWT claims with Supabase auth hooks (and the two traps)",
+    "accent": "two traps",
+    "sub": "Checking permissions on every call is auth at the wrong layer."
+  },
+  {
+    "slug": "deterministic-state-machines-over-llms",
+    "title": "GPT isn't enough: we wrap deterministic state machines around the LLM",
+    "accent": "deterministic",
+    "sub": "The reliable parts of an agent live in the code around the model."
+  },
+  {
+    "slug": "evaluating-ai-agents-in-production",
+    "title": "Evaluating AI agents in production: getting past vibes",
+    "accent": "vibes",
+    "sub": "Shipping agent changes on 'it felt better' hides silent regressions."
+  },
+  {
+    "slug": "how-to-evaluate-an-ai-consulting-partner",
+    "title": "How to evaluate an AI consulting partner: a CTO's checklist",
+    "accent": "checklist",
+    "sub": "Most sell decks or dependency; a few transfer real capability."
+  },
+  {
+    "slug": "how-to-make-ai-work-for-your-dev-team",
+    "title": "How to actually make AI work for your dev team",
+    "accent": "actually",
+    "sub": "Five operating levers separate the teams that get gains from rework."
+  },
+  {
+    "slug": "how-we-ship-with-an-agent-fleet",
+    "title": "How we ship our own product with a fleet of AI agents",
+    "accent": "fleet",
+    "sub": "Not an autocomplete in an editor: an org chart of agents."
+  },
+  {
+    "slug": "infra-failures-nobody-warns-you-about",
+    "title": "The infra failures that quietly break a dockerized AI stack",
+    "accent": "infra failures",
+    "sub": "What takes down an AI system is the boring infrastructure underneath."
+  },
+  {
+    "slug": "is-ai-written-code-safe-to-ship",
+    "title": "Is AI-written code safe to ship? Yes, if you review it for what AI gets wrong",
+    "accent": "safe to ship",
+    "sub": "It passes the tests and imports a library that doesn't exist."
+  },
+  {
+    "slug": "make-ai-coding-agents-reliable-in-production",
+    "title": "How to make AI coding agents reliable in production",
+    "accent": "reliable",
+    "sub": "Not a better model: scoped permissions, review gates, observability."
+  },
+  {
+    "slug": "measuring-ai-impact-in-production",
+    "title": "Measuring AI's impact in production, honestly (no vanity metrics)",
+    "accent": "vanity metrics",
+    "sub": "Lines written and acceptance rates measure activity, not impact."
+  },
+  {
+    "slug": "open-weight-model-license-trap",
+    "title": "Your open-weight model's license is probably lying to you",
+    "accent": "lying",
+    "sub": "The license tag often isn't the license you're actually bound by."
+  },
+  {
+    "slug": "orchestrating-ai-coding-agent-fleets",
+    "title": "Orchestrating AI coding-agent fleets: making many agents act like a team",
+    "accent": "Orchestrating",
+    "sub": "One agent needs no coordination. Five do."
+  },
+  {
+    "slug": "rag-in-production-over-regulations",
+    "title": "RAG in production over regulations and client documents",
+    "accent": "RAG",
+    "sub": "Production RAG isn't embed-and-retrieve; it's a layered pipeline."
+  },
+  {
+    "slug": "replacing-legacy-dms-with-doc-intelligence",
+    "title": "Replacing a legacy document system with doc-intelligence is a pipeline, not a chatbot",
+    "accent": "a pipeline",
+    "sub": "'AI reads your documents' dies on the boring parts."
+  },
+  {
+    "slug": "running-agent-fleets-in-production",
+    "title": "Running agent fleets in production: what it actually takes",
+    "accent": "actually takes",
+    "sub": "Not a prompt change: four engineering layers."
+  },
+  {
+    "slug": "securing-ai-coding-agents-prompt-injection",
+    "title": "Securing AI coding agents: prompt injection is the new RCE",
+    "accent": "the new RCE",
+    "sub": "Give an agent tools and prompt injection becomes remote code execution."
+  },
+  {
+    "slug": "silent-failures-production-invoice-pipeline",
+    "title": "Five silent failures in a production invoice pipeline",
+    "accent": "silent failures",
+    "sub": "They return 200, paint the dashboard green, and stop doing their job."
+  },
+  {
+    "slug": "what-agentic-dev-training-looks-like",
+    "title": "What agentic-dev training actually looks like",
+    "accent": "training",
+    "sub": "Not a slide deck: hands-on, on your own codebase."
+  },
+  {
+    "slug": "what-agentic-operators-actually-do",
+    "title": "What agentic operators actually do (the operator, not the copilot)",
+    "accent": "operators",
+    "sub": "Running agents that do whole units of work, not typing every line."
+  },
+  {
+    "slug": "what-ai-readiness-means-for-a-dev-team",
+    "title": "What AI readiness actually means for a dev team",
+    "accent": "readiness",
+    "sub": "Not a license count: whether your team can run agents on real work."
+  },
+  {
+    "slug": "what-is-an-ai-engineering-assessment",
+    "title": "What an AI engineering assessment actually is (and what you walk away with)",
+    "accent": "assessment",
+    "sub": "Not a quiz with a sales call. It happens in your repo, in production."
+  },
+  {
+    "slug": "when-to-scale-your-agent-setup",
+    "title": "When to scale your agent setup: the team signals that actually matter",
+    "accent": "signals",
+    "sub": "The signal to scale isn't the demo working."
+  },
+  {
+    "slug": "why-ai-coding-agents-fail",
+    "title": "Why AI coding agents fail: the failure-mode catalogue",
+    "accent": "failure-mode",
+    "sub": "Not random: a handful of predictable, nameable, fixable ways."
+  },
+  {
+    "slug": "winning-over-developers-skeptical-of-ai",
+    "title": "How to win over developers who are skeptical of AI (a lead's playbook)",
+    "accent": "skeptical",
+    "sub": "Your best senior tried it, hit almost-right code, and quietly stopped."
+  },
+  {
+    "slug": "how-we-run-our-growth-team-on-ai-agents",
+    "title": "How we run a 9-agent growth team on wrai.th",
+    "accent": "9-agent",
+    "sub": "Our marketing org is a fleet of agents over a relay, not people with an assistant.",
+    "kicker": "dogfooding"
+  },
+  {
+    "slug": "what-is-an-ai-native-engineering-team",
+    "title": "What is an AI-native engineering team? The operating model, not the tool stack",
+    "accent": "AI-native",
+    "sub": "Not more Copilot seats: the default is running agent fleets, with developers as operators."
+  },
+  {
+    "slug": "what-broke-running-content-on-an-agent-fleet",
+    "title": "What broke this week running our content on an agent fleet",
+    "accent": "broke",
+    "sub": "Three real failures from a week running content on AI agents, and the fixes.",
+    "source": "build in public · our own run"
+  }
+]

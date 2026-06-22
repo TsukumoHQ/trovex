@@ -7,192 +7,49 @@
   <span class="mono">{{ "{:,}".format(totals.saved) }} tokens saved · last {{ days }}d</span>
 {% endblock %}
 
-{% block content %}
-<div class="section-head" style="margin-bottom: var(--s-5);">
-  <div>
-    <h1 style="margin-bottom: 2px;">Token savings</h1>
-    <div class="subtle mono" style="font-size: var(--t-12);">
-      estimated savings vs reading top-3 .md without trovex · model below
-    </div>
-  </div>
-  <div class="filter-pills" style="margin-left: auto; padding: 2px; background: var(--bg-card); border-radius: var(--radius-sm);">
-    {% for d in [1, 7, 14, 30, 90] %}
-      <a href="/savings?days={{ d }}" class="filter-pill {% if d == days %}active{% endif %}">{{ d }}d</a>
-    {% endfor %}
-  </div>
-</div>
-
-{# ── Hero KPIs ─────────────────────────────────────────── #}
-<div class="savings-hero">
-  <div class="savings-hero-main">
-    <div class="savings-hero-eyebrow mono">SAVED · LAST {{ days }}D</div>
-    <div class="savings-hero-number">
-      {{ "{:,}".format(totals.saved) }}
-      <span class="savings-hero-unit">tokens</span>
-    </div>
-    <div class="savings-hero-ratio">
-      <span class="savings-ratio-bar">
-        <span class="savings-ratio-fill" style="width: {{ (totals.ratio * 100) | round(1) }}%;"></span>
-      </span>
-      <b class="mono">{{ "%.0f"|format(totals.ratio * 100) }}%</b>
-      <span class="subtle mono">reduction vs no-trovex baseline</span>
-    </div>
-  </div>
-  <div class="savings-hero-side">
-    <div class="savings-side-row">
-      <span class="savings-side-label">would have read</span>
-      <span class="savings-side-value mono">{{ "{:,}".format(totals.would_have_read) }}</span>
-    </div>
-    <div class="savings-side-row">
-      <span class="savings-side-label">actual read (top-1)</span>
-      <span class="savings-side-value mono">{{ "{:,}".format(totals.actual_read) }}</span>
-    </div>
-    <div class="savings-side-row">
-      <span class="savings-side-label">trovex response overhead</span>
-      <span class="savings-side-value mono">{{ "{:,}".format(totals.response_tokens) }}</span>
-    </div>
-    <div class="savings-side-row savings-side-divider"></div>
-    <div class="savings-side-row">
-      <span class="savings-side-label">queries</span>
-      <span class="savings-side-value mono">{{ "{:,}".format(totals.queries) }}</span>
-    </div>
-    {% if totals.queries > 0 %}
-    <div class="savings-side-row">
-      <span class="savings-side-label">avg saved / query</span>
-      <span class="savings-side-value mono">{{ "{:,}".format((totals.saved / totals.queries) | int) }}</span>
-    </div>
-    {% endif %}
-  </div>
-</div>
-
-{# ── Daily trend ──────────────────────────────────────── #}
-{% if daily %}
-<div class="section">
-  <div class="section-divider">
-    <span class="section-divider-label">Daily</span>
-    <span class="section-divider-meta mono">{{ daily | length }} day{% if daily | length != 1 %}s{% endif %}</span>
-  </div>
-  <div class="card">
-    <div class="trend-chart">
-      {% set max_saved = (daily | map(attribute='saved') | max) or 1 %}
-      {% for d in daily %}
-      <div class="trend-day">
-        <div class="trend-bar-wrap">
-          <div class="trend-bar"
-               style="height: {{ (d.saved / max_saved * 100) | round(1) }}%;"
-               title="{{ d.day }}: {{ '{:,}'.format(d.saved) }} tokens · {{ d.queries }} queries"></div>
-        </div>
-        <div class="trend-label mono">{{ d.day }}</div>
-        <div class="trend-value mono">{{ number(d.saved) }}</div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{# ── Per-user breakdown ───────────────────────────────── #}
-{% if per_user %}
-<div class="section">
-  <div class="section-divider">
-    <span class="section-divider-label">Per user</span>
-    <span class="section-divider-meta mono">{{ per_user | length }} active</span>
-  </div>
-  <div class="card">
-    <div class="table-wrap" style="border: none; border-radius: 0;">
-      <table class="t">
-        <thead>
-          <tr>
-            <th style="width: 32px;"></th>
-            <th>user</th>
-            <th style="text-align: right;">queries</th>
-            <th style="text-align: right;">would have read</th>
-            <th style="text-align: right;">saved</th>
-            <th style="width: 120px;">ratio</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in per_user %}
-          <tr>
-            <td style="padding-right: 0;">{{ avatar(u.user, 22) }}</td>
-            <td class="path">
-              <a href="/usage?user={{ u.user | urlencode }}">{{ u.user }}</a>
-            </td>
-            <td class="num">{{ u.queries }}</td>
-            <td class="num cell-faint">{{ "{:,}".format(u.would_have_read) }}</td>
-            <td class="num" style="color: var(--accent); font-weight: 500;">
-              {{ "{:,}".format(u.saved) }}
-            </td>
-            <td>
-              <div class="user-ratio-bar">
-                <span class="user-ratio-fill" style="width: {{ (u.ratio * 100) | round(1) }}%;"></span>
-              </div>
-              <span class="mono" style="font-size: var(--t-11); color: var(--fg-muted);">{{ "%.0f"|format(u.ratio * 100) }}%</span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{# ── Top queries by savings ───────────────────────────── #}
-{% if top_queries %}
-<div class="section">
-  <div class="section-divider">
-    <span class="section-divider-label">Top queries by savings</span>
-  </div>
-  <div class="card">
-    <ul class="query-feed">
-      {% for q in top_queries %}
-      <li class="query-feed-item">
-        {{ avatar(q.user, 22) }}
-        <div class="query-feed-body">
-          <div class="query-feed-line mono">
-            <span class="query-feed-user">{{ q.user }}</span>
-            <span class="query-feed-arrow">→</span><span class="query-feed-q">{{ q.query }}</span>
-          </div>
-        </div>
-        <div class="query-feed-meta mono">
-          <span style="color: var(--accent);"><b>{{ number(q.saved) }}</b> saved</span>
-          <span class="cell-faint">/ {{ number(q.whr) }}</span>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-</div>
-{% endif %}
-
-{# ── Model explainer ──────────────────────────────────── #}
-<details class="model-card">
-  <summary>
-    <span class="mono" style="color: var(--fg-muted); font-size: var(--t-12);">How is "saved" computed?</span>
-    <span class="chevron">▾</span>
-  </summary>
-  <div class="model-body">
-    <p>
-      Without <code>trovex</code>, an agent typically does <code>Glob</code> or
-      <code>Grep</code> to find matching <code>.md</code> files, then
-      <code>Read</code> the top 2-3 candidates to figure out which one is
-      canonical. With <code>trovex</code>, they get a ranked list with status
-      markers and read just the top-1.
-    </p>
-    <pre class="model-formula mono">would_have_read = ∑ tokens_est(result[0..3])
-actual_read     = tokens_est(result[0])
-overhead        = tokens(trovex output)
-saved           = would_have_read − actual_read − overhead</pre>
-    <p class="subtle">
-      Conservative — assumes the agent <em>does</em> still read the top result.
-      If markers reveal that all results are stale or duplicates, real savings
-      are higher and not captured here.
-    </p>
-  </div>
-</details>
-
+{% block head %}
 <style>
+  /* ── Section dividers (mirrors home.html scoped tokens) ── */
+  .section-divider {
+    display: flex; align-items: baseline; gap: var(--s-3);
+    margin: var(--s-8) 0 var(--s-3);
+  }
+  .section-divider-label {
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .section-divider::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+  .section-divider-meta { color: var(--fg-faint); font-size: var(--t-11); order: 3; }
+  .section-divider:has(.section-divider-meta)::after { order: 2; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* ── Page head ────────────────────────────────────────── */
+  .savings-estimate-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: var(--s-2);
+    padding: 2px 8px;
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    color: var(--fg-subtle);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+  }
+  .savings-estimate-tag .icon { width: 12px; height: 12px; stroke-width: 1.75; color: var(--fg-faint); }
+
   /* ── Hero ─────────────────────────────────────────────── */
   .savings-hero {
     display: grid;
@@ -228,7 +85,7 @@ saved           = would_have_read − actual_read − overhead</pre>
     margin-left: var(--s-2);
   }
   .savings-hero-ratio {
-    margin-top: var(--s-3);
+    margin-top: var(--s-4);
     display: flex; align-items: center; gap: var(--s-3);
   }
   .savings-ratio-bar {
@@ -246,6 +103,40 @@ saved           = would_have_read − actual_read − overhead</pre>
   }
   .savings-hero-ratio b { font-size: var(--t-18); color: var(--accent); font-weight: 600; }
 
+  /* Flow decomposition: the honest visual of the savings model. */
+  .savings-flow {
+    margin-top: var(--s-5);
+    padding-top: var(--s-5);
+    border-top: 1px solid var(--border);
+  }
+  .savings-flow-caption {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: var(--s-2);
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    color: var(--fg-subtle);
+  }
+  .savings-flow-track {
+    display: flex; height: 14px;
+    border-radius: 999px; overflow: hidden;
+    background: var(--bg-input);
+  }
+  .savings-flow-seg { height: 100%; transition: opacity var(--duration); }
+  .savings-flow-seg:hover { opacity: 0.82; }
+  .savings-flow-seg.is-saved   { background: var(--accent); }
+  .savings-flow-seg.is-actual  { background: var(--fg-faint); }
+  .savings-flow-seg.is-resp    { background: var(--border-strong); }
+  .savings-flow-legend {
+    display: flex; flex-wrap: wrap; gap: var(--s-4);
+    margin-top: var(--s-3);
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    color: var(--fg-muted);
+  }
+  .savings-flow-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .savings-flow-swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .savings-flow-legend b { color: var(--fg); font-weight: 500; font-variant-numeric: tabular-nums; }
+
   .savings-hero-side {
     padding-left: var(--s-5);
     border-left: 1px solid var(--border);
@@ -262,52 +153,34 @@ saved           = would_have_read − actual_read − overhead</pre>
   }
   .savings-side-label { color: var(--fg-muted); }
   .savings-side-value { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .savings-side-value.is-accent { color: var(--accent); font-weight: 500; }
 
-  /* ── Trend chart ─────────────────────────────────────── */
-  .trend-chart {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--s-2);
-    padding: var(--s-5);
-    min-height: 200px;
+  /* ── Trend chart (SVG area + line) ───────────────────── */
+  .trend {
+    padding: var(--s-5) var(--s-5) var(--s-4);
   }
-  .trend-day {
-    flex: 1; min-width: 28px;
-    display: flex; flex-direction: column; align-items: center;
-    gap: var(--s-1);
-  }
-  .trend-bar-wrap {
-    width: 100%;
-    flex: 1;
-    display: flex; align-items: flex-end;
-    min-height: 120px;
-  }
-  .trend-bar {
-    width: 100%;
-    background: var(--accent);
-    border-radius: 3px 3px 0 0;
-    min-height: 2px;
-    transition: opacity var(--duration), background var(--duration);
-    cursor: default;
-  }
-  .trend-bar:hover {
-    background: var(--accent);
-    opacity: 1;
-    box-shadow: 0 0 12px var(--accent-soft);
-  }
-  .trend-bar:not(:hover) {
-    opacity: 0.75;
-  }
-  .trend-label {
+  .trend-svg { display: block; width: 100%; height: 180px; overflow: visible; }
+  .trend-grid line { stroke: var(--border); stroke-width: 1; }
+  .trend-area { fill: var(--accent-soft); }
+  .trend-line { fill: none; stroke: var(--accent); stroke-width: 2;
+                stroke-linejoin: round; stroke-linecap: round; }
+  .trend-dot { fill: var(--bg-card); stroke: var(--accent); stroke-width: 2; }
+  .trend-hit { fill: transparent; cursor: default; }
+  .trend-hit:hover + .trend-dot,
+  .trend-hit:focus-visible + .trend-dot { r: 4.5; fill: var(--accent); }
+  .trend-axis {
+    display: flex; justify-content: space-between;
+    margin-top: var(--s-3);
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
     color: var(--fg-subtle);
-    font-size: var(--t-11);
-    margin-top: var(--s-2);
-    white-space: nowrap;
   }
-  .trend-value {
-    color: var(--fg-muted);
-    font-size: var(--t-11);
-    font-variant-numeric: tabular-nums;
+  .trend-axis span { flex: 1; text-align: center; white-space: nowrap; }
+  .trend-axis span:first-child { text-align: left; }
+  .trend-axis span:last-child  { text-align: right; }
+  .trend-ymax {
+    font-family: var(--font-mono); font-size: var(--t-11);
+    color: var(--fg-faint); font-variant-numeric: tabular-nums;
   }
 
   /* ── Per-user ratio bar ──────────────────────────────── */
@@ -327,25 +200,51 @@ saved           = would_have_read − actual_read − overhead</pre>
     border-radius: 999px;
   }
 
+  /* ── Top-query feed ──────────────────────────────────── */
+  .query-feed { list-style: none; margin: 0; padding: 0; }
+  .query-feed-item {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+  }
+  .query-feed-item + .query-feed-item { border-top: 1px solid var(--border); }
+  .query-feed-item:hover { background: var(--bg-hover); }
+  .query-feed-body { flex: 1; min-width: 0; }
+  .query-feed-line {
+    font-size: var(--t-13);
+    display: flex; align-items: baseline; gap: var(--s-2);
+    min-width: 0;
+  }
+  .query-feed-user { color: var(--fg-muted); flex-shrink: 0; }
+  .query-feed-arrow { color: var(--fg-faint); flex-shrink: 0; }
+  .query-feed-q {
+    color: var(--fg);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .query-feed-meta {
+    font-size: var(--t-12);
+    text-align: right; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  }
+  .query-feed-meta .cell-faint { color: var(--fg-subtle); }
+
   /* ── Model card ──────────────────────────────────────── */
   .model-card {
     margin-top: var(--s-8);
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    cursor: pointer;
   }
   .model-card > summary {
     list-style: none;
     padding: var(--s-3) var(--s-4);
     display: flex; align-items: center; justify-content: space-between;
-    user-select: none;
+    user-select: none; cursor: pointer;
   }
   .model-card > summary::-webkit-details-marker { display: none; }
-  .model-card[open] > summary {
-    border-bottom: 1px solid var(--border);
-  }
+  .model-card[open] > summary { border-bottom: 1px solid var(--border); }
   .model-card[open] > summary .chevron { transform: rotate(180deg); }
+  .model-card .chevron { transition: transform var(--duration); color: var(--fg-subtle); }
   .model-body {
     padding: var(--s-4) var(--s-5);
     color: var(--fg-muted);
@@ -374,14 +273,13 @@ saved           = would_have_read − actual_read − overhead</pre>
   }
 
   @media (max-width: 880px) {
-    .savings-hero {
-      grid-template-columns: 1fr;
-      padding: var(--s-4);
+    .savings-hero { grid-template-columns: 1fr; padding: var(--s-4); }
+    .savings-hero-side {
+      padding-left: 0; padding-top: var(--s-4);
+      border-left: none; border-top: 1px solid var(--border);
     }
-    .savings-hero-side { padding-left: 0; padding-top: var(--s-4); border-left: none; border-top: 1px solid var(--border); }
     .savings-hero-number { font-size: 36px; }
-    .trend-chart { padding: var(--s-3); }
-    .trend-label, .trend-value { font-size: 10px; }
+    .trend { padding: var(--s-3); }
   }
 
   /* Filter pills (re-used from usage.html) */
@@ -396,10 +294,298 @@ saved           = would_have_read − actual_read − overhead</pre>
     transition: all var(--duration);
   }
   .filter-pill:hover { color: var(--fg); background: var(--bg-hover); }
-  .filter-pill.active {
-    color: var(--bg);
-    background: var(--accent);
-  }
-  .filter-pill.active:hover { color: var(--bg); }
+  .filter-pill.active { color: var(--on-accent); background: var(--accent); }
+  .filter-pill.active:hover { color: var(--on-accent); }
 </style>
+{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: var(--s-5);">
+  <div>
+    <h1 style="margin-bottom: 2px;">Token savings</h1>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      estimated savings vs reading top-3 .md without trovex · model below
+    </div>
+    <span class="savings-estimate-tag">
+      <svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg>
+      modeled estimate over {{ "{:,}".format(totals.queries) }} real quer{{ 'y' if totals.queries == 1 else 'ies' }}
+    </span>
+  </div>
+  <div class="filter-pills" role="group" aria-label="Time range"
+       style="margin-left: auto; padding: 2px; background: var(--bg-card); border-radius: var(--radius-sm); align-self: flex-start;">
+    {% for d in [1, 7, 14, 30, 90] %}
+      <a href="/savings?days={{ d }}" class="filter-pill {% if d == days %}active{% endif %}"
+         {% if d == days %}aria-current="true"{% endif %}>{{ d }}d</a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if totals.queries == 0 %}
+{# ── Empty state — honest, never fakes a number ───────── #}
+<div class="card">
+  <div class="empty">
+    <div class="empty-title">No agent queries in the last {{ days }} days</div>
+    <p class="subtle" style="max-width: 42ch; margin: 0 auto;">
+      Savings accrue as your coding agents call <code class="mono">trovex</code> for docs.
+      Once queries land, this dashboard shows the modeled tokens saved versus reading
+      the top-3 <code class="mono">.md</code> files by hand.
+    </p>
+    <div class="empty-hint">
+      <span>Try a wider window:</span>
+      <a href="/savings?days=90" class="filter-pill">last 90d</a>
+    </div>
+  </div>
+</div>
+
+{% else %}
+{# ── Hero KPIs ─────────────────────────────────────────── #}
+<div class="savings-hero">
+  <div class="savings-hero-main">
+    <div class="savings-hero-eyebrow mono">SAVED · LAST {{ days }}D</div>
+    <div class="savings-hero-number">
+      {{ "{:,}".format(totals.saved) }}
+      <span class="savings-hero-unit">tokens</span>
+    </div>
+    <div class="savings-hero-ratio">
+      <span class="savings-ratio-bar" role="img"
+            aria-label="{{ '%.0f'|format(totals.ratio * 100) }} percent reduction versus baseline">
+        <span class="savings-ratio-fill" style="width: {{ (totals.ratio * 100) | round(1) }}%;"></span>
+      </span>
+      <b class="mono">{{ "%.0f"|format(totals.ratio * 100) }}%</b>
+      <span class="subtle mono">reduction vs no-trovex baseline</span>
+    </div>
+
+    {# Stacked flow: would_have_read = saved + actual_read + overhead #}
+    {% set whr = totals.would_have_read or 1 %}
+    <div class="savings-flow">
+      <div class="savings-flow-caption">
+        <span>would have read · {{ "{:,}".format(totals.would_have_read) }}</span>
+        <span>= saved + actual read + overhead</span>
+      </div>
+      <div class="savings-flow-track" role="img"
+           aria-label="Of {{ totals.would_have_read }} tokens that would have been read, {{ totals.saved }} were saved, {{ totals.actual_read }} actually read, {{ totals.response_tokens }} response overhead.">
+        <span class="savings-flow-seg is-saved"
+              style="width: {{ (totals.saved / whr * 100) | round(2) }}%;"
+              title="saved: {{ '{:,}'.format(totals.saved) }}"></span>
+        <span class="savings-flow-seg is-actual"
+              style="width: {{ (totals.actual_read / whr * 100) | round(2) }}%;"
+              title="actual read: {{ '{:,}'.format(totals.actual_read) }}"></span>
+        <span class="savings-flow-seg is-resp"
+              style="width: {{ (totals.response_tokens / whr * 100) | round(2) }}%;"
+              title="response overhead: {{ '{:,}'.format(totals.response_tokens) }}"></span>
+      </div>
+      <div class="savings-flow-legend">
+        <span class="savings-flow-legend-item">
+          <span class="savings-flow-swatch" style="background: var(--accent);"></span>
+          saved <b>{{ "{:,}".format(totals.saved) }}</b>
+        </span>
+        <span class="savings-flow-legend-item">
+          <span class="savings-flow-swatch" style="background: var(--fg-faint);"></span>
+          actual read <b>{{ "{:,}".format(totals.actual_read) }}</b>
+        </span>
+        <span class="savings-flow-legend-item">
+          <span class="savings-flow-swatch" style="background: var(--border-strong);"></span>
+          overhead <b>{{ "{:,}".format(totals.response_tokens) }}</b>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="savings-hero-side">
+    <div class="savings-side-row">
+      <span class="savings-side-label">would have read</span>
+      <span class="savings-side-value mono">{{ "{:,}".format(totals.would_have_read) }}</span>
+    </div>
+    <div class="savings-side-row">
+      <span class="savings-side-label">actual read (top-1)</span>
+      <span class="savings-side-value mono">{{ "{:,}".format(totals.actual_read) }}</span>
+    </div>
+    <div class="savings-side-row">
+      <span class="savings-side-label">trovex response overhead</span>
+      <span class="savings-side-value mono">{{ "{:,}".format(totals.response_tokens) }}</span>
+    </div>
+    <div class="savings-side-row savings-side-divider"></div>
+    <div class="savings-side-row">
+      <span class="savings-side-label">net saved</span>
+      <span class="savings-side-value is-accent mono">{{ "{:,}".format(totals.saved) }}</span>
+    </div>
+    <div class="savings-side-row">
+      <span class="savings-side-label">queries</span>
+      <span class="savings-side-value mono">{{ "{:,}".format(totals.queries) }}</span>
+    </div>
+    {% if totals.queries > 0 %}
+    <div class="savings-side-row">
+      <span class="savings-side-label">avg saved / query</span>
+      <span class="savings-side-value mono">{{ "{:,}".format((totals.saved / totals.queries) | int) }}</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Daily trend (SVG area + line) ────────────────────── #}
+{% if daily %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Daily saved</span>
+    <span class="section-divider-meta mono">{{ daily | length }} day{% if daily | length != 1 %}s{% endif %}</span>
+  </div>
+  <div class="card">
+    <div class="trend">
+      {% set max_saved = (daily | map(attribute='saved') | max) or 1 %}
+      {% set n = daily | length %}
+      {% set W = 1000 %}{% set H = 160 %}{% set PAD = 6 %}
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: var(--s-2);">
+        <span class="trend-ymax">peak {{ number(max_saved) }} / day</span>
+        <span class="trend-ymax">0</span>
+      </div>
+      <svg class="trend-svg" viewBox="0 0 {{ W }} {{ H }}" preserveAspectRatio="none"
+           role="img" aria-label="Daily tokens saved over the last {{ days }} days, peaking at {{ '{:,}'.format(max_saved) }} tokens.">
+        <g class="trend-grid">
+          <line x1="0" y1="{{ PAD }}" x2="{{ W }}" y2="{{ PAD }}"></line>
+          <line x1="0" y1="{{ (H + PAD) / 2 }}" x2="{{ W }}" y2="{{ (H + PAD) / 2 }}"></line>
+          <line x1="0" y1="{{ H }}" x2="{{ W }}" y2="{{ H }}"></line>
+        </g>
+        {% if n == 1 %}
+          {% set d0 = daily[0] %}
+          {% set y0 = PAD + (H - PAD) * (1 - (d0.saved / max_saved)) %}
+          <line class="trend-line" x1="0" y1="{{ y0 | round(1) }}" x2="{{ W }}" y2="{{ y0 | round(1) }}"></line>
+          <circle class="trend-dot" cx="{{ (W / 2) | round(1) }}" cy="{{ y0 | round(1) }}" r="3"></circle>
+        {% else %}
+          {% set step = W / (n - 1) %}
+          {%- set pts = [] -%}
+          {%- for d in daily -%}
+            {%- set x = (loop.index0 * step) | round(2) -%}
+            {%- set y = (PAD + (H - PAD) * (1 - (d.saved / max_saved))) | round(2) -%}
+            {%- set _ = pts.append(x ~ ',' ~ y) -%}
+          {%- endfor -%}
+          <polygon class="trend-area" points="0,{{ H }} {{ pts | join(' ') }} {{ W }},{{ H }}"></polygon>
+          <polyline class="trend-line" points="{{ pts | join(' ') }}"></polyline>
+          {% for d in daily %}
+            {% set x = (loop.index0 * step) | round(2) %}
+            {% set y = (PAD + (H - PAD) * (1 - (d.saved / max_saved))) | round(2) %}
+            <rect class="trend-hit" x="{{ (x - step/2) | round(2) }}" y="0"
+                  width="{{ step | round(2) }}" height="{{ H }}" tabindex="0"
+                  role="img"
+                  aria-label="{{ d.day }}: {{ '{:,}'.format(d.saved) }} tokens saved across {{ d.queries }} quer{{ 'y' if d.queries == 1 else 'ies' }}">
+              <title>{{ d.day }} · {{ '{:,}'.format(d.saved) }} saved · {{ d.queries }} quer{{ 'y' if d.queries == 1 else 'ies' }}</title>
+            </rect>
+            <circle class="trend-dot" cx="{{ x }}" cy="{{ y }}" r="3"></circle>
+          {% endfor %}
+        {% endif %}
+      </svg>
+      <div class="trend-axis" aria-hidden="true">
+        {% for d in daily %}
+          {% if n <= 10 or loop.first or loop.last or loop.index0 % ((n // 7) + 1) == 0 %}
+            <span>{{ d.day }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Per-user breakdown ───────────────────────────────── #}
+{% if per_user %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Per user</span>
+    <span class="section-divider-meta mono">{{ per_user | length }} active</span>
+  </div>
+  <div class="card">
+    <div class="table-wrap" style="border: none; border-radius: 0;">
+      <table class="t">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 32px;"><span class="sr-only">avatar</span></th>
+            <th scope="col">user</th>
+            <th scope="col" style="text-align: right;">queries</th>
+            <th scope="col" style="text-align: right;">would have read</th>
+            <th scope="col" style="text-align: right;" aria-sort="descending">saved</th>
+            <th scope="col" style="width: 120px;">ratio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in per_user %}
+          <tr>
+            <td style="padding-right: 0;">{{ avatar(u.user, 22) }}</td>
+            <td class="path">
+              <a href="/usage?user={{ u.user | urlencode }}">{{ u.user }}</a>
+            </td>
+            <td class="num">{{ u.queries }}</td>
+            <td class="num cell-faint">{{ "{:,}".format(u.would_have_read) }}</td>
+            <td class="num" style="color: var(--accent); font-weight: 500;">
+              {{ "{:,}".format(u.saved) }}
+            </td>
+            <td>
+              <div class="user-ratio-bar" role="img"
+                   aria-label="{{ '%.0f'|format(u.ratio * 100) }} percent reduction">
+                <span class="user-ratio-fill" style="width: {{ (u.ratio * 100) | round(1) }}%;"></span>
+              </div>
+              <span class="mono" style="font-size: var(--t-11); color: var(--fg-muted);">{{ "%.0f"|format(u.ratio * 100) }}%</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Top queries by savings ───────────────────────────── #}
+{% if top_queries %}
+<div class="section">
+  <div class="section-divider">
+    <span class="section-divider-label">Top queries by savings</span>
+  </div>
+  <div class="card">
+    <ul class="query-feed">
+      {% for q in top_queries %}
+      <li class="query-feed-item">
+        {{ avatar(q.user, 22) }}
+        <div class="query-feed-body">
+          <div class="query-feed-line mono">
+            <span class="query-feed-user">{{ q.user }}</span>
+            <span class="query-feed-arrow" aria-hidden="true">→</span><span class="query-feed-q" title="{{ q.query }}">{{ q.query }}</span>
+          </div>
+        </div>
+        <div class="query-feed-meta mono">
+          <span style="color: var(--accent);"><b>{{ number(q.saved) }}</b> saved</span>
+          <span class="cell-faint">of {{ number(q.whr) }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
+{# ── Model explainer ──────────────────────────────────── #}
+<details class="model-card">
+  <summary>
+    <span class="mono" style="color: var(--fg-muted); font-size: var(--t-12);">How is "saved" computed?</span>
+    <span class="chevron" aria-hidden="true">▾</span>
+  </summary>
+  <div class="model-body">
+    <p>
+      Without <code>trovex</code>, an agent typically does <code>Glob</code> or
+      <code>Grep</code> to find matching <code>.md</code> files, then
+      <code>Read</code> the top 2-3 candidates to figure out which one is
+      canonical. With <code>trovex</code>, they get a ranked list with status
+      markers and read just the top-1.
+    </p>
+    <pre class="model-formula mono">would_have_read = ∑ tokens_est(result[0..3])
+actual_read     = tokens_est(result[0])
+overhead        = tokens(trovex output)
+saved           = would_have_read − actual_read − overhead</pre>
+    <p class="subtle">
+      Conservative — assumes the agent <em>does</em> still read the top result.
+      If markers reveal that all results are stale or duplicates, real savings
+      are higher and not captured here. These are modeled estimates over real
+      query logs, never guaranteed exact.
+    </p>
+  </div>
+</details>
 {% endblock %}

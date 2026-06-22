@@ -10,30 +10,9 @@
   <span><span class="kbd">/</span> to search</span>
 {% endblock %}
 
-{% block content %}
-{# ── Onboarding banner ─────────────────────────────────────────────── #}
-<div id="onboarding-banner" class="banner" hidden>
-  <div class="banner-content">
-    <div>
-      <div class="banner-title">Connect Claude Code to trovex in 30 seconds</div>
-      <div class="banner-sub">paste one prompt into Claude Code — that's it</div>
-    </div>
-    <a href="/install" class="banner-cta">Install →</a>
-  </div>
-  <button class="banner-dismiss" aria-label="Dismiss" onclick="trovexDismissBanner()">×</button>
-</div>
-<script>
-  (function () {
-    if (localStorage.getItem('trovex-banner-dismissed') !== '1') {
-      document.getElementById('onboarding-banner').hidden = false;
-    }
-    window.trovexDismissBanner = function () {
-      localStorage.setItem('trovex-banner-dismissed', '1');
-      document.getElementById('onboarding-banner').hidden = true;
-    };
-  })();
-</script>
+{% block head %}
 <style>
+  /* ── Onboarding banner ───────────────────────────────── */
   .banner {
     position: relative;
     background: linear-gradient(90deg, var(--accent-soft), transparent);
@@ -57,7 +36,7 @@
     font-weight: 500;
     font-family: var(--font-mono);
     font-size: var(--t-13);
-    transition: all var(--duration);
+    transition: opacity var(--duration);
   }
   .banner-cta:hover { opacity: 0.85; color: var(--on-accent) !important; }
   .banner-dismiss {
@@ -72,66 +51,125 @@
     padding: 4px 8px;
   }
   .banner-dismiss:hover { color: var(--fg); }
-</style>
 
-<div class="section-head" style="margin-bottom: var(--s-6);">
-  <div>
-    <h1 style="margin-bottom: 2px;">Overview</h1>
-    <div class="subtle mono" style="font-size: var(--t-12);">
-      the trovex store · indexed on write
-    </div>
-  </div>
-</div>
+  /* ── Source-of-truth masthead ────────────────────────── */
+  .masthead {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: var(--s-4);
+    margin-bottom: var(--s-6);
+  }
+  .truth {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--s-6);
+    display: flex; flex-direction: column;
+    justify-content: space-between;
+    gap: var(--s-5);
+    position: relative;
+    overflow: hidden;
+  }
+  /* subtle accent edge marking the canonical store */
+  .truth::before {
+    content: ''; position: absolute;
+    left: 0; top: 0; bottom: 0; width: 2px;
+    background: linear-gradient(180deg, var(--accent), transparent);
+  }
+  .truth-eyebrow {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+  }
+  .truth-eyebrow .icon { color: var(--accent); }
+  .truth h1 {
+    font-size: var(--t-28);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: var(--s-3) 0 var(--s-2);
+  }
+  .truth h1 .em { color: var(--accent); }
+  .truth-lede {
+    color: var(--fg-muted);
+    font-size: var(--t-14);
+    line-height: 1.55;
+    max-width: 52ch;
+  }
+  .truth-id {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: var(--s-2) var(--s-3);
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    color: var(--fg-subtle);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--border);
+  }
+  .truth-path {
+    color: var(--fg-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%;
+  }
+  .truth-id .sep { color: var(--fg-faint); }
+  .truth-fresh { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
+  .truth-fresh .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--accent);
+  }
 
-{# ── KPI tiles ─────────────────────────────────────────────────────── #}
-<div class="kpi-grid">
-  <div class="kpi">
-    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-file"></use></svg> docs</div>
-    <div class="kpi-value">{{ "{:,}".format(total) }}</div>
-    <div class="kpi-sub">{{ docs_written_7d | default(0) }} written · 7d</div>
-  </div>
+  /* Proof panel: the headline payoff number */
+  .proof {
+    background: linear-gradient(180deg, var(--accent-soft), var(--bg-card));
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius);
+    padding: var(--s-6);
+    display: flex; flex-direction: column;
+    justify-content: space-between;
+    gap: var(--s-4);
+  }
+  .proof-label {
+    font-size: var(--t-11); color: var(--fg-subtle);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .proof-label .icon { color: var(--accent); }
+  .proof-value {
+    font-family: var(--font-mono);
+    font-size: 44px; font-weight: 500;
+    color: var(--accent); line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .proof-unit { font-size: var(--t-16); color: var(--fg-muted); margin-left: 6px; }
+  .proof-meta {
+    display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap;
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-muted);
+  }
+  .proof-meta .delta { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .delta-up { color: var(--accent); }
+  .delta-down { color: var(--fg-subtle); }
+  .proof-link { color: var(--accent); margin-left: auto; }
+  .proof-link:hover { color: var(--accent); text-decoration: underline; }
+  .proof-spark { width: 100%; height: 34px; display: block; }
+  .proof-spark-area { fill: var(--accent-soft); stroke: none; }
+  .proof-spark-line {
+    fill: none; stroke: var(--accent); stroke-width: 1.5;
+    stroke-linejoin: round; stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+  .proof-empty {
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-subtle); line-height: 1.5;
+  }
 
-  <div class="kpi">
-    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-zap"></use></svg> total tokens</div>
-    <div class="kpi-value">{{ number(total_tokens) }}</div>
-    <div class="kpi-sub">avg {{ "{:,}".format(avg_tokens) }} / doc</div>
-  </div>
+  @media (max-width: 880px) {
+    .masthead { grid-template-columns: 1fr; }
+  }
 
-  <div class="kpi">
-    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg> noise to triage</div>
-    <div class="kpi-value">{{ (by_status.get('stale', 0) + by_status.get('duplicate', 0)) }}</div>
-    <div class="kpi-sub">
-      {{ by_status.get('stale', 0) }} stale · {{ by_status.get('duplicate', 0) }} dup
-    </div>
-  </div>
-
-  <div class="kpi {% if savings_totals.saved > 0 %}kpi-accent{% endif %}">
-    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trend"></use></svg> tokens saved · 7d</div>
-    <div class="kpi-value">{{ number(savings_totals.saved) }}</div>
-    <div class="kpi-sub kpi-sub-row">
-      {% if saved_delta_pct is defined and saved_delta_pct is not none %}
-        {% if saved_delta_pct >= 0 %}
-          <span class="delta delta-up" title="vs previous 7 days">▲ {{ "%.0f"|format(saved_delta_pct * 100) }}%</span>
-        {% else %}
-          <span class="delta delta-down" title="vs previous 7 days">▼ {{ "%.0f"|format(saved_delta_pct * -100) }}%</span>
-        {% endif %}
-      {% endif %}
-      {% if savings_totals.queries > 0 %}
-        <a href="/savings" class="kpi-link">{{ "%.0f"|format(savings_totals.ratio * 100) }}% reduction →</a>
-      {% else %}
-        <span class="subtle">no data yet</span>
-      {% endif %}
-    </div>
-    {% if savings_spark is defined and savings_spark %}
-    <svg class="kpi-spark" viewBox="0 0 {{ savings_spark.w }} {{ savings_spark.h }}"
-         preserveAspectRatio="none" aria-hidden="true">
-      <polygon class="kpi-spark-area" points="{{ savings_spark.area }}"></polygon>
-      <polyline class="kpi-spark-line" points="{{ savings_spark.line }}"></polyline>
-    </svg>
-    {% endif %}
-  </div>
-</div>
-<style>
+  /* ── KPI labels / accents ────────────────────────────── */
   .kpi-label { display: flex; align-items: center; gap: 6px; }
   .kpi-label .icon { color: var(--fg-faint); }
   .kpi-accent {
@@ -140,29 +178,327 @@
   }
   .kpi-accent .kpi-value { color: var(--accent); }
   .kpi-accent .kpi-label .icon { color: var(--accent); }
-
   .kpi-sub-row { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
-  .delta { font-weight: 500; font-variant-numeric: tabular-nums; }
-  .delta-up { color: var(--accent); }
-  .delta-down { color: var(--fg-subtle); }
-  .kpi-link { color: var(--accent); }
-  .kpi-link:hover { color: var(--accent); text-decoration: underline; }
 
-  .kpi-spark {
-    width: 100%; height: 30px;
-    margin-top: var(--s-3);
-    display: block;
+  /* tiny inline coverage meter inside a KPI */
+  .kpi-meter {
+    height: 3px; border-radius: 999px; overflow: hidden;
+    background: var(--bg-input); margin-top: var(--s-3);
   }
-  .kpi-spark-area { fill: var(--accent-soft); stroke: none; }
-  .kpi-spark-line {
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 1.5;
-    stroke-linejoin: round;
-    stroke-linecap: round;
-    vector-effect: non-scaling-stroke;
+  .kpi-meter > span {
+    display: block; height: 100%; border-radius: 999px;
+    background: var(--accent);
+  }
+
+  /* ── Sources rail ────────────────────────────────────── */
+  .sources-rail {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: var(--s-2);
+    margin: 0 0 var(--s-6);
+    font-family: var(--font-mono); font-size: var(--t-12);
+    color: var(--fg-subtle);
+  }
+  .sources-rail .lead {
+    display: inline-flex; align-items: center; gap: 6px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: var(--t-11);
+  }
+  .sources-rail .lead .icon { color: var(--fg-faint); }
+  .source-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--fg-muted);
+  }
+  .source-chip b { color: var(--fg); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .sources-rail .arrow { color: var(--fg-faint); }
+  .sources-rail .canon {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px;
+    color: var(--canonical);
+    background: var(--canonical-bg);
+    border-radius: 999px;
+    font-weight: 500;
+  }
+
+  /* ── Section dividers ────────────────────────────────── */
+  .section-divider {
+    display: flex; align-items: baseline; gap: var(--s-3);
+    margin: var(--s-8) 0 var(--s-3);
+  }
+  .section-divider-label {
+    font-family: var(--font-mono);
+    font-size: var(--t-11);
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .section-divider-label .icon { color: var(--fg-faint); }
+  .section-divider::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+  .section-divider-meta {
+    color: var(--fg-faint);
+    font-size: var(--t-11);
+    order: 3;
+  }
+  .section-divider:has(.section-divider-meta)::after { order: 2; }
+
+  /* Layout rows */
+  .row-2col-narrow-wide,
+  .row-2col-wide-narrow {
+    display: grid;
+    gap: var(--s-4);
+  }
+  .row-2col-narrow-wide { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+  .row-2col-wide-narrow { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  @media (max-width: 880px) {
+    .row-2col-narrow-wide, .row-2col-wide-narrow { grid-template-columns: 1fr; }
+  }
+
+  /* ── User list (MCP usage) ───────────────────────────── */
+  .user-list { list-style: none; margin: 0; padding: 0; }
+  .user-list-item + .user-list-item { border-top: 1px solid var(--border); }
+  .user-list-link {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    color: var(--fg) !important;
+    transition: background var(--duration);
+  }
+  .user-list-link:hover { background: var(--bg-hover); color: var(--fg) !important; }
+  .user-list-name {
+    font-family: var(--font-mono); font-weight: 500;
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .user-list-stats {
+    display: inline-flex; gap: var(--s-3); align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+  }
+  .user-list-stat { font-variant-numeric: tabular-nums; }
+  .user-list-stat b { color: var(--fg); font-weight: 500; }
+  .user-list-stat-label {
+    color: var(--fg-faint);
+    margin-left: 2px;
+    font-size: 10px;
+  }
+
+  .connect-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    background: var(--accent);
+    color: var(--on-accent) !important;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--t-12);
+    font-weight: 500;
+    transition: opacity var(--duration);
+  }
+  .connect-btn:hover { opacity: 0.85; color: var(--on-accent) !important; }
+
+  /* ── Query feed ──────────────────────────────────────── */
+  .query-feed { list-style: none; margin: 0; padding: 0; }
+  .query-feed-item {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-2) var(--s-4);
+    transition: background var(--duration);
+  }
+  .query-feed-item + .query-feed-item { border-top: 1px solid var(--border); }
+  .query-feed-item:hover { background: var(--bg-hover); }
+  .query-feed-body { flex: 1; min-width: 0; }
+  .query-feed-line {
+    font-size: var(--t-12);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .query-feed-user { color: var(--fg-muted); font-weight: 500; }
+  .query-feed-arrow { color: var(--fg-faint); margin: 0 6px; }
+  .query-feed-q { color: var(--fg); }
+  .query-feed-meta {
+    display: inline-flex; gap: var(--s-3); align-items: baseline;
+    font-size: var(--t-11);
+    color: var(--fg-subtle);
+    flex-shrink: 0;
+  }
+
+  /* ── Attention list ──────────────────────────────────── */
+  .attention-list { list-style: none; margin: 0; padding: 0; }
+  .attention-item {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-2) var(--s-4);
+    transition: background var(--duration);
+  }
+  .attention-item + .attention-item { border-top: 1px solid var(--border); }
+  .attention-item:hover { background: var(--bg-hover); }
+  .attention-path {
+    color: var(--fg) !important;
+    font-size: var(--t-12);
+    flex: 1; min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .attention-path:hover { color: var(--accent) !important; }
+  .attention-age { font-size: var(--t-11); flex-shrink: 0; }
+  .attention-clean {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent-line);
+    margin: 0 auto var(--s-2);
   }
 </style>
+{% endblock %}
+
+{% block content %}
+{# ── Onboarding banner ─────────────────────────────────────────────── #}
+<div id="onboarding-banner" class="banner" hidden>
+  <div class="banner-content">
+    <div>
+      <div class="banner-title">Connect Claude Code to trovex in 30 seconds</div>
+      <div class="banner-sub">paste one prompt into Claude Code — that's it</div>
+    </div>
+    <a href="/install" class="banner-cta">Install →</a>
+  </div>
+  <button class="banner-dismiss" aria-label="Dismiss" onclick="trovexDismissBanner()">×</button>
+</div>
+<script>
+  (function () {
+    if (localStorage.getItem('trovex-banner-dismissed') !== '1') {
+      document.getElementById('onboarding-banner').hidden = false;
+    }
+    window.trovexDismissBanner = function () {
+      localStorage.setItem('trovex-banner-dismissed', '1');
+      document.getElementById('onboarding-banner').hidden = true;
+    };
+  })();
+</script>
+
+{# ── Source-of-truth masthead ──────────────────────────────────────── #}
+{% set canonical = by_status.get('canonical', 0) %}
+{% set noise = by_status.get('stale', 0) + by_status.get('duplicate', 0) %}
+{% set coverage = (canonical / total * 100) if total else 0 %}
+<div class="masthead">
+  <section class="truth">
+    <div>
+      <span class="truth-eyebrow">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-bookmark"></use></svg>
+        canonical store
+      </span>
+      <h1>One <span class="em">source of truth</span> for your coding agents.</h1>
+      <p class="truth-lede">
+        {{ "{:,}".format(total) }} docs indexed on write — agents stop rereading the repo
+        to guess what's current. trovex serves the single canonical answer as a
+        <span class="mono">path:line</span> pointer with a freshness marker.
+      </p>
+    </div>
+    <div class="truth-id">
+      <span class="truth-fresh" title="latest write to the store">
+        <span class="dot" aria-hidden="true"></span> fresh · {{ last_write_relative }}
+      </span>
+      <span class="sep">·</span>
+      <span class="truth-path mono" title="{{ corpus_path }}">{{ corpus_path }}</span>
+    </div>
+  </section>
+
+  <aside class="proof">
+    <div>
+      <div class="proof-label">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-trend"></use></svg>
+        tokens not reread · 7d
+      </div>
+      <div class="proof-value" style="margin-top: var(--s-3);">
+        {{ number(savings_totals.saved) }}<span class="proof-unit">saved</span>
+      </div>
+      <div class="proof-meta" style="margin-top: var(--s-2);">
+        {% if saved_delta_pct is defined and saved_delta_pct is not none %}
+          {% if saved_delta_pct >= 0 %}
+            <span class="delta delta-up" title="vs previous 7 days">▲ {{ "%.0f"|format(saved_delta_pct * 100) }}%</span>
+          {% else %}
+            <span class="delta delta-down" title="vs previous 7 days">▼ {{ "%.0f"|format(saved_delta_pct * -100) }}%</span>
+          {% endif %}
+        {% endif %}
+        {% if savings_totals.queries > 0 %}
+          <span>{{ "%.0f"|format(savings_totals.ratio * 100) }}% less context per query</span>
+          <a href="/savings" class="proof-link">details →</a>
+        {% else %}
+          <span class="subtle">no queries yet</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if savings_spark is defined and savings_spark and savings_totals.queries > 0 %}
+    <svg class="proof-spark" viewBox="0 0 {{ savings_spark.w }} {{ savings_spark.h }}"
+         preserveAspectRatio="none" aria-hidden="true">
+      <polygon class="proof-spark-area" points="{{ savings_spark.area }}"></polygon>
+      <polyline class="proof-spark-line" points="{{ savings_spark.line }}"></polyline>
+    </svg>
+    {% else %}
+    <div class="proof-empty">
+      Connect an agent — every answer trovex serves instead of a full reread
+      shows up here as tokens saved.
+    </div>
+    {% endif %}
+  </aside>
+</div>
+
+{# ── Sources → one canonical answer ────────────────────────────────── #}
+{% if sources %}
+<div class="sources-rail">
+  <span class="lead">
+    <svg class="icon icon-sm" aria-hidden="true"><use href="#i-layers"></use></svg>
+    fed by
+  </span>
+  {% for s in sources %}
+  <span class="source-chip" title="{{ s.id }}: {{ s.count }} docs">
+    @{{ s.id }} <b>{{ s.count }}</b>
+  </span>
+  {% endfor %}
+  <span class="arrow">→</span>
+  <span class="canon" title="one resolved answer per query">
+    <svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"></use></svg>
+    one canonical answer
+  </span>
+</div>
+{% endif %}
+
+{# ── KPI tiles — corpus → trust → noise → payoff ────────────────────── #}
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-file"></use></svg> docs in store</div>
+    <div class="kpi-value">{{ "{:,}".format(total) }}</div>
+    <div class="kpi-sub">{{ docs_written_7d | default(0) }} written · 7d</div>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bookmark"></use></svg> canonical coverage</div>
+    <div class="kpi-value">{% if total %}{{ "%.0f"|format(coverage) }}<span class="proof-unit">%</span>{% else %}–{% endif %}</div>
+    <div class="kpi-sub">{{ "{:,}".format(canonical) }} trusted docs</div>
+    {% if total %}<div class="kpi-meter"><span style="width: {{ coverage }}%;"></span></div>{% endif %}
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg> noise to triage</div>
+    <div class="kpi-value">{{ noise }}</div>
+    <div class="kpi-sub">
+      {{ by_status.get('stale', 0) }} stale · {{ by_status.get('duplicate', 0) }} dup
+    </div>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-zap"></use></svg> total tokens</div>
+    <div class="kpi-value">{{ number(total_tokens) }}</div>
+    <div class="kpi-sub">avg {{ "{:,}".format(avg_tokens) }} / doc</div>
+  </div>
+</div>
 
 {# ── Status distribution stacked bar ───────────────────────────────── #}
 {% if total > 0 %}
@@ -171,7 +507,7 @@
     <h3 style="margin: 0;">Status distribution</h3>
     <span class="mono subtle" style="font-size: var(--t-11);">{{ total }} docs · {{ "{:,}".format(total_tokens) }} tokens</span>
   </div>
-  <div class="dist-track" role="img" aria-label="Status distribution">
+  <div class="dist-track" role="img" aria-label="Status distribution: {% for status in ['canonical', 'plan', 'duplicate', 'stale'] %}{{ by_status.get(status, 0) }} {{ status }}{% if not loop.last %}, {% endif %}{% endfor %}">
     {% for status in ['canonical', 'plan', 'duplicate', 'stale'] %}
       {% set c = by_status.get(status, 0) %}
       {% if c > 0 %}
@@ -202,7 +538,7 @@
 <div class="row-2col-narrow-wide">
   <div class="card">
     <div class="card-header">
-      <h3 style="margin: 0;"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-users"></use></svg> MCP usage</h3>
+      <h3 style="margin: 0;"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-users"></use></svg> Agents querying</h3>
       <span class="subtle mono" style="margin-left: auto; font-size: var(--t-11);">
         {{ total_queries_7d }} queries
       </span>
@@ -226,7 +562,7 @@
     {% else %}
     <div class="card-body" style="text-align: center; padding: var(--s-6) var(--s-4);">
       <div class="mono subtle" style="font-size: var(--t-12); margin-bottom: var(--s-2);">
-        no MCP calls yet
+        no agent has queried the store yet
       </div>
       <a href="/install" class="connect-btn">
         Connect Claude Code →
@@ -279,10 +615,10 @@
       <table class="t">
         <thead>
           <tr>
-            <th>doc</th>
-            <th>status</th>
-            <th style="text-align: right;">age</th>
-            <th style="text-align: right;">tokens</th>
+            <th scope="col">doc</th>
+            <th scope="col">status</th>
+            <th scope="col" style="text-align: right;">age</th>
+            <th scope="col" style="text-align: right;">tokens</th>
           </tr>
         </thead>
         <tbody>
@@ -320,189 +656,44 @@
       </ul>
     {% else %}
       <div class="card-body" style="text-align: center; padding: var(--s-6);">
-        <div class="attention-clean"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></div>
+        <div class="attention-clean"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-check"></use></svg></div>
         <div class="subtle mono" style="font-size: var(--t-12);">clean — nothing to triage</div>
       </div>
     {% endif %}
   </div>
 </div>
 
-<style>
-  /* ── Section dividers ────────────────────────────────── */
-  .section-divider {
-    display: flex; align-items: baseline; gap: var(--s-3);
-    margin: var(--s-8) 0 var(--s-3);
-  }
-  .section-divider-label {
-    font-family: var(--font-mono);
-    font-size: var(--t-11);
-    color: var(--fg-subtle);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    font-weight: 500;
-  }
-  .section-divider::after {
-    content: ''; flex: 1; height: 1px;
-    background: var(--border);
-  }
-  .section-divider-meta {
-    color: var(--fg-faint);
-    font-size: var(--t-11);
-    order: 3;
-  }
-  .section-divider:has(.section-divider-meta)::after { order: 2; }
-
-  /* Layout rows */
-  .row-2col-narrow-wide,
-  .row-2col-wide-narrow {
-    display: grid;
-    gap: var(--s-4);
-  }
-  .row-2col-narrow-wide { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
-  .row-2col-wide-narrow { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-  @media (max-width: 880px) {
-    .row-2col-narrow-wide, .row-2col-wide-narrow { grid-template-columns: 1fr; }
-  }
-
-  /* ── User list (MCP usage) ───────────────────────────── */
-  .user-list { list-style: none; margin: 0; padding: 0; }
-  .user-list-item + .user-list-item { border-top: 1px solid var(--border); }
-  .user-list-link {
-    display: flex; align-items: center; gap: var(--s-3);
-    padding: var(--s-3) var(--s-4);
-    color: var(--fg) !important;
-    transition: background var(--duration);
-  }
-  .user-list-link:hover { background: var(--bg-hover); color: var(--fg) !important; }
-  .user-list-name {
-    font-family: var(--font-mono); font-weight: 500;
-    flex: 1; min-width: 0;
-    overflow: hidden; text-overflow: ellipsis;
-  }
-  .user-list-stats {
-    display: inline-flex; gap: var(--s-3); align-items: baseline;
-    font-family: var(--font-mono);
-    font-size: var(--t-12);
-  }
-  .user-list-stat {
-    font-variant-numeric: tabular-nums;
-  }
-  .user-list-stat b { color: var(--fg); font-weight: 500; }
-  .user-list-stat-label {
-    color: var(--fg-faint);
-    margin-left: 2px;
-    font-size: 10px;
-  }
-
-  .connect-btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px;
-    background: var(--accent);
-    color: var(--on-accent) !important;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-    font-size: var(--t-12);
-    font-weight: 500;
-    transition: opacity var(--duration);
-  }
-  .connect-btn:hover { opacity: 0.85; color: var(--on-accent) !important; }
-
-  /* ── Query feed ──────────────────────────────────────── */
-  .query-feed { list-style: none; margin: 0; padding: 0; }
-  .query-feed-item {
-    display: flex; align-items: center; gap: var(--s-3);
-    padding: var(--s-2) var(--s-4);
-    transition: background var(--duration);
-  }
-  .query-feed-item + .query-feed-item { border-top: 1px solid var(--border); }
-  .query-feed-item:hover { background: var(--bg-hover); }
-  .query-feed-body { flex: 1; min-width: 0; }
-  .query-feed-line {
-    font-size: var(--t-12);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .query-feed-user {
-    color: var(--fg-muted);
-    font-weight: 500;
-  }
-  .query-feed-arrow {
-    color: var(--fg-faint);
-    margin: 0 6px;
-  }
-  .query-feed-q { color: var(--fg); }
-  .query-feed-meta {
-    display: inline-flex; gap: var(--s-3); align-items: baseline;
-    font-size: var(--t-11);
-    color: var(--fg-subtle);
-    flex-shrink: 0;
-  }
-
-  /* ── Attention list ──────────────────────────────────── */
-  .attention-list { list-style: none; margin: 0; padding: 0; }
-  .attention-item {
-    display: flex; align-items: center; gap: var(--s-3);
-    padding: var(--s-2) var(--s-4);
-    transition: background var(--duration);
-  }
-  .attention-item + .attention-item { border-top: 1px solid var(--border); }
-  .attention-item:hover { background: var(--bg-hover); }
-  .attention-path {
-    color: var(--fg) !important;
-    font-size: var(--t-12);
-    flex: 1; min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .attention-path:hover { color: var(--accent) !important; }
-  .attention-age { font-size: var(--t-11); flex-shrink: 0; }
-  .attention-clean {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background: var(--accent-soft);
-    color: var(--accent);
-    border: 1px solid var(--accent-line);
-    font-size: var(--t-18);
-    margin: 0 auto var(--s-2);
-  }
-</style>
-
 {# ── Heaviest files ────────────────────────────────────────────────── #}
 {% if heaviest %}
-<div class="section">
-  <div class="section-head">
-    <h3><svg class="icon icon-sm" aria-hidden="true"><use href="#i-flame"></use></svg> Heaviest files</h3>
-    <span class="subtle mono" style="font-size: var(--t-11);">by token estimate</span>
-  </div>
-  <div class="table-wrap">
-    <table class="t">
-      <thead>
-        <tr>
-          <th>path</th>
-          <th>status</th>
-          <th style="text-align: right;">age</th>
-          <th style="text-align: right;">tokens</th>
-          <th style="text-align: right;">bytes</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in heaviest %}
-        <tr>
-          <td class="path">
-            <a href="/doc/{{ r.path }}" title="{{ r.title }}">{{ r.title }}</a>
-          </td>
-          <td>{{ status_pill(r.status) }}</td>
-          <td class="num">{{ fresh_label(r.age_days) }}</td>
-          <td class="num">{{ "{:,}".format(r.tokens_est) }}</td>
-          <td class="num cell-faint">{{ "{:,}".format(r.size_bytes) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<div class="section-divider">
+  <span class="section-divider-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-flame"></use></svg> Heaviest files</span>
+  <span class="section-divider-meta mono">by token estimate</span>
+</div>
+<div class="table-wrap">
+  <table class="t">
+    <thead>
+      <tr>
+        <th scope="col">path</th>
+        <th scope="col">status</th>
+        <th scope="col" style="text-align: right;">age</th>
+        <th scope="col" style="text-align: right;">tokens</th>
+        <th scope="col" style="text-align: right;">bytes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in heaviest %}
+      <tr>
+        <td class="path">
+          <a href="/doc/{{ r.path }}" title="{{ r.title }}">{{ r.title }}</a>
+        </td>
+        <td>{{ status_pill(r.status) }}</td>
+        <td class="num">{{ fresh_label(r.age_days) }}</td>
+        <td class="num">{{ "{:,}".format(r.tokens_est) }}</td>
+        <td class="num cell-faint">{{ "{:,}".format(r.size_bytes) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% endif %}
 {% endblock %}

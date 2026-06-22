@@ -46,7 +46,7 @@ async function kvLimited(key, max, windowMs) {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!incr.ok) return null
-    const data = await incr.json()
+    const data = /** @type {any} */ (await incr.json())
     const count = typeof data.result === 'number' ? data.result : 1
     if (count === 1) {
       // First hit in the window → set the TTL. Fire-and-forget: a failure only

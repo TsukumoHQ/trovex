@@ -25,7 +25,8 @@ function originOf(req) {
 }
 
 // Swap the content="" of the <meta> tag carrying `selector` (e.g. property="og:image").
-function setMeta(html, selector, value) {
+// Exported for unit tests (escaping is the security boundary here).
+export function setMeta(html, selector, value) {
   const safe = value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

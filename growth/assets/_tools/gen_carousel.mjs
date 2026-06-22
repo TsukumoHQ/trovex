@@ -70,6 +70,8 @@ function titleEl(full, accent, fs, accentColor) {
     : [{t:full.slice(0,idx),a:false},{t:accent,a:true},{t:full.slice(idx+accent.length),a:false}];
   const words = [];
   for (const s of segs) for (const w of s.t.split(" ")) { if (w==="") continue; words.push({w,a:s.a}); }
+  // attach trailing punctuation (a lone ".", "," etc after the accent) to the prior word — else it renders as a floating detached token
+  for (let i = words.length - 1; i > 0; i--) if (/^[.,!?;:]+$/.test(words[i].w)) { words[i-1].w += words[i].w; words.splice(i, 1); }
   return h("div",{style:{display:"flex",flexWrap:"wrap",fontFamily:"Archivo",fontWeight:800,fontSize:`${fs}px`,lineHeight:0.98,letterSpacing:"-0.035em"}},
     ...words.map(({w,a}) => h("span",{style:{color:a?accentColor:C.ink,marginRight:"0.24em"}}, w)));
 }

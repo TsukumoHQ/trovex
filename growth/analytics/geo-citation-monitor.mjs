@@ -382,6 +382,24 @@ async function main() {
   console.log(out);
   const summary = live.map((n) => `${n} ${perEngine[n].all.cited}/${perEngine[n].all.total}`).join(", ");
   process.stderr.write(`per-engine: ${summary}; union ${unionAll.cited}/${unionAll.total} (${unionAll.pct}%)\n`);
+
+  // dokan RESULT channel: emit a compact structured summary that dokan captures (last
+  // ::dokan:result:: line) and POSTs to the relay — event-driven citation alert without
+  // log-polling. Guarded to dokan runs (DOKAN_RUN_ID) so local stdout (piped to trovex_write)
+  // stays a clean markdown report.
+  if (process.env.DOKAN_RUN_ID) {
+    const result = {
+      date,
+      engines: live,
+      skipped,
+      union: unionAll,
+      perEngine: Object.fromEntries(
+        live.map((n) => [n, { all: perEngine[n].all, standing: perEngine[n].standing, offensive: perEngine[n].offensive, products: perEngine[n].products }]),
+      ),
+      summary: `GEO citations ${date}: union ${unionAll.cited}/${unionAll.total} (${unionAll.pct}%) across ${live.join(", ") || "no"} engine(s)`,
+    };
+    console.log(`::dokan:result:: ${JSON.stringify(result)}`);
+  }
   if (process.argv.includes("--save")) {
     const outDir = join(__dir, "reports");
     mkdirSync(outDir, { recursive: true });

@@ -33,3 +33,4 @@ secrets/
 
 # Vercel CLI local link
 .vercel
+.fastembed_cache/

@@ -19,3 +19,7 @@ growth/method/**
 # Social drafts: copy-paste-ready files a human fires (specs, calendars, atoms),
 # not centralized docs. Owned by social-lead, live on disk in growth/social/.
 growth/social/**
+#
+# Process/governance docs: also live on disk for repo-readability; the canonical
+# copy is mirrored to the trovex store (SSOT) per the growth/social precedent.
+growth/process/**

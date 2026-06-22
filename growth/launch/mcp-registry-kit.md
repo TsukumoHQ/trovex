@@ -243,6 +243,7 @@ Same §1 copy + repo URL for each. One human pass after the top five land.
 | Directory | Submit method | Notes |
 |---|---|---|
 | mcpservers.org | GitHub PR / web submit | confirm the current path on the site — **VERIFY** |
+| MCPMarket.com | web submit | large human-browsable directory (~10k servers, 23+ categories); plain repo + §1 copy — **VERIFY** submit path |
 | Docker MCP Catalog (Hub) | auto from the official registry | confirm propagation; no separate submit |
 | GitHub MCP Registry | auto from the official registry | renders in VS Code's MCP view; confirm propagation |
 | mcp-get / registry CLIs | per their docs | inherits from official where applicable |

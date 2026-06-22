@@ -44,6 +44,15 @@ const BANNED = [
   'not just', 'not only', '~10x', "let's dive in", 'honest caveat', 'unpopular take',
 ];
 
+// PORTFOLIO ROLE RATIO — brand-channel-direction v1.1, cmo chair-call #1 (LOCKED, revisit only w/ data).
+// The ladder applies at the PORTFOLIO/week level, NOT per post. Each pool item carries a `role`.
+// pre-launch ~0 audience → reach-heavy on purpose.
+const ROLE_TARGET = { reach: 60, activation: 30, convert: 10 }; // % per account per ISO-week
+const ROLE_TOL = 15; // pp deviation before it flags
+// LINK-PLACEMENT per channel (v1.1 call #4): X=reply(descendant), LI=native/no-link (A/B the
+// first-comment penalty), Threads=in-body. trovex surfaces ladder via ONE soft endplate link,
+// NEVER a redirect/recanonical to tsukumo (geo cross-domain anti-dupe lock).
+
 const args = parseArgs(process.argv.slice(2));
 if (!args.from) die('need --from YYYY-MM-DD');
 const DAYS = Number(args.days || 2);
@@ -117,7 +126,7 @@ function buildSpec(item, brand, net, day, time, violations) {
     : (item.media || []);
   const text = net === 'linkedin' ? item.text : injectLink(item, link);
   const spec = {
-    id: item.id, brand, blogId: BLOG_ID[brand], network: net, pillar: item.pillar,
+    id: item.id, brand, blogId: BLOG_ID[brand], network: net, pillar: item.pillar, role: item.role || 'reach',
     date: `${day}T${time}:00`, timezone: 'Europe/Zurich',
     text: item.text,
     media,
@@ -158,10 +167,37 @@ function summary(plan, gaps, violations) {
   for (const s of plan) { const k = `${s.date.slice(0, 10)} ${s.brand}/${s.network}`; tally[k] = (tally[k] || 0) + 1; }
   let out = `\nPLAN: ${plan.length} posts\n`;
   for (const k of Object.keys(tally).sort()) out += `  ${k}: +${tally[k]}\n`;
+
+  // role ratio per account per ISO-week (LOCKED 60/30/10; this plan's additions only — caveat below).
+  const byWeek = {};
+  for (const s of plan) {
+    const k = `${s.brand}|${isoWeek(s.date.slice(0, 10))}`;
+    (byWeek[k] ||= { reach: 0, activation: 0, convert: 0, n: 0 });
+    byWeek[k][s.role] = (byWeek[k][s.role] || 0) + 1; byWeek[k].n++;
+  }
+  out += `\nROLE MIX (target ${ROLE_TARGET.reach}/${ROLE_TARGET.activation}/${ROLE_TARGET.convert} reach/activation/convert, ±${ROLE_TOL}pp; planned adds only):\n`;
+  for (const k of Object.keys(byWeek).sort()) {
+    const w = byWeek[k];
+    const pct = (r) => Math.round((w[r] / w.n) * 100);
+    const line = `${k}: ${pct('reach')}/${pct('activation')}/${pct('convert')} (n=${w.n})`;
+    const off = ['reach', 'activation', 'convert'].filter((r) => Math.abs(pct(r) - ROLE_TARGET[r]) > ROLE_TOL);
+    out += `  ${line}${off.length ? '  ⚠ off: ' + off.join(',') : ''}\n`;
+    if (off.length && w.n >= 5) violations.push(`${k}: role mix ${pct('reach')}/${pct('activation')}/${pct('convert')} off target on ${off.join(',')} (ladder up at PORTFOLIO level)`);
+  }
+
   if (gaps.length) out += `\nFLOOR GAPS (pool short — write more angles):\n  ${gaps.join('\n  ')}\n`;
   if (violations.length) out += `\nVIOLATIONS (fix before scheduling):\n  ${violations.join('\n  ')}\n`;
-  if (!gaps.length && !violations.length) out += '\nclean: floor met, no violations.\n';
+  if (!gaps.length && !violations.length) out += '\nclean: floor met, role mix on target, no violations.\n';
   return out;
+}
+
+function isoWeek(iso) {
+  const d = new Date(iso + 'T00:00:00Z');
+  const day = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - day + 3);
+  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((d - firstThu) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
 function parseArgs(a) { const o = {}; for (let i = 0; i < a.length; i++) if (a[i].startsWith('--')) o[a[i].slice(2)] = a[i + 1]?.startsWith('--') || a[i + 1] === undefined ? true : a[++i]; return o; }

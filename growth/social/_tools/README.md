@@ -22,6 +22,9 @@ What it does each day, per brand × network:
 - stamps **UTM** (`utm_source` mapped from network → x/linkedin/threads, `utm_medium=social`, campaign, content slug)
 - greps every string against the **anti-slop ban-list** and flags em-dash overuse
 - flags **floor gaps** (pool too thin → that's the cue to write more angles)
+- checks the **portfolio role ratio** per account per ISO-week against the locked
+  **60% REACH / 30% ACTIVATION / 10% CONVERT** (brand-channel-direction v1.1, cmo chair-call #1)
+  — the ladder applies at the WEEK level, not per post; off-target (±15pp, n≥5) is a violation
 
 Output: `plan.json` (schedulable specs) + a console summary. **Exit code ≠ 0** if there are
 violations or unfilled floor — so a human/agent reviews before anything is scheduled.

@@ -63,8 +63,15 @@ async function scan(surface) {
   return out;
 }
 
+// dokan can DOUBLE-encode run input: env DOKAN_INPUT arrives as a JSON string
+// whose content is itself the JSON (JSON.stringify run twice). Parse once; if
+// the result is still a string, parse again. Handles single- and double-encoded.
 let input = {};
-try { input = JSON.parse(process.env.DOKAN_INPUT || "{}"); } catch (e) { /* default */ }
+try {
+  let parsed = JSON.parse(process.env.DOKAN_INPUT || "{}");
+  if (typeof parsed === "string") parsed = JSON.parse(parsed);
+  if (parsed && typeof parsed === "object") input = parsed;
+} catch (e) { /* default */ }
 const surfaces = (Array.isArray(input.surfaces) && input.surfaces.length) ? input.surfaces : DEFAULT_SURFACES;
 const strict = input.strict === true;
 

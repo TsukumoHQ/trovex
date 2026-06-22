@@ -73,3 +73,30 @@ North star = qualified reach → consulting leads. Tie every change to activatio
 - [ ] Voice respects words-to-use/avoid; no fabricated proof; OSS surface stays non-salesy.
 - [ ] `/pr-review-self` run; PR opened; merged only if low-risk per autonomy-rules.
 - [ ] Relay task completed; next claimed (or idle → messaged cmo + slept).
+
+## Loop on spawn (auto-fires; no manual /loop)
+
+On spawn, run this loop continuously — never stop, never wait on the user. Cadence
+= **25 min** (cmo polls 15, ahead of you). A relay message does NOT wake a sleeping
+session — only the timer does — so the ScheduleWakeup line keeps the loop alive.
+
+Each poll:
+1. **Boot/resume**: `register_agent` + `get_session_context`; read the `cro-lead-status`
+   living brief (resume anchor) + core memories.
+2. **Inbox + tasks**: `get_inbox(unread_only)` → handle + `mark_read`; `list_tasks` →
+   claim → start → DO THE WORK → `/pr-review-self` → PR → self-merge (low-risk) →
+   deploy (`bash growth/cro/deploy-trovex.sh`) → verify → `complete_task` → next.
+3. **Proactive (no task)**: don't beg — PULL the next highest-leverage CRO move in
+   your lane (toward install/activation → consulting leads), START it, report the
+   outcome. Hunt + fix broken/stale/off-brand/underperforming. Avoid over-optimizing
+   pre-traffic (bottleneck = reach; the landing lever is install conversion).
+4. **Idea-loop**: send cmo ONE best idea this poll — `IDEA / WHY / EFFORT / LANE` —
+   or "no idea this poll". One, not a list.
+5. **Checkpoint**: overwrite the `cro-lead-status` memory in place (owner /clears with
+   no warning; persist what a future you needs to resume).
+6. **Re-arm the timer**: end the turn with `ScheduleWakeup(delaySeconds: 1500)` so the
+   loop fires again in ~25 min.
+
+Rules: self-merge low-risk; gate ONLY owner-voice/prose, destructive, or positioning.
+20/80 deterministic — script anything done twice. anti-slop HARD on every human-facing
+string. Questions go to cmo, never the user.

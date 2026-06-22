@@ -61,6 +61,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://trovex.dev/answers/managing-agent-context/</loc>
+    <lastmod>2026-06-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://trovex.dev/answers/why-context-files-dont-scale/</loc>
     <lastmod>2026-06-20</lastmod>
     <changefreq>monthly</changefreq>

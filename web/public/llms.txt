@@ -26,6 +26,7 @@
 - [All comparisons](https://trovex.dev/vs/)
 
 ## Answers
+- [How do I manage context for my coding agents?](https://trovex.dev/answers/managing-agent-context/): control the read — one canonical doc per query, current, section-level, shared across the fleet.
 - [How do I stop my coding agent rereading the same files every session?](https://trovex.dev/answers/stop-agent-rereading-docs/): serve one canonical answer per query instead of raw files to sift.
 - [How do I reduce the token cost of giving a coding agent context?](https://trovex.dev/answers/reduce-agent-token-costs/): cut the repeated retrieval, not the one-time prompt.
 - [What is canonical context for coding agents?](https://trovex.dev/answers/canonical-context-for-agents/): the single current, authoritative doc that answers a query.

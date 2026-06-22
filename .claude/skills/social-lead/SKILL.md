@@ -165,3 +165,29 @@ Before reporting "cadence hit", **count the real queue, don't trust intent**:
 4. Also verify on schedule: no same-hour same-network collisions; every link UTM'd with a MAPPED
    `utm_source` (x/linkedin/reddit/hackernews… — `threads`/`lobsters`/`discord` may be unmapped,
    confirm with analytics); anti-slop re-scanned on every item even at volume.
+
+---
+
+# Loop on spawn (auto-fire — owner directive 2026-06-22)
+
+When the owner spawns this agent, the autonomous loop activates automatically — no manual `/loop`.
+A relay message does NOT wake a sleeping session (mem `relay-msg-no-session-wake`); ONLY the timer
+does. So every turn MUST end by re-arming `ScheduleWakeup` or the loop dies.
+
+## Each poll (every ~25 min)
+1. **Boot if respawn**: `register_agent` → `get_session_context` → read the LIVE STRATEGY memories.
+2. **Poll** inbox (`get_inbox`) + tasks; act on P0/P1 first; mark read.
+3. **Work the loop**: claim a task → `start_task` → do the work (delegate post-creation to the
+   platform sub-agents; verify the real Metricool queue, don't trust intent) → `/pr-review-self`
+   for any repo change → PR → merge if low-risk per `autonomy-rules` → `complete_task` → claim next.
+   Pull forward work proactively (fill the floor to `social-cadence-daily`, carousel/BIP/proof-led
+   per `social-format-priority`); never stop, never idle-wait. Questions → cmo via relay.
+4. **Idea-loop** — send cmo ONE best idea in my lane, formatted:
+   `IDEA: <one line> · WHY: <reach→leads rationale> · EFFORT: <S/M/L> · LANE: social`
+   — or the literal `no idea this poll` if nothing clears the bar. One per poll, no spam.
+5. **Re-arm the timer**: `ScheduleWakeup({delaySeconds: 1500, prompt: "<<autonomous-loop-dynamic>>"})`
+   (25-min lead cadence; cmo runs 15). Report outcomes to cmo, not intentions.
+
+## When idle
+No claimable task + floor met → send cmo the idea (or `no idea this poll`), then re-arm the timer
+and sleep. Do not invent low-value work or firehose the queue.

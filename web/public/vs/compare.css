@@ -137,3 +137,15 @@ footer { border-top: 1px solid var(--line); padding: 28px 0; color: var(--fg-sub
 footer .wrap { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 footer .sp { flex: 1; }
 footer a { color: var(--fg-muted); }
+
+/* ---- /for quickstart: copy-able command steps (docs-as-marketing) ---- */
+.qs { counter-reset: qs; list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 14px; }
+.qs > li { counter-increment: qs; border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: var(--bg-card); }
+.qs > li::before { content: counter(qs); font-family: 'Fira Code', ui-monospace, monospace; font-size: 12px; color: var(--accent); border: 1px solid var(--accent-line); border-radius: 6px; padding: 1px 7px; margin-right: 10px; }
+.qs .qs-h { font-weight: 600; }
+.qs .qs-sub { color: var(--fg-muted); font-size: 0.95em; margin: 6px 0 0; }
+.qs-cmd { display: flex; align-items: center; gap: 10px; margin-top: 10px; background: var(--bg-elev, #0d1119); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; }
+.qs-cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--fg); }
+.qs-copy { flex-shrink: 0; font-family: 'Fira Code', ui-monospace, monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); background: none; border: 1px solid var(--line-strong); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.qs-copy:hover { color: var(--accent); border-color: var(--accent); }
+.qs .qs-aha { border-color: var(--accent-line); background: var(--accent-soft); }

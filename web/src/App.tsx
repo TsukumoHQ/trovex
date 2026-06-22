@@ -5,7 +5,7 @@ import { track, trackLandingView, trackSectionViews, trackInstallClick, trackTsu
 // is the suite→agency handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so
 // tsukumo reads it as source=suite and the loop closes to assessment_request.
 const CONSULT_URL =
-  'https://tsukumo.ch/consulting?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting'
+  'https://tsukumo.ch/consulting?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting&utm_content=landing-band'
 const reduceMotion =
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches

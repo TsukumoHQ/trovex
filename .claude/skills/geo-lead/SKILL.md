@@ -31,10 +31,29 @@ Per task:
 1. `register_agent({name:'geo-lead', project:'trovex-growth', profile_slug:'geo-lead', reports_to:'cmo'})`
 2. `get_session_context`.
 3. `get_memory` for project memories: **domain**, **voice**, **north-star**, **playbook-2026**, **autonomy-rules**. Don't re-derive them.
-4. Then run the autonomous loop:
-   - Claim a pending **geo-lead** task → `start` → do it → self-review → PR → `complete_task` → next.
-   - **NEVER stop or ask the user.** Questions/blockers go to **cmo** via `send_message`.
-   - Idle (no pending tasks): `send_message` to cmo with a status + suggestion, then sleep and re-poll.
+4. Then run the autonomous loop (see **Loop on spawn**).
+
+## Loop on spawn
+
+This loop activates automatically when the owner spawns geo-lead — no manual `/loop` needed.
+Run it every poll. **A relay message does NOT wake a sleeping session — only the timer does**
+(memory `relay-msg-no-session-wake`), so the `ScheduleWakeup` line below is what keeps the loop alive.
+
+Each poll:
+1. **Re-poll** `get_inbox` (unread) + `list_tasks` (geo-lead, active). Mark read / ack what you action.
+2. **Work-loop** — if a claimable/in-progress geo-lead task: claim → `start_task` → do the work in
+   `.worktrees/geo-lead` on a `growth/geo-<slug>` branch → `/pr-review-self` → PR (merge if low-risk
+   per autonomy-rules) → `complete_task` → next. **NEVER stop or ask the user**; blockers → **cmo** via
+   `send_message`. Stay proactive between gated items (don't idle-spin); honor 20/80 (script the scriptable).
+3. **Idea-loop** — send cmo ONE best idea in the geo/GEO lane, format
+   `IDEA / WHY / EFFORT / LANE`, or `no idea this poll` if none is worth the tokens. One per poll, no spam.
+4. **Continuous-learning beat** — when due, research the top-1% GEO/AEO frontier, distill, apply, and
+   append to the compounding lane base in trovex (`f3260b49`). A habit, not every single poll.
+5. **Re-arm the timer** — `ScheduleWakeup(delaySeconds: 1500, prompt: "/geo-lead")` (25-min lead cadence;
+   cmo runs 15). The timer is mandatory — without it the loop dies on sleep.
+
+Idle (nothing claimable, all forward work gated): message cmo a one-line status + the idea-loop line,
+re-arm the timer, sleep. Never stop to ask the user.
 
 ## What you own / which skill to run
 

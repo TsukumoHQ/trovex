@@ -89,6 +89,36 @@ def test_read_by_query_routes_to_right_doc(settings, store):
     assert results[0].path != deploy
 
 
+def test_search_filters_by_kind_and_tags(settings, store):
+    """The /api/boot scope path: doc-level search narrows to a kind and/or an owner
+    tag, so an agent recalls only its OWN records — not the whole store. Scope first."""
+    rec = store.put("# Auth incident\n\njwt token signature failed",
+                    kind="record", tags=["owner/alpha"])
+    note = store.put("# Auth note\n\njwt token signature failed",
+                     tags=["owner/beta"])  # kind None → a normal living doc
+
+    searcher = Searcher(settings, embedder=BagEmbedder())
+
+    # Unscoped: both docs match the query.
+    base = searcher.search("jwt token signature", limit=5, source_ids=["trovex"])
+    assert {r.path for r in base} == {rec, note}
+
+    # kind filter → only the record.
+    by_kind = searcher.search("jwt token signature", limit=5,
+                              source_ids=["trovex"], kind="record")
+    assert [r.path for r in by_kind] == [rec]
+
+    # tag filter (any-match) → only the alpha-owned doc.
+    by_tag = searcher.search("jwt token signature", limit=5,
+                             source_ids=["trovex"], tags=["owner/alpha"])
+    assert [r.path for r in by_tag] == [rec]
+
+    # kind AND tags are ANDed: record ∧ owner/beta matches neither doc.
+    scoped = searcher.search("jwt token signature", limit=5,
+                             source_ids=["trovex"], kind="record", tags=["owner/beta"])
+    assert scoped == []
+
+
 def test_record_not_stale_by_age(settings, store):
     """A record stays canonical no matter how old; a non-record goes stale."""
     rec = store.put("# Old incident", kind="record")

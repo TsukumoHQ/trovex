@@ -1,0 +1,35 @@
+{
+  "slug": "li-co-fleet-is-an-operating-problem",
+  "audience": "company",
+  "kicker": "orchestration",
+  "cover": {
+    "title": "running a fleet is an operating problem, not a model one",
+    "accent": "an operating problem",
+    "sub": "past one agent, the hard part stops being the model and starts being coordination."
+  },
+  "slides": [
+    {
+      "title": "what breaks past one agent",
+      "accent": "past one agent",
+      "body": "no shared memory. no handoff. two agents grab the same task and step on each other. the model didn't fail. the operating layer was never there."
+    },
+    {
+      "title": "the fix is a control plane",
+      "accent": "control plane",
+      "pairs": [
+        {"broke": "agents coordinate by luck and overlap", "fix": "shared memory, handoffs, and task ownership"}
+      ]
+    },
+    {
+      "title": "point your existing agents at it",
+      "accent": "existing agents",
+      "body": "wrai.th is an open-source control plane. it doesn't replace your agents. it coordinates the ones you already run."
+    }
+  ],
+  "cta": {
+    "title": "wrai.th, open source",
+    "accent": "open source",
+    "sub": "a control plane for a fleet of agents: coordination, memory, handoffs.",
+    "foot": "github.com/TsukumoHQ/WRAI.TH"
+  }
+}

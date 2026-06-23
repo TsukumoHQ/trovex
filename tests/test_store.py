@@ -119,6 +119,40 @@ def test_search_filters_by_kind_and_tags(settings, store):
     assert scoped == []
 
 
+def test_boot_pointers_scopes_to_owner_records(settings, store):
+    """/api/boot recall: an agent gets ONLY its own records (owner/<agent> +
+    kind=record) — not other agents', not non-record docs. Scope first."""
+    from trovex.boot import boot_pointers
+
+    store.put("# fullstack state\n\njwt token signature work in flight",
+              kind="record", tags=["owner/fullstack"])
+    store.put("# cmo state\n\njwt token signature current state",
+              kind="record", tags=["owner/cmo"])
+    store.put("# fullstack note\n\njwt token signature",
+              tags=["owner/fullstack"])  # owned but NOT a record
+
+    searcher = Searcher(settings, embedder=BagEmbedder())
+    boot = boot_pointers(searcher, "fullstack", floor=0.0)
+
+    assert {p["title"] for p in boot["pointers"]} == {"fullstack state"}
+    assert boot["render"].startswith("## Resume — fullstack")
+    assert boot["tokens_est"] > 0
+
+
+def test_boot_empty_when_no_owner_records(settings, store):
+    """No scoped record → empty pack, zero cost (unknown agent injects nothing)."""
+    from trovex.boot import boot_pointers
+
+    store.put("# someone else\n\njwt token signature",
+              kind="record", tags=["owner/other"])
+    searcher = Searcher(settings, embedder=BagEmbedder())
+    boot = boot_pointers(searcher, "nobody", floor=0.0)
+
+    assert boot["pointers"] == []
+    assert boot["render"] == ""
+    assert boot["tokens_est"] == 0
+
+
 def test_record_not_stale_by_age(settings, store):
     """A record stays canonical no matter how old; a non-record goes stale."""
     rec = store.put("# Old incident", kind="record")

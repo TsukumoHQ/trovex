@@ -199,10 +199,16 @@ async function main() {
     twenty(`/rest/people?limit=100`),
   ]);
   let propRows = null, totalInq = null, totalQual = null, suiteQual = null, twPersons = null;
+  let lmBooked = null, lmTeam = null; // Panel F — lead machine (booked calls + teamIntent)
   if (twOpps && twPpl) {
     const opps = twOpps.opportunities || twOpps || [];
     const ppl = twPpl.people || twPpl || [];
     twPersons = ppl.length;
+    // Lead-machine KPIs: a booked call = an opp that reached MEETING+ (a call is booked/held).
+    // teamIntent = the dark-funnel team signal (twenty-lead-scorer sets it on company-domain clusters).
+    const BOOKED = new Set(["MEETING", "PROPOSAL", "CUSTOMER"]);
+    lmBooked = opps.filter((o) => BOOKED.has(o.stage)).length;
+    lmTeam = ppl.filter((p) => p.teamIntent).length;
     const srcOf = (id) => (ppl.find((p) => p.id === id) || {}).source || null;
     const by = new Map();
     for (const o of opps) {
@@ -464,6 +470,20 @@ async function main() {
         : "blog is producing attributable signal (see rows) — keep + double down on what converts";
     P(`> **Verdict:** ${verdict}. _A real 0 (with traffic) = not converting; n/a = not yet measurable (untagged links / no citation run)._`);
   }
+  P(``);
+
+  // Panel F — Lead machine (cmo #1: autonomous lead loop — capture→score→surface)
+  P(`## F · Lead machine — booked calls + team signal (the autonomous loop)`);
+  P(`*The loop's output: a call booked + the team-buying signal scored into Twenty (\`twenty-lead-scorer\`). Booked call = opp at MEETING+ (a call is booked/held). teamIntent = company-domain cluster (2+ from one company) = a team evaluating us, the consulting signal. Honest n/a if Twenty unavailable.*`);
+  P(``);
+  P(`| Metric | Value |`);
+  P(`|--------|------:|`);
+  P(`| Booked calls (opp MEETING+) | ${lmBooked == null ? "n/a" : lmBooked} |`);
+  P(`| Qualified opportunities (past NEW) | ${n(totalQual)} |`);
+  P(`| teamIntent leads (team signal, scored) | ${lmTeam == null ? "n/a" : lmTeam} |`);
+  P(`| Suite-sourced qualified (north star) | ${n(suiteQual)} |`);
+  P(``);
+  P(`> Booked-calls/day is the lead-machine throughput KPI — at thin volume it's a cumulative count, not yet a rate (needs a booked-date field for per-day). teamIntent leads are surfaced for the owner's yes/no (donna pings on a HOT team cluster). The signal is in the CRM, not a CTA.`);
   P(``);
 
   // Availability legend

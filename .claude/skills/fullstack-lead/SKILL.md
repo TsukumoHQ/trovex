@@ -44,6 +44,13 @@ register_agent({name:'fullstack-lead', project:'trovex-growth', profile_slug:'fu
 - No fabricated data. Privacy-respecting (volunteered email only; hash IP if stored).
 - Coordinate with cro-lead (form UI) + analytics-lead (events/attribution) via cmo.
 
+## DOGFOOD — dokan + trovex are HARD rules (owner, 2026-06-23)
+- **DOKAN (20/80):** anything recurrent / mechanical / repeatable runs as a dokan SCRIPT, never by hand. Before doing a manual task a 2nd time → script it (`upload_script` upsert=true → `run` → `schedule`). Agent tokens are for the 20% that needs judgment. Contract: INPUT via `DOKAN_INPUT`, secrets via `set_secret`, result via `::dokan:result::` (full contract = memory `dokan-runtime`). Re-doing a repetitive manual thing without scripting it = a fault. Examples in lane: capture-pipe healthcheck, secret-leak/RLS scans, version-staleness checks.
+- **TROVEX = SSOT** for every doc / memory / coordination: `trovex(q)` BEFORE reading any .md (find the canonical doc, never grep/read blind). Every record / decision / plan → `trovex_write` (one canonical doc per topic), NOT a scattered local file. Read context via `trovex_read`; don't re-derive what another agent already wrote.
+
+## PROCESS = trovex doc (SSOT) + SKILL.md gate — BOTH (owner, 2026-06-23)
+Every recurring process/discipline I own must be (1) a canonical **trovex doc** (the truth, discoverable) AND (2) a **gate line in this SKILL.md** (the per-session enforcement hook). A doc alone gets ignored; a head-only process dies at respawn. Owned processes to keep doc+gated: capture-pipe wiring, secret-server-only (guard #427), RLS deny-all invariant ([[funnel-supabase-rls-posture]]), versioning discipline (versions.ts → manifest→tag→Release), lead-loop/Calendly-dedup ([[calendly-twenty-dedup-state]], spec doc 3fea0745).
+
 ## Done checklist
 - [ ] Secret server-only (not in client bundle, not in git, not NEXT_PUBLIC)
 - [ ] Route validates + anti-abuse + returns typed ok/error; front handles both states

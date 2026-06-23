@@ -248,6 +248,8 @@ Same §1 copy + repo URL for each. One human pass after the top five land.
 | GitHub MCP Registry | auto from the official registry | renders in VS Code's MCP view; confirm propagation |
 | mcp-get / registry CLIs | per their docs | inherits from official where applicable |
 | awesome-mcp.tools | per the site | aggregator indexing Claude/Cursor/Cline/Windsurf — **VERIFY** submit path |
+| mcp.directory | web form — `mcp.directory/submit` (confirmed live 2026-06-24) | large human-browsable index (3,000+), one-click install for Cursor/VS Code/Claude Desktop/Claude Code/Codex/ChatGPT. Also `/submit-skill` for an agent-skill listing (cross-list trovex as a skill too). **VERIFY** the `/submit` fields |
+| mcpserverfinder.com | per the site — **VERIFY** submit path | curated directory w/ descriptions/features/integration details; confirm it takes author submissions vs. crawl-only |
 
 **Checklist (human):**
 - [ ] For each, check it isn't already auto-fed by the official registry (avoid duplicates).
@@ -296,6 +298,8 @@ Use these exact tagged URLs in each listing's homepage / `/for` links. The repo 
 | Docker MCP Catalog | `docker-mcp` | `https://trovex.dev/?utm_source=docker-mcp&utm_medium=mcp-registry&utm_campaign=launch` | `https://trovex.dev/for/?utm_source=docker-mcp&utm_medium=mcp-registry&utm_campaign=launch` |
 | awesome-mcp.tools | `awesome-mcp-tools` | `https://trovex.dev/?utm_source=awesome-mcp-tools&utm_medium=mcp-registry&utm_campaign=launch` | `https://trovex.dev/for/?utm_source=awesome-mcp-tools&utm_medium=mcp-registry&utm_campaign=launch` |
 | cursor.directory | `cursor-directory` | `https://trovex.dev/?utm_source=cursor-directory&utm_medium=mcp-registry&utm_campaign=launch` | `https://trovex.dev/for/?utm_source=cursor-directory&utm_medium=mcp-registry&utm_campaign=launch` |
+| mcp.directory | `mcp-directory` | `https://trovex.dev/?utm_source=mcp-directory&utm_medium=mcp-registry&utm_campaign=launch` | `https://trovex.dev/for/?utm_source=mcp-directory&utm_medium=mcp-registry&utm_campaign=launch` |
+| mcpserverfinder | `mcpserverfinder` | `https://trovex.dev/?utm_source=mcpserverfinder&utm_medium=mcp-registry&utm_campaign=launch` | `https://trovex.dev/for/?utm_source=mcpserverfinder&utm_medium=mcp-registry&utm_campaign=launch` |
 
 Note: some registries auto-fill the homepage from the repo's metadata and strip query strings. Where a registry takes a free-text homepage field, paste the tagged URL; where it pulls from GitHub automatically the UTM won't survive, which is expected, and the repo-referral still shows in Plausible as a plain referrer.
 

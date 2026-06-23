@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/use-cases/small-team/" />
+  <title>trovex for small teams: one source of truth across your agents</title>
+  <meta name="description" content="On a small team, every dev's coding agent re-derives the same things and your docs drift out of sync. trovex gives the whole team's agents one shared point to read and write — a single source of truth, no copies to sync." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/use-cases/small-team/" />
+  <meta property="og:title" content="trovex for small teams: one source of truth across your agents" />
+  <meta property="og:description" content="Every dev's agent re-derives the same things; docs drift. trovex gives the team's agents one shared read-and-write point — SSOT, no sync." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for small teams: one source of truth across your agents" />
+  <meta name="twitter:description" content="Every dev's agent re-derives the same things; docs drift. trovex gives the team's agents one shared read-and-write point." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Use cases", "item": "https://trovex.dev/use-cases/" },
+          { "@type": "ListItem", "position": 3, "name": "Small team", "item": "https://trovex.dev/use-cases/small-team/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How do I keep a team's coding agents from drifting out of sync?", "acceptedAnswer": { "@type": "Answer", "text": "Give every agent one shared point to read and write, instead of each maintaining its own copy. When one agent records what it learns through a single store, every other agent and teammate reads that record back. With one point of passage for reads and writes there are no copies to drift and nothing to sync — a single source of truth by construction." } },
+          { "@type": "Question", "name": "Does trovex need a server or cloud account for a team?", "acceptedAnswer": { "@type": "Answer", "text": "No hosted account. trovex is a local-first MCP server each developer runs against the team's repo. There's no SaaS to buy and no procurement — adoption is bottom-up, one developer at a time, and the docs never leave your machines." } },
+          { "@type": "Question", "name": "We're rolling agents out across the team and it's messy. Can someone help?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. trovex is open source you can adopt yourself; if you want hands-on help making a fleet of agents reliable and consistent across the team, the founder offers consulting, and trovex is the proof of how that's done. Start with the tool; the help is there if scaling it well is the hard part." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-23", "dateModified": "2026-06-23",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I keep a small team's coding agents working from the same docs?",
+          "text": "On our team each dev's coding agent re-derives the same answers and our docs drift out of sync. How do we give all the agents one current source of truth?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/use-cases/small-team/",
+            "text": "Give every agent and teammate one shared point to read from and write to, instead of each maintaining its own copy. trovex indexes the team's docs and serves the single current doc per query with a freshness marker, and agents write what they learn back through that one point — so there are no copies to drift and nothing to sync. It's a local-first MCP server with no hosted account or procurement; adoption is bottom-up, one dev at a time."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/use-cases/">Use cases</a> / Small team
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-23">23 June 2026</time></p>
+    <h1>trovex for small teams</h1>
+
+    <div class="verdict">
+      <div class="l">The short version</div>
+      <p>On a small team, every dev's coding agent <strong>re-derives the same things</strong> and your docs <strong>drift out of sync</strong>. trovex gives the whole team's agents one shared point to read from and write to — a <a href="/glossary/ssot-for-agents/">single source of truth</a>, no copies to sync. Local-first, no hosted account.</p>
+    </div>
+
+    <h2>The problem at team scale</h2>
+    <p class="lead-answer">Two developers, two agents, one repo — and three versions of "how deploys work." Each agent reads whichever doc looks most relevant, re-derives what the other already figured out, and saves notes into its own context that no one else sees. Multiply by every runbook, ADR, and README that overlaps, and the team is quietly paying for the same lookups over and over while working from copies that disagree.</p>
+
+    <h2>One point of passage for the whole team</h2>
+    <p class="lead-answer">trovex closes that loop. It indexes the team's docs and serves the one current doc per query with a <a href="/glossary/freshness-marker/">freshness marker</a>, and every agent writes what it learns back through a single shared point — so a fix one dev's agent finds is readable by everyone else's next session. No copies to drift, nothing to sync. That's what <a href="/answers/shared-source-of-truth-multiple-agents/">keeping multiple agents on the same docs</a> actually requires.</p>
+
+    <h2>How it rolls out</h2>
+    <p class="lead-answer">Bottom-up, no procurement. It's a local-first MCP server each developer runs against the team's repo — no SaaS to buy, no SSO project, no data leaving your machines. One person installs it, sees the savings, and it spreads.</p>
+
+    <h2>When scaling it well is the hard part</h2>
+    <p class="lead-answer">Adopting the tool is a one-minute install. Making a whole fleet of agents reliable and consistent across a team — scoped permissions, review gates, shared context that stays current — is a harder problem. trovex is open source you can run yourself; if you want hands-on help getting there, <a href="https://tsukumo.ch/" target="_blank" rel="noopener noreferrer">the founder offers consulting</a>, and trovex is the proof of how it's done. Start with the tool; the help is there if you need it.</p>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/use-cases/solo-developer/">trovex for solo developers</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/source-of-truth-multi-agent-repos/">What's the single source of truth for a multi-agent repo?</a></li>
+        <li><a href="/answers/missing-layer-agent-memory/">What's the missing layer in agent memory?</a></li>
+        <li><a href="/glossary/ssot-for-agents/">SSOT for agents</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How do I keep a team's coding agents from drifting out of sync?</p>
+        <p class="faq-a">Give every agent one shared point to read and write, instead of each maintaining its own copy. When one agent records what it learns through a single store, every other agent and teammate reads that record back. With one point of passage there are no copies to drift and nothing to sync — a single source of truth by construction.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does trovex need a server or cloud account for a team?</p>
+        <p class="faq-a">No hosted account. trovex is a local-first MCP server each developer runs against the team's repo. No SaaS to buy and no procurement — adoption is bottom-up, one developer at a time, and the docs never leave your machines.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">We're rolling agents out across the team and it's messy. Can someone help?</p>
+        <p class="faq-a">Yes. trovex is open source you can adopt yourself; if you want hands-on help making a fleet of agents reliable and consistent across the team, the founder offers consulting, and trovex is the proof of how that's done.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Give your team's agents one source of truth.</h2>
+      <p>One shared read-and-write point. No copies to sync. About a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install git+https://github.com/TsukumoHQ/trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/for/">Setup for your agent</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/use-cases/">Use cases</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

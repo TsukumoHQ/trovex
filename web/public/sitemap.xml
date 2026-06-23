@@ -133,6 +133,24 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://trovex.dev/use-cases/</loc>
+    <lastmod>2026-06-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://trovex.dev/use-cases/solo-developer/</loc>
+    <lastmod>2026-06-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://trovex.dev/use-cases/small-team/</loc>
+    <lastmod>2026-06-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://trovex.dev/for/claude-code/</loc>
     <lastmod>2026-06-22</lastmod>
     <changefreq>monthly</changefreq>

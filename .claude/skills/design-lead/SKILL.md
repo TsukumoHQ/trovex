@@ -126,7 +126,13 @@ When you create/change a process, update BOTH in the same tick.
 Accent **cyan `#22d3ee`** — distinct from trovex green / wraith violet / yoru amber; reads
 conduit/runtime. lowercase `dokan` wordmark, cyan square mark, Archivo 800, same data-editorial
 system. Assets at SB `media/dokan/brand/` (og, wordmark, suite-4pillar). Generator:
-`gen_dokan_brand.mjs`. SSOT positioning: trovex doc `eeeddc3f`. PREP not launch — don't promote.
+`gen_dokan_brand.mjs`. SSOT positioning: trovex doc `eeeddc3f` (v2). Design SSOT: `fd4e4f70`.
+- **Sharpest wedge = ZERO LLM inside:** the platform burns NO tokens, runs deterministic code,
+  expensive AI stays in the agent (outside). "automation that doesn't burn tokens." Lead with this.
+- **⚠️ Anti-overpromise (HARD):** NEVER "production-grade enterprise" / "infinite scale" — true
+  for internal-team use, NOT multi-tenant public. Frame = internal teams / design partners /
+  early adopters. An overpromising dokan claim = brand + anti-slop fail.
+- Marketing lines are CANDIDATES — cmo/owner validate before ANY public use. PREP not launch.
 
 ## ⛔ Anti-slop gate — MANDATORY (owner directive)
 Run the **anti-ai-slop** skill on EVERY piece of human-facing text BEFORE you commit/PR

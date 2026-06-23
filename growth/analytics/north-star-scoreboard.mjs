@@ -320,6 +320,18 @@ async function main() {
       ])
     : [null, null, null, null, null, null];
 
+  // ---- Blog ROI (Panel E): is the blog (60+ posts) actually paying? ----
+  // Blog→install = trovex.dev events attributed to the blog via utm_campaign=blog (set on blog→trovex
+  // links). Blog→lead = Supabase leads self-/UTM-attributed to the blog. Both degrade to n/a/0 until
+  // the blog→trovex links are UTM-tagged + traffic lands — never fabricated. Citation share reuses Panel C.
+  const [blogLanding, blogInstall] = trovexSite
+    ? await Promise.all([
+        evAgg(trovexSite, w, "landing_view", ";event:props:utm_campaign==blog"),
+        evAgg(trovexSite, w, "github_clicked", ";event:props:utm_campaign==blog"),
+      ])
+    : [null, null];
+  const blogLeads = await supabase(`leads?or=(utm_campaign.eq.blog,utm_source.eq.blog,how_heard.ilike.*blog*)&select=project,utm_campaign,utm_source,how_heard`);
+
   // ===== PANEL C — 4-engine citation panel =====
   const cite = citationPanel();
 
@@ -429,6 +441,28 @@ async function main() {
     P(`| No self-report (not comparable) | ${dark.noSelfReport} |`);
     P(``);
     P(`**Dark-funnel rate: ${dark.darkRate == null ? "n/a" : `${dark.darkRate}%`}** (${dark.darkCount} of ${dark.agree + dark.disagree + dark.autoBlind} comparable leads). _A high rate means auto-attribution is under-counting; at thin volume \`how_heard\` is the more reliable source signal — weight it, and tighten UTM coverage to shrink the gap._`);
+  }
+  P(``);
+
+  // Panel E — Blog ROI (does the blog pay?)
+  P(`## E · Blog ROI — does the blog pay? (citation + blog→install + blog→lead)`);
+  P(`*Decide the blog investment with data, not vibes (cmo). 60+ posts; the question = do they drive citations, installs, or consulting leads. Blog→install/lead need blog→trovex links UTM-tagged (\`utm_campaign=blog\`) — until then they degrade to honest n/a/0, never fabricated.*`);
+  P(``);
+  P(`| Signal | Value | Source |`);
+  P(`|--------|------:|--------|`);
+  P(`| AI-citation share (any engine) | ${cite ? cite.union : "n/a"} | geo citation-monitor${cite ? ` (${cite.srcDate})` : " (no report)"} |`);
+  P(`| Blog → install-intent (\`github_clicked\`, utm_campaign=blog) | ${trovexSite ? `${n(blogInstall)} / ${n(blogLanding)} blog views` : "n/a"} | Plausible (trovex.dev) |`);
+  P(`| Blog → consulting lead (source=blog) | ${blogLeads == null ? "n/a" : blogLeads.length} | Supabase \`leads\` |`);
+  P(``);
+  {
+    const inst = Number(blogInstall) || 0;
+    const ld = blogLeads ? blogLeads.length : null;
+    const verdict = (!trovexSite && !cite && blogLeads == null)
+      ? "n/a — citation + blog-funnel sources not wired yet"
+      : (inst === 0 && (ld || 0) === 0)
+        ? "no blog-attributed install or lead yet — HOLD judgment until blog→trovex links carry `utm_campaign=blog` + reach lands; if it persists at 0 with real traffic, that's the signal to cut blog spend"
+        : "blog is producing attributable signal (see rows) — keep + double down on what converts";
+    P(`> **Verdict:** ${verdict}. _A real 0 (with traffic) = not converting; n/a = not yet measurable (untagged links / no citation run)._`);
   }
   P(``);
 

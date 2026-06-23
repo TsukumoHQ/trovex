@@ -5,7 +5,8 @@
 // no Synergix, no client names, de-em-dashed copy.
 //
 // Reads a specs JSON: [{uuid, brand:"founder"|"company", shape:"square"|"portrait",
-//   layout:"quote"|"stat"|"bars"|"twocol"|"receipt", kicker, headline, accent, sub, ...}]
+//   layout:"quote"|"stat"|"bars"|"twocol"|"checklist"|"receipt", kicker, headline, accent, sub, ...}]
+//   checklist adds: items:[{t, note?}] — green-check rows (rollback/audit/readiness lists)
 // Renders each → Supabase media/<property>/social/<uuid>/<shape>.png, prints uuid→URL.
 //
 // Deps (satori/resvg) resolve via render.sh symlink. Creds: supabase.env.
@@ -77,6 +78,18 @@ function twocolEl(cols) {
       h("div",{style:{fontFamily:"Fira Code",fontSize:"19px",color:i===cols.length-1?C.green:C.soft,letterSpacing:"0.02em"}}, deDash(col.head)),
       h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"27px",color:C.ink,lineHeight:1.25}}, deDash(col.body)))));
 }
+function checklistEl(items) {
+  const check = h("div",{style:{display:"flex",width:"34px",height:"34px",minWidth:"34px",borderRadius:"7px",border:`1.5px solid ${C.green}`,backgroundColor:"rgba(34,197,94,0.08)",alignItems:"center",justifyContent:"center"}},
+    h("div",{style:{width:"9px",height:"16px",borderRight:`3px solid ${C.green}`,borderBottom:`3px solid ${C.green}`,transform:"rotate(45deg)",marginTop:"-3px"}}));
+  return h("div",{style:{display:"flex",flexDirection:"column",gap:"22px"}},
+    ...items.map(it=>{
+      const txt = [h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"31px",color:C.ink,letterSpacing:"-0.02em",lineHeight:1.1}}, deDash(it.t))];
+      if (it.note) txt.push(h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"24px",color:C.soft,lineHeight:1.3}}, deDash(it.note)));
+      return h("div",{style:{display:"flex",alignItems:"flex-start",gap:"20px"}},
+        check,
+        h("div",{style:{display:"flex",flexDirection:"column",gap:"5px",flex:1}}, ...txt));
+    }));
+}
 function receiptEl(c, S) {
   return h("div",{style:{display:"flex",flexDirection:"column",gap:"0px",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"14px",padding:"36px 38px"}},
     h("div",{style:{fontFamily:"Fira Code",fontSize:"20px",color:C.soft,letterSpacing:"0.04em",borderBottom:`1px dashed ${C.rule}`,paddingBottom:"18px",marginBottom:"22px"}}, "savings receipt"),
@@ -93,12 +106,13 @@ function body(c, S) {
     case "stat":    return [c.headline?headlineEl(c.headline,c.accent,S):null, heroEl(c,S), subEl(c.sub,S)].filter(Boolean);
     case "bars":    return [headlineEl(c.headline,c.accent,S), barsEl(c.data), subEl(c.sub,S)].filter(Boolean);
     case "twocol":  return [headlineEl(c.headline,c.accent,S), twocolEl(c.cols), subEl(c.sub,S)].filter(Boolean);
+    case "checklist": return [headlineEl(c.headline,c.accent,S), checklistEl(c.items), subEl(c.sub,S)].filter(Boolean);
     case "receipt": return [c.headline?headlineEl(c.headline,c.accent,S):null, receiptEl(c,S), subEl(c.sub,S)].filter(Boolean);
     default:        return [headlineEl(c.headline,c.accent,S), subEl(c.sub,S)].filter(Boolean); // quote
   }
 }
 function card(c, S) {
-  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat";
+  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist";
   return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,backgroundImage:`url(${DOT})`,backgroundRepeat:"repeat",padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"20px"}},
       wordmark(brandFor(c.brand), S.mark),

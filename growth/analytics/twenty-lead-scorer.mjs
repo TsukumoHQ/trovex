@@ -25,7 +25,10 @@
  */
 const BASE = process.env.TWENTY_BASE_URL, KEY = process.env.TWENTY_API_KEY;
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
-const WRITE = process.argv.includes("--write");
+// Runs on dokan (no host runs): write flag via DOKAN_INPUT {"write":true} (env JSON), or --write on argv.
+let DOKAN_IN = {};
+try { DOKAN_IN = JSON.parse(process.env.DOKAN_INPUT || "{}"); } catch { DOKAN_IN = {}; }
+const WRITE = process.argv.includes("--write") || DOKAN_IN.write === true;
 const FREE = new Set(["gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "yahoo.fr", "proton.me", "protonmail.com", "icloud.com", "me.com", "gmx.ch", "gmx.com", "bluewin.ch", "hispeed.ch", "live.com", "aol.com", "pm.me"]);
 
 async function tw(path, init) {

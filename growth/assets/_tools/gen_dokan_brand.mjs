@@ -51,7 +51,7 @@ function og() {
         ...[["your",0],["agents",0],["run",0],["the",0],["scripts.",1],["you",0],["don't",0],["click.",1]].map(([w,a])=>
           h("span",{style:{color:a?A.dokan:C.ink,marginRight:"0.24em"}}, w))),
       h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"30px",lineHeight:1.4,color:C.soft,maxWidth:"940px"}},
-        "an agent-operated deterministic script runtime. upload, run, schedule over MCP. the mechanical 80%, off your agents' token budget."),
+        "zero LLM inside. the platform runs deterministic code and burns no tokens; the expensive AI stays in your agent, outside the runtime. apache-2.0, no license trap. for internal teams + early adopters."),
     ],
   }, { left: "the conduit · MCP-native", right: "Apache-2.0", accent: A.dokan });
 }

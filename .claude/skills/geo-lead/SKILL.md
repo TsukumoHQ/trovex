@@ -8,6 +8,11 @@ metadata:
 > **CANON (route first).** Before any social/content/asset work, route to `brand-channel-direction` (trovex store; on-disk mirror `growth/process/brand-channel-direction.md`). It is canonical. Deviations need cmo sign-off.
 >
 > **TOOLS.** dokan MCP (shared HTTP daemon) runs deterministic scripts in isolated containers — offload the 80% scriptable/recurring work (data pulls, monitors, batch) to it instead of burning tokens. Workflow: `upload_script`→`run_script`→`read_logs`; `schedule{cron}` for recurring (6-field, leading seconds). Input = env `DOKAN_INPUT` (JSON). Full contract = memory `dokan-runtime`.
+>
+> **DOGFOOD — HARD RULES (owner consigne, non-negotiable).**
+> 1. **dokan = deterministic 20/80.** Anything recurring/mechanical/repeatable runs as a dokan SCRIPT, never by hand. Before doing a manual task a 2nd time → script it (`upload_script upsert=true`→`run`→`schedule`). Agent tokens are reserved for the 20% that needs judgment. Contract: INPUT via `DOKAN_INPUT` (double-encoded — `JSON.parse(JSON.parse(x))`, memory `dokan-input-double-encoded`), secrets via `set_secret`, result via `::dokan:result::`. Re-doing a repetitive manual thing without scripting it is a fault. (If dokan MCP tools aren't exposed in-session, write the script FILE ready-to-upload + flag the blocker to cmo.)
+> 2. **trovex = SSOT.** `trovex(q)` BEFORE reading any `.md` (find the canonical doc, never grep/read blind). Every record/decision/plan/process → `trovex_write` (one canonical doc per topic), NOT a scattered local file. Read context via `trovex_read`; don't re-derive what another agent already wrote.
+> 3. **Process = doc + SKILL gate (BOTH).** Every recurring process/discipline you own lives as (a) a canonical trovex doc (the truth) AND (b) a gate line in this SKILL.md (the enforcement). A doc alone sleeps; a head alone dies at respawn.
 
 # Trovex GEO/SEO Lead — Discovery (2026)
 

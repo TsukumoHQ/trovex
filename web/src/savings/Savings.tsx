@@ -169,7 +169,12 @@ export default function Savings() {
   // One-click X composer, prefilled with the same line copy-post hands over (the trailing
   // shareUrl auto-cards). Kills the copy → switch tab → paste step on the dominant dev channel.
   const xIntentUrl = `https://x.com/intent/post?text=${encodeURIComponent(tweetLine)}`
-  const badge = `[![trovex saves ~${pct}% of doc-lookup tokens](https://img.shields.io/badge/trovex-~${pct}%25%20fewer%20tokens-22c55e)](https://trovex.dev/savings)`
+  // The README badge is the longest-lived share artifact (it sits permanently in a public
+  // repo), so its link carries referral attribution too — own source, same taxonomy as the
+  // link/post shares (utm_medium=referral, campaign=savings-calculator).
+  const badgeHref =
+    'https://trovex.dev/savings?utm_source=savings-badge&utm_medium=referral&utm_campaign=savings-calculator'
+  const badge = `[![trovex saves ~${pct}% of doc-lookup tokens](https://img.shields.io/badge/trovex-~${pct}%25%20fewer%20tokens-22c55e)](${badgeHref})`
 
   async function copy(text: string, format: string) {
     try {

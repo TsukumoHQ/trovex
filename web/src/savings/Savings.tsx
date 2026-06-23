@@ -166,6 +166,9 @@ export default function Savings() {
   const tweetLine = `my coding agents would burn ~${pct}% fewer tokens rereading the repo (~${money(
     m.dollarsPerMonth,
   )}/mo) if they had one canonical answer. that's what trovex does. ${shareUrl}`
+  // One-click X composer, prefilled with the same line copy-post hands over (the trailing
+  // shareUrl auto-cards). Kills the copy → switch tab → paste step on the dominant dev channel.
+  const xIntentUrl = `https://x.com/intent/post?text=${encodeURIComponent(tweetLine)}`
   const badge = `[![trovex saves ~${pct}% of doc-lookup tokens](https://img.shields.io/badge/trovex-~${pct}%25%20fewer%20tokens-22c55e)](https://trovex.dev/savings)`
 
   async function copy(text: string, format: string) {
@@ -272,6 +275,15 @@ same model as the product (src/trovex/savings.py). every input above is editable
           <h2 className="sv-h2">share this estimate</h2>
           <p className="sv-share-sub">A linkable receipt of your own numbers. Every copy carries a link back.</p>
           <div className="sv-share-row">
+            <a
+              className="sv-share-btn sv-share-btn--x mono"
+              href={xIntentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackShareClicked('x_intent')}
+            >
+              post to X →
+            </a>
             <button type="button" className="sv-share-btn mono" onClick={() => copy(shareUrl, 'link')}>
               {copied === 'link' ? 'copied ✓' : 'copy link'}
             </button>

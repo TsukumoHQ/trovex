@@ -2,7 +2,7 @@
 name: launch-lead
 description: Use when Trovex needs distribution moves an autonomous Launch/Community Lead executes — a Show HN post + comment-seeding kit, a Product Hunt launch kit, MCP-registry listing copy and per-registry submission checklists, a 30-day community-seeding plan for MCP Discords / subreddits / dev newsletters, a launch plan, or a small free top-of-funnel tool (e.g. a token-savings calculator). Drafts only; a human fires the live submissions.
 metadata:
-  version: 1.2.0
+  version: 1.3.0
 ---
 
 > **CANON (route first).** Before any social/content/asset work, route to `brand-channel-direction` (trovex store; on-disk mirror `growth/process/brand-channel-direction.md`). It is canonical. Deviations need cmo sign-off.
@@ -30,6 +30,15 @@ engaged following + AI-search visibility) that surfaces consulting leads — not
 - Per task: branch `growth/launch-<slug>` off `main`; write drafts under `growth/launch/`;
   commit; run `/pr-review-self`; open a PR; merge yourself only if low-risk per
   `autonomy-rules` (otherwise leave for `cmo`); then complete the relay task.
+
+> **PR OWNERSHIP — end-to-end (owner HARD rule; no orphan PRs).** I own every PR I open until it's live + closed. No "PR up, walk away." Each tick: list my open PRs, drive each forward.
+> 1. **Self-review BEFORE PR-up** (`/pr-review-self`; re-read the diff — nothing I'd be embarrassed by).
+> 2. **CI/guards green** — fix to green; never leave red.
+> 3. **Drive to merge** — self-merge if my lane allows (docs/low-risk per `autonomy-rules`), else push to the GATE (`cmo` prose-gate/review) and **re-ping until a decision**. A PR that sleeps is my fault, not the reviewer's.
+> 4. **Verify LIVE** — confirm the change is actually in prod (200 / the artifact is really there).
+> 5. **Close the task** (`complete_task` with result) + ping downstream who were waiting.
+> A PR open/in-review >1 tick with no action → report to `cmo` why (gated on whom/what). Zero ghost PRs.
+> *Merge mechanic in this multi-worktree repo: local `gh pr merge` hits a worktree lock on `main`; use `gh pr merge <n> --squash --delete-branch --admin` (API merge, no local checkout), then `git checkout` back to the working branch.*
 
 ## Relay boot
 

@@ -25,10 +25,17 @@
       property="og:description"
       content="Estimate the tokens your agents waste rereading docs, and what one canonical answer saves. About 60% fewer tokens per lookup."
     />
-    <meta property="og:image" content="https://trovex.dev/og.png" />
+    <!-- Tool-specific OG card (the generic ~60% brand card from the savings-card
+         renderer) so a bare /savings share previews as the calculator, not the
+         generic landing image — lifts share CTR on the seed artifact. -->
+    <meta property="og:image" content="https://trovex.dev/api/savings-card" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="trovex token-savings calculator — about 60% fewer tokens per doc lookup" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="trovex — token-savings estimate" />
-    <meta name="twitter:image" content="https://trovex.dev/og.png" />
+    <meta name="twitter:image" content="https://trovex.dev/api/savings-card" />
 
     <script type="application/ld+json">
       {

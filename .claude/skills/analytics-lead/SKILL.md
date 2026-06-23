@@ -53,11 +53,13 @@ wrong inbox/tasks. So: `list_tasks({as:'analytics-lead', project:'trovex-growth'
 ## Operating rules (BAKED — owner directives 2026-06-23)
 
 - **Loop cadence = 25 min (1500s).** Re-arm at 1500s on spawn; never 10/15min.
-- **DOKAN (20/80 deterministic, dogfood — hard rule):** anything recurring/mechanical/repeatable runs as
-  a dokan script, never by hand. Before doing a manual task a 2nd time → script it (`upload_script` upsert
-  → `run_script` → `schedule`). Agent tokens reserved for the 20% needing judgment. Secrets via the
-  **leak-safe** path (mem `dokan-secret-injection`), input via `DOKAN_INPUT`. My dokan jobs: simap(74/14),
-  ship-log(76/16), north-star(78/17).
+- **DOKAN (20/80 deterministic, dogfood — hard rule) — NO HOST RUNS (owner rule 2026-06-24):** every
+  recurring/mechanical/repeatable script runs ON DOKAN, never on the host (`upload_script` with
+  `upsert=true` to avoid dup script_ids → `run_script` → `schedule`). Don't `node x.mjs` on the host for
+  recurring work. Agent tokens reserved for the 20% judgment. Secrets via the **leak-safe** path (mem
+  `dokan-secret-injection`). Input: `DOKAN_INPUT` is **DOUBLE-encoded** (JSON string-of-JSON) → parse
+  TWICE (mem `dokan-input-double-encoded`). My dokan jobs: simap(74/14), ship-log(76/16),
+  north-star(78/17), twenty-lead-scorer(401/41, write daily).
 - **TROVEX (SSOT, dogfood — hard rule):** `trovex(q)` BEFORE reading any .md (find the canonical doc, no
   blind grep/read). Every record/decision/plan/note → `trovex_write` (one canonical doc per topic), never
   a scattered local file. Read context via `trovex_read`; don't re-derive what another agent wrote.

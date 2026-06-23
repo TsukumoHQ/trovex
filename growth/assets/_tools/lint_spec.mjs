@@ -53,6 +53,8 @@ function cardFields(cards) {
     (c.data || []).forEach((d, j) => { push(`${p}.data[${j}].label`, d.label); push(`${p}.data[${j}].value`, d.value); });
     (c.lines || []).forEach((l, j) => { push(`${p}.lines[${j}].k`, l.k); push(`${p}.lines[${j}].v`, l.v); });
     (c.items || []).forEach((it, j) => { push(`${p}.items[${j}].t`, it.t); push(`${p}.items[${j}].note`, it.note); });
+    if (c.before) { push(`${p}.before.label`, c.before.label); push(`${p}.before.value`, c.before.value); }
+    if (c.after) { push(`${p}.after.label`, c.after.label); push(`${p}.after.value`, c.after.value); }
     push(`${p}.totalK`, c.totalK); push(`${p}.totalV`, c.totalV);
   });
   return out;

@@ -7,6 +7,7 @@
 // Reads a specs JSON: [{uuid, brand:"founder"|"company", shape:"square"|"portrait",
 //   layout:"quote"|"stat"|"bars"|"twocol"|"checklist"|"receipt", kicker, headline, accent, sub, ...}]
 //   checklist adds: items:[{t, note?}] — green-check rows (rollback/audit/readiness lists)
+//   compare adds: before:{label?,value}, after:{label?,value} — struck old → green arrow → new
 // Renders each → Supabase media/<property>/social/<uuid>/<shape>.png, prints uuid→URL.
 //
 // Deps (satori/resvg) resolve via render.sh symlink. Creds: supabase.env.
@@ -90,6 +91,17 @@ function checklistEl(items) {
         h("div",{style:{display:"flex",flexDirection:"column",gap:"5px",flex:1}}, ...txt));
     }));
 }
+const ARROW = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="44" height="30"><path d="M3 15 H34 M24 5 L37 15 L24 25" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>').toString("base64")}`;
+function compareEl(c) {
+  const arrow = h("img",{src:ARROW,width:44,height:30,style:{}});
+  const box = (label, value, on) => h("div",{style:{display:"flex",flexDirection:"column",gap:"12px",flex:1,justifyContent:"center",border:`1px solid ${on?C.green:C.rule}`,backgroundColor:on?"rgba(34,197,94,0.07)":C.panel,borderRadius:"12px",padding:"28px 26px"}},
+    h("div",{style:{fontFamily:"Fira Code",fontSize:"18px",color:on?C.green:C.faint,letterSpacing:"0.02em"}}, deDash(label)),
+    h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"40px",color:on?C.ink:C.soft,letterSpacing:"-0.02em",lineHeight:1.02,...(on?{}:{textDecoration:"line-through"})}}, deDash(value)));
+  return h("div",{style:{display:"flex",alignItems:"stretch",gap:"20px"}},
+    box(c.before.label||"before", c.before.value, false),
+    h("div",{style:{display:"flex",alignItems:"center"}}, arrow),
+    box(c.after.label||"after", c.after.value, true));
+}
 function receiptEl(c, S) {
   return h("div",{style:{display:"flex",flexDirection:"column",gap:"0px",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"14px",padding:"36px 38px"}},
     h("div",{style:{fontFamily:"Fira Code",fontSize:"20px",color:C.soft,letterSpacing:"0.04em",borderBottom:`1px dashed ${C.rule}`,paddingBottom:"18px",marginBottom:"22px"}}, "savings receipt"),
@@ -107,12 +119,13 @@ function body(c, S) {
     case "bars":    return [headlineEl(c.headline,c.accent,S), barsEl(c.data), subEl(c.sub,S)].filter(Boolean);
     case "twocol":  return [headlineEl(c.headline,c.accent,S), twocolEl(c.cols), subEl(c.sub,S)].filter(Boolean);
     case "checklist": return [headlineEl(c.headline,c.accent,S), checklistEl(c.items), subEl(c.sub,S)].filter(Boolean);
+    case "compare": return [headlineEl(c.headline,c.accent,S), compareEl(c), subEl(c.sub,S)].filter(Boolean);
     case "receipt": return [c.headline?headlineEl(c.headline,c.accent,S):null, receiptEl(c,S), subEl(c.sub,S)].filter(Boolean);
     default:        return [headlineEl(c.headline,c.accent,S), subEl(c.sub,S)].filter(Boolean); // quote
   }
 }
 function card(c, S) {
-  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist";
+  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist"||c.layout==="compare";
   return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,backgroundImage:`url(${DOT})`,backgroundRepeat:"repeat",padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"20px"}},
       wordmark(brandFor(c.brand), S.mark),

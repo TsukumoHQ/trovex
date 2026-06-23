@@ -1,0 +1,36 @@
+{
+  "slug": "li-most-expensive-thing-agents-do",
+  "audience": "founder",
+  "kicker": "the operating layer",
+  "cover": {
+    "title": "the most expensive thing your agents do is re-read your codebase",
+    "accent": "re-read your codebase",
+    "sub": "no durable memory means they reconstruct context on every single run. here's the bill."
+  },
+  "slides": [
+    {
+      "title": "the tax",
+      "accent": "the tax",
+      "body": "with no durable memory, every agent run rebuilds context from zero. multiply by 30 developers' worth of agent runs and that reconstruction is most of your bill, and most of your latency."
+    },
+    {
+      "title": "the fix",
+      "accent": "the fix",
+      "heroValue": "~60%",
+      "heroLabel": "fewer tokens per lookup",
+      "body": "a canonical context layer: one current answer instead of a re-read. first-party, trovex own-run.",
+      "source": "first-party, trovex own-run"
+    },
+    {
+      "title": "it's not really a cost problem",
+      "accent": "not really a cost problem",
+      "body": "context is a reliability problem wearing a cost problem's clothes. the agent acting on stale context ships the wrong call. the bill is just the part you noticed first."
+    }
+  ],
+  "cta": {
+    "title": "how agents should remember your codebase",
+    "accent": "remember your codebase",
+    "sub": "once, correctly, and shared. not from scratch, every run.",
+    "foot": "trovex.dev"
+  }
+}

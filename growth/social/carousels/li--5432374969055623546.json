@@ -1,0 +1,37 @@
+{
+  "slug": "li-honest-way-to-measure-agent-roi",
+  "audience": "founder",
+  "kicker": "ai readiness",
+  "cover": {
+    "title": "measuring ai roi as headcount you didn't hire is easy to fake, and easy to regret",
+    "accent": "easy to fake",
+    "sub": "the layoff math feels clean. it's also the number you'll cut first. here's the honest one."
+  },
+  "slides": [
+    {
+      "title": "the honest measure",
+      "accent": "honest measure",
+      "body": "throughput and capability per senior you actually trust. not bodies removed. work shipped, at a standard you'd sign off on."
+    },
+    {
+      "title": "what to track",
+      "accent": "what to track",
+      "items": [
+        "cycle time, idea to merged",
+        "review pass rate on agent output",
+        "senior time moved from typing to deciding"
+      ]
+    },
+    {
+      "title": "none of these is a layoff",
+      "accent": "none of these",
+      "body": "and that's the point. frame ai as headcount saved and you'll cut it the first bad quarter. frame it as capacity and it survives."
+    }
+  ],
+  "cta": {
+    "title": "the honest way to measure agent roi",
+    "accent": "honest way",
+    "sub": "capacity per senior you trust, not headcount you didn't hire.",
+    "foot": "trovex.dev"
+  }
+}

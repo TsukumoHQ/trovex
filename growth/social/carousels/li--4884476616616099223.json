@@ -1,0 +1,35 @@
+{
+  "slug": "li-your-agents-dont-share-memory",
+  "audience": "founder",
+  "kicker": "fleet memory",
+  "cover": {
+    "title": "your agents don't share a memory",
+    "accent": "don't share",
+    "sub": "each one learns your system alone, then drifts. here's the failure, and the fix."
+  },
+  "slides": [
+    {
+      "title": "the same lesson, twice",
+      "accent": "twice",
+      "body": "agent A learns the rollback the hard way. agent B, an hour later, re-derives it and lands on the version you already killed. no shared memory, no shared truth."
+    },
+    {
+      "title": "the fix",
+      "accent": "the fix",
+      "pairs": [
+        {"broke": "every agent keeps its own private copy of the truth", "fix": "one store. every read and write goes through it. that's trovex."}
+      ]
+    },
+    {
+      "title": "the hard part isn't the store",
+      "accent": "the hard part",
+      "body": "it's the discipline of routing a whole team's agents through one source of truth, every time. the tool is easy. the habit is the work."
+    }
+  ],
+  "cta": {
+    "title": "where does your fleet's truth live",
+    "accent": "your fleet's truth",
+    "sub": "if the answer is 'in each agent's head,' they're already drifting apart.",
+    "foot": "trovex.dev"
+  }
+}

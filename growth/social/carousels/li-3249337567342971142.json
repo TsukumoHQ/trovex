@@ -1,0 +1,37 @@
+{
+  "slug": "li-second-agent-is-an-operating-problem",
+  "audience": "founder",
+  "kicker": "orchestration",
+  "cover": {
+    "title": "one agent is a demo. a second is an operating problem.",
+    "accent": "an operating problem",
+    "sub": "the moment two agents touch one repo, you have a coordination problem nobody demos."
+  },
+  "slides": [
+    {
+      "title": "what breaks first",
+      "accent": "breaks first",
+      "body": "two agents on one repo edit the same file and undo each other. no crash, no error. just silently lost work and a confused human."
+    },
+    {
+      "title": "coordination is the unglamorous middle",
+      "accent": "unglamorous middle",
+      "items": [
+        "who owns what",
+        "how they hand off",
+        "how a human reads what the group did"
+      ]
+    },
+    {
+      "title": "get it right",
+      "accent": "get it right",
+      "body": "and capacity scales with your seniors' judgment instead of fighting it. it's orchestration and ops, not prompting."
+    }
+  ],
+  "cta": {
+    "title": "coordinate agents without chaos",
+    "accent": "without chaos",
+    "sub": "ownership, handoffs, and a legible trail. the boring parts that make a fleet actually work.",
+    "foot": "trovex.dev"
+  }
+}

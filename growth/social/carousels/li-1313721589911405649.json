@@ -1,0 +1,40 @@
+{
+  "slug": "li-pilots-die-in-the-gap",
+  "audience": "founder",
+  "kicker": "ai readiness",
+  "cover": {
+    "title": "a demo and production are different sports",
+    "accent": "different sports",
+    "sub": "most ai pilots die in the gap between them. here's what never shows up in the demo."
+  },
+  "slides": [
+    {
+      "title": "the gap",
+      "accent": "the gap",
+      "pairs": [
+        {"broke": "a demo runs once, on a clean path you chose", "fix": "production runs constantly, on messy paths you didn't"}
+      ]
+    },
+    {
+      "title": "what a demo never shows",
+      "accent": "never shows",
+      "items": [
+        "stale context: agents citing docs you deleted months ago",
+        "silent failures: green checks, quietly wrong output",
+        "two agents editing one file, undoing each other",
+        "agents that can't explain what they just did"
+      ]
+    },
+    {
+      "title": "the real question",
+      "accent": "real question",
+      "body": "not 'did it work once?' but 'will it run unattended, signed off by the seniors who own the system?'"
+    }
+  ],
+  "cta": {
+    "title": "where pilots die",
+    "accent": "where pilots die",
+    "sub": "in the gap between a clean demo and your messy production. that gap is the whole problem.",
+    "foot": "trovex.dev"
+  }
+}

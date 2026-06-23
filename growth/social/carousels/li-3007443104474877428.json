@@ -1,0 +1,36 @@
+{
+  "slug": "li-cheaper-is-the-wrong-case",
+  "audience": "founder",
+  "kicker": "the operating model",
+  "cover": {
+    "title": "cheaper is the wrong ai business case",
+    "accent": "the wrong",
+    "sub": "'ship the same software with fewer people' is a mispriced goal. here's the one that isn't."
+  },
+  "slides": [
+    {
+      "title": "what cheap erodes",
+      "accent": "erodes",
+      "body": "optimize for fewer people and you quietly trade away the standards worth keeping: review depth, current context, the senior judgment that catches the wrong call."
+    },
+    {
+      "title": "one real number",
+      "accent": "one real number",
+      "heroValue": "~60%",
+      "heroLabel": "fewer tokens per lookup",
+      "body": "a canonical context layer cut our agents' context to ~60% fewer tokens per lookup. first-party, trovex own-run.",
+      "source": "first-party, trovex own-run"
+    },
+    {
+      "title": "the goal that isn't mispriced",
+      "accent": "isn't mispriced",
+      "body": "done well, ai is the team you already trust, made more capable. that compounds. cheap doesn't."
+    }
+  ],
+  "cta": {
+    "title": "what agents actually cost",
+    "accent": "actually cost",
+    "sub": "the bill isn't the license. it's the context they re-read on every single run.",
+    "foot": "trovex.dev"
+  }
+}

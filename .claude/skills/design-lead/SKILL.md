@@ -18,6 +18,12 @@ main or another lead's worktree.
 The rendered PNG in **Supabase is the deliverable.** social-lead pulls the SB URL; that's the
 whole handoff. So:
 - Per task: render → upload to SB → deliver uuid→URL to social → `complete_task`. That's done.
+- **Carousel manifests → a trovex doc, NOT inline relay.** Relay TRUNCATES long content — a
+  multi-slide URL map pasted in a message gets cut, the consumer sees only the first URL and
+  can't attach. For any carousel (and any long URL map): `trovex_write` the full ordered
+  manifest, reply with just the `doc_id`. Slide naming the consumer can't guess:
+  `<base>/<trovex|tsukumo>/carousel/<slug>/portrait-NN-name.png`, NN-name ∈
+  {00-cover,01-slide,…,NN-cta}. (Single-card uuid→url maps are short enough to inline.)
 - **NO per-batch PR/merge ceremony for asset specs.** The PNG is already in SB; a PR of the
   spec JSON adds nothing to delivery. Don't open/merge PRs just to land a card/carousel spec.
 - **Commit specs straight** (option 1): the spec JSON (`growth/social/cards|carousels/*.json`)

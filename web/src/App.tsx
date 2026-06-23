@@ -397,7 +397,8 @@ export default function App() {
             {/* Above-fold proof of the aha (the savings number). The dashboard below is the
                 visual proof, but it sits below the fold — this carries the ~60% up top. */}
             <p className="hero-proof">
-              <b>~60% fewer tokens</b> per lookup · same answers · measured, not marketing
+              <b>~60% fewer tokens</b> per lookup · same answers · measured, not marketing ·{' '}
+              <a className="hero-proof-link" href="/savings" onClick={() => track('cta_clicked', { cta_id: 'estimate-savings', location: 'hero' })}>estimate it on your numbers →</a>
             </p>
             {/* The install command IS the primary action (uv pattern): copy + run,
                 no scroll, no signup. command_copied = the install-intent signal. */}
@@ -498,6 +499,14 @@ export default function App() {
                 <li><CopyCmd cmd="trovex index /path/to/your/repo" id="index" /></li>
                 <li><CopyCmd cmd={'trovex search "how do we roll back a deploy?"'} id="search" /> and it prints the tokens it saved.</li>
               </ol>
+              <p className="start-setup">
+                Then point your agent at it:{' '}
+                <a href="/for/claude-code" onClick={() => track('setup_clicked', { location: 'start', tool: 'claude-code' })}>Claude Code</a> ·{' '}
+                <a href="/for/cursor" onClick={() => track('setup_clicked', { location: 'start', tool: 'cursor' })}>Cursor</a> ·{' '}
+                <a href="/for/windsurf" onClick={() => track('setup_clicked', { location: 'start', tool: 'windsurf' })}>Windsurf</a> ·{' '}
+                <a href="/for/zed" onClick={() => track('setup_clicked', { location: 'start', tool: 'zed' })}>Zed</a> ·{' '}
+                <a href="/for/" onClick={() => track('setup_clicked', { location: 'start', tool: 'all' })}>all editors →</a>
+              </p>
               <div className="hero-cta">
                 <a className="btn btn-primary" href={GITHUB} target="_blank" rel="noopener noreferrer" onClick={() => trackInstallClick('start')}>star on GitHub</a>
               </div>

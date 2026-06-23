@@ -121,6 +121,10 @@ a { color: inherit; text-decoration: none; }
    proof sits below the fold). Green number = the figure does the work; not a CTA. */
 .hero-proof { margin: 16px auto 0; font-size: clamp(14px, 1.6vw, 17px); color: var(--fg-subtle); letter-spacing: 0.01em; }
 .hero-proof b { color: var(--accent); font-weight: 600; }
+/* Quiet text link on the proof line — turns the static ~60% claim into a self-serve
+   receipt on the dev's own numbers. Not a button: the install command stays the one CTA. */
+.hero-proof-link { color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--accent-line); white-space: nowrap; transition: color .15s; }
+.hero-proof-link:hover { color: var(--accent); }
 .hero-install { display: inline-flex; align-items: center; gap: 12px; margin: 32px auto 0; padding: 11px 14px; background: var(--bg-input); border: 1px solid var(--accent-line); border-radius: var(--radius); max-width: min(100%, 580px); }
 .hero-install-lab { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); flex-shrink: 0; }
 .hero-install .cmd-row { flex: 1; min-width: 0; justify-content: space-between; }
@@ -325,6 +329,11 @@ a { color: inherit; text-decoration: none; }
 .cta-note { margin-top: 16px; font-family: var(--font-mono); font-size: 12.5px; color: var(--fg-subtle); }
 .start-steps { list-style: decimal; text-align: left; max-width: 60ch; margin: 0 auto 28px; padding-left: 1.4em; display: grid; gap: 12px; color: var(--fg-muted); font-size: 15px; }
 .start-steps code { font-size: 13px; }
+/* Activation→retention bridge: after the aha (step 3 prints the savings), point the
+   dev at the per-tool setup pages so they can actually wire their agent. Nav, not prose. */
+.start-setup { max-width: 60ch; margin: -12px auto 28px; font-size: 14px; color: var(--fg-subtle); letter-spacing: 0.01em; }
+.start-setup a { color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--accent-line); transition: color .15s; }
+.start-setup a:hover { color: var(--accent); }
 .cmd-row { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cmd-copy { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 2px 7px; cursor: pointer; transition: color .15s, border-color .15s; }
 .cmd-copy:hover { color: var(--accent); border-color: var(--accent); }

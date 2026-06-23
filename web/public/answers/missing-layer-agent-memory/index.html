@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/missing-layer-agent-memory/" />
+  <title>What's the missing layer in agent memory?</title>
+  <meta name="description" content="The 7 types of agent memory are all per-agent recall — none is the one current answer a whole team maintains and writes back to. That missing layer is a shared canonical source of truth, and it's separate from memory and RAG." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/missing-layer-agent-memory/" />
+  <meta property="og:title" content="What's the missing layer in agent memory?" />
+  <meta property="og:description" content="The 7 memory types are per-agent recall. The missing layer is one current source of truth the whole fleet writes back to." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="What's the missing layer in agent memory?" />
+  <meta name="twitter:description" content="The 7 memory types are per-agent recall. The missing layer is one current source of truth the fleet writes back to." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "What's the missing layer in agent memory?", "item": "https://trovex.dev/answers/missing-layer-agent-memory/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "What is a source of truth for AI agents?", "acceptedAnswer": { "@type": "Answer", "text": "A source of truth for AI agents is one shared store that serves the single current, authoritative doc per topic — marked canonical, stale, or duplicate — that every agent reads from and writes back to. Unlike per-agent memory, it is maintained by the team and shared by the whole fleet, so agents work from the same current answer instead of separate recollections." } },
+          { "@type": "Question", "name": "Does a canonical layer replace the 7 types of agent memory?", "acceptedAnswer": { "@type": "Answer", "text": "No. The seven memory types still do their jobs — working, episodic, semantic, procedural, long-term, shared, and entity recall. A canonical context layer sits alongside them as the shared current truth the fleet writes back to. It complements memory; it does not replace it." } },
+          { "@type": "Question", "name": "Why isn't a long-term memory store enough?", "acceptedAnswer": { "@type": "Answer", "text": "A long-term store remembers what one agent saved; it does not guarantee which version is current or authoritative for the team. Two agents can each have rich memory and still disagree. The missing layer is freshness plus authority plus write-back — one current answer, shared, kept current as agents learn." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-23", "dateModified": "2026-06-23",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "What's the missing layer in agent memory?",
+          "text": "People list 7 types of agent memory, but my agents still re-derive the same answers and disagree with each other. What layer is actually missing?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/missing-layer-agent-memory/",
+            "text": "The seven types of agent memory are all per-agent recall — working, episodic, semantic, procedural, long-term, shared, and entity. None of them is the one current answer a whole team maintains and writes back to. The missing layer is a shared canonical source of truth: one current, authoritative doc per topic, freshness-marked, that every agent reads from and writes back to. It's separate from memory (which recalls an agent's own past) and from RAG (which fetches by similarity)."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / The missing layer in agent memory
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-23">23 June 2026</time></p>
+    <h1>What's the missing layer in agent memory?</h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>The <a href="/glossary/agent-memory/">seven types of agent memory</a> are all per-agent recall — working, episodic, semantic, procedural, long-term, shared, and entity. None of them is the one current answer a whole team maintains and writes back to. The missing layer is a <strong>shared canonical source of truth</strong>: one current, authoritative doc per topic, freshness-marked, that every agent reads from and writes back to.</p>
+    </div>
+
+    <h2>Why the 7 types don't cover it</h2>
+    <p class="lead-answer">Every one of the seven is about what a <em>single</em> agent retains. Working memory holds the current run; episodic, semantic, and procedural stores recall that agent's own past; even "shared" and "long-term" memory are still recollection — what got saved, not what is authoritative <em>right now</em> for the team. So two agents can each have rich memory and still disagree, because each remembers a different version of "how deploys work." The question none of them answers is: <strong>what is current, right now, across the whole fleet?</strong></p>
+
+    <h2>The missing layer: a source of truth the fleet writes back to</h2>
+    <p class="lead-answer">That layer is a <a href="/glossary/canonical-context-layer/">canonical context layer</a> — one shared store that serves the single current, authoritative doc per topic with a <a href="/glossary/freshness-marker/">freshness marker</a> (canonical, stale, or duplicate), and that agents <strong>write back</strong> to as they learn. It's not a smarter memory and not a bigger model; it's the team's current truth, shared. It sits alongside the seven memory types and any RAG stack — it doesn't replace them. For the full argument, see the long-form: <a href="https://tsukumo.ch/blog/canonical-doc-layer-agent-memory-types" target="_blank" rel="noopener noreferrer">the canonical-doc layer the 7 agent-memory types miss</a>.</p>
+
+    <h2>Why it matters: re-derivation and cost</h2>
+    <p class="lead-answer">Without that layer, agents re-derive answers other agents already worked out, because the result was never written somewhere authoritative they could read. That's wasted tokens and confidently-wrong answers from stale copies. Serve the one current doc instead and a lookup costs about <strong>60% fewer tokens</strong>, and the agent reads the answer that's actually current.</p>
+
+    <h2>How trovex provides it</h2>
+    <p class="lead-answer"><a href="/">trovex</a> is that shared layer, run locally. It indexes your docs, returns the one current section that answers a query as a <code>path:line</code> pointer marked canonical / stale / duplicate, and exposes a write path so agents save canonical <a href="/glossary/record/">records</a> back through one shared point. SQLite + ONNX, no cloud, no API keys.</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/agent-memory-vs-rag/">What's the difference between agent memory and retrieval (RAG)?</a></li>
+        <li><a href="/answers/source-of-truth-multi-agent-repos/">What's the single source of truth for a multi-agent repo?</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="https://tsukumo.ch/blog/canonical-doc-layer-agent-memory-types" target="_blank" rel="noopener noreferrer">Long-form: the canonical-doc layer the 7 memory types miss</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">What is a source of truth for AI agents?</p>
+        <p class="faq-a">A source of truth for AI agents is one shared store that serves the single current, authoritative doc per topic — marked canonical, stale, or duplicate — that every agent reads from and writes back to. Unlike per-agent memory, it is maintained by the team and shared by the whole fleet, so agents work from the same current answer instead of separate recollections.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does a canonical layer replace the 7 types of agent memory?</p>
+        <p class="faq-a">No. The seven memory types still do their jobs — working, episodic, semantic, procedural, long-term, shared, and entity recall. A canonical context layer sits alongside them as the shared current truth the fleet writes back to. It complements memory; it does not replace it.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Why isn't a long-term memory store enough?</p>
+        <p class="faq-a">A long-term store remembers what one agent saved; it does not guarantee which version is current or authoritative for the team. Two agents can each have rich memory and still disagree. The missing layer is freshness plus authority plus write-back — one current answer, shared, kept current as agents learn.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Give your fleet the missing layer.</h2>
+      <p>One current answer per query, with a freshness marker — in about a minute.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install git+https://github.com/TsukumoHQ/trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

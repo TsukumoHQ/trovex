@@ -164,6 +164,15 @@
   transition: border-color 0.15s var(--ease);
 }
 .sv-share-btn:hover { border-color: var(--accent-line); }
+.sv-share-btn--x {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.sv-share-btn--x:hover { background: var(--accent-soft, var(--bg-card)); }
 
 .sv-consult {
   text-align: center;

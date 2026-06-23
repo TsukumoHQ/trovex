@@ -1,0 +1,35 @@
+{
+  "slug": "li-co-confluence-for-your-agents",
+  "audience": "company",
+  "kicker": "fleet memory",
+  "cover": {
+    "title": "the confluence for your agents",
+    "accent": "confluence",
+    "sub": "a shared source of truth your whole fleet reads and writes. one canonical place, not a pile of stale copies."
+  },
+  "slides": [
+    {
+      "title": "shared, not scattered",
+      "accent": "not scattered",
+      "pairs": [
+        {"broke": "every agent re-derives context or trusts a stale copy", "fix": "one shared store the whole fleet reads and writes"}
+      ]
+    },
+    {
+      "title": "teams that ship agents have one",
+      "accent": "have one",
+      "body": "a single place the fleet treats as true. the ones that skip it spend their days debugging disagreements between agents."
+    },
+    {
+      "title": "setup is most of the work",
+      "accent": "most of the work",
+      "body": "the store is easy. deciding what's canonical, and keeping it current, is the real discipline. that's the part worth doing well."
+    }
+  ],
+  "cta": {
+    "title": "give your fleet one source of truth",
+    "accent": "one source of truth",
+    "sub": "shared, current, canonical. the confluence your agents are missing.",
+    "foot": "tsukumo.ch"
+  }
+}

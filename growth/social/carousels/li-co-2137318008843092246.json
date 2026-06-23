@@ -1,0 +1,40 @@
+{
+  "slug": "li-co-straight-read-on-your-repo",
+  "audience": "company",
+  "kicker": "ai readiness",
+  "cover": {
+    "title": "the first step isn't a pitch, it's a straight read on your repo",
+    "accent": "a straight read",
+    "sub": "before any tool, a plain assessment of where you actually stand. useful even if you buy nothing."
+  },
+  "slides": [
+    {
+      "title": "what a straight read gives you",
+      "accent": "straight read",
+      "items": [
+        "where agents already help on your stack",
+        "where they break on your codebase",
+        "which readiness gap is blocking you right now"
+      ]
+    },
+    {
+      "title": "the six readiness gaps",
+      "accent": "six readiness gaps",
+      "items": [
+        "context, orchestration, observability",
+        "operating model, team trust, governance"
+      ]
+    },
+    {
+      "title": "useful either way",
+      "accent": "either way",
+      "body": "ready, and you move. not ready, and you know exactly what to fix first. no pitch required."
+    }
+  ],
+  "cta": {
+    "title": "get the straight read",
+    "accent": "straight read",
+    "sub": "a plain assessment of your repo and your six readiness gaps.",
+    "foot": "tsukumo.ch"
+  }
+}

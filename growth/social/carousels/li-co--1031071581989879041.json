@@ -1,0 +1,38 @@
+{
+  "slug": "li-co-seniors-right-not-to-trust",
+  "audience": "company",
+  "kicker": "ai readiness",
+  "cover": {
+    "title": "your seniors are right not to trust agents yet",
+    "accent": "right not to trust",
+    "sub": "their distrust isn't resistance. it's a requirements doc. here's what it's asking for."
+  },
+  "slides": [
+    {
+      "title": "distrust is a spec",
+      "accent": "a spec",
+      "body": "when a senior says 'i don't trust it in prod,' that isn't a blocker. it's a list of conditions the system hasn't met yet. write them down."
+    },
+    {
+      "title": "what reliable-in-prod means",
+      "accent": "reliable-in-prod",
+      "items": [
+        "scoped permissions, not root access",
+        "review gates before anything merges",
+        "observability, per agent",
+        "trusted, current context"
+      ]
+    },
+    {
+      "title": "then the real question",
+      "accent": "real question",
+      "body": "stops being 'do we trust the agent?' and becomes 'do we trust the controls around it?' that one your seniors can actually answer."
+    }
+  ],
+  "cta": {
+    "title": "make ai coding agents reliable",
+    "accent": "reliable",
+    "sub": "scoped, gated, observable, current. the controls your seniors are really asking for.",
+    "foot": "tsukumo.ch"
+  }
+}

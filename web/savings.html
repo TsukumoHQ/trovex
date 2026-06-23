@@ -58,6 +58,43 @@
             "isAccessibleForFree": true,
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
             "publisher": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "How many tokens do coding agents waste rereading the repo?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Every session, coding agents reread several candidate docs to work out which one is current. trovex serves the single canonical answer instead — about 60% fewer tokens per doc lookup at typical settings. Estimate your own number with the calculator on this page."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "How is the token-savings estimate calculated?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "It compares the top few candidate docs an agent reads to triage without trovex against one canonical doc plus a small pointer with trovex. It uses the same model as the product's own savings number (src/trovex/savings.py), and every input is an editable, labeled assumption."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does the calculator send my code or data anywhere?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. The calculator runs client-side in your browser and nothing leaves the page. trovex itself is local-first — no cloud, no API keys; your docs stay on your machine."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is the token-savings calculator free?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. It is free, with no account and no signup. trovex is open source and in public beta."
+                }
+              }
+            ]
           }
         ]
       }

@@ -35,6 +35,7 @@
 - [How do I keep multiple agents working from the same docs?](https://trovex.dev/answers/shared-source-of-truth-multiple-agents/): one shared read-and-write point, no drift.
 - [Is there an MCP server that serves a repo's docs to coding agents?](https://trovex.dev/answers/mcp-server-for-repo-docs/): yes — trovex is an MCP server that returns the one canonical doc per query, not the whole repo.
 - [What's the single source of truth for a multi-agent repo?](https://trovex.dev/answers/source-of-truth-multi-agent-repos/): one canonical, freshness-marked doc every agent reads and writes back, instead of each agent guessing from raw files.
+- [What's the difference between agent memory and retrieval (RAG)?](https://trovex.dev/answers/agent-memory-vs-rag/): memory is an agent's recall of its own past; RAG is on-demand fetch from a corpus; neither gives a fleet one current source of truth — that's a separate shared canonical-context layer.
 - [All answers](https://trovex.dev/answers/)
 
 ## Setup (per MCP client)

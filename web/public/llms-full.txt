@@ -125,6 +125,18 @@ teammate reads that record back instead of re-deriving it. With one point of pas
 and writes there are no copies to drift and nothing to sync — a single source of truth by
 construction. trovex implements this with a shared write path.
 
+### What's the difference between agent memory and retrieval (RAG)?
+Agent memory is what an agent retains about its own past — its working context during a run, plus
+stores of past events (episodic), facts (semantic), and how-to (procedural). RAG fetches the
+top-k most similar chunks from a corpus at query time. Memory is recall of your own history; RAG
+is on-demand lookup by similarity. They solve different problems, and neither one gives a fleet of
+agents a single current source of truth: per-agent memory drifts, and RAG ranks by similarity so
+it returns stale and duplicate copies alongside the right one. The missing piece is a canonical
+context layer — one shared store that serves the single current, authoritative doc per topic with
+a canonical/stale/duplicate marker, that every agent reads from and writes back to. trovex is that
+layer; it sits alongside an agent's memory and any RAG stack, not in place of them, at about 60%
+fewer tokens per lookup.
+
 ---
 
 ## FAQ

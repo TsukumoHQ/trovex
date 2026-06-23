@@ -36,7 +36,7 @@ Per task:
 ## Dogfood: dokan + trovex (HARD — owner rule)
 
 - **dokan for the 80%.** Recurring / mechanical / repeatable work runs as a dokan script, never by hand a 2nd time. Reserve agent tokens for the 20% that needs judgment. **Voice-lint = dokan `script 342` (`voice-lint`, node):** run it on every copy draft for the mechanical scan (banned words, em-dash, exclamation, wordmark casing, proof-discipline %); you judge tone / angle / salesiness. Contract: input via `DOKAN_INPUT` (double-encoded — parse-twice guard), result via `::dokan:result::`. Daemon `http://127.0.0.1:8088/mcp` (Bearer `~/.config/dokan/token`); if MCP tools absent, drive via curl JSON-RPC (initialize→session-id→call). See [[dokan-runtime]].
-- **trovex = SSOT.** `trovex(q)` before reading any `.md`; `trovex_write` every record / decision / plan / digest (ONE canonical doc per topic), never a scattered local file. Read context via `trovex_read`; don't re-derive what another agent already wrote.
+- **trovex = SSOT.** `trovex(q)` before reading any `.md`; `trovex_write` every record / decision / plan / digest (ONE canonical doc per topic), never a scattered local file. Read context via `trovex_read`; don't re-derive what another agent already wrote. **START every doc with a `# Title` (H1) line** — trovex derives the listing/search title from the first `# `; a doc that opens with `## ` shows as "Untitled" and is unfindable (owner hygiene rule 2026-06-23).
 
 ## Process discipline (doc + SKILL gate — both, always)
 

@@ -123,6 +123,11 @@ const UTM_SOURCE: Record<string, GeoSource> = {
   wraith: 'referral',
   trovex: 'referral',
   yoru: 'referral',
+  // Owned-property + outreach sources — without these they decay to geo_source='unknown'.
+  // blog = tsukumo.ch/blog → trovex.dev links (utm_campaign=blog; powers the Blog-ROI panel).
+  // outbound = donna's warm outreach (utm_medium=outbound). Both bucket as referral (not a cold channel).
+  blog: 'referral',
+  outbound: 'referral',
 }
 
 const AI_ENGINES: GeoSource[] = ['chatgpt', 'perplexity', 'claude', 'gemini', 'copilot']

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/glossary/canonical-context-layer/" />
+  <title>What is a canonical context layer? | trovex glossary</title>
+  <meta name="description" content="A canonical context layer is one shared store that holds the single current, authoritative doc per topic — freshness-marked — that every agent in a fleet reads from and writes back to, so they share one source of truth instead of separate, drifting memories." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/glossary/canonical-context-layer/" />
+  <meta property="og:title" content="What is a canonical context layer? | trovex glossary" />
+  <meta property="og:description" content="One shared store of the current, authoritative doc per topic that every agent reads from and writes back to — the fleet's source of truth, not per-agent memory." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="What is a canonical context layer? | trovex glossary" />
+  <meta name="twitter:description" content="One shared store of the current, authoritative doc per topic the whole fleet reads and writes back to." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+        { "@type": "ListItem", "position": 2, "name": "Glossary", "item": "https://trovex.dev/glossary/" },
+        { "@type": "ListItem", "position": 3, "name": "Canonical context layer", "item": "https://trovex.dev/glossary/canonical-context-layer/" }
+      ]
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://trovex.dev/glossary/canonical-context-layer/#term",
+      "name": "canonical context layer",
+      "description": "A canonical context layer is one shared store that holds the single current, authoritative doc per topic, freshness-marked, that every agent in a fleet reads from and writes back to, so they share one source of truth instead of separate, drifting memories.",
+      "inDefinedTermSet": "https://trovex.dev/glossary/"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://trovex.dev/glossary/canonical-context-layer/#write-back-memory",
+      "name": "write-back memory",
+      "description": "Write-back memory is when an agent saves what it learned back into the shared store once, through a single point, so the next agent or session reads it instead of re-deriving it. It is the mechanism that keeps a canonical context layer current.",
+      "inDefinedTermSet": "https://trovex.dev/glossary/"
+    },
+    {
+      "@type": "QAPage",
+      "datePublished": "2026-06-23",
+      "dateModified": "2026-06-23",
+      "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+      "mainEntity": {
+        "@type": "Question",
+        "name": "What is a canonical context layer?",
+        "text": "What is a canonical context layer for AI coding agents, and how is it different from agent memory?",
+        "answerCount": 1,
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "url": "https://trovex.dev/glossary/canonical-context-layer/",
+          "text": "A canonical context layer is one shared store that holds the single current, authoritative doc per topic, freshness-marked, that every agent in a fleet reads from and writes back to, so they share one source of truth instead of separate, drifting memories. Per-agent memory recalls one agent's own past; the canonical context layer is the team's current truth that all agents share."
+        }
+      }
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/glossary/">Glossary</a> / Canonical context layer
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-23">23 June 2026</time></p>
+    <h1>What is a canonical context layer?</h1>
+
+    <div class="verdict">
+      <div class="l">Definition</div>
+      <p><strong>A canonical context layer is</strong> one shared store that holds the single current, authoritative doc per topic — freshness-marked — that every agent in a fleet reads from and writes back to, so they share one source of truth instead of separate, drifting memories.</p>
+    </div>
+
+    <p class="lead-answer">Most of what people call <a href="/glossary/agent-memory/">agent memory</a> is per-agent recall: an agent remembering its own past runs, facts, and procedures. That's useful, but it's private and it drifts — two agents can each remember a different "how deploys work." The canonical context layer sits one level up: it is the team's <em>current</em> truth, shared, not any one agent's recollection.</p>
+
+    <h2>The three properties that make it canonical</h2>
+    <ul>
+      <li><strong>One current doc per topic.</strong> Not the top-k similar files — the one that is authoritative right now, with the stale and duplicate copies marked as such by a <a href="/glossary/freshness-marker/">freshness marker</a>.</li>
+      <li><strong>Shared across the fleet.</strong> Every agent and teammate reads through the same point, so there's no per-agent copy to fall out of sync. That's what makes it a <a href="/glossary/ssot-for-agents/">single source of truth for agents</a>.</li>
+      <li><strong>Written back, not just read.</strong> The layer stays current because agents <strong>write-back</strong> what they learn into it.</li>
+    </ul>
+
+    <h2>Write-back memory: the part that keeps it current</h2>
+    <p class="lead-answer"><strong>Write-back memory</strong> is when an agent saves what it learned back into the shared store once, through a single point, so the next agent reads it instead of re-deriving it. Without write-back, a context layer is read-only and goes stale the day it ships; with it, every solved problem becomes a <a href="/glossary/record/">record</a> the rest of the fleet inherits. Write-back is what turns a static doc dump into a living source of truth, and it's the direct fix for <a href="/glossary/re-derivation/">re-derivation</a>.</p>
+
+    <h2>How trovex implements it</h2>
+    <p class="lead-answer"><a href="/">trovex</a> is a canonical context layer you run locally. It indexes your docs, returns the one current section that answers a query as a <code>path:line</code> pointer marked canonical / stale / duplicate, and exposes a write path so agents save canonical records back through a single shared point. Serving the one current section instead of a pile of candidates is about <strong>60% fewer tokens per lookup</strong>. SQLite + ONNX, no cloud, no API keys — your docs never leave your machine.</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/agent-memory-vs-rag/">What's the difference between agent memory and retrieval (RAG)?</a></li>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+      </ul>
+    </div>
+
+    <div class="related">
+      <div class="l">Related terms</div>
+      <ul>
+        <li><a href="/glossary/agent-memory/">agent memory</a></li>
+        <li><a href="/glossary/canonical-doc/">canonical doc</a></li>
+        <li><a href="/glossary/ssot-for-agents/">SSOT for agents</a></li>
+        <li><a href="/glossary/record/">record</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Give your fleet one source of truth.</h2>
+      <p>One current answer per query, with a freshness marker, in about a minute.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install git+https://github.com/TsukumoHQ/trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

@@ -103,6 +103,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://trovex.dev/answers/agent-memory-vs-rag/</loc>
+    <lastmod>2026-06-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://trovex.dev/answers/bigger-context-window-rereading/</loc>
     <lastmod>2026-06-19</lastmod>
     <changefreq>monthly</changefreq>
@@ -255,6 +261,18 @@
   <url>
     <loc>https://trovex.dev/glossary/ssot-for-agents/</loc>
     <lastmod>2026-06-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://trovex.dev/glossary/agent-memory/</loc>
+    <lastmod>2026-06-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://trovex.dev/glossary/canonical-context-layer/</loc>
+    <lastmod>2026-06-23</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>

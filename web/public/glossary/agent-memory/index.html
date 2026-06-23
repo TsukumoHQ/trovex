@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/glossary/agent-memory/" />
+  <title>What is agent memory? The 7 types, plainly | trovex glossary</title>
+  <meta name="description" content="Agent memory is how an AI agent retains and recalls information across a run or across sessions — working, episodic, semantic, procedural, long-term, shared, and entity memory. Most of it is per-agent recall; the shared current source of truth is a separate layer." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/glossary/agent-memory/" />
+  <meta property="og:title" content="What is agent memory? The 7 types, plainly | trovex glossary" />
+  <meta property="og:description" content="Agent memory is how an AI agent retains and recalls information across a run or across sessions: working, episodic, semantic, procedural, long-term, shared, and entity memory." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="What is agent memory? The 7 types, plainly | trovex glossary" />
+  <meta name="twitter:description" content="The 7 types of agent memory, plainly — and where a shared canonical source of truth fits." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+        { "@type": "ListItem", "position": 2, "name": "Glossary", "item": "https://trovex.dev/glossary/" },
+        { "@type": "ListItem", "position": 3, "name": "Agent memory", "item": "https://trovex.dev/glossary/agent-memory/" }
+      ]
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://trovex.dev/glossary/agent-memory/#term",
+      "name": "agent memory",
+      "description": "Agent memory is how an AI agent retains and recalls information across a run or across sessions, so it does not start from zero each time. It usually spans seven types: working, episodic, semantic, procedural, long-term, shared, and entity memory.",
+      "inDefinedTermSet": "https://trovex.dev/glossary/"
+    },
+    {
+      "@type": "QAPage",
+      "datePublished": "2026-06-23",
+      "dateModified": "2026-06-23",
+      "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+      "mainEntity": {
+        "@type": "Question",
+        "name": "What is agent memory?",
+        "text": "What is agent memory in AI coding agents, and what are the types?",
+        "answerCount": 1,
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "url": "https://trovex.dev/glossary/agent-memory/",
+          "text": "Agent memory is how an AI agent retains and recalls information across a run or across sessions, so it does not start from zero each time. It usually spans seven types: working memory (the current run), episodic memory (past events), semantic memory (facts), procedural memory (how-to), long-term memory (a durable store), shared memory (knowledge across agents), and entity memory (per-user or per-object profiles). Most of these are per-agent recall; a current, authoritative source of truth a whole fleet reads is a separate, shared layer."
+        }
+      }
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/glossary/">Glossary</a> / Agent memory
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-23">23 June 2026</time></p>
+    <h1>What is agent memory?</h1>
+
+    <div class="verdict">
+      <div class="l">Definition</div>
+      <p><strong>Agent memory is</strong> how an AI agent retains and recalls information across a run or across sessions, so it doesn't start from zero each time. It usually spans seven types — working, episodic, semantic, procedural, long-term, shared, and entity memory.</p>
+    </div>
+
+    <p class="lead-answer">"Memory" is a loose word in agent systems, and taxonomies vary by source. The useful split is between memory an agent keeps about <em>its own</em> past, and the one current source of truth a <em>whole team of agents</em> reads. Below are the seven types people usually mean, then where that shared layer fits — because they're often confused.</p>
+
+    <h2>The 7 types of agent memory</h2>
+    <ol>
+      <li><strong>Working memory</strong> — what the agent holds during the current run: the prompt, retrieved docs, and its own output, all inside the <a href="/glossary/context-window/">context window</a>. Volatile; it's gone when the run ends.</li>
+      <li><strong>Episodic memory</strong> — a log of past events and interactions ("last Tuesday this deploy failed because…"), so the agent can recall specific prior runs rather than re-derive them.</li>
+      <li><strong>Semantic memory</strong> — durable facts and concepts the agent treats as known: API shapes, domain rules, project conventions. Knowledge, not events.</li>
+      <li><strong>Procedural memory</strong> — how to do things: the steps, tools, and skills the agent reuses, so a learned workflow doesn't have to be rediscovered.</li>
+      <li><strong>Long-term memory</strong> — a persistent store (often a vector or key-value DB) that outlives any single session, where episodic and semantic memories are written and later retrieved.</li>
+      <li><strong>Shared memory</strong> — knowledge available across multiple agents, so one agent's finding is readable by the next instead of trapped in its private store.</li>
+      <li><strong>Entity memory</strong> — structured profiles about specific people or objects (a user's preferences, a service's config), keyed so the agent recalls the right record.</li>
+    </ol>
+
+    <h2>Memory vs a canonical source of truth</h2>
+    <p class="lead-answer">Six of those seven are about a single agent recalling <em>its own</em> past. That's recall — useful, and personal to the agent. It is not the same as the project's current truth. Two agents can each have rich memory and still disagree, because each remembers a different version of "how deploys work."</p>
+    <p class="lead-answer">A <a href="/glossary/canonical-context-layer/">canonical context layer</a> is the missing piece: one shared store that holds the single current, authoritative doc per topic, with a <a href="/glossary/freshness-marker/">freshness marker</a> (canonical, stale, or duplicate), that every agent reads from and writes back to. It's what turns scattered per-agent memory into one <a href="/glossary/ssot-for-agents/">source of truth for the fleet</a>. The bridge between the two is the <a href="/glossary/record/">record</a>: an agent writes what it learned back once, and the next agent reads it instead of re-deriving it.</p>
+    <p class="lead-answer"><a href="/">trovex</a> is that shared layer, not a per-agent memory store. It indexes your docs, serves the one current section that answers a query, and lets agents write canonical records back — about <strong>60% fewer tokens per lookup</strong> than handing over a pile of candidate files. It runs locally; no cloud, no keys.</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/agent-memory-vs-rag/">What's the difference between agent memory and retrieval (RAG)?</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+      </ul>
+    </div>
+
+    <div class="related">
+      <div class="l">Related terms</div>
+      <ul>
+        <li><a href="/glossary/canonical-context-layer/">canonical context layer</a></li>
+        <li><a href="/glossary/ssot-for-agents/">SSOT for agents</a></li>
+        <li><a href="/glossary/record/">record</a></li>
+        <li><a href="/glossary/re-derivation/">re-derivation</a></li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <h2>Give your fleet one source of truth.</h2>
+      <p>One current answer per query, with a freshness marker, in about a minute.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install git+https://github.com/TsukumoHQ/trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

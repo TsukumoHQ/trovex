@@ -1,0 +1,6 @@
+[
+  {"uuid":"-5706285140321484556","brand":"founder","shape":"square","layout":"quote","kicker":"what broke","headline":"the silent agent tax","accent":"silent agent tax","sub":"an agent rereads 3 versions of a doc to guess which is live, and pays for the 2 it throws away. ~60% off doc lookups once one store answers.","source":"first-party, trovex own-run"},
+  {"uuid":"-7750701812624440279","brand":"founder","shape":"portrait","layout":"quote","kicker":"what broke","headline":"stale context looks like a confident wrong answer","accent":"confident wrong answer","sub":"your agent cites a doc you deleted months ago. the index just never noticed it died."},
+  {"uuid":"6660103984753297518","brand":"company","shape":"square","layout":"quote","kicker":"the operating model","headline":"a faster autocomplete isn't the jump","accent":"isn't the jump","sub":"the payoff: agents running real units of work in prod. a different operating model, not a license."},
+  {"uuid":"-1106365093964264578","brand":"company","shape":"portrait","layout":"checklist","kicker":"ai readiness","headline":"ai readiness is six things, not a seat count","accent":"not a seat count","items":[{"t":"context"},{"t":"orchestration"},{"t":"observability"},{"t":"operating model"},{"t":"team trust"},{"t":"governance"}],"sub":"most teams are strong on one or two, thin on the rest."}
+]

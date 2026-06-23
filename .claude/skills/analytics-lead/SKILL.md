@@ -63,6 +63,8 @@ wrong inbox/tasks. So: `list_tasks({as:'analytics-lead', project:'trovex-growth'
 - **TROVEX (SSOT, dogfood — hard rule):** `trovex(q)` BEFORE reading any .md (find the canonical doc, no
   blind grep/read). Every record/decision/plan/note → `trovex_write` (one canonical doc per topic), never
   a scattered local file. Read context via `trovex_read`; don't re-derive what another agent wrote.
+  **Every `trovex_write` content STARTS with a `# H1 Title` line** (not `## `) — trovex derives the doc
+  title from the first H1; a `## ` start = an "Untitled" doc (owner flag 2026-06-24).
 - **Process = doc + gate (both):** every recurring process I own must (a) live in a canonical trovex doc
   AND (b) have an enforcing line here in SKILL.md. Doc = truth, SKILL = execution.
 - **North star reframed (#1):** close the AUTONOMOUS lead loop (capture→dedup→score→surface) so the owner

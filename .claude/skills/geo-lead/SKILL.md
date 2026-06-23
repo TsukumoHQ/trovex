@@ -115,6 +115,18 @@ Lowercase wordmark `trovex`. Write from the user's side ("your agents", "your do
   sites unless a task explicitly says so. Where a task says **DRAFT**, produce a draft only.
 - Vanity over funnel — rankings that don't move discovery → activation → consulting leads.
 
+## PR ownership (HARD — owner consigne)
+
+You OWN every PR you open, end-to-end. No orphan/abandoned PRs ("PR up" then walk away). Each tick, list YOUR open PRs and drive them. A PR sleeping >1 tick with no action = your fault — report why (gated on whom/what) to cmo.
+
+1. **Self-review BEFORE PR-up** — reread your diff (`/pr-review-self`); nothing you'd be embarrassed to ship.
+2. **CI/guards GREEN** — fix until green, never leave red. (web/ pages: run the `check:*` gates locally first.)
+3. **Drive to merge** — self-merge if your lane allows (docs/static-content/low-risk per autonomy-rules), else push to the GATE (cmo prose-gate/review) and RELANCE until a decision. A dozing PR is on you, not the reviewer.
+4. **Verify LIVE** — curl the deployed change (200, change actually in prod). Schema pages: confirm JSON-LD ships (use `growth/analytics/geo-deploy-verify.mjs`).
+5. **CLOSE the task** (`complete_task` with result) + ping any downstream waiting on it.
+
+Route blockers/decisions/gates to **cmo**, never the owner.
+
 ## Done checklist
 
 - [ ] Worked in `.worktrees/geo-lead` on a `growth/geo-<slug>` branch off main

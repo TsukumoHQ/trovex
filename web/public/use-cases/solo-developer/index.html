@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/use-cases/solo-developer/" />
+  <title>trovex for solo developers: cheaper context for your coding agents</title>
+  <meta name="description" content="If you run coding agents solo on a doc-heavy repo, they reread the same .md files every session to guess which is current — and you pay for it every time. trovex serves the one canonical doc per query, about 60% fewer tokens per lookup." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/use-cases/solo-developer/" />
+  <meta property="og:title" content="trovex for solo developers: cheaper context for your coding agents" />
+  <meta property="og:description" content="Your agents reread the repo every session to guess which doc is current. trovex serves the one canonical answer — about 60% fewer tokens per lookup." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for solo developers: cheaper context for your coding agents" />
+  <meta name="twitter:description" content="Your agents reread the repo every session. trovex serves the one canonical answer — ~60% fewer tokens per lookup." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Use cases", "item": "https://trovex.dev/use-cases/" },
+          { "@type": "ListItem", "position": 3, "name": "Solo developer", "item": "https://trovex.dev/use-cases/solo-developer/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Is trovex worth it for a single developer?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, if your repo has more than a handful of overlapping .md files and you run a coding agent on it. The cost a single dev pays is the same lookup, re-billed every session: the agent rereads docs to guess which is current. Serving the one canonical doc per query is about 60% fewer tokens per lookup, and it's a one-minute local install with no cloud or keys." } },
+          { "@type": "Question", "name": "Do I need a team to benefit from a source of truth?", "acceptedAnswer": { "@type": "Answer", "text": "No. Even solo, you run many sessions and often several agents; each re-derives what an earlier one already worked out. A shared canonical store means an agent writes a fix or decision once and your next session reads it back instead of re-deriving it." } },
+          { "@type": "Question", "name": "Does trovex send my code anywhere?", "acceptedAnswer": { "@type": "Answer", "text": "No. Indexing and embeddings run locally in SQLite + ONNX. No cloud, no API keys, your code never leaves your machine — which is the point for a solo dev who doesn't want another SaaS." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-23", "dateModified": "2026-06-23",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I give a solo developer's coding agents the right context cheaply?",
+          "text": "I work solo on a doc-heavy repo and my coding agent keeps rereading the same files every session. How do I make that cheaper without setting up a whole platform?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/use-cases/solo-developer/",
+            "text": "Index your repo's markdown once and serve the agent the single current doc that answers each query — a path:line pointer with a freshness marker — instead of letting it reread files to guess which is canonical. For a solo dev that's about 60% fewer tokens per lookup, with a one-minute local install (SQLite + ONNX, no cloud or keys). You run it on your own machine; nothing leaves it."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/use-cases/">Use cases</a> / Solo developer
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-23">23 June 2026</time></p>
+    <h1>trovex for solo developers</h1>
+
+    <div class="verdict">
+      <div class="l">The short version</div>
+      <p>If you run a coding agent solo on a doc-heavy repo, it <strong>rereads the same <code>.md</code> files every session</strong> to guess which one is current — and you pay for that lookup again every time. trovex serves the one canonical doc per query, with a freshness marker, for about <strong>60% fewer tokens per lookup</strong>. One-minute local install, no cloud.</p>
+    </div>
+
+    <h2>What this costs a solo dev</h2>
+    <p class="lead-answer">It's easy to assume a source of truth is a team thing. It isn't. Alone, you still run dozens of sessions a week, often with more than one agent, and each one re-derives what an earlier session already worked out — because that result was never saved anywhere the next agent could read. You feel it as token spend you can't quite account for and answers built on a stale copy of a doc you fixed last week.</p>
+
+    <h2>How trovex fits a solo workflow</h2>
+    <p class="lead-answer">It's a local MCP server, not a platform. You point it at your repo, and it returns the one current section that answers a query as a <code>path:line</code> pointer marked <a href="/glossary/freshness-marker/">canonical / stale / duplicate</a> — the agent reads the right doc, not the six most similar files. When the agent learns something (a fix, a decision), it writes a <a href="/glossary/record/">record</a> back through one shared point, so your <em>next</em> session reads it instead of re-deriving it. That's a <a href="/glossary/ssot-for-agents/">source of truth</a> even for one person.</p>
+
+    <h2>Why not just a CLAUDE.md or a bigger window?</h2>
+    <p class="lead-answer">A <a href="/vs/claude-md/">single CLAUDE.md</a> is one static file loaded whole every session — it goes stale and can't route a query to the right doc once you have more than a handful. A <a href="/answers/bigger-context-window-rereading/">bigger context window</a> only lets you load more of the wrong thing; you still pay per token, every session. trovex loads less but the right thing.</p>
+
+    <h2>Setup, honestly</h2>
+    <p class="lead-answer">One command, runs on your machine, SQLite + ONNX, no API keys, your docs never leave the box. It's open source and in public beta. The only number it claims is the real one: about <strong>60% fewer tokens per doc lookup</strong> — and it shows you the savings so it justifies itself.</p>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/use-cases/small-team/">trovex for a small team sharing agent context</a></li>
+        <li><a href="/answers/reduce-agent-token-costs/">How do I reduce the token cost of giving a coding agent context?</a></li>
+        <li><a href="/answers/stop-agent-rereading-docs/">How do I stop my agent rereading the same files every session?</a></li>
+        <li><a href="/answers/local-first-context-for-agents/">Can you give coding agents canonical context without a cloud?</a></li>
+        <li><a href="/vs/claude-md/">trovex vs CLAUDE.md</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Is trovex worth it for a single developer?</p>
+        <p class="faq-a">Yes, if your repo has more than a handful of overlapping <code>.md</code> files and you run a coding agent on it. The cost a single dev pays is the same lookup, re-billed every session. Serving the one canonical doc per query is about 60% fewer tokens per lookup, and it's a one-minute local install with no cloud or keys.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Do I need a team to benefit from a source of truth?</p>
+        <p class="faq-a">No. Even solo, you run many sessions and often several agents; each re-derives what an earlier one already worked out. A shared canonical store means an agent writes a fix or decision once and your next session reads it back.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does trovex send my code anywhere?</p>
+        <p class="faq-a">No. Indexing and embeddings run locally in SQLite + ONNX. No cloud, no API keys, your code never leaves your machine.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Stop paying for the same lookup twice.</h2>
+      <p>Point trovex at your repo. Your agent reads the one current doc, in about a minute.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install git+https://github.com/TsukumoHQ/trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/for/">Setup for your agent</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/use-cases/">Use cases</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

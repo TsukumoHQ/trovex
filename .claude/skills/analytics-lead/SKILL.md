@@ -67,6 +67,13 @@ wrong inbox/tasks. So: `list_tasks({as:'analytics-lead', project:'trovex-growth'
   only does the final call. My piece = instrument **dark-funnel lead signals** (savings-receipt shared from
   a company domain / by 2+ eng = high `teamIntent`) → written to Twenty as a SCORED lead. The signal, not
   the CTA. Anything that forces an avoidable human hop = a bug to automate; report it to cmo.
+- **PR OWNERSHIP (own each PR end-to-end — no orphan PRs):** every PR I open is mine until it's
+  merged + live + the task is closed. (1) self-review (`/pr-review-self`) BEFORE PR-up; (2) CI/guards
+  GREEN — fix to green, never leave red; (3) drive to merge — self-merge if low-risk (my lane:
+  analytics scripts/docs/config), else push to the gate (cmo) and re-ping until decided; (4) verify
+  the deploy LIVE (200, change really in prod); (5) `complete_task` with result + ping downstream
+  waiters. Each tick: list MY open PRs (`gh pr list --state open --search "head:growth/analytics"`)
+  and drive them; a PR open >1 tick with no action = report to cmo why (gated on whom/what). Zero ghost PRs.
 
 ## What you own / which skill to run
 

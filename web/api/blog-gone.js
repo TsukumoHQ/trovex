@@ -19,10 +19,11 @@
 // slug → live tsukumo URL. Add a slug ONLY after curl-confirming the target is a
 // real 200 post (not soft-404). Empty until content republishes the originals.
 const MIGRATED = {
-  // 'the-token-cost-of-agents-rereading-docs': 'https://tsukumo.ch/blog/the-token-cost-of-agents-rereading-docs',
-  // 'mcp-context-patterns-for-coding-agents':  'https://tsukumo.ch/blog/mcp-context-patterns-for-coding-agents',
-  // 'one-source-of-truth-for-a-fleet-of-agents': 'https://tsukumo.ch/blog/one-source-of-truth-for-a-fleet-of-agents',
-  // 'local-first-vs-cloud-rag-for-agent-context': 'https://tsukumo.ch/blog/local-first-vs-cloud-rag-for-agent-context',
+  // Republished + verified LIVE (200) on tsukumo 2026-06-23 — 1:1 same-slug.
+  'the-token-cost-of-agents-rereading-docs': 'https://tsukumo.ch/blog/the-token-cost-of-agents-rereading-docs',
+  'mcp-context-patterns-for-coding-agents': 'https://tsukumo.ch/blog/mcp-context-patterns-for-coding-agents',
+  'one-source-of-truth-for-a-fleet-of-agents': 'https://tsukumo.ch/blog/one-source-of-truth-for-a-fleet-of-agents',
+  'local-first-vs-cloud-rag-for-agent-context': 'https://tsukumo.ch/blog/local-first-vs-cloud-rag-for-agent-context',
 }
 
 export default function handler(req, res) {

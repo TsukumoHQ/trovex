@@ -35,8 +35,8 @@ const CONTENT = {
     eyebrow: "the agent control plane",
     shots: [{ file: "/tmp/fleet-v2-band.png", w: 2800, h: 826, title: "Mission control for your agent fleet", accent: "agent fleet", eb: "LIVE · the real board" }],
     how: { title: "point any MCP agent at it, no rewrite", accent: "no rewrite", steps: ["register your agents", "they message + share a task board", "watch the fleet from one dashboard"], foot: "Claude Code · Cursor · Windsurf · Zed — the control plane you point agents at, not a framework you rewrite into." },
-    trust: { facts: ["one Go binary, one SQLite file", "58 MCP tools, zero config", "100% local by default, no telemetry", "AGPL · v1.0 stable"], install: "curl -fsSL https://raw.githubusercontent.com/TsukumoHQ/WRAI.TH/main/install.sh | bash", foot: "github.com/TsukumoHQ/WRAI.TH · tsukumo.ch/wraith" },
-    og: { title: "Mission control for your agent fleet.", accent: "agent fleet.", sub: "Persistent memory, messaging, and a shared task board over MCP. One Go binary, local, open source.", footRight: "v1.0 · 58 MCP tools · 100% local · AGPL" },
+    trust: { facts: ["one Go binary, one SQLite file", "58 MCP tools, zero config", "100% local by default, no telemetry", "AGPL · v1.3.0 stable"], install: "curl -fsSL https://raw.githubusercontent.com/TsukumoHQ/WRAI.TH/main/install.sh | bash", foot: "github.com/TsukumoHQ/WRAI.TH · tsukumo.ch/wraith" },
+    og: { title: "Mission control for your agent fleet.", accent: "agent fleet.", sub: "Persistent memory, messaging, and a shared task board over MCP. One Go binary, local, open source.", footRight: "v1.3.0 · 58 MCP tools · 100% local · AGPL" },
     thumb: "CONTROL PLANE",
   },
   trovex: {

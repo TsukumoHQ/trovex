@@ -1,0 +1,43 @@
+{
+  "slug": "li-what-shipped-this-week",
+  "audience": "founder",
+  "kicker": "build in public",
+  "cover": {
+    "title": "what shipped this week",
+    "accent": "shipped",
+    "sub": "trovex went public beta, and the savings dashboard went live. the receipts:"
+  },
+  "slides": [
+    {
+      "title": "shipped",
+      "accent": "shipped",
+      "items": [
+        "trovex flipped to public beta: open source, install and star, no signup gate",
+        "live savings dashboard, running on our own fleet",
+        "evidence write-ups: METR, DORA, GitClear, Stanford, Apple, ETH"
+      ]
+    },
+    {
+      "title": "the receipt",
+      "accent": "the receipt",
+      "tiles": [
+        {"value": "340,784", "label": "tokens saved last week"},
+        {"value": "74%", "label": "fewer tokens per lookup"},
+        {"value": "91", "label": "doc-lookups measured"},
+        {"value": "~60%", "label": "conservative public number"}
+      ],
+      "source": "first-party, trovex savings dashboard"
+    },
+    {
+      "title": "next, in the open",
+      "accent": "in the open",
+      "body": "the orchestration layer: how a fleet of agents coordinates, hands off, and stays legible to a human. building it in public."
+    }
+  ],
+  "cta": {
+    "title": "trovex.dev",
+    "accent": "trovex.dev",
+    "sub": "public beta. open source. install and star.",
+    "foot": "trovex.dev"
+  }
+}

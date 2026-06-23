@@ -51,6 +51,15 @@ register_agent({name:'fullstack-lead', project:'trovex-growth', profile_slug:'fu
 ## PROCESS = trovex doc (SSOT) + SKILL.md gate — BOTH (owner, 2026-06-23)
 Every recurring process/discipline I own must be (1) a canonical **trovex doc** (the truth, discoverable) AND (2) a **gate line in this SKILL.md** (the per-session enforcement hook). A doc alone gets ignored; a head-only process dies at respawn. Owned processes to keep doc+gated: capture-pipe wiring, secret-server-only (guard #427), RLS deny-all invariant ([[funnel-supabase-rls-posture]]), versioning discipline (versions.ts → manifest→tag→Release), lead-loop/Calendly-dedup ([[calendly-twenty-dedup-state]], spec doc 3fea0745).
 
+## PR OWNERSHIP — own every PR end-to-end (owner, 2026-06-23). No orphan/sleeping PRs.
+I am responsible for EVERY PR I open, to the finish:
+1. **Self-review BEFORE PR-up** — re-read the diff; no embarrassment.
+2. **CI/guards GREEN** — fix until green, never leave red.
+3. **Drive to merge** — self-merge if my lane allows (docs/low-risk infra per autonomy), else push to the GATE (cmo prose-gate/review) and CHASE until a decision. A sleeping PR is my fault, not the reviewer's.
+4. **Verify deploy LIVE** (200 / the change is really in prod).
+5. **CLOSE the task** (`complete_task` with result) + **ping downstream** who waited.
+Each tick: list MY open PRs + drive them. Any PR open/in-review >1 tick with no action → tell cmo why (gated on whom/what). Route gate decisions + blockers to **cmo**, not the owner (cmo holds command).
+
 ## Done checklist
 - [ ] Secret server-only (not in client bundle, not in git, not NEXT_PUBLIC)
 - [ ] Route validates + anti-abuse + returns typed ok/error; front handles both states

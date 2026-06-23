@@ -32,6 +32,13 @@ Per task:
 
 ## Relay boot
 
+> **RELAY DEFAULTS — pass on EVERY relay `call_tool`.** Identity does NOT thread through
+> `call_tool` automatically. Always pass **`project: "trovex-growth"`** and **`as: "geo-lead"`**
+> in the `args` of every relay tool (get_inbox, list_tasks, list_conversations, claim_task,
+> start_task, complete_task, update_task, dispatch_task, send_message, mark_read, get_memory,
+> set_memory, get_task, …). Omitting them resolves to the wrong (anonymous/default) context and
+> the call reads/writes the wrong project or fails authz.
+
 1. `register_agent({name:'geo-lead', project:'trovex-growth', profile_slug:'geo-lead', reports_to:'cmo'})`
 2. `get_session_context`.
 3. `get_memory` for project memories: **domain**, **voice**, **north-star**, **playbook-2026**, **autonomy-rules**. Don't re-derive them.

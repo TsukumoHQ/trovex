@@ -439,9 +439,12 @@ def build_app() -> FastAPI:
         q: str = Query(..., min_length=1),
         limit: int = Query(5, ge=1, le=20),
         summary: bool = False,
+        kind: str | None = Query(None, description="filter to one doc kind, e.g. 'record'"),
+        tags: str | None = Query(None, description="comma-separated tags; any-match scope"),
     ) -> JSONResponse:
         state = get_state()
-        results = state.searcher.search(q, limit=limit)
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+        results = state.searcher.search(q, limit=limit, kind=kind, tags=tag_list)
         return JSONResponse([
             {
                 "path": r.path, "title": r.title,

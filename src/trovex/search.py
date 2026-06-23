@@ -49,21 +49,37 @@ class Searcher:
         self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim())
         self.embedder = embedder or build_embedder(settings.embed_model)
 
-    def search(self, query: str, limit: int = 5,
-               source_ids: list[str] | None = None) -> list[SearchResult]:
+    def search(
+        self,
+        query: str,
+        limit: int = 5,
+        source_ids: list[str] | None = None,
+        kind: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[SearchResult]:
         if not query.strip():
             return []
         query_emb = next(self.embedder.embed([query]))
+        # Widen the knn pool when metadata filters are on, so post-filtering
+        # doesn't starve a tightly-scoped query (e.g. owner/<agent> + kind=record).
+        pool = max(limit * 5, 50) if (kind or tags) else limit * 5
         sql = """SELECT d.path, d.title, d.mtime, d.status, d.size_bytes,
                         d.tokens_est, d.absolute_path, d.source_id, v.distance
                  FROM vec_docs v
                  JOIN docs d ON d.id = v.rowid
                  WHERE v.embedding MATCH ? AND k = ?"""
-        params: list = [sqlite_vec.serialize_float32(query_emb.tolist()), limit * 5]
+        params: list = [sqlite_vec.serialize_float32(query_emb.tolist()), pool]
         if source_ids:
             placeholders = ",".join("?" * len(source_ids))
             sql += f" AND d.source_id IN ({placeholders})"
             params.extend(source_ids)
+        if kind:
+            sql += " AND d.kind = ?"
+            params.append(kind)
+        if tags:
+            placeholders = ",".join("?" * len(tags))
+            sql += f" AND d.id IN (SELECT doc_id FROM doc_tags WHERE tag IN ({placeholders}))"
+            params.extend(tags)
         sql += " ORDER BY v.distance"
         rows = self.db.execute(sql, params).fetchall()
 

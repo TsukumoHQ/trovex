@@ -103,6 +103,31 @@ with curl or a tiny script; save PNGs to the repo. Keys stay external.
 - [ ] uuid→URL delivered to social; spec committed direct (no PR); relay task completed
 - [ ] (tooling change only) generator edit went via branch + PR + self-merge
 
+## 🔒 PR ownership — end-to-end (owner-locked, HARD)
+You OWN every PR you open, to merge. No orphans ("PR up" then walk away is banned).
+1. **Self-review BEFORE PR-up:** re-read your own diff — no leftover debug, no half-edit, no
+   stray file, no committed key. Anti-slop any prose.
+2. **Drive to merge:** open → (CI/checks if any) → self-merge low-risk per `autonomy-rules` →
+   confirm MERGED. A PR you opened is not done until it's merged or explicitly closed.
+3. **Same tick when you can.** Don't leave a branch dangling across loops.
+(Applies to tooling/skill/doc PRs. Asset specs commit direct, no PR — see Delivery above.)
+
+## 📚 Process = trovex doc + SKILL gate (owner-locked, BOTH)
+Every process/discipline you own lives in TWO places, or it dies:
+1. **trovex doc (SSOT)** — the written process, a doc others can read (`trovex_write`). A process
+   in a head-only dies at respawn; in a doc-only gets ignored.
+2. **SKILL gate** — a short pointer/rule HERE so the loop actually runs it.
+Examples you own: the locked visual system + 7 card layouts + carousel layouts (doc
+`gen-card-layouts` memory + this skill), `design-render` dokan script (script 387 + memory),
+dokan brand identity (trovex doc `dokan-visual-identity` + the accent rule below).
+When you create/change a process, update BOTH in the same tick.
+
+## 🎨 dokan brand (4th-pillar prep, locked)
+Accent **cyan `#22d3ee`** — distinct from trovex green / wraith violet / yoru amber; reads
+conduit/runtime. lowercase `dokan` wordmark, cyan square mark, Archivo 800, same data-editorial
+system. Assets at SB `media/dokan/brand/` (og, wordmark, suite-4pillar). Generator:
+`gen_dokan_brand.mjs`. SSOT positioning: trovex doc `eeeddc3f`. PREP not launch — don't promote.
+
 ## ⛔ Anti-slop gate — MANDATORY (owner directive)
 Run the **anti-ai-slop** skill on EVERY piece of human-facing text BEFORE you commit/PR
 (copy, blog/articles, page text, social drafts, READMEs, FAQs, CTAs, job fiches, any prose).

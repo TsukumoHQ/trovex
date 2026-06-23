@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/agent-memory-vs-rag/" />
+  <title>What's the difference between agent memory and retrieval (RAG)?</title>
+  <meta name="description" content="Agent memory is what an agent retains about its own past; RAG fetches relevant chunks from a corpus on demand. They answer different questions — and neither one guarantees the fleet a single current source of truth. Here's how they fit." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/agent-memory-vs-rag/" />
+  <meta property="og:title" content="What's the difference between agent memory and retrieval (RAG)?" />
+  <meta property="og:description" content="Memory is per-agent recall; RAG is on-demand fetch from a corpus. Different jobs — and neither gives the fleet one current source of truth." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="What's the difference between agent memory and retrieval (RAG)?" />
+  <meta name="twitter:description" content="Memory is per-agent recall; RAG is on-demand fetch. Different jobs." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "What's the difference between agent memory and retrieval (RAG)?", "item": "https://trovex.dev/answers/agent-memory-vs-rag/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Is RAG a type of agent memory?", "acceptedAnswer": { "@type": "Answer", "text": "Not quite. RAG is a retrieval method — it fetches relevant chunks from a corpus at query time. Memory is what the agent retains about its own past runs, facts, and procedures. RAG is often the read mechanism a long-term memory uses, but retrieval and memory are different jobs." } },
+          { "@type": "Question", "name": "Do AI agents need a canonical source of truth?", "acceptedAnswer": { "@type": "Answer", "text": "If more than one agent or session touches the same docs, yes. Per-agent memory drifts and RAG returns whatever is most similar, including stale copies. A canonical source of truth is one shared store that serves the single current, authoritative doc per topic and is written back to, so the whole fleet works from the same current knowledge." } },
+          { "@type": "Question", "name": "Can you use memory, RAG, and a canonical source of truth together?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, and most real systems do. Memory keeps an agent's own state, RAG fetches from a corpus, and a canonical context layer is the shared current truth all agents read and write back to. trovex is that shared layer; it does not replace an agent's working memory." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-23", "dateModified": "2026-06-23",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "What's the difference between agent memory and retrieval (RAG)?",
+          "text": "People talk about agent memory and RAG as if they're the same thing. What's the actual difference, and which do I need?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/agent-memory-vs-rag/",
+            "text": "Agent memory is what an agent retains about its own past — working state during a run, plus episodic, semantic, and procedural memories of earlier sessions. RAG (retrieval-augmented generation) fetches the most relevant chunks from a corpus at query time. Memory is recall of your own history; RAG is on-demand lookup in a body of documents. They solve different problems, and neither one guarantees a fleet of agents a single current source of truth — that is a separate, shared layer."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Agent memory vs RAG
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-23">23 June 2026</time></p>
+    <h1>What's the difference between agent memory and retrieval (RAG)?</h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p><strong>Agent memory</strong> is what an agent retains about its own past — working state during a run, plus episodic, semantic, and procedural memories of earlier sessions. <strong>RAG</strong> fetches the most relevant chunks from a corpus at query time. Memory is recall of your own history; RAG is on-demand lookup. They solve different problems — and neither one gives a fleet of agents a single current source of truth.</p>
+    </div>
+
+    <h2>Memory is recall; RAG is fetch</h2>
+    <p class="lead-answer"><a href="/glossary/agent-memory/">Agent memory</a> answers "what do <em>I</em> already know from before?" — the current run's working context, plus stores of past events (episodic), facts (semantic), and how-to (procedural). It's keyed to one agent's experience.</p>
+    <p class="lead-answer">RAG answers "what in this corpus is relevant to the question right now?" It embeds your query, finds the top-k most similar chunks, and feeds them to the model. It doesn't care whose past it came from; it cares about similarity. RAG is frequently the <em>read mechanism</em> a long-term memory uses — but retrieval and memory are still different jobs, and people conflate them constantly.</p>
+
+    <h2>What both leave open</h2>
+    <p class="lead-answer">Here's the gap neither closes on its own: <strong>which doc is current and authoritative?</strong> Per-agent memory drifts — two agents remember two versions of the same procedure. RAG ranks by similarity, so it will happily return last quarter's postmortem and a duplicate wiki page alongside the right one. In a single-agent toy that's tolerable. Across a <a href="/answers/shared-source-of-truth-multiple-agents/">fleet of agents touching the same repo</a>, it's how they quietly disagree.</p>
+
+    <h2>The missing layer: a shared source of truth</h2>
+    <p class="lead-answer">A <a href="/glossary/canonical-context-layer/">canonical context layer</a> is the part memory and RAG don't provide: one shared store that serves the single current, authoritative doc per topic — marked canonical, stale, or duplicate by a <a href="/glossary/freshness-marker/">freshness marker</a> — that every agent reads from and writes back to. It's not a smarter similarity search and it's not a bigger memory; it's the team's current truth, shared.</p>
+    <p class="lead-answer"><a href="/">trovex</a> is that layer. It indexes your docs and returns the one current section that answers a query as a <code>path:line</code> pointer with a freshness marker, and lets agents write canonical <a href="/glossary/record/">records</a> back through one shared point. Serving the one current section instead of a similarity pile is about <strong>60% fewer tokens per lookup</strong>. It runs locally — SQLite + ONNX, no cloud, no keys — and sits alongside your agent's memory and any RAG stack, not in place of them.</p>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/why-agents-pick-stale-docs/">Why do AI coding agents pick stale or outdated docs?</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/source-of-truth-multi-agent-repos/">What's the single source of truth for a multi-agent repo?</a></li>
+        <li><a href="/vs/mem0/">trovex vs mem0</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Is RAG a type of agent memory?</p>
+        <p class="faq-a">Not quite. RAG is a retrieval method — it fetches relevant chunks from a corpus at query time. Memory is what the agent retains about its own past runs, facts, and procedures. RAG is often the read mechanism a long-term memory uses, but retrieval and memory are different jobs.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Do AI agents need a canonical source of truth?</p>
+        <p class="faq-a">If more than one agent or session touches the same docs, yes. Per-agent memory drifts and RAG returns whatever is most similar, including stale copies. A canonical source of truth is one shared store that serves the single current, authoritative doc per topic and is written back to, so the whole fleet works from the same current knowledge.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Can you use memory, RAG, and a canonical source of truth together?</p>
+        <p class="faq-a">Yes, and most real systems do. Memory keeps an agent's own state, RAG fetches from a corpus, and a canonical context layer is the shared current truth all agents read and write back to. trovex is that shared layer; it does not replace an agent's working memory.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Give your agents one current source of truth.</h2>
+      <p>One canonical answer per query, with a freshness marker — in about a minute.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install git+https://github.com/TsukumoHQ/trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

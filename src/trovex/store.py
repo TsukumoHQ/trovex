@@ -33,6 +33,8 @@ TROVEX_SOURCE_ID = "trovex"
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 TITLE_RE = re.compile(r"^\s*#\s+(.+)$", re.MULTILINE)
+ANY_HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.+?)\s*$", re.MULTILINE)
+FM_TITLE_RE = re.compile(r"^title:\s*(.+?)\s*$", re.MULTILINE)
 
 
 @dataclass
@@ -562,9 +564,27 @@ def _row_to_doc(row: sqlite3.Row) -> StoredDoc:
 
 
 def _extract_title(content: str) -> str:
-    stripped = FRONTMATTER_RE.sub("", content)
-    m = TITLE_RE.search(stripped[:2000])
-    return m.group(1).strip() if m else "Untitled"
+    """Derive a doc's title, robust to docs that don't lead with an H1.
+
+    Order: an H1 anywhere (preferred) → the first heading of any level
+    (``##``-led docs) → a frontmatter ``title:`` → the first non-empty body
+    line → "Untitled". Fixes docs that indexed as "Untitled" because the store
+    only ever matched ``# `` (H1).
+    """
+    body = FRONTMATTER_RE.sub("", content)
+    head = body[:2000]
+    m = TITLE_RE.search(head) or ANY_HEADING_RE.search(head)
+    if m:
+        return m.group(1).strip()
+    fm = FRONTMATTER_RE.match(content)
+    if fm:
+        tm = FM_TITLE_RE.search(fm.group(1))
+        if tm:
+            return tm.group(1).strip().strip("\"'")
+    for line in body.splitlines():
+        if line.strip():
+            return line.strip()[:120]
+    return "Untitled"
 
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")

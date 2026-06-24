@@ -45,6 +45,9 @@ function wordmark(word, fs) {
   return h("div",{style:{display:"flex",alignItems:"center",gap:"11px",fontFamily:"Fira Code",fontSize:`${fs}px`,color:C.ink}},
     h("div",{style:{width:`${Math.round(fs*0.62)}px`,height:`${Math.round(fs*0.62)}px`,backgroundColor:C.green}}), h("span",{},word));
 }
+// founder account is DE-BRANDED (owner): keep the accent (green square mark) but drop the
+// product NAME — no 'trovex'/'tsukumo' wordmark text, no domain footer. company stays branded.
+const markOnly = (fs) => h("div",{style:{display:"flex",width:`${Math.round(fs*0.62)}px`,height:`${Math.round(fs*0.62)}px`,backgroundColor:C.green}});
 // headline: accent substring colored green, word-level spans wrap
 function headlineEl(full, accent, S) {
   const fs = tfs(S, full);
@@ -126,14 +129,15 @@ function body(c, S) {
 }
 function card(c, S) {
   const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist"||c.layout==="compare";
+  const unbranded = c.brand === "founder"; // founder account de-branded: accent stays, name goes
   return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,backgroundImage:`url(${DOT})`,backgroundRepeat:"repeat",padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"20px"}},
-      wordmark(brandFor(c.brand), S.mark),
+      unbranded ? markOnly(S.mark) : wordmark(brandFor(c.brand), S.mark),
       c.kicker?h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.eb}px`,color:C.soft,letterSpacing:"0.04em"}}, deDash(c.kicker)):h("div",{})),
     h("div",{style:{display:"flex",flexDirection:"column",gap:"30px",flex:1,justifyContent:dataLed?"flex-start":"center",paddingTop:dataLed?"48px":"0"}}, ...body(c,S)),
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.rule}`,paddingTop:"20px"}},
       h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.soft}}, c.source?`source: ${deDash(c.source)}`:""),
-      h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.green}}, domainFor(c.brand))));
+      unbranded ? h("div",{}) : h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.green}}, domainFor(c.brand))));
 }
 
 const SB_URL = process.env.SUPABASE_URL, SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

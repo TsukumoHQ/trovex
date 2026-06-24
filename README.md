@@ -26,7 +26,7 @@ A 30-second trust check, since the decision happens on the README, not the direc
 - **First-party, open source.** Built and run in production by [tsukumo](https://tsukumo.ch), the team behind it. AGPL-3.0-or-later.
 - **Local-first, nothing leaves your machine.** Vectors in SQLite, embeddings via ONNX. No cloud, no API keys, no network call to answer a query.
 - **Confined writes, no shell.** Six MCP tools: three read-only (`trovex`, `trovex_read`, `trovex_search`) and three that mutate only trovex's own doc store (`trovex_write`, `trovex_tag`, `trovex_delete`). No shell execution, no writes to your source files.
-- **The ~60% is reproducible.** Measured on real repos; `trovex search` prints the savings on yours (method in the [benchmark writeup](https://trovex.dev/blog/the-token-cost-of-agents-rereading-docs/)).
+- **The ~60% is reproducible.** Measured on real repos; `trovex search` prints the savings on yours (method in the [benchmark writeup](https://tsukumo.ch/blog/the-token-cost-of-agents-rereading-docs)).
 
 ## Quick start
 
@@ -89,7 +89,7 @@ Humans read trovex-owned docs at `/doc/{id}` in the rendered reader. To make age
   one current doc with an explicit marker. [More](https://trovex.dev/vs/vector-db-rag/).
 
 The reasoning behind the ~60% number is written up in
-[the token cost of agents rereading docs](https://trovex.dev/blog/the-token-cost-of-agents-rereading-docs/).
+[the token cost of agents rereading docs](https://tsukumo.ch/blog/the-token-cost-of-agents-rereading-docs).
 
 ## Stack
 

@@ -167,6 +167,40 @@ def test_boot_empty_when_no_owner_records(settings, store):
     assert boot["tokens_est"] == 0
 
 
+def test_capture_then_boot_roundtrip(settings, store):
+    """Step 3 → step 2: a free-summary capture upserts owner-<agent>-current-state
+    (owner/<agent> + kind=record) and /api/boot then recalls that FRESH record."""
+    from trovex.boot import boot_pointers
+    from trovex.capture import capture_state
+
+    res = capture_state(
+        store, "cmo",
+        "Shipped /api/capture. Next: distil path. Gotcha: hooks no-op if trovex down.",
+        reason="postcompact",
+    )
+    assert res["captured"] is True
+    assert res["doc_id"] == "owner-cmo-current-state"
+
+    # Idempotent: a second capture overwrites in place — one canonical record.
+    n_before = len(store.list_docs())
+    capture_state(store, "cmo", "Updated current state v2 — distil path landed.")
+    assert len(store.list_docs()) == n_before
+    assert "v2" in store.get("owner-cmo-current-state").content
+
+    # /api/boot recalls the captured record.
+    searcher = Searcher(settings, embedder=BagEmbedder())
+    boot = boot_pointers(searcher, "cmo", floor=0.0)
+    assert any(p["id"] == "owner-cmo-current-state" for p in boot["pointers"])
+
+
+def test_capture_rejects_empty(store):
+    """No durable signal → no write."""
+    from trovex.capture import capture_state
+
+    assert capture_state(store, "cmo", "   ")["captured"] is False
+    assert store.get("owner-cmo-current-state") is None
+
+
 def test_record_not_stale_by_age(settings, store):
     """A record stays canonical no matter how old; a non-record goes stale."""
     rec = store.put("# Old incident", kind="record")

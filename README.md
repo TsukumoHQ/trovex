@@ -19,6 +19,15 @@ so every agent and teammate reads the same source of truth instead of re-derivin
 About **60% fewer tokens** on doc lookups, same context quality. Runs locally: vectors in
 SQLite, embeddings via ONNX, no cloud or API keys.
 
+## What you're installing
+
+A 30-second trust check, since the decision happens on the README, not the directory listing:
+
+- **First-party, open source.** Built and run in production by [tsukumo](https://tsukumo.ch), the team behind it. AGPL-3.0-or-later.
+- **Local-first, nothing leaves your machine.** Vectors in SQLite, embeddings via ONNX. No cloud, no API keys, no network call to answer a query.
+- **Confined writes, no shell.** Six MCP tools: three read-only (`trovex`, `trovex_read`, `trovex_search`) and three that mutate only trovex's own doc store (`trovex_write`, `trovex_tag`, `trovex_delete`). No shell execution, no writes to your source files.
+- **The ~60% is reproducible.** Measured on real repos; `trovex search` prints the savings on yours (method in the [benchmark writeup](https://trovex.dev/blog/the-token-cost-of-agents-rereading-docs/)).
+
 ## Quick start
 
 trovex is in public beta, on PyPI. No clone needed — `uv tool install` puts `trovex`
@@ -63,6 +72,8 @@ claude mcp add --transport http trovex http://localhost:8765/mcp
   (optionally just one section) instead of re-deriving it. See [`REFONTE.md`](REFONTE.md).
 - `trovex_search(query, k?, tags?)` — passage-level retrieval across the store with tag
   filters, for when you want the top matching chunks rather than one canonical doc.
+- `trovex_tag(...)` / `trovex_delete(...)` — tag or soft-delete a stored doc; delete is a
+  recoverable archive, not a hard wipe. Both touch only the trovex store, never your files.
 
 Humans read trovex-owned docs at `/doc/{id}` in the rendered reader. To make agents route
 `.md` writes through `trovex_write` instead of the disk, install the PreToolUse hook

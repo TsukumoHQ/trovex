@@ -19,6 +19,9 @@
 - Solo developers and small teams (1–20) running AI coding agents on real, doc-heavy repos.
 - Anyone whose agents reread the same .md files every session and burn tokens guessing which doc is current.
 
+## Try it
+- [Free self-audit](https://trovex.dev/audit): a 5-minute interactive check that estimates how much your coding agent wastes rereading docs, and what trovex would save — no install required.
+
 ## Comparisons
 - [trovex vs CLAUDE.md / AGENTS.md](https://trovex.dev/vs/claude-md/): a static instructions file vs one canonical doc routed per query.
 - [trovex vs repomix / files-to-prompt](https://trovex.dev/vs/repomix/): packing the whole repo into a prompt vs retrieving the one answer.

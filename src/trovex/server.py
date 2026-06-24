@@ -19,6 +19,7 @@ from fastapi.templating import Jinja2Templates
 from . import insights as insights_mod
 from . import savings as savings_mod
 from .boot import boot_pointers
+from .capture import capture_state
 from .markdown import PYGMENTS_CSS, render_markdown
 from .mcp_app import mcp
 from .state import get_state
@@ -471,6 +472,26 @@ def build_app() -> FastAPI:
             boot_pointers(get_state().searcher, agent, k=k, floor=floor, q=q)
         )
 
+    @app.post("/api/capture")
+    async def api_capture(request: Request) -> JSONResponse:
+        """Active-memory capture (RFC 330e7d43, step 3): upsert an agent's
+        current-state record from a free summary (PostCompact's compact_summary,
+        no LLM). Distil-from-transcript is step 4. Write-gated."""
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
+        body = await request.json()
+        agent = (body.get("agent") or "").strip()
+        if not agent:
+            return JSONResponse({"captured": False, "reason": "no agent"}, status_code=400)
+        return JSONResponse(
+            capture_state(
+                get_state().store,
+                agent,
+                body.get("summary") or "",
+                reason=(body.get("reason") or "postcompact"),
+            )
+        )
+
     @app.get("/api/map")
     async def api_map(canonical_only: bool = True) -> JSONResponse:
         """The 'map' of the store: titles + tags + status, no content. Cheap enough
@@ -560,7 +581,7 @@ def build_app() -> FastAPI:
     async def hook_download(name: str) -> str:
         if name not in {
             "trovex-md-guard.sh", "trovex-md-read-guard.sh",
-            "trovex-boot.sh", "trovex-prompt.sh",
+            "trovex-boot.sh", "trovex-prompt.sh", "trovex-postcompact.sh",
         }:
             return ""
         repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"

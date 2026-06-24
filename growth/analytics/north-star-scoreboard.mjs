@@ -199,7 +199,7 @@ async function main() {
     twenty(`/rest/people?limit=100`),
   ]);
   let propRows = null, totalInq = null, totalQual = null, suiteQual = null, twPersons = null;
-  let lmBooked = null, lmBookedWin = null, lmTeam = null; // Panel F — lead machine (booked calls + teamIntent)
+  let lmBooked = null, lmBookedWin = null, lmTeam = null, lmTiers = null; // Panel F — lead machine
   if (twOpps && twPpl) {
     const opps = twOpps.opportunities || twOpps || [];
     const ppl = twPpl.people || twPpl || [];
@@ -211,6 +211,10 @@ async function main() {
     // Booked IN THE WINDOW — opp.createdAt is the booked-date proxy (Twenty has no separate booked field).
     lmBookedWin = opps.filter((o) => BOOKED.has(o.stage) && (o.createdAt || "").slice(0, 10) >= w.start).length;
     lmTeam = ppl.filter((p) => p.teamIntent).length;
+    // Tier distribution — the lead/hand-raiser pipeline writes Person.tier (A/B/C; score>=60=A,35-59=B,<35=C).
+    // Reads live; until the pipeline write goes live (currently dry-run) it's all unset → 0/0/0 = honest.
+    lmTiers = { A: 0, B: 0, C: 0, unset: 0 };
+    for (const p of ppl) { const t = p.tier; if (t === "A" || t === "B" || t === "C") lmTiers[t]++; else lmTiers.unset++; }
     const srcOf = (id) => (ppl.find((p) => p.id === id) || {}).source || null;
     const by = new Map();
     for (const o of opps) {
@@ -484,6 +488,7 @@ async function main() {
   P(`| Booked calls in window (${w.label}) | ${lmBookedWin == null ? "n/a" : lmBookedWin} |`);
   P(`| Qualified opportunities (past NEW) | ${n(totalQual)} |`);
   P(`| teamIntent leads (team signal, scored) | ${lmTeam == null ? "n/a" : lmTeam} |`);
+  P(`| Tiered leads (A / B / C) | ${lmTiers == null ? "n/a" : `${lmTiers.A} / ${lmTiers.B} / ${lmTiers.C}`}${lmTiers && lmTiers.unset ? ` _(${lmTiers.unset} untiered)_` : ""} |`);
   P(`| Suite-sourced qualified (north star) | ${n(suiteQual)} |`);
   P(``);
   P(`> Booked-calls/day is the lead-machine throughput KPI — at thin volume it's a cumulative count, not yet a rate (needs a booked-date field for per-day). teamIntent leads are surfaced for the owner's yes/no (donna pings on a HOT team cluster). The signal is in the CRM, not a CTA.`);

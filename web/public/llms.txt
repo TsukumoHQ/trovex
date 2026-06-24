@@ -48,7 +48,7 @@
 
 ## Access
 - Status: public beta. The repository is public; install it and run it on your own repo.
-- Install: `uv tool install git+https://github.com/TsukumoHQ/trovex` (a GitHub star helps other devs find it).
+- Install: `uv tool install trovex` (a GitHub star helps other devs find it).
 - Community: questions or comparing setups, join the Slack at https://tsukumo.ch/slack.
 
 ## Links
@@ -65,4 +65,4 @@
 - Works with: Claude Code, Cursor, Windsurf, Cline, Zed, and any MCP client.
 - License: core AGPL-3.0, CLIs MIT.
 - Access: public beta — the repository is public at github.com/TsukumoHQ/trovex.
-- Install: `uv tool install git+https://github.com/TsukumoHQ/trovex`, then `trovex index /path/to/repo` and `trovex serve`.
+- Install: `uv tool install trovex`, then `trovex index /path/to/repo` and `trovex serve`.

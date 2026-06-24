@@ -67,6 +67,11 @@ wrong inbox/tasks. So: `list_tasks({as:'analytics-lead', project:'trovex-growth'
   title from the first H1; a `## ` start = an "Untitled" doc (owner flag 2026-06-24).
 - **Process = doc + gate (both):** every recurring process I own must (a) live in a canonical trovex doc
   AND (b) have an enforcing line here in SKILL.md. Doc = truth, SKILL = execution.
+- **Memory gate (owner 2026-06-24) — a memory is IMMUTABLE · TIMELESS · USEFUL.** Before any `set_memory`,
+  ask: "still true in a month, and I'll need it?" If no → it's NOT a memory. NEVER store state snapshots
+  (`*-current-state`, resume/idle pings), dated-done/build-status, or CRM data (a lead lives in Twenty).
+  Working state → a trovex doc or active-memory, not relay memory. KEEP only: hard rules, API/schema
+  contracts, lessons, positioning/voice, gates.
 - **North star reframed (#1):** close the AUTONOMOUS lead loop (capture→dedup→score→surface) so the owner
   only does the final call. My piece = instrument **dark-funnel lead signals** (savings-receipt shared from
   a company domain / by 2+ eng = high `teamIntent`) → written to Twenty as a SCORED lead. The signal, not

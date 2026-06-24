@@ -147,6 +147,16 @@ It is a HARD gate, not optional: fail → rewrite → re-run. A reader must not 
 a model wrote it (kill uniform sentence rhythm, "leverage/robust/seamless/dive into/in
 today's landscape", hedge-stacking, rule-of-three, empty conclusions). NO exceptions — owner is seeing slop; this is now enforced on every PR.
 
+## 🧠 Memory gate — before EVERY set_memory (owner-locked)
+A memory must be **IMMUTABLE · TIMELESS · USEFUL**. Test before storing: "still true in a month?
+no date/status/PR#? worth recalling later?" If any fails, DON'T store it.
+- ❌ state / WIP / "current-state" / resume snapshots / "NEXT: …" / dated scans / done-plans →
+  these belong in the conversation or a relay message, never in memory.
+- ✅ locked rules, system contracts, design tokens, hard constraints, naming conventions, gotchas.
+- Prune your set periodically (the 80%-junk is an OUTCOME of state-bloat, not a quota — keep
+  EVERY real rule). Layer it: `constraints` (hard rules) / `behavior` (defaults) / `context` is
+  ephemeral and usually shouldn't be a memory at all.
+
 ## 💡 Idea loop (every poll, owner directive)
 At EVERY poll, in addition to your work loop, send cmo ONE idea in your lane (type=question, P2)
 that advances the funnel/north-star (consulting leads via tsukumo) and is not yet done. Format:

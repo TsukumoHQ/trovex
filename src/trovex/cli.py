@@ -468,6 +468,35 @@ def backfill_chunks(batch: int = typer.Option(200, help="Embedding batch size.")
 
 
 @app.command()
+def retitle(
+    execute: bool = typer.Option(False, "--execute", help="Apply (default: dry-run)."),
+) -> None:
+    """Re-derive every store doc's title from its content with the current rule
+    (H1 -> any heading -> frontmatter title: -> first line). Fixes docs that
+    indexed as 'Untitled' before the fallback existed. No doc rewrite."""
+    from .store import SqliteStore, _extract_title
+
+    settings = Settings()
+    store = SqliteStore(settings)
+    rows = store.db.execute(
+        "SELECT id, title, content FROM docs WHERE content IS NOT NULL"
+    ).fetchall()
+    changed: list[tuple[int, str]] = []
+    for r in rows:
+        new = _extract_title(r["content"])
+        if new != (r["title"] or ""):
+            changed.append((r["id"], new))
+            if execute:
+                store.db.execute("UPDATE docs SET title = ? WHERE id = ?", (new, r["id"]))
+    if execute:
+        store.db.commit()
+    mode = "EXECUTE" if execute else "dry-run"
+    console.print(f"[bold]retitle[/bold] ({mode}): {len(changed)}/{len(rows)} re-derived")
+    for _id, new in changed[:20]:
+        console.print(f"  #{_id} -> [dim]{new[:60]}[/dim]")
+
+
+@app.command()
 def enrich() -> None:
     """Re-derive tags + provenance + titles for migrated docs from the source files.
 

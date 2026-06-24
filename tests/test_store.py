@@ -139,6 +139,20 @@ def test_boot_pointers_scopes_to_owner_records(settings, store):
     assert boot["tokens_est"] > 0
 
 
+def test_extract_title_fallbacks():
+    """Title derivation is robust to docs that don't lead with an H1 — the bug
+    that left ## -led docs as 'Untitled'."""
+    from trovex.store import _extract_title
+
+    assert _extract_title("# Real H1\n\nbody") == "Real H1"
+    assert _extract_title("## Sub only\n\nbody") == "Sub only"          # H2 → first heading
+    assert _extract_title("text first\n\n# Later H1") == "Later H1"     # H1 preferred over a line
+    assert _extract_title("---\ntitle: From FM\n---\n\nplain body") == "From FM"  # frontmatter
+    assert _extract_title("just a sentence, no heading") == "just a sentence, no heading"
+    assert _extract_title("") == "Untitled"
+    assert _extract_title("   \n\n  ") == "Untitled"
+
+
 def test_boot_empty_when_no_owner_records(settings, store):
     """No scoped record → empty pack, zero cost (unknown agent injects nothing)."""
     from trovex.boot import boot_pointers

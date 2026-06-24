@@ -11,17 +11,16 @@
 
 ## Post body
 
-three commands. no clone, no account, no keys. run it on a repo you know and read your own number:
+two commands. no clone, no account, no keys, nothing installed — `uvx` runs it. point it at a repo you know and read your own number:
 
 ```
-uv tool install git+https://github.com/TsukumoHQ/trovex
-trovex index /path/to/your/repo
-trovex search "how do we roll back a deploy?"
+uvx trovex index /path/to/your/repo
+uvx trovex search "how do we roll back a deploy?"
 ```
 
 that last line prints the tokens it saved versus reading the top candidate docs. on a doc-heavy repo that's around 60% on the lookup, same answer. your number, your repo — not mine.
 
-don't want to install anything? `uvx --from git+https://github.com/TsukumoHQ/trovex trovex search "..."`
+want it permanent? `pip install trovex` (or `uv tool install trovex`), then drop the `uvx`.
 
 local: sqlite + onnx, your code never leaves the box.
 
@@ -32,7 +31,7 @@ local: sqlite + onnx, your code never leaves the box.
 wire it into your agent over MCP and the savings stack up on a dashboard:
 
 ```
-trovex serve
+uvx trovex serve
 claude mcp add --transport http trovex http://localhost:8765/mcp
 ```
 

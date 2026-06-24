@@ -46,7 +46,7 @@ const CONTENT = {
       { file: "/tmp/trovex-search.png", w: 1920, h: 1120, title: "one query, one current doc", accent: "one current doc", eb: "LIVE · trovex search" },
     ],
     how: { title: "index your repo, then ask, get one doc", accent: "one doc", steps: ["index your repo", "agent asks trovex(q)", "one canonical doc + freshness marker"], foot: "Local: SQLite + on-device ONNX embeddings. No cloud, no API keys." },
-    trust: { facts: ["local-first, runs on your machine", "SQLite + on-device ONNX embeddings", "no cloud, no API keys", "AGPL core · MIT CLI · MCP-native"], install: "uv tool install git+https://github.com/TsukumoHQ/trovex", foot: "github.com/TsukumoHQ/trovex · trovex.dev" },
+    trust: { facts: ["local-first, runs on your machine", "SQLite + on-device ONNX embeddings", "no cloud, no API keys", "AGPL core · MIT CLI · MCP-native"], install: "uvx trovex   ·   or: uv tool install trovex", foot: "github.com/TsukumoHQ/trovex · trovex.dev" },
     og: { title: "One canonical doc for your coding agents.", accent: "coding agents.", sub: "~60% fewer tokens per lookup. Local-first, open source.", footRight: "AGPL core / MIT CLI · MCP-native" },
     thumb: "CONTEXT",
   },

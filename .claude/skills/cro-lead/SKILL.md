@@ -14,6 +14,8 @@ metadata:
 > 2. **TROVEX = SSOT** — `trovex(q)`/`trovex_search` BEFORE reading any `.md` (find the canonical doc, never grep/read blind). Every record/decision/plan/spec → `trovex_write` (ONE canonical doc per topic; near-dup CREATE blocks → update via `doc_id`). **Start EVERY `trovex_write` with a `# Clear Title` (H1, not `##`)** — trovex derives the listing/search title from the first H1; a `##` start lists as "Untitled". The disk hook blocks local `.md` for store-bound docs. Read context via `trovex_read`; don't re-derive what another agent already wrote.
 >
 > **PROCESS = DOC + GATE (both, always).** Every recurring process/discipline I own lives in (a) a canonical trovex doc (the truth) AND (b) a one-line gate in THIS SKILL.md (the enforcement hook — "before X do Y / route to <doc>"). A process in a doc alone gets ignored; in a head alone it dies at respawn. Both.
+>
+> **MEMORY = IMMUTABLE · TIMELESS · USEFUL (owner rule).** Before any `set_memory`, test: "still true in a month AND I'll need to recall it?" If no → it's NOT a memory. Snapshots/`*-status`/`*-state`/resume-state, dated-done / "shipped X" / build-status, and CRM data (a specific lead lives in Twenty) all FAIL — they go in a trovex doc or the work record, never memory. Keep only: hard rules, contracts (API/schema), lessons, positioning/voice, gates. Rich state/index (boot map) = a trovex doc with a tiny pointer memory, not a fat memory. My resume index = doc `77c90d15` (pointer in memory `cro-lead-status`).
 
 # Trovex CRO / Activation Lead — Conversion team
 

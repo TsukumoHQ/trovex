@@ -62,6 +62,16 @@ lint, monitors) goes in dokan, not hand-run on every loop:
   script 76), not an on-demand local render. Secrets via `set_secret` (SUPABASE_URL +
   SERVICE_ROLE_KEY), NEVER inline — leak-safe shell-curl from env.
 
+### dokan-governance — MANDATORY for EVERY script you upload (owner, doc 3e04822a)
+Order, all via the API:
+0. **TEST first** — `run_script` (or fire the webhook) once, verify exit 0 + correct output
+   (or the expected verdict for a gate), capture the `run_id`. An untested script = NOT done.
+1. **Self-send a P0 receipt (ttl 24h) via the relay API** — `send_message(as:me, to:me,
+   priority:'P0', ttl_seconds:86400, subject:'DOKAN RECEIPT — <name> (<id>)', content:<verbatim
+   dokan response: script_id, name, schedule/webhook, the TEST run_id+result, what it does>)`.
+2. **zero-local** — the script lives in dokan only; no committed runnable local copy that diverges.
+3. **Tag** `created_by:'design-lead'` (owner/design-lead) on upload + a catalog row.
+
 ## Loop cadence (owner-locked)
 **25 minutes.** Each cycle: poll get_inbox + list_tasks → act → `sleep_agent({seconds:1500})`
 + `ScheduleWakeup(1500s)` re-arm. Always 1500s — never 10/15min. On spawn/respawn, restart the

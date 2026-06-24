@@ -61,6 +61,12 @@ function wordmark(word, fs) {
   return h("div",{style:{display:"flex",alignItems:"center",gap:"11px",fontFamily:"Fira Code",fontSize:`${fs}px`,color:C.ink}},
     h("div",{style:{width:`${Math.round(fs*0.62)}px`,height:`${Math.round(fs*0.62)}px`,backgroundColor:C.green}}), h("span",{},word));
 }
+// founder account is DE-BRANDED (owner): accent (green square) stays, product NAME goes —
+// no wordmark text, no domain footer, no 'a tsukumo product' endplate. company unchanged.
+const isFounder = (a) => a === "founder";
+const markOnly = (fs) => h("div",{style:{display:"flex",width:`${Math.round(fs*0.62)}px`,height:`${Math.round(fs*0.62)}px`,backgroundColor:C.green}});
+const caroMark = (spec, S) => isFounder(spec.audience) ? markOnly(S.mark) : wordmark(brandFor(spec.audience), S.mark);
+const caroFoot = (spec, accent) => isFounder(spec.audience) ? { text:"", accent } : { text:spec.cta.foot, accent };
 const eyebrow = (s,fs) => h("div",{style:{fontFamily:"Fira Code",fontSize:`${fs}px`,color:C.soft,letterSpacing:"0.03em"}}, deMood(s));
 
 // headline: accent substring colored; word-level spans wrap cleanly; Archivo display
@@ -146,29 +152,29 @@ function footerSource(spec, slide) {
 function coverCard(spec, S) {
   const ac = accentFor(spec.audience);
   return frame(S, eyebrow(spec.kicker, S.eb), {
-    mark: wordmark(brandFor(spec.audience), S.mark),
+    mark: caroMark(spec, S),
     body: [ titleEl(spec.cover.title, spec.cover.accent, tfs(S, spec.cover.title), ac), body(spec.cover.sub, S.sub), ...(spec.cover.data ? [bars(spec.cover.data)] : []) ],
-  }, footerSource(spec, spec.cover), { text: spec.cta.foot, accent:false });
+  }, footerSource(spec, spec.cover), caroFoot(spec, false));
 }
 function slideCard(spec, slide, S) {
   const ac = accentFor(spec.audience);
   const dataLed = !!(slide.tiles || slide.items || slide.pairs || slide.heroValue);
   return frame(S, eyebrow(spec.kicker, S.eb), {
-    mark: wordmark(brandFor(spec.audience), S.mark),
+    mark: caroMark(spec, S),
     body: layoutBody(spec, slide, S, ac),
     align: dataLed ? "flex-start" : "center", // top-1% rhythm: data/list cards pin content high, not floating mid-card
-  }, footerSource(spec, slide), { text: spec.cta.foot, accent:false });
+  }, footerSource(spec, slide), caroFoot(spec, false));
 }
 function ctaCard(spec, S) {
   // LADDER ENDPLATE (brand-channel-direction v1.1, LOCKED — design = visual SSOT): product
   // decks (trovex/wraith/yoru) carry a small faint 'a tsukumo product' cue on the CTA card
   // ONLY — the tsukumo ladder is a footer, never a repaint. Institutional (tsukumo) decks
   // ARE tsukumo, so no endplate. Renders in frame's left footer (C.soft mono, S.foot).
-  const endplate = brandFor(spec.audience) === "tsukumo" ? "" : "a tsukumo product";
+  const endplate = (isFounder(spec.audience) || brandFor(spec.audience) === "tsukumo") ? "" : "a tsukumo product";
   return frame(S, h("div",{}), {
-    mark: wordmark(brandFor(spec.audience), S.mark),
+    mark: caroMark(spec, S),
     body: [ titleEl(spec.cta.title, spec.cta.accent, tfs(S, spec.cta.title), C.green), body(spec.cta.sub, S.sub) ],
-  }, endplate, { text: spec.cta.foot, accent:true });
+  }, endplate, caroFoot(spec, true));
 }
 
 function cardsFor(spec) {

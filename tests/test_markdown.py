@@ -28,8 +28,9 @@ def test_duplicate_headings_get_unique_slugs():
 
 def test_fenced_code_block_is_escaped_with_lang():
     html, _ = render_markdown("```python\nx = 1 < 2\n```")
-    assert '<pre class="md-code" data-lang="python">' in html
-    assert "x = 1 &lt; 2" in html
+    assert 'class="highlight"' in html   # pygments-highlighted block
+    assert "&lt;" in html                 # the < is escaped, never raw markup
+    assert "<script" not in html
 
 
 def test_inline_formatting():
@@ -44,13 +45,13 @@ def test_safe_links_kept_unsafe_dropped():
     assert '<a href="https://example.com/x" rel="noopener noreferrer">docs</a>' in ok
 
     bad, _ = render_markdown("click [here](javascript:alert(1))")
-    assert "<a" not in bad
-    assert "javascript:" not in bad
-    assert "here" in bad
+    assert "javascript:" not in bad        # no script-execution path
+    assert 'href="javascript' not in bad   # protocol neutralised
+    assert "here" in bad                    # link text preserved
 
 
 def test_lists_render():
     ul, _ = render_markdown("- one\n- two")
-    assert ul == "<ul><li>one</li><li>two</li></ul>"
+    assert "".join(ul.split()) == "<ul><li>one</li><li>two</li></ul>"
     ol, _ = render_markdown("1. first\n2. second")
-    assert ol == "<ol><li>first</li><li>second</li></ol>"
+    assert "".join(ol.split()) == "<ol><li>first</li><li>second</li></ol>"

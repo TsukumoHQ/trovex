@@ -93,9 +93,19 @@ function suite() {
       h("div",{style:{fontFamily:"Fira Code",fontSize:"22px",color:C.ink}}, "tsukumo.ch")));
 }
 
+// tight README-hero wordmark: transparent canvas + a self-contained dark rounded chip
+// (reads clean on GitHub light AND dark). cyan square mark + lowercase dokan.
+function heroMark() {
+  return h("div",{style:{width:"720px",height:"220px",display:"flex",alignItems:"center",justifyContent:"center"}},
+    h("div",{style:{display:"flex",alignItems:"center",gap:"24px",backgroundColor:C.bg,border:`1px solid ${C.rule}`,borderRadius:"20px",padding:"36px 52px"}},
+      h("div",{style:{width:"56px",height:"56px",backgroundColor:A.dokan}}),
+      h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"90px",color:C.ink,letterSpacing:"-0.04em",lineHeight:1}}, "dokan")));
+}
+
 const ASSETS = [
   { name: "og", w:1200, h:630, el: og },
   { name: "wordmark", w:1200, h:630, el: lockup },
+  { name: "wordmark-hero", w:720, h:220, el: heroMark },
   { name: "suite-4pillar", w:1600, h:900, el: suite },
 ];
 

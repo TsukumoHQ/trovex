@@ -82,6 +82,22 @@ function twocolEl(cols) {
       h("div",{style:{fontFamily:"Fira Code",fontSize:"19px",color:i===cols.length-1?C.green:C.soft,letterSpacing:"0.02em"}}, deDash(col.head)),
       h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"27px",color:C.ink,lineHeight:1.25}}, deDash(col.body)))));
 }
+// versus: honest comparison table — rows of {criterion, us, them, win?:'us'|'them'}.
+// the winner cell per row is green (and `win` CAN be 'them' — show their strengths too).
+function versusEl(c) {
+  const cell = (txt, win) => h("div",{style:{display:"flex",flex:1,padding:"14px 16px",fontFamily:"Fira Sans",fontWeight:win?700:500,fontSize:"23px",lineHeight:1.22,color:win?C.green:C.ink}}, deDash(txt));
+  const head = h("div",{style:{display:"flex",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"10px"}},
+    h("div",{style:{display:"flex",flex:1.1,fontFamily:"Fira Code",fontSize:"18px",color:C.faint,padding:"0 16px"}}, ""),
+    h("div",{style:{display:"flex",flex:1,alignItems:"center",gap:"9px",padding:"0 16px"}},
+      h("div",{style:{width:"16px",height:"16px",backgroundColor:C.green}}), h("div",{style:{fontFamily:"Fira Code",fontSize:"20px",color:C.ink,letterSpacing:"0.02em"}}, deDash(c.versus.us))),
+    h("div",{style:{display:"flex",flex:1,fontFamily:"Fira Code",fontSize:"20px",color:C.soft,padding:"0 16px",letterSpacing:"0.02em"}}, deDash(c.versus.them)));
+  const rows = c.rows.map((r,i)=>h("div",{style:{display:"flex",alignItems:"stretch",borderTop:i?`1px solid ${C.track}`:"none"}},
+    h("div",{style:{display:"flex",flex:1.1,padding:"14px 16px",fontFamily:"Fira Code",fontSize:"18px",color:C.soft}}, deDash(r.criterion)),
+    cell(r.us, r.win==="us"), cell(r.them, r.win==="them")));
+  const out = [head, ...rows];
+  if (c.pick) out.push(h("div",{style:{display:"flex",borderTop:`1px solid ${C.rule}`,marginTop:"4px",paddingTop:"14px",fontFamily:"Fira Sans",fontWeight:500,fontSize:"22px",color:C.soft,lineHeight:1.3}}, deDash(c.pick)));
+  return h("div",{style:{display:"flex",flexDirection:"column",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"14px",padding:"22px 18px"}}, ...out);
+}
 function checklistEl(items) {
   const check = h("div",{style:{display:"flex",width:"34px",height:"34px",minWidth:"34px",borderRadius:"7px",border:`1.5px solid ${C.green}`,backgroundColor:"rgba(34,197,94,0.08)",alignItems:"center",justifyContent:"center"}},
     h("div",{style:{width:"9px",height:"16px",borderRight:`3px solid ${C.green}`,borderBottom:`3px solid ${C.green}`,transform:"rotate(45deg)",marginTop:"-3px"}}));
@@ -123,12 +139,13 @@ function body(c, S) {
     case "twocol":  return [headlineEl(c.headline,c.accent,S), twocolEl(c.cols), subEl(c.sub,S)].filter(Boolean);
     case "checklist": return [headlineEl(c.headline,c.accent,S), checklistEl(c.items), subEl(c.sub,S)].filter(Boolean);
     case "compare": return [headlineEl(c.headline,c.accent,S), compareEl(c), subEl(c.sub,S)].filter(Boolean);
+    case "versus": return [headlineEl(c.headline,c.accent,S), versusEl(c), subEl(c.sub,S)].filter(Boolean);
     case "receipt": return [c.headline?headlineEl(c.headline,c.accent,S):null, receiptEl(c,S), subEl(c.sub,S)].filter(Boolean);
     default:        return [headlineEl(c.headline,c.accent,S), subEl(c.sub,S)].filter(Boolean); // quote
   }
 }
 function card(c, S) {
-  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist"||c.layout==="compare";
+  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist"||c.layout==="compare"||c.layout==="versus";
   const unbranded = c.brand === "founder"; // founder account de-branded: accent stays, name goes
   return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,backgroundImage:`url(${DOT})`,backgroundRepeat:"repeat",padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"20px"}},

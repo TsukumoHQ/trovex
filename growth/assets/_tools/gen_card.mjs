@@ -36,9 +36,12 @@ const deDash = (s) => (s || "").replace(/\s*[—–]\s*/g, " · "); // de-em-das
 const SHAPES = {
   square:   { w:1080, h:1080, pad:80, big:96, mark:25, sub:28, foot:19, eb:19 },
   portrait: { w:1080, h:1350, pad:84, big:104, mark:26, sub:30, foot:20, eb:20 },
+  og:       { w:1200, h:630,  pad:64, big:74, mark:24, sub:25, foot:18, eb:18 },
 };
-const brandFor = (b) => (b === "founder" ? "trovex" : "tsukumo");
-const domainFor = (b) => (b === "founder" ? "trovex.dev" : "tsukumo.ch");
+// brand: founder = trovex property but DE-BRANDED (no name); trovex = product surface
+// (trovex wordmark + trovex.dev + small 'a tsukumo product' endplate); company = tsukumo.
+const brandFor = (b) => (b === "company" || b === "tsukumo") ? "tsukumo" : "trovex";
+const domainFor = (b) => brandFor(b) === "tsukumo" ? "tsukumo.ch" : "trovex.dev";
 const tfs = (S, str) => { const n = (str||"").length; if (n > 64) return S.big - 34; if (n > 42) return S.big - 18; return S.big; };
 
 function wordmark(word, fs) {
@@ -153,7 +156,7 @@ function card(c, S) {
       c.kicker?h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.eb}px`,color:C.soft,letterSpacing:"0.04em"}}, deDash(c.kicker)):h("div",{})),
     h("div",{style:{display:"flex",flexDirection:"column",gap:"30px",flex:1,justifyContent:dataLed?"flex-start":"center",paddingTop:dataLed?"48px":"0"}}, ...body(c,S)),
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.rule}`,paddingTop:"20px"}},
-      h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.soft}}, c.source?`source: ${deDash(c.source)}`:""),
+      h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.soft}}, c.source?`source: ${deDash(c.source)}` : (c.brand==="trovex"?"a tsukumo product":"")),
       unbranded ? h("div",{}) : h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.green}}, domainFor(c.brand))));
 }
 
@@ -181,7 +184,7 @@ const result = {};
 for (const file of files) {
   const cards = JSON.parse(await readFile(file, "utf8"));
   for (const c of cards) {
-    const shape = c.shape === "portrait" ? "portrait" : "square";
+    const shape = (c.shape === "portrait" || c.shape === "og") ? c.shape : "square";
     const S = SHAPES[shape];
     const png = await render(card(c, S), S);
     if (outDir) { await mkdir(join(outDir), { recursive:true }); await writeFile(join(outDir, `${c.uuid}.png`), png); }

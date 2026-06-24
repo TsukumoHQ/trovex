@@ -12,7 +12,10 @@
       "title": "the gap",
       "accent": "the gap",
       "pairs": [
-        {"broke": "a demo runs once, on a clean path you chose", "fix": "production runs constantly, on messy paths you didn't"}
+        {
+          "broke": "a demo runs once, on a clean path you chose",
+          "fix": "production runs constantly, on messy paths you didn't"
+        }
       ]
     },
     {
@@ -35,6 +38,6 @@
     "title": "where pilots die",
     "accent": "where pilots die",
     "sub": "in the gap between a clean demo and your messy production. that gap is the whole problem.",
-    "foot": "trovex.dev"
+    "foot": "in the open"
   }
 }

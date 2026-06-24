@@ -24,13 +24,13 @@
       "accent": "one answer",
       "heroValue": "~60%",
       "heroLabel": "fewer tokens per lookup",
-      "body": "Return the single current doc: path:line + a freshness marker, section-level, no pile. The agent does zero ranking. trovex's default for doc-heavy, multi-agent repos."
+      "body": "Return the single current doc: path:line + a freshness marker, section-level, no pile. The agent does zero ranking. the default for doc-heavy, multi-agent repos."
     }
   ],
   "cta": {
     "title": "pick by your repo, not the hype",
     "accent": "your repo",
-    "sub": "Tiny repo → dump. Broad mixed corpus → retrieve. Doc-heavy fleet that needs the current answer cheaply → trovex. Open source: install + star.",
-    "foot": "trovex.dev"
+    "sub": "Tiny repo → dump. Broad mixed corpus → retrieve. Doc-heavy fleet that needs the current answer cheaply → one canonical answer. Open source: install + star.",
+    "foot": "in the open"
   }
 }

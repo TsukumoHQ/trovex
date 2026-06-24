@@ -18,8 +18,8 @@
       "accent": "the fix",
       "heroValue": "~60%",
       "heroLabel": "fewer tokens per lookup",
-      "body": "a canonical context layer: one current answer instead of a re-read. first-party, trovex own-run.",
-      "source": "first-party, trovex own-run"
+      "body": "a canonical context layer: one current answer instead of a re-read. first-party, our own run.",
+      "source": "first-party, our own run"
     },
     {
       "title": "it's not really a cost problem",
@@ -31,6 +31,6 @@
     "title": "how agents should remember your codebase",
     "accent": "remember your codebase",
     "sub": "once, correctly, and shared. not from scratch, every run.",
-    "foot": "trovex.dev"
+    "foot": "in the open"
   }
 }

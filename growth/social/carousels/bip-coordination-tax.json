@@ -27,7 +27,7 @@
   "cta": {
     "title": "feed your fleet one source of truth",
     "accent": "one source of truth",
-    "sub": "trovex is the shared doc store: write once, every agent reads the same canonical answer instead of re-deriving it. Open source: install + star.",
-    "foot": "trovex.dev"
+    "sub": "the shared doc store: write once, every agent reads the same canonical answer instead of re-deriving it. Open source: install + star.",
+    "foot": "in the open"
   }
 }

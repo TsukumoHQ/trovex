@@ -17,7 +17,10 @@
       "title": "the fix",
       "accent": "the fix",
       "pairs": [
-        {"broke": "every agent keeps its own private copy of the truth", "fix": "one store. every read and write goes through it. that's trovex."}
+        {
+          "broke": "every agent keeps its own private copy of the truth",
+          "fix": "one store. every read and write goes through it."
+        }
       ]
     },
     {
@@ -30,6 +33,6 @@
     "title": "where does your fleet's truth live",
     "accent": "your fleet's truth",
     "sub": "if the answer is 'in each agent's head,' they're already drifting apart.",
-    "foot": "trovex.dev"
+    "foot": "in the open"
   }
 }

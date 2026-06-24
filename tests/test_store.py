@@ -201,6 +201,20 @@ def test_capture_rejects_empty(store):
     assert store.get("owner-cmo-current-state") is None
 
 
+def test_capture_transcript_distil_is_byok_best_effort(store):
+    """Step 4 distil is BYOK + best-effort: with no OpenAI key in context the
+    distil returns None → a transcript-only capture writes nothing and never
+    raises. The free-summary path is unaffected."""
+    from trovex.capture import capture_state
+
+    res = capture_state(store, "cmo", "", transcript="x" * 500, reason="sessionend")
+    assert res["captured"] is False  # no key → no distil → no write
+    assert store.get("owner-cmo-current-state") is None
+
+    res2 = capture_state(store, "cmo", "Durable summary of the session state.", reason="sessionend")
+    assert res2["captured"] is True
+
+
 def test_record_not_stale_by_age(settings, store):
     """A record stays canonical no matter how old; a non-record goes stale."""
     rec = store.put("# Old incident", kind="record")

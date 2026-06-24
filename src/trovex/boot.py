@@ -29,7 +29,9 @@ def boot_pointers(
         limit=k,
         source_ids=["trovex"],
         kind="record",
-        tags=[f"owner/{agent}"],
+        # owner tags are stored lower-cased; normalise the query so a mixed-case
+        # agent (e.g. "COO") recalls its own records instead of nothing.
+        tags=[f"owner/{agent.lower()}"],
     )
     results = [r for r in results if r.score >= floor]
     if not results:

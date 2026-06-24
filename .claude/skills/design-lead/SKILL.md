@@ -105,6 +105,19 @@ with curl or a tiny script; save PNGs to the repo. Keys stay external.
 - Legible at small sizes; high contrast; consistent palette/type across assets.
 - Drafts-only for anything external: you generate the files; a human posts.
 
+## 🪪 Founder account = DE-BRANDED (owner-locked, FUNCTION-ONLY)
+The founder account (@heliosmarket / personal LI/X) carries ZERO product branding. `brand:'founder'`
+/ `audience:'founder'`:
+- **Visual (auto in code):** green square mark only (no `trovex`/`tsukumo` wordmark text), no domain
+  footer, no `a tsukumo product` endplate. Accent + layout + content stay. Company stays branded.
+- **Copy (YOUR job — not enforced by code):** founder slide/card COPY must NEVER NAME a product
+  (trovex/tsukumo/wrai.th/yoru/dokan) or a product domain. Refer by FUNCTION: trovex→"the doc
+  context-router / our doc store / the canonical context layer"; wrai.th→"the agent control plane";
+  yoru→"the observability layer"; dokan→"the script runtime". Drop github/*.dev links (they live in
+  the post caption). The accent does the brand work, not the name.
+- **Self-check before any founder render:** `grep -iE 'trovex|tsukumo|wrai\.?th|yoru|dokan|TsukumoHQ'`
+  the spec's copy fields (headline/sub/body/items/pairs/title/source) → must be clean.
+
 ## Anti-patterns
 - Generic AI-art look (neon gradients, glowing brains, robots). Restrained, technical, real.
 - Text-heavy images the model renders with garbled letters — keep copy minimal, verify spelling

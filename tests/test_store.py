@@ -215,6 +215,19 @@ def test_capture_transcript_distil_is_byok_best_effort(store):
     assert res2["captured"] is True
 
 
+def test_owner_scope_is_case_insensitive(settings, store):
+    """A mixed-case agent name (e.g. 'COO') must recall its own captured record.
+    The owner tag is normalised to lower case on both capture and boot, so the
+    scope matches the store's lower-cased tags regardless of input case."""
+    from trovex.boot import boot_pointers
+    from trovex.capture import capture_state
+
+    capture_state(store, "COO", "Durable current-state for the COO agent.", reason="postcompact")
+    searcher = Searcher(settings, embedder=BagEmbedder())
+    boot = boot_pointers(searcher, "COO", floor=0.0)
+    assert any("current-state" in p["id"] for p in boot["pointers"])
+
+
 def test_record_not_stale_by_age(settings, store):
     """A record stays canonical no matter how old; a non-record goes stale."""
     rec = store.put("# Old incident", kind="record")

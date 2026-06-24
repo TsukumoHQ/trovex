@@ -17,7 +17,8 @@ const PUB = 'public'
 // so the walker below can't see them. They are real, indexable URLs and belong in the
 // sitemap — list them here so the guard treats them as live pages, not dead <loc>s.
 //   /savings → /api/savings (serves the built savings.html calculator shell)
-const REWRITES = ['/savings']
+//   /audit   → /audit.html  (serves the built audit.html self-audit shell)
+const REWRITES = ['/savings', '/audit']
 const pages = new Set(['/', ...REWRITES])
 function walk(dir) {
   for (const e of readdirSync(dir)) {

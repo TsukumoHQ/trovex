@@ -52,6 +52,10 @@ export type EventName =
   | 'math_shown'
   | 'share_clicked'
   | 'consult_signal_shown'
+  // /audit token-waste self-audit (lead magnet, content doc 4f28762f). Three events
+  // (handoff to analytics-lead): audit_view (page view), command_copied (install-line
+  // copy — REUSES the landing event, one funnel), tsukumo_clicked (soft consulting endplate).
+  | 'audit_view'
 
 type Props = Record<string, string>
 
@@ -217,6 +221,11 @@ export function track(event: EventName, props: Props = {}): void {
 export function trackLandingView(): void {
   track('landing_view')
   track('oss_surface_view', { surface: 'trovex' })
+}
+
+export function trackAuditView(): void {
+  track('audit_view')
+  track('oss_surface_view', { surface: 'audit' })
 }
 
 /* ── Waitlist funnel (primary conversion under the private-beta GTM) ──────────

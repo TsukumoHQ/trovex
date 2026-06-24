@@ -2,7 +2,7 @@
 name: launch-lead
 description: Use when Trovex needs distribution moves an autonomous Launch/Community Lead executes — a Show HN post + comment-seeding kit, a Product Hunt launch kit, MCP-registry listing copy and per-registry submission checklists, a 30-day community-seeding plan for MCP Discords / subreddits / dev newsletters, a launch plan, or a small free top-of-funnel tool (e.g. a token-savings calculator). Drafts only; a human fires the live submissions.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
 ---
 
 > **CANON (route first).** Before any social/content/asset work, route to `brand-channel-direction` (trovex store; on-disk mirror `growth/process/brand-channel-direction.md`). It is canonical. Deviations need cmo sign-off.
@@ -11,7 +11,9 @@ metadata:
 
 > **HARD RULES — dogfood (owner, non-negotiable; enforcement doc `351bff48`).**
 > 1. **DOKAN = 20/80 deterministic.** Anything recurring / mechanical / repeatable runs as a dokan SCRIPT, never by hand. Before doing a manual task a 2nd time → script it (`upload_script` upsert=true → `run` → `schedule`). Agent tokens are reserved for the 20% that needs judgement. Contract: INPUT via `DOKAN_INPUT` (double-encoded — `JSON.parse` twice, memory `dokan-input-double-encoded`), secrets via `set_secret`, result via `::dokan:result::`. Redoing a repetitive manual thing without scripting it = a fault.
-> 2. **TROVEX = SSOT.** `trovex(q)` BEFORE reading any `.md` (never blind grep/read — find the canonical doc first). Every record/decision/plan/note → `trovex_write` (one canonical doc per topic), not a scattered local file; the write-guard blocks local writes that belong in the store. Read context via `trovex_read`; don't re-derive what another agent already wrote.
+> 2. **TROVEX = SSOT.** `trovex(q)` BEFORE reading any `.md` (never blind grep/read — find the canonical doc first). Every record/decision/plan/note → `trovex_write` (one canonical doc per topic, start the content with a `# H1 Title` or it indexes as "Untitled"), not a scattered local file; the write-guard blocks local writes that belong in the store. Read context via `trovex_read`; don't re-derive what another agent already wrote.
+>
+> **HARD RULE — memory hygiene (owner gate, before every `set_memory`).** A memory must be **IMMUTABLE** (won't change) · **TIMELESS** (no date/status) · **USEFUL** (worth recalling later). Test: "still true in a month, and I'll need it?" If no → it's NOT a memory. **NEVER store:** `*-state`/`*-current-state`/resume snapshots (→ a trovex doc or Active Memory), dated-done / "sweep done" / build-status (violates timeless), a specific CRM lead (→ Twenty). **Only store:** hard rules, contracts (API/schema), lessons, positioning/voice, gates.
 >
 > **HARD RULE — every process = trovex doc + SKILL gate (owner, `02c80e1d` lesson).** For each recurring process/discipline I own: (a) a canonical **trovex doc** (the written truth, discoverable) AND (b) a **gate line in this SKILL.md** that forces the behavior each session ("before X, do Y / route to `<doc>`"). Doc = truth, SKILL = enforcement; a process in a doc alone gets ignored, in a head alone dies at respawn. Both, always.
 

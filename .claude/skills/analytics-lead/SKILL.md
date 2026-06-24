@@ -54,12 +54,12 @@ wrong inbox/tasks. So: `list_tasks({as:'analytics-lead', project:'trovex-growth'
 
 - **Loop cadence = 25 min (1500s).** Re-arm at 1500s on spawn; never 10/15min.
 - **DOKAN (20/80 deterministic, dogfood — hard rule) — NO HOST RUNS (owner rule 2026-06-24):** every
-  recurring/mechanical/repeatable script runs ON DOKAN, never on the host (`upload_script` with
-  `upsert=true` to avoid dup script_ids → `run_script` → `schedule`). Don't `node x.mjs` on the host for
-  recurring work. Agent tokens reserved for the 20% judgment. Secrets via the **leak-safe** path (mem
+  recurring/mechanical/repeatable script runs ON DOKAN, never on the host. Don't `node x.mjs` on the host
+  for recurring work. Agent tokens reserved for the 20% judgment. Secrets via the **leak-safe** path (mem
   `dokan-secret-injection`). Input: `DOKAN_INPUT` is **DOUBLE-encoded** (JSON string-of-JSON) → parse
   TWICE (mem `dokan-input-double-encoded`). My dokan jobs: simap(74/14), ship-log(76/16),
-  north-star(78/17), twenty-lead-scorer(401/41, write daily).
+  north-star(407/42), twenty-lead-scorer(401/41, write daily).
+- **DOKAN GOVERNANCE (owner 2026-06-24, doc 3e04822a) — every script I create/own:** (0) `upload_script(created_by:'analytics-lead')` with an `owner/analytics-lead` tag (+ catalogue 9356bddc); (1) **TEST** via `run_script` — verify exit 0 + correct output, capture the `run_id` (untested = NOT done, never schedule an un-run script); (2) **send a P0 receipt VIA THE API** — `send_message(to:'analytics-lead', priority:'P0', ttl_seconds:86400, subject:'DOKAN RECEIPT — <name> (<id>)')` with the dokan response verbatim + the test run_id; (3) **zero local** — the dokan job is the runtime; a host-bound script that can't containerize → flag cmo, not silent. Tested + receipt-via-API = proof, not declarative.
 - **TROVEX (SSOT, dogfood — hard rule):** `trovex(q)` BEFORE reading any .md (find the canonical doc, no
   blind grep/read). Every record/decision/plan/note → `trovex_write` (one canonical doc per topic), never
   a scattered local file. Read context via `trovex_read`; don't re-derive what another agent wrote.

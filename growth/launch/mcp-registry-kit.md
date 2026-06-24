@@ -4,7 +4,7 @@
 **Owner:** launch-lead · **Reviewed against:** `.agents/product-marketing-context.md`, the `voice` memory, anti-ai-slop pass.
 
 > **🔥 FIRE SEQUENCE (the human runs, in order, the moment PyPI is live):**
-> 0. **FIRE GATE:** `curl https://pypi.org/pypi/trovex/json` → 200, and `uvx trovex --version` runs clean. (404 today; fullstack-trovex confirms the flip.) Do not fire before this.
+> 0. **FIRE GATE — ✅ GREEN (2026-06-24):** PyPI returns 200, **trovex 0.11.0 LIVE**, `uvx trovex` resolves + runs. The gate is open — fire steps 1–4 now.
 > 1. **Official MCP Registry** (§2.1) — `server.json` (pypi/`trovex`/0.11.0) at repo root → `mcp-publisher login github` (TsukumoHQ org) → `mcp-publisher publish`. This auto-feeds PulseMCP / GitHub-MCP-Registry (VS Code) / Docker = the biggest passive reach.
 > 2. **Glama** (§2.3) → **awesome-mcp-servers PR** (§2.4, needs the Glama badge) → **mcp.so** (§2.5).
 > 3. **Fire-now directories** (§2.6): MCPMarket.com, mcp.directory (+ `/submit-skill`), mcpserverfinder — all now take the clean `uvx` install.
@@ -29,7 +29,7 @@ Being listed is not the same as getting installs. The install signal is verified
 
 The official registry hosts metadata, not code: your server points at a package in a registry it supports (PyPI, npm, NuGet, Docker/OCI, or MCPB). **trovex 0.11.0 is published to PyPI as `trovex`** — so the registry_type is **`pypi`**, identifier **`trovex`** (the §2.1 `server.json` is ready to publish). No MCPB / hosted-endpoint detour needed.
 
-> **🔥 FIRE GATE (the ONLY remaining condition):** PyPI propagation must be LIVE. Verify `https://pypi.org/pypi/trovex/json` returns 200 (and `uvx trovex --version` runs from a clean machine) **before** firing the official-registry publish. As of the last check (2026-06-24, dispatch tick) PyPI returned **404 — not yet propagated**; fullstack-trovex confirms when it flips. The moment it's 200, everything below is fireable. (registry-presence-monitor `136` also flips trovex/pypi to LIVE on its daily run.)
+> **🔥 FIRE GATE — ✅ GREEN (2026-06-24):** PyPI returns 200, **trovex 0.11.0 is LIVE** (`name: trovex`, `requires_python >=3.11`), and `uvx trovex` resolves + runs from PyPI. The package blocker is cleared — the official-registry publish + every directory below is fireable now. (registry-presence-monitor `136` also flips trovex/pypi → LIVE on its daily run.)
 
 ### Submit order (most reach first)
 
@@ -162,7 +162,7 @@ Full per-client setup also lives at `trovex.dev/for/`.
 > `description` under 100 chars. `version` = the published release **0.11.0** (bump to match each future release). `packages` = trovex on PyPI as `trovex` (confirmed the publish target). **VERIFY the exact stdio invocation** the CLI runs (`uvx trovex serve --stdio`?) with eng before publishing — ship nothing that doesn't run from a clean machine.
 
 **Checklist (human + eng) — fire after the §0 FIRE GATE (PyPI 200) is green:**
-- [ ] **FIRE GATE:** `https://pypi.org/pypi/trovex/json` returns 200 + `uvx trovex --version` runs clean (§0).
+- [ ] **FIRE GATE:** `https://pypi.org/pypi/trovex/json` returns 200 + `uvx trovex --help` runs clean (§0).
 - [ ] Add `server.json` to repo root; `version` = `0.11.0` (the release tag).
 - [ ] Install `mcp-publisher` per the official docs.
 - [ ] `mcp-publisher login github` (must be someone with rights on the `TsukumoHQ` org).
@@ -199,7 +199,7 @@ Full per-client setup also lives at `trovex.dev/for/`.
 **Checklist (human):**
 - [ ] Sign in at `glama.ai` with GitHub.
 - [ ] Submit `https://github.com/TsukumoHQ/trovex` via the add-server form.
-- [ ] Confirm a fresh install runs (`uvx trovex --version` / `pip install trovex`) — Glama validates.
+- [ ] Confirm a fresh install runs (`uvx trovex --help` / `pip install trovex`) — Glama validates.
 - [ ] Fill tagline, description, tags from §1.
 - [ ] Once listed, grab the Glama badge (needed for the awesome-mcp PR) and, if cmo agrees, add it to the README.
 

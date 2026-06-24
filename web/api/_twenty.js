@@ -67,6 +67,31 @@ async function findPersonId(c, email) {
   return Array.isArray(people) && people[0]?.id ? people[0].id : null
 }
 
+// Fallback dedup by full name, for a lead who already exists in Twenty WITHOUT an email
+// (e.g. an in-person lead the owner logged by hand) and now signs up / books online with one.
+// Email-only dedup misses them → a duplicate Person + Opportunity, which double-counts the lead in
+// the north-star. REST name filters on the FULL_NAME subfields are unreliable (silently empty), so
+// we fetch a page and match client-side. Conservative: requires BOTH first AND last name to be
+// present and to match, so single-token or email-derived names never false-merge two real people.
+async function findPersonByFullName(c, name) {
+  const { firstName, lastName } = splitName(name, '')
+  const fn = (firstName || '').trim().toLowerCase()
+  const ln = (lastName || '').trim().toLowerCase()
+  if (!fn || !ln) return null
+  const res = await twentyFetch(c, `/rest/people?limit=200`, { method: 'GET' })
+  if (!res || !res.ok) return null
+  const json = /** @type {any} */ (await res.json().catch(() => null))
+  const people = json?.data?.people
+  if (!Array.isArray(people)) return null
+  return (
+    people.find(
+      (p) =>
+        (p?.name?.firstName || '').trim().toLowerCase() === fn &&
+        (p?.name?.lastName || '').trim().toLowerCase() === ln,
+    ) || null
+  )
+}
+
 async function createPerson(c, lead) {
   const { firstName, lastName } = splitName(lead.name, lead.email)
   const body = { name: { firstName, lastName }, emails: { primaryEmail: lead.email } }
@@ -131,7 +156,20 @@ export async function syncLeadToTwenty(lead) {
   if (!c || !lead?.email) return
   try {
     const existing = await findPersonId(c, lead.email)
-    if (existing) return // already in the pipeline — idempotent
+    if (existing) return // already in the pipeline (email match) — idempotent
+    // No email match → check by full name, to catch an existing no-email lead who now has an email.
+    const byName = await findPersonByFullName(c, lead.name)
+    if (byName) {
+      // Same person. Backfill the email if the record has none, so the NEXT sync dedups by email
+      // (self-healing) — but never overwrite an email already on file. Then stop: no duplicate.
+      if (!byName?.emails?.primaryEmail && lead.email) {
+        await twentyFetch(c, `/rest/people/${byName.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ emails: { primaryEmail: lead.email } }),
+        })
+      }
+      return
+    }
     const personId = await createPerson(c, lead)
     if (personId) await attachSourceNote(c, personId, lead)
   } catch {

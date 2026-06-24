@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import insights as insights_mod
 from . import savings as savings_mod
+from .boot import boot_pointers
 from .markdown import PYGMENTS_CSS, render_markdown
 from .mcp_app import mcp
 from .state import get_state
@@ -456,6 +457,20 @@ def build_app() -> FastAPI:
             for r in results
         ])
 
+    @app.get("/api/boot")
+    async def api_boot(
+        agent: str = Query(..., min_length=1),
+        k: int = Query(5, ge=1, le=20),
+        floor: float = Query(0.62, ge=0.0, le=1.0),
+        q: str | None = Query(None, description="override the generic boot query"),
+    ) -> JSONResponse:
+        """Active-memory recall: the agent's own records as a ~80-token pointer
+        pack (RFC 330e7d43, step 2). Read-only; empty when nothing clears
+        scope (owner/<agent> + kind=record) + floor."""
+        return JSONResponse(
+            boot_pointers(get_state().searcher, agent, k=k, floor=floor, q=q)
+        )
+
     @app.get("/api/map")
     async def api_map(canonical_only: bool = True) -> JSONResponse:
         """The 'map' of the store: titles + tags + status, no content. Cheap enough
@@ -543,7 +558,10 @@ def build_app() -> FastAPI:
 
     @app.get("/hooks/{name}", response_class=PlainTextResponse)
     async def hook_download(name: str) -> str:
-        if name not in {"trovex-md-guard.sh", "trovex-md-read-guard.sh"}:
+        if name not in {
+            "trovex-md-guard.sh", "trovex-md-read-guard.sh",
+            "trovex-boot.sh", "trovex-prompt.sh",
+        }:
             return ""
         repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"
         for base in (Path("/home/synxadmin/.claude/hooks"), repo_hooks):

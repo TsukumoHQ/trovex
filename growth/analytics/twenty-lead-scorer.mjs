@@ -31,6 +31,12 @@ const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 let DOKAN_IN = {};
 try { let v = JSON.parse(process.env.DOKAN_INPUT || "{}"); if (typeof v === "string") v = JSON.parse(v); DOKAN_IN = v || {}; } catch { DOKAN_IN = {}; }
 const WRITE = process.argv.includes("--write") || DOKAN_IN.write === true;
+// Optional second write: persist the band as Person.tier (HOT→A / WARM→B / COLD→C) so the north-star
+// Panel F tier distribution reflects the CORRECT booked-aware scoring. OFF by default — coordinate
+// ownership before flipping (the field may also be a target of fullstack's pipeline). Gated so the
+// scheduled teamIntent write is unaffected. Dry mode always PREVIEWS what it would write.
+const WRITE_TIER = process.argv.includes("--write-tier") || DOKAN_IN.writeTier === true;
+const bandToTier = (b) => (b === "HOT" ? "A" : b === "WARM" ? "B" : "C");
 const FREE = new Set(["gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "yahoo.fr", "proton.me", "protonmail.com", "icloud.com", "me.com", "gmx.ch", "gmx.com", "bluewin.ch", "hispeed.ch", "live.com", "aol.com", "pm.me"]);
 
 async function tw(path, init) {
@@ -133,6 +139,21 @@ if (WRITE && toWrite.length) {
   console.error(`lead-scorer: ${rows.filter((r) => r.team).length} team-cluster persons, ${toWrite.length} to flag (dry)`);
 }
 
+// Tier = the booked-aware band persisted to Person.tier (the north-star Panel F source). Only scored
+// persons get a tier; genuinely unscored leads (free email, no opp) stay null — not forced to C.
+const tierTargets = rows.filter((r) => r.score != null).map((r) => ({ id: r.id, first: r.first, tier: bandToTier(band(r.score)) }));
+const tierDist = tierTargets.reduce((m, t) => ((m[t.tier] = (m[t.tier] || 0) + 1), m), { A: 0, B: 0, C: 0 });
+console.log(`\n**Tier ${WRITE_TIER ? "WRITE" : "PREVIEW (would write)"}: ${tierDist.A} A / ${tierDist.B} B / ${tierDist.C} C** (${tierTargets.length} scored; ${rows.length - tierTargets.length} unscored stay null). _band→tier: HOT→A · WARM→B · COLD→C._`);
+let tierWrote = 0;
+if (WRITE_TIER && tierTargets.length) {
+  for (const t of tierTargets) {
+    const res = await tw(`/rest/people/${t.id}`, { method: "PATCH", body: JSON.stringify({ tier: t.tier }) });
+    if (res) tierWrote++;
+  }
+  console.log(`TIER WRITE: set tier on ${tierWrote}/${tierTargets.length} persons.`);
+  console.error(`lead-scorer: wrote tier on ${tierWrote}/${tierTargets.length} (${tierDist.A}A/${tierDist.B}B/${tierDist.C}C)`);
+}
+
 // Structured receipt for the dokan operator (parsed from the ::dokan:result:: line).
 console.log(`::dokan:result:: ${JSON.stringify({
   date: today,
@@ -144,4 +165,7 @@ console.log(`::dokan:result:: ${JSON.stringify({
   flagged: toWrite.length,
   wrote,
   junkSkipped,
+  tierMode: WRITE_TIER ? "write" : "preview",
+  tierDist,
+  tierWrote,
 })}`);

@@ -1,0 +1,107 @@
+/* trovex.dev/audit — self-audit lead magnet. Inherits fonts/colors from index.css
+ * (body bg, Fira families). Local layout only; theme values match #0d1119 dark. */
+
+.audit {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.audit-home {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+.audit-home:hover { opacity: 1; }
+
+.audit-head h1 {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  line-height: 1.15;
+  margin: 0 0 0.4rem;
+}
+.audit-sub { font-size: 1.1rem; opacity: 0.75; margin: 0 0 1rem; }
+.audit-intro { max-width: 42rem; opacity: 0.85; line-height: 1.6; }
+
+/* Checklist + sticky scorecard side by side; stacks on narrow screens. */
+.audit-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+@media (min-width: 56rem) {
+  .audit-grid { grid-template-columns: 1fr 18rem; align-items: start; }
+}
+
+.audit-group {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.6rem;
+  padding: 1rem 1.1rem 0.5rem;
+  margin: 0 0 1rem;
+}
+.audit-group legend {
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  padding: 0 0.4rem;
+}
+
+.audit-item {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.4rem;
+  line-height: 1.5;
+  cursor: pointer;
+  border-radius: 0.4rem;
+  transition: background 0.12s;
+}
+.audit-item:hover { background: rgba(255, 255, 255, 0.04); }
+.audit-item input { margin-top: 0.25rem; flex: 0 0 auto; width: 1.05rem; height: 1.05rem; cursor: pointer; }
+.audit-item.is-checked span { opacity: 0.6; }
+
+.audit-score { position: sticky; top: 1rem; }
+.audit-scorecard {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.7rem;
+  padding: 1.2rem 1.2rem 1.4rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+.audit-score-num { font-size: 2.6rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.audit-score-of { font-size: 1rem; font-weight: 400; opacity: 0.5; margin-left: 0.4rem; }
+.audit-band-label { font-weight: 600; margin: 0.6rem 0 0.5rem; }
+.audit-band-body { font-size: 0.9rem; line-height: 1.55; opacity: 0.85; margin: 0; }
+
+/* Band accents — quiet, not alarmist. */
+.band-low { border-color: rgba(120, 200, 160, 0.4); }
+.band-low .audit-band-label { color: #79d8a4; }
+.band-real { border-color: rgba(230, 200, 120, 0.45); }
+.band-real .audit-band-label { color: #e6c878; }
+.band-compounding { border-color: rgba(230, 140, 120, 0.5); }
+.band-compounding .audit-band-label { color: #ec8c78; }
+
+.audit-do { max-width: 46rem; }
+.audit-do h2 { font-size: 1.4rem; margin: 2rem 0 1rem; }
+.audit-do ol { padding-left: 1.2rem; }
+.audit-do li { margin: 0 0 1.1rem; line-height: 1.6; }
+.audit-cmds { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.7rem 0; }
+.audit-note { display: block; font-size: 0.9rem; opacity: 0.8; margin-top: 0.4rem; line-height: 1.55; }
+.audit-link, .audit-consult { text-decoration: underline; text-underline-offset: 2px; }
+
+.audit-endplate {
+  max-width: 46rem;
+  margin: 2rem 0 0;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.6rem;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+.audit-endplate.is-live { border-color: rgba(230, 140, 120, 0.45); opacity: 1; }
+.audit-consult { font-weight: 600; white-space: nowrap; }
+
+.audit-foot { margin-top: 3rem; font-size: 0.85rem; opacity: 0.6; }
+.audit-foot a { text-decoration: underline; text-underline-offset: 2px; }

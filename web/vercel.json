@@ -12,6 +12,7 @@
     { "source": "/js/script.js", "destination": "https://plausible.io/js/script.js" },
     { "source": "/api/event", "destination": "https://plausible.io/api/event" },
     { "source": "/savings", "destination": "/api/savings" },
+    { "source": "/audit", "destination": "/audit.html" },
     { "source": "/blog/(.*)", "destination": "/api/blog-gone?path=$1" }
   ],
   "functions": {

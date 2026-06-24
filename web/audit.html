@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d1119" />
+    <link rel="canonical" href="https://trovex.dev/audit" />
+    <title>Is your coding agent burning tokens on docs? A 5-minute self-audit — trovex</title>
+    <meta
+      name="description"
+      content="A 13-point self-audit to find out whether your coding agents waste tokens rereading docs. Score it in five minutes, then measure your real number with trovex. Ungated, no signup."
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="trovex" />
+    <meta property="og:url" content="https://trovex.dev/audit" />
+    <meta property="og:title" content="Is your coding agent burning tokens on docs?" />
+    <meta
+      property="og:description"
+      content="A 5-minute, 13-point self-audit: are your agents paying a rereading tax? Score it, then measure your own number. About 60% fewer tokens per lookup with trovex."
+    />
+    <meta property="og:image" content="https://trovex.dev/api/savings-card" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="trovex — self-audit for the agent rereading tax" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Is your coding agent burning tokens on docs?" />
+    <meta name="twitter:image" content="https://trovex.dev/api/savings-card" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+              { "@type": "ListItem", "position": 2, "name": "Token-waste self-audit", "item": "https://trovex.dev/audit" }
+            ]
+          },
+          {
+            "@type": "WebApplication",
+            "name": "trovex agent token-waste self-audit",
+            "url": "https://trovex.dev/audit",
+            "description": "A 13-point self-audit that tells a developer whether their coding agents waste tokens rereading docs, and lands them in one of three cost bands. Runs client-side; nothing leaves the page.",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Any (web browser)",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "publisher": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "How do I know if my coding agents are wasting tokens on docs?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Run a quick self-audit. Tick the items that apply across your docs, agents, team, and bill. 0–3 points means rereading isn't your problem; 4–8 means a real, recurring tax; 9+ means a compounding cost across agents and teammates. Then measure your real number by pointing trovex at the repo and reading the savings tab."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "What is the agent rereading tax?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Coding agents reread a repo's markdown every session to work out which doc is current, then answer from a guess. You pay for that on every session, every agent, every teammate. Serving one canonical doc per query instead is about 60% fewer tokens per lookup."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does the self-audit need an email or signup?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. The audit is ungated and runs client-side in your browser — no email, no account, nothing leaves the page. trovex itself is open source and local-first."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Same first-party Plausible setup as the landing (cookieless, no PII). -->
+    <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+    <script>
+      window.plausible =
+        window.plausible ||
+        function () {
+          ;(window.plausible.q = window.plausible.q || []).push(arguments)
+        }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/audit/main.tsx"></script>
+  </body>
+</html>

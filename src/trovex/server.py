@@ -488,6 +488,7 @@ def build_app() -> FastAPI:
                 get_state().store,
                 agent,
                 body.get("summary") or "",
+                transcript=body.get("transcript") or "",
                 reason=(body.get("reason") or "postcompact"),
             )
         )
@@ -582,7 +583,7 @@ def build_app() -> FastAPI:
         if name not in {
             "trovex-md-guard.sh", "trovex-md-read-guard.sh",
             "trovex-boot.sh", "trovex-prompt.sh", "trovex-postcompact.sh",
-            "install-active-memory.sh",
+            "trovex-sessionend.sh", "install-active-memory.sh",
         }:
             return ""
         repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"

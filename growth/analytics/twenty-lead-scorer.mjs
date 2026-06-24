@@ -46,16 +46,33 @@ const data = await tw(`/rest/people?limit=200`);
 const opps = await tw(`/rest/opportunities?limit=100`);
 if (!data) { console.log("# Twenty lead scorer — n/a (TWENTY creds missing or API unreachable). Nothing fabricated."); process.exit(0); }
 const ppl = data.data?.people || [];
-const oppPocIds = new Set((opps?.data?.opportunities || []).map((o) => o.pointOfContactId).filter(Boolean));
+// Opp stage per point-of-contact. A booked/engaged call (stage past SCREENING) is the STRONGEST
+// dark-funnel signal we can read from the CRM — they raised their hand for a consulting conversation.
+// (Verified in the lead-machine sample: warm booked deals were mis-tiered COLD because the scorer
+// was blind to this; the LLM judged empty enrichment. Reading opp stage fixes it at the source.)
+const BOOKED_STAGES = new Set(["MEETING", "PROPOSAL", "CUSTOMER"]);
+const oppStageByPoc = new Map();
+for (const o of opps?.data?.opportunities || []) {
+  if (o.pointOfContactId) oppStageByPoc.set(o.pointOfContactId, (o.stage || "").toUpperCase());
+}
+
+// Junk filter: test/probe rows are not leads — drop them from the report and from clusters so a
+// fake company domain can't fabricate a team. Same regex family as the north-star scoreboard.
+const isJunk = (em, first) =>
+  /(^|@)(example\.com|y\.com|test|eeid\.ch)/i.test(em || "") ||
+  /^(test|klk|asdf|qwer|poip|xxx|probe)/i.test(first || "") ||
+  em === "x@x.com";
 
 // Cluster by company domain.
 const byDomain = new Map();
 for (const p of ppl) {
   const em = (p.emails?.primaryEmail || "").toLowerCase();
+  const first = p.name?.firstName || "?";
   const dom = em.includes("@") ? em.split("@")[1] : null;
   const company = dom && !FREE.has(dom);
-  const rec = { id: p.id, first: p.name?.firstName || "?", dom, company, teamIntent: !!p.teamIntent, hasOpp: oppPocIds.has(p.id) };
-  if (company) {
+  const stage = oppStageByPoc.get(p.id) || null;
+  const rec = { id: p.id, first, dom, company, teamIntent: !!p.teamIntent, hasOpp: oppStageByPoc.has(p.id), booked: BOOKED_STAGES.has(stage || ""), stage, junk: isJunk(em, first) };
+  if (company && !rec.junk) {
     if (!byDomain.has(dom)) byDomain.set(dom, []);
     byDomain.get(dom).push(rec);
   }
@@ -65,18 +82,23 @@ for (const p of ppl) {
 function score(rec, clusterSize) {
   let s = 0;
   if (rec.company) s += 40;
-  if (clusterSize >= 2) s += 40;
-  if (rec.hasOpp) s += 20;
-  return s;
+  if (clusterSize >= 2) s += 40;        // 2+ same-domain = a team evaluating us
+  if (rec.booked) s += 40;              // booked call (opp MEETING+) = strong consulting intent
+  else if (rec.hasOpp) s += 20;         // open opp, pre-meeting = some intent
+  return Math.min(s, 100);
 }
 const band = (s) => (s >= 80 ? "HOT" : s >= 40 ? "WARM" : "COLD");
 
 const rows = [];
 const toWrite = []; // persons to set teamIntent=true
+let junkSkipped = 0;
 for (const p of ppl) {
   const r = p._rec;
+  if (r.junk) { junkSkipped++; continue; } // test/probe rows are not leads
   const cluster = r.company ? byDomain.get(r.dom).length : 0;
-  const s = r.company ? score(r, cluster) : null;
+  // Score whenever there's a readable signal — company OR a booked/open opp. A booked solo-dev
+  // (free email, no cluster) is still a real consulting hand-raise → WARM, not unscored.
+  const s = (r.company || r.hasOpp) ? score(r, cluster) : null;
   const team = cluster >= 2; // 2+ from same company = a team evaluating us
   rows.push({ ...r, cluster, score: s, team });
   if (team && !r.teamIntent) toWrite.push(r);
@@ -91,21 +113,35 @@ console.log(`## Team clusters (2+ people, same company domain) — the teamInten
 if (!clusters.length) console.log(`_None yet — no company domain has 2+ people. A real zero._`);
 for (const [dom, m] of clusters) console.log(`- **${dom}** — ${m.length} people (${m.map((x) => x.first).join(", ")}) → teamIntent${m.every((x) => x.teamIntent) ? " (already set)" : " ← FLAG"}`);
 console.log(`\n## Scored persons`);
-console.log(`| Person | Domain | Company? | Cluster | Score | Band | teamIntent |`);
-console.log(`|--------|--------|:--------:|-------:|------:|------|:----------:|`);
+console.log(`| Person | Domain | Company? | Cluster | Booked | Score | Band | teamIntent |`);
+console.log(`|--------|--------|:--------:|-------:|:------:|------:|------|:----------:|`);
 for (const r of rows.sort((a, b) => (b.score || 0) - (a.score || 0))) {
-  console.log(`| ${r.first} | ${r.dom || "—"} | ${r.company ? "✓" : "—"} | ${r.cluster || "—"} | ${r.score == null ? "n/a" : r.score} | ${r.score == null ? "—" : band(r.score)} | ${r.team ? "true" : r.teamIntent ? "true(was)" : "—"} |`);
+  console.log(`| ${r.first} | ${r.dom || "—"} | ${r.company ? "✓" : "—"} | ${r.cluster || "—"} | ${r.booked ? "✓" : r.hasOpp ? "opp" : "—"} | ${r.score == null ? "n/a" : r.score} | ${r.score == null ? "—" : band(r.score)} | ${r.team ? "true" : r.teamIntent ? "true(was)" : "—"} |`);
 }
-console.log(`\n**${rows.filter((r) => r.team).length} person(s) in a team cluster · ${toWrite.length} need teamIntent set.**`);
+const booked = rows.filter((r) => r.booked).length;
+console.log(`\n**${rows.filter((r) => r.team).length} person(s) in a team cluster · ${booked} booked call(s) · ${toWrite.length} need teamIntent set · ${junkSkipped} junk skipped.**`);
 
+let wrote = 0;
 if (WRITE && toWrite.length) {
-  let ok = 0;
   for (const r of toWrite) {
     const res = await tw(`/rest/people/${r.id}`, { method: "PATCH", body: JSON.stringify({ teamIntent: true }) });
-    if (res) ok++;
+    if (res) wrote++;
   }
-  console.log(`\nWRITE: set teamIntent=true on ${ok}/${toWrite.length} persons.`);
-  console.error(`lead-scorer: wrote teamIntent on ${ok}/${toWrite.length}`);
+  console.log(`\nWRITE: set teamIntent=true on ${wrote}/${toWrite.length} persons.`);
+  console.error(`lead-scorer: wrote teamIntent on ${wrote}/${toWrite.length}`);
 } else {
   console.error(`lead-scorer: ${rows.filter((r) => r.team).length} team-cluster persons, ${toWrite.length} to flag (dry)`);
 }
+
+// Structured receipt for the dokan operator (parsed from the ::dokan:result:: line).
+console.log(`::dokan:result:: ${JSON.stringify({
+  date: today,
+  mode: WRITE ? "write" : "dry",
+  persons: ppl.length,
+  teamClusters: clusters.length,
+  teamPersons: rows.filter((r) => r.team).length,
+  booked,
+  flagged: toWrite.length,
+  wrote,
+  junkSkipped,
+})}`);

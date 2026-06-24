@@ -18,7 +18,7 @@ import { join } from "node:path";
 const SECTIONS = ["answers", "vs", "glossary"];
 const SRC = "public";
 const OUT = "dist";
-const INSTALL = "uv tool install git+https://github.com/TsukumoHQ/trovex";
+const INSTALL = "uv tool install trovex";
 
 const decode = (s) =>
   s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")

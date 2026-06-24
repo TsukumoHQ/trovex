@@ -101,11 +101,15 @@ uvx trovex serve                        # MCP at /mcp, dashboard at /savings
 
 Full per-client setup also lives at `trovex.dev/for/`.
 
-**MCP tools exposed (for registries that list tools):**
-- `trovex(q)` — route a question to the right on-disk `.md`; returns `path:line` pointers with freshness markers, not a pile of files to rank.
-- `trovex_write(content, kind?, doc_id?, tags?)` — store a record (an incident, a decision, what worked) inside trovex once.
-- `trovex_read(query | doc_id, section?)` — read a trovex-owned doc back, optionally just one section.
-- `trovex_search(query, k?, tags?)` — passage-level retrieval across the store, for when you want top chunks rather than one canonical doc.
+**MCP tools exposed (6 — 3 read-only, 3 mutate; for registries that list tools):**
+- `trovex(q)` — *(read)* route a question to the right on-disk `.md`; returns `path:line` pointers with freshness markers, not a pile of files to rank.
+- `trovex_read(query | doc_id, section?)` — *(read)* read a trovex-owned doc back, optionally just one section.
+- `trovex_search(query, k?, tags?)` — *(read)* passage-level retrieval across the store, for when you want top chunks rather than one canonical doc.
+- `trovex_write(content, kind?, doc_id?, tags?)` — *(write)* store a record (an incident, a decision, what worked) inside trovex's own doc store.
+- `trovex_tag(...)` — *(write)* tag/retag a stored doc.
+- `trovex_delete(...)` — *(write)* soft-delete a stored doc.
+
+**Tool-safety (the trust signal devs check):** writes are **confined to trovex's own doc store** — no shell-exec, and trovex never writes to your source files. Read-only by default; the 3 mutating tools only touch the trovex store.
 
 **Category / tags:** `developer-tools`, `code`, `context`, `memory`, `rag`, `documentation`, `coding-agents`, `claude-code`, `cursor`, `local-first`, `python`
 

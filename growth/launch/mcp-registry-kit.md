@@ -1,8 +1,16 @@
 # trovex — MCP registry listing kit + per-registry submission checklists
 
-**Status:** DRAFT. Nothing here is submitted live. A human runs each checklist and fires each submit.
+**Status:** DRAFT — **FIRE-READY (gated on PyPI live).** Nothing here is submitted live; a human runs each checklist and fires each submit. As of 2026-06-24 the whole kit is flipped to the published-PyPI state (`uvx trovex` / `pip install trovex`, server.json `registry_type: pypi` @ 0.11.0) and is fireable the second the FIRE GATE goes green.
 **Owner:** launch-lead · **Reviewed against:** `.agents/product-marketing-context.md`, the `voice` memory, anti-ai-slop pass.
-**Verified against README:** repo `github.com/TsukumoHQ/trovex`, install `uv tool install git+https://github.com/TsukumoHQ/trovex`, landing `trovex.dev`. (2026-06-22)
+
+> **🔥 FIRE SEQUENCE (the human runs, in order, the moment PyPI is live):**
+> 0. **FIRE GATE:** `curl https://pypi.org/pypi/trovex/json` → 200, and `uvx trovex --version` runs clean. (404 today; fullstack-trovex confirms the flip.) Do not fire before this.
+> 1. **Official MCP Registry** (§2.1) — `server.json` (pypi/`trovex`/0.11.0) at repo root → `mcp-publisher login github` (TsukumoHQ org) → `mcp-publisher publish`. This auto-feeds PulseMCP / GitHub-MCP-Registry (VS Code) / Docker = the biggest passive reach.
+> 2. **Glama** (§2.3) → **awesome-mcp-servers PR** (§2.4, needs the Glama badge) → **mcp.so** (§2.5).
+> 3. **Fire-now directories** (§2.6): MCPMarket.com, mcp.directory (+ `/submit-skill`), mcpserverfinder — all now take the clean `uvx` install.
+> 4. Verify each resolves; log each (registry, URL, date, live y/n). Then ping cmo.
+> **Voice/brand:** lowercase `trovex`, no superlatives, no "Synergix", real ~60% number. Drafts→human-fires; nothing auto-submits.
+**Verified against README:** repo `github.com/TsukumoHQ/trovex`, install `uvx trovex` / `pip install trovex` (PyPI `trovex` 0.11.0), landing `trovex.dev`. (2026-06-24 — flipped from git-install on PyPI publish)
 **Supersedes:** the older `mcp-registries.md` that lived here before the trovex-store migration (#238). It used the old `Synergix-lab` repo and the old `git clone + uv run` install. Both are corrected here.
 
 Scope: this is Play 1 — registry/directory listings only. The Show HN and Product Hunt one-shots are a separate play; do not fire them from this kit.
@@ -17,17 +25,11 @@ The one with the most reach is the official registry. Publish once and it propag
 
 Being listed is not the same as getting installs. The install signal is verified ownership, a versioned release, a one-line install that actually runs, and a number a reader can reproduce. trovex has the number (~60% fewer tokens per lookup) and the one-line install. The gap is below.
 
-### The blocker a human or eng has to clear before the official registry
+### The package blocker — CLEARED (PyPI)
 
-The official registry hosts metadata, not code. Your server has to point at a package in a registry it supports: PyPI, npm, NuGet, Docker/OCI, or MCPB (a GitHub or GitLab release artifact). It also accepts a `remotes` entry for a hosted HTTP endpoint.
+The official registry hosts metadata, not code: your server points at a package in a registry it supports (PyPI, npm, NuGet, Docker/OCI, or MCPB). **trovex 0.11.0 is published to PyPI as `trovex`** — so the registry_type is **`pypi`**, identifier **`trovex`** (the §2.1 `server.json` is ready to publish). No MCPB / hosted-endpoint detour needed.
 
-trovex today installs with `uv tool install git+https://github.com/TsukumoHQ/trovex` — a build straight from the git repo. A raw git URL is **not** one of the supported package types. So before the official submit, eng picks one of:
-
-- [ ] **Publish trovex to PyPI** (cleanest — then `registry_type: pypi`, identifier `trovex`, and the listing's install line stays close to the README). Recommended. → eng. **[BLOCKER]**
-- [ ] **Ship an MCPB bundle as a GitHub release** and reference it as `registry_type: mcpb`. Works without PyPI but is more setup. → eng.
-- [ ] **Expose a brand-neutral hosted HTTP endpoint** (e.g. `mcp.trovex.dev/mcp`) and list it under `remotes`. This is a product decision, not a copy one — local-first is a core differentiator, so a hosted multi-tenant trovex is the team's call, not the registry's. → cmo/eng.
-
-Until one of those is true, the official-registry `server.json` below is a draft you cannot publish. Every other registry on the list (Glama, mcp.so, awesome-mcp, PulseMCP's form, the per-client directories) accepts a plain GitHub repo URL and can go ahead with the git install line as written.
+> **🔥 FIRE GATE (the ONLY remaining condition):** PyPI propagation must be LIVE. Verify `https://pypi.org/pypi/trovex/json` returns 200 (and `uvx trovex --version` runs from a clean machine) **before** firing the official-registry publish. As of the last check (2026-06-24, dispatch tick) PyPI returned **404 — not yet propagated**; fullstack-trovex confirms when it flips. The moment it's 200, everything below is fireable. (registry-presence-monitor `136` also flips trovex/pypi to LIVE on its daily run.)
 
 ### Submit order (most reach first)
 
@@ -73,13 +75,12 @@ Lowercase `trovex` in all prose. No superlatives. Brand prose never names the co
 >
 > About 60% fewer tokens on doc lookups, same context quality. Runs locally: vectors in SQLite, embeddings via ONNX, no cloud and no API keys. Public beta, AGPL-3.0.
 
-**Install (the one line, straight from git — matches the README):**
+**Install (PyPI — trovex is published, `trovex` on PyPI):**
 ```bash
-uv tool install git+https://github.com/TsukumoHQ/trovex   # one-time, no clone
-trovex index /path/to/your/repo                            # ~1 min
-trovex serve                                               # MCP at /mcp, dashboard at /savings
+uvx trovex index /path/to/your/repo    # run with no install (uvx), ~1 min
+uvx trovex serve                        # MCP at /mcp, dashboard at /savings
 ```
-*No `uv`? `curl -LsSf https://astral.sh/uv/install.sh | sh` or `brew install uv`. After the public launch this shortens to `uvx trovex`.*
+*Prefer a persistent install? `pip install trovex` or `uv tool install trovex`, then `trovex index … && trovex serve`. No `uv`? `curl -LsSf https://astral.sh/uv/install.sh | sh` or `brew install uv`.*
 
 **MCP client config — what a user pastes into their agent (HTTP, after `trovex serve`):**
 ```json
@@ -92,8 +93,13 @@ trovex serve                                               # MCP at /mcp, dashbo
   }
 }
 ```
-For Claude Code specifically: `claude mcp add --transport http trovex http://localhost:8765/mcp`.
-Per-client setup (Claude Code, Cursor, Windsurf, Cline, Zed, Roo) is at `trovex.dev/for/`.
+**Per-client quick-install (copy-paste — paste the same one server into each client's config):**
+- **Claude Code (CLI):** `claude mcp add --transport http trovex http://localhost:8765/mcp` (after `trovex serve`). Stdio variant: `claude mcp add trovex -- uvx trovex serve --stdio` — **VERIFY the `--stdio` flag with eng** before publishing.
+- **Cursor:** Settings → Tools & Integrations → New MCP Server → paste the `mcpServers` JSON above.
+- **VS Code:** add to `.vscode/mcp.json` (the same `mcpServers` block); `@mcp` gallery auto-detects it.
+- **Windsurf / Cline / Zed / Roo:** same `mcpServers` JSON in each client's MCP config.
+
+Full per-client setup also lives at `trovex.dev/for/`.
 
 **MCP tools exposed (for registries that list tools):**
 - `trovex(q)` — route a question to the right on-disk `.md`; returns `path:line` pointers with freshness markers, not a pile of files to rank.
@@ -142,22 +148,22 @@ Per-client setup (Claude Code, Cursor, Windsurf, Cline, Zed, Roo) is at `trovex.
     "url": "https://github.com/TsukumoHQ/trovex",
     "source": "github"
   },
-  "version": "0.0.0",
+  "version": "0.11.0",
   "packages": [
     {
       "registry_type": "pypi",
       "identifier": "trovex",
-      "version": "0.0.0",
+      "version": "0.11.0",
       "transport": { "type": "stdio" }
     }
   ]
 }
 ```
-> `description` is under 100 chars. `version` is a placeholder — set it to the real release tag. `packages` assumes trovex is on PyPI as `trovex`. If it isn't, swap to a `mcpb` package pointing at a GitHub release, or hold (see §0). **VERIFY** the exact stdio invocation the CLI runs before publishing — ship nothing that doesn't run.
+> `description` under 100 chars. `version` = the published release **0.11.0** (bump to match each future release). `packages` = trovex on PyPI as `trovex` (confirmed the publish target). **VERIFY the exact stdio invocation** the CLI runs (`uvx trovex serve --stdio`?) with eng before publishing — ship nothing that doesn't run from a clean machine.
 
-**Checklist (human + eng):**
-- [ ] Clear the package blocker from §0 (PyPI publish, MCPB release, or hosted `remotes`). **[BLOCKER]**
-- [ ] Add `server.json` to repo root; set `version` to the release tag.
+**Checklist (human + eng) — fire after the §0 FIRE GATE (PyPI 200) is green:**
+- [ ] **FIRE GATE:** `https://pypi.org/pypi/trovex/json` returns 200 + `uvx trovex --version` runs clean (§0).
+- [ ] Add `server.json` to repo root; `version` = `0.11.0` (the release tag).
 - [ ] Install `mcp-publisher` per the official docs.
 - [ ] `mcp-publisher login github` (must be someone with rights on the `TsukumoHQ` org).
 - [ ] Tag the release and push the tag.
@@ -193,7 +199,7 @@ Per-client setup (Claude Code, Cursor, Windsurf, Cline, Zed, Roo) is at `trovex.
 **Checklist (human):**
 - [ ] Sign in at `glama.ai` with GitHub.
 - [ ] Submit `https://github.com/TsukumoHQ/trovex` via the add-server form.
-- [ ] Confirm a fresh clone builds (the `uv tool install` path succeeds) — Glama validates.
+- [ ] Confirm a fresh install runs (`uvx trovex --version` / `pip install trovex`) — Glama validates.
 - [ ] Fill tagline, description, tags from §1.
 - [ ] Once listed, grab the Glama badge (needed for the awesome-mcp PR) and, if cmo agrees, add it to the README.
 

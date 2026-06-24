@@ -59,6 +59,7 @@
 - [Community Slack](https://tsukumo.ch/slack): questions and setup help.
 - [Website](https://trovex.dev): the landing page.
 - [Token-savings calculator](https://trovex.dev/savings): a free client-side tool to estimate how many tokens your coding agents waste rereading the repo, and what one canonical answer saves (~60% fewer per doc lookup). No install, nothing leaves the page.
+- [5-minute agent-docs self-audit](https://trovex.dev/audit): a free self-audit to spot whether your coding agents are burning tokens rereading docs, and what to fix.
 - [Repository](https://github.com/TsukumoHQ/trovex): source (public; core AGPL-3.0, CLIs MIT).
 - [llms-full.txt](https://trovex.dev/llms-full.txt): the full extractable content in one file.
 - Markdown twins: every /answers, /vs, and /glossary page has a chrome-free markdown version at its URL + `index.md` (e.g. https://trovex.dev/answers/canonical-context-for-agents/index.md) — token-cheap content built for AI ingestion.

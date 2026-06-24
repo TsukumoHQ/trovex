@@ -36,6 +36,9 @@ const SURFACES = [
   // link previews via it. If it 500s, shares preview broken silently. Assert it serves
   // a real raster (200 + image/png), not an error page that happens to return 200.
   { label: "savings-card OG endpoint", url: "https://trovex.dev/api/savings-card", contentType: "image/png" },
+  // /audit lead magnet (#519): assert the SPA chunk carries the canonical install cmd
+  // (catches a break of the page or an install regression on this lead→consulting surface).
+  { label: "audit lead magnet", url: "https://trovex.dev/audit", chunk: { re: /\/assets\/audit-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex"] } },
   { label: "tsukumo consulting", url: "https://tsukumo.ch/consulting" },
   { label: "tsukumo assessment", url: "https://tsukumo.ch/assessment" },
   { label: "wraith (violet)", url: "https://tsukumo.ch/wraith", want: ["wraith-scope"] },

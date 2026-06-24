@@ -199,7 +199,7 @@ async function main() {
     twenty(`/rest/people?limit=100`),
   ]);
   let propRows = null, totalInq = null, totalQual = null, suiteQual = null, twPersons = null;
-  let lmBooked = null, lmTeam = null; // Panel F — lead machine (booked calls + teamIntent)
+  let lmBooked = null, lmBookedWin = null, lmTeam = null; // Panel F — lead machine (booked calls + teamIntent)
   if (twOpps && twPpl) {
     const opps = twOpps.opportunities || twOpps || [];
     const ppl = twPpl.people || twPpl || [];
@@ -208,6 +208,8 @@ async function main() {
     // teamIntent = the dark-funnel team signal (twenty-lead-scorer sets it on company-domain clusters).
     const BOOKED = new Set(["MEETING", "PROPOSAL", "CUSTOMER"]);
     lmBooked = opps.filter((o) => BOOKED.has(o.stage)).length;
+    // Booked IN THE WINDOW — opp.createdAt is the booked-date proxy (Twenty has no separate booked field).
+    lmBookedWin = opps.filter((o) => BOOKED.has(o.stage) && (o.createdAt || "").slice(0, 10) >= w.start).length;
     lmTeam = ppl.filter((p) => p.teamIntent).length;
     const srcOf = (id) => (ppl.find((p) => p.id === id) || {}).source || null;
     const by = new Map();
@@ -478,7 +480,8 @@ async function main() {
   P(``);
   P(`| Metric | Value |`);
   P(`|--------|------:|`);
-  P(`| Booked calls (opp MEETING+) | ${lmBooked == null ? "n/a" : lmBooked} |`);
+  P(`| Booked calls (opp MEETING+, all-time) | ${lmBooked == null ? "n/a" : lmBooked} |`);
+  P(`| Booked calls in window (${w.label}) | ${lmBookedWin == null ? "n/a" : lmBookedWin} |`);
   P(`| Qualified opportunities (past NEW) | ${n(totalQual)} |`);
   P(`| teamIntent leads (team signal, scored) | ${lmTeam == null ? "n/a" : lmTeam} |`);
   P(`| Suite-sourced qualified (north star) | ${n(suiteQual)} |`);

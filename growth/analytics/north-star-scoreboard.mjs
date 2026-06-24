@@ -344,6 +344,23 @@ async function main() {
     : [null, null];
   const blogLeads = await supabase(`leads?or=(utm_campaign.eq.blog,utm_source.eq.blog,how_heard.ilike.*blog*)&select=project,utm_campaign,utm_source,how_heard`);
 
+  // ---- Savings-receipt propagation (Panel D, privacy-safe). The dark-funnel virality of the shared
+  // savings receipt, measured WITHOUT any identity. `share_clicked` = receipts shared FROM the site
+  // (by format); `visit:utm_source==savings-share` = sessions that arrived VIA a shared receipt.
+  // Both anonymous — audit/savings are privacy-by-design (no email, nothing leaves the page), so a
+  // share carries no who/which-company (see trovex record audit-savings-privacy-by-design). This is
+  // the honest propagation signal — the receipt spreading team→team — never a profile. A non-zero
+  // inflow with zero share_clicks (or vice-versa) is still real: shares can happen off-site (copied
+  // link / posted badge) and land later.
+  const [shareClicks, shareByFormat, savingsInflow] = trovexSite
+    ? await Promise.all([
+        evAgg(trovexSite, w, "share_clicked"),
+        evBreakdown(trovexSite, w, "format", "share_clicked"),
+        plausible(trovexSite, `aggregate?period=custom&date=${w.start},${w.end}&metrics=visitors&filters=visit:utm_source==savings-share`)
+          .then((d) => (d ? d.results?.visitors?.value ?? 0 : null)),
+      ])
+    : [null, null, null];
+
   // ===== PANEL C — 4-engine citation panel =====
   const cite = citationPanel();
 
@@ -453,6 +470,26 @@ async function main() {
     P(`| No self-report (not comparable) | ${dark.noSelfReport} |`);
     P(``);
     P(`**Dark-funnel rate: ${dark.darkRate == null ? "n/a" : `${dark.darkRate}%`}** (${dark.darkCount} of ${dark.agree + dark.disagree + dark.autoBlind} comparable leads). _A high rate means auto-attribution is under-counting; at thin volume \`how_heard\` is the more reliable source signal — weight it, and tighten UTM coverage to shrink the gap._`);
+  }
+  P(``);
+
+  // Panel D propagation — the savings-receipt dark-funnel virality (privacy-safe, no identity).
+  P(`### D2 · Savings-receipt propagation — dark-funnel virality (no PII)`);
+  if (!trovexSite) {
+    P(`_trovex.dev Plausible site not set → **n/a**. (\`TROVEX_PLAUSIBLE_SITE_ID\` missing.)_`);
+  } else {
+    P(`*The shared savings receipt is anonymous by design (no email, nothing leaves the page — see trovex record \`audit-savings-privacy-by-design\`). So we measure PROPAGATION, never who: \`share_clicked\` = receipts shared FROM the site; \`utm_source=savings-share\` inflow = sessions that arrived VIA a shared receipt. A real team→team spread signal with zero PII. To attribute a share to a company (teamIntent → a Twenty lead) would need a separate opt-in capture — owner decision, not built.*`);
+    P(``);
+    P(`| Propagation signal | Value | Source |`);
+    P(`|--------------------|------:|--------|`);
+    P(`| Receipts shared from site (\`share_clicked\`) | ${shareClicks == null ? "n/a" : n(shareClicks)} | Plausible (trovex.dev) |`);
+    P(`| Sessions arrived via a shared receipt (\`utm_source=savings-share\`) | ${savingsInflow == null ? "n/a" : n(savingsInflow)} | Plausible (trovex.dev) |`);
+    if (shareByFormat && shareByFormat.length) {
+      P(`| — by format | ${shareByFormat.map((r) => `${r.value}:${r.events}`).join(" · ")} | |`);
+    }
+    const propTotal = (shareClicks || 0) + (savingsInflow || 0);
+    P(``);
+    P(`**Receipt propagation this window: ${shareClicks == null && savingsInflow == null ? "n/a" : propTotal === 0 ? "0 — a real zero (no shares out, no shared-receipt inflow yet)" : `${n(shareClicks || 0)} shared · ${n(savingsInflow || 0)} inbound`}.** _Anonymous virality only; not a lead count. Rising inflow with no matching on-site share = off-site spread (copied link / posted badge) — the dark-funnel working._`);
   }
   P(``);
 

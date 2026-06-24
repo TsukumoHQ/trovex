@@ -240,8 +240,13 @@ async function twUpsertLead(c, lead, commit) {
     let personId = found.id || null;
     if (!personId) personId = await twCreatePerson(c, lead);
     if (!personId) return { email: lead.email, action: "error_no_person" };
+    // Write the score band into Twenty's Person `tier` SELECT field (analytics-lead schema,
+    // field 7a9addd2; exact options "A"/"B"/"C" — any other string 400s). Powers Panel F.
+    const tiered = ["A", "B", "C"].includes(lead.tier)
+      ? !!(await twFetch(c, `/rest/people/${personId}`, { method: "PATCH", body: JSON.stringify({ tier: lead.tier }) }))
+      : false;
     const noted = await twAttachDraftNote(c, personId, lead);
-    return { email: lead.email, action: found.id ? "updated" : "created", noted };
+    return { email: lead.email, action: found.id ? "updated" : "created", noted, tiered };
   } catch {
     return { email: lead.email, action: "error" };
   }

@@ -32,6 +32,10 @@ const SURFACES = [
     want: ["api/savings-card"],
     chunk: { re: /\/assets\/savings-[A-Za-z0-9_-]+\.js/, want: ["intent/post", "savings-badge"] },
   },
+  // The OG card endpoint is load-bearing for the share loop — every shared /savings
+  // link previews via it. If it 500s, shares preview broken silently. Assert it serves
+  // a real raster (200 + image/png), not an error page that happens to return 200.
+  { label: "savings-card OG endpoint", url: "https://trovex.dev/api/savings-card", contentType: "image/png" },
   { label: "tsukumo consulting", url: "https://tsukumo.ch/consulting" },
   { label: "tsukumo assessment", url: "https://tsukumo.ch/assessment" },
   { label: "wraith (violet)", url: "https://tsukumo.ch/wraith", want: ["wraith-scope"] },
@@ -44,6 +48,10 @@ let fail = 0;
 async function check(s) {
   const r = await fetch(s.url, { ...ua, redirect: "follow" });
   if (!r.ok) return `FAIL ${s.label} HTTP ${r.status}`;
+  if (s.contentType) {
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes(s.contentType)) return `FAIL ${s.label} content-type:${ct || "none"}`;
+  }
   const needsBody = s.want || s.chunk;
   const html = needsBody ? await r.text() : "";
   if (s.want) {

@@ -128,6 +128,11 @@ const UTM_SOURCE: Record<string, GeoSource> = {
   // outbound = donna's warm outreach (utm_medium=outbound). Both bucket as referral (not a cold channel).
   blog: 'referral',
   outbound: 'referral',
+  // Savings referral loop (utm_campaign=savings-calculator): the shared savings receipt (#419) +
+  // README savings badge (#421). Without these they decay to unknown — the loop's clicks go
+  // unattributed and the north-star "installs/leads by source" loses the savings channel.
+  'savings-share': 'referral',
+  'savings-badge': 'referral',
 }
 
 const AI_ENGINES: GeoSource[] = ['chatgpt', 'perplexity', 'claude', 'gemini', 'copilot']

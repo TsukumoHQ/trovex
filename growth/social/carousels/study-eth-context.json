@@ -26,13 +26,13 @@
     {
       "title": "serve the currently-correct doc",
       "accent": "currently-correct",
-      "body": "Per query, path:line, marked canonical or stale. That's what trovex does, and it cuts roughly 60% of the tokens per lookup."
+      "body": "Per query, path:line, marked canonical or stale. That's the canonical-answer pattern, and it cuts roughly 60% of the tokens per lookup."
     }
   ],
   "cta": {
-    "title": "try trovex on your repo",
+    "title": "try it on your repo",
     "accent": "your repo",
     "sub": "Serves your coding agent the one canonical doc per query, local and open source, ~60% fewer tokens. Read the teardown, star it.",
-    "foot": "trovex.dev"
+    "foot": "in the open"
   }
 }

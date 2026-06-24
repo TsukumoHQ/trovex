@@ -18,8 +18,8 @@
       "accent": "one real number",
       "heroValue": "~60%",
       "heroLabel": "fewer tokens per lookup",
-      "body": "a canonical context layer cut our agents' context to ~60% fewer tokens per lookup. first-party, trovex own-run.",
-      "source": "first-party, trovex own-run"
+      "body": "a canonical context layer cut our agents' context to ~60% fewer tokens per lookup. first-party, our own run.",
+      "source": "first-party, our own run"
     },
     {
       "title": "the goal that isn't mispriced",
@@ -31,6 +31,6 @@
     "title": "what agents actually cost",
     "accent": "actually cost",
     "sub": "the bill isn't the license. it's the context they re-read on every single run.",
-    "foot": "trovex.dev"
+    "foot": "in the open"
   }
 }

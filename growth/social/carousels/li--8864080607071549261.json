@@ -5,14 +5,14 @@
   "cover": {
     "title": "what shipped this week",
     "accent": "shipped",
-    "sub": "trovex went public beta, and the savings dashboard went live. the receipts:"
+    "sub": "our context layer went public beta, and the savings dashboard went live. the receipts:"
   },
   "slides": [
     {
       "title": "shipped",
       "accent": "shipped",
       "items": [
-        "trovex flipped to public beta: open source, install and star, no signup gate",
+        "the context layer flipped to public beta: open source, install and star, no signup gate",
         "live savings dashboard, running on our own fleet",
         "evidence write-ups: METR, DORA, GitClear, Stanford, Apple, ETH"
       ]
@@ -21,12 +21,24 @@
       "title": "the receipt",
       "accent": "the receipt",
       "tiles": [
-        {"value": "340,784", "label": "tokens saved last week"},
-        {"value": "74%", "label": "fewer tokens per lookup"},
-        {"value": "91", "label": "doc-lookups measured"},
-        {"value": "~60%", "label": "conservative public number"}
+        {
+          "value": "340,784",
+          "label": "tokens saved last week"
+        },
+        {
+          "value": "74%",
+          "label": "fewer tokens per lookup"
+        },
+        {
+          "value": "91",
+          "label": "doc-lookups measured"
+        },
+        {
+          "value": "~60%",
+          "label": "conservative public number"
+        }
       ],
-      "source": "first-party, trovex savings dashboard"
+      "source": "first-party, our savings dashboard"
     },
     {
       "title": "next, in the open",
@@ -35,9 +47,9 @@
     }
   ],
   "cta": {
-    "title": "trovex.dev",
-    "accent": "trovex.dev",
+    "title": "in the open",
+    "accent": "in the open",
     "sub": "public beta. open source. install and star.",
-    "foot": "trovex.dev"
+    "foot": "in the open"
   }
 }

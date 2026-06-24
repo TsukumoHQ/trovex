@@ -13,7 +13,7 @@
       "title": "shipped",
       "accent": "shipped",
       "items": [
-        "Flipped trovex to public beta: open source, install + star, no waitlist",
+        "Flipped our context layer to public beta: open source, install + star, no waitlist",
         "Shipped a live savings dashboard (and posted the real receipt)",
         "Published 6 research write-ups: METR, DORA, GitClear, Stanford, Apple, ETH Zurich",
         "Wired the whole growth team as a fleet of agents on one shared board"
@@ -24,6 +24,6 @@
     "title": "follow the build",
     "accent": "the build",
     "sub": "We post the real logs, numbers, and the misses too.",
-    "foot": "trovex.dev"
+    "foot": "in the open"
   }
 }

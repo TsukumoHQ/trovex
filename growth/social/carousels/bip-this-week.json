@@ -11,18 +11,30 @@
   "slides": [
     {
       "tiles": [
-        {"value": "340,784", "label": "tokens saved"},
-        {"value": "74%", "label": "fewer per lookup"},
-        {"value": "91", "label": "doc-lookups"},
-        {"value": "~3,744", "label": "saved per query"}
+        {
+          "value": "340,784",
+          "label": "tokens saved"
+        },
+        {
+          "value": "74%",
+          "label": "fewer per lookup"
+        },
+        {
+          "value": "91",
+          "label": "doc-lookups"
+        },
+        {
+          "value": "~3,744",
+          "label": "saved per query"
+        }
       ]
     }
   ],
   "cta": {
     "title": "measure it on your own repo",
     "accent": "your own repo",
-    "sub": "trovex ships a savings view. Install it, point it at a repo, read your own number.",
-    "foot": "trovex.dev"
+    "sub": "our context layer ships a savings view. Install it, point it at a repo, read your own number.",
+    "foot": "in the open"
   },
-  "source": "trovex savings dashboard, our own repo"
+  "source": "our savings dashboard, our own repo"
 }

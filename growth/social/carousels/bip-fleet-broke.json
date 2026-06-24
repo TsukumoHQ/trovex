@@ -1,12 +1,63 @@
 {
-  "slug":"bip-fleet-broke","audience":"founder","kicker":"build in public · what broke","layout":"before-after",
-  "cover":{"title":"what broke running our content on an agent fleet","accent":"broke","sub":"Three real failures this week. None were the model's fault, all were coordination."},
-  "slides":[
-    {"title":"drop","accent":"drop","pairs":[{"broke":"Raw widget syntax shipped live. The pipeline dropped blocks silently.","fix":"A render gate that fails closed on unknown blocks. No silent drops."}]},
-    {"title":"stale","accent":"stale","pairs":[{"broke":"Agents wrote from the old positioning, in parallel. Same wrong answer, everywhere.","fix":"One canonical positioning doc the fleet reads first, before it writes."}]},
-    {"title":"unreachable","accent":"unreachable","pairs":[{"broke":"18 widgets built, 0 emitted. The pipeline couldn't reach them.","fix":"Wire the emitter, add a smoke test before publish. Build less, ship what works."}]},
-    {"title":"the pattern","accent":"the pattern","body":"Every failure was a coordination gap, not a model limit. Serve the fleet one current, canonical source and most of these stop happening.","data":[{"label":"review tax ≈ share of agent reads","value":"~60%","pct":60,"tone":"green"}]}
+  "slug": "bip-fleet-broke",
+  "audience": "founder",
+  "kicker": "build in public · what broke",
+  "layout": "before-after",
+  "cover": {
+    "title": "what broke running our content on an agent fleet",
+    "accent": "broke",
+    "sub": "Three real failures this week. None were the model's fault, all were coordination."
+  },
+  "slides": [
+    {
+      "title": "drop",
+      "accent": "drop",
+      "pairs": [
+        {
+          "broke": "Raw widget syntax shipped live. The pipeline dropped blocks silently.",
+          "fix": "A render gate that fails closed on unknown blocks. No silent drops."
+        }
+      ]
+    },
+    {
+      "title": "stale",
+      "accent": "stale",
+      "pairs": [
+        {
+          "broke": "Agents wrote from the old positioning, in parallel. Same wrong answer, everywhere.",
+          "fix": "One canonical positioning doc the fleet reads first, before it writes."
+        }
+      ]
+    },
+    {
+      "title": "unreachable",
+      "accent": "unreachable",
+      "pairs": [
+        {
+          "broke": "18 widgets built, 0 emitted. The pipeline couldn't reach them.",
+          "fix": "Wire the emitter, add a smoke test before publish. Build less, ship what works."
+        }
+      ]
+    },
+    {
+      "title": "the pattern",
+      "accent": "the pattern",
+      "body": "Every failure was a coordination gap, not a model limit. Serve the fleet one current, canonical source and most of these stop happening.",
+      "data": [
+        {
+          "label": "review tax ≈ share of agent reads",
+          "value": "~60%",
+          "pct": 60,
+          "tone": "green"
+        }
+      ]
+    }
   ],
-  "cta":{"title":"we post the misses too","accent":"the misses","sub":"Real artifacts beat polished claims. Follow the build.","foot":"trovex.dev"},
-  "source":"build in public · our own run"
+  "cta": {
+    "title": "we post the misses too",
+    "accent": "the misses",
+    "sub": "Real artifacts beat polished claims. Follow the build.",
+    "foot": "in the open"
+  },
+  "source": "build in public · our own run"
 }

@@ -128,12 +128,43 @@ function scoreAndTier(lead, v) {
   return { score: s, tier: s >= 60 ? "A" : s >= 35 ? "B" : "C" };
 }
 
+// A specific TRUE reason for [why-them], a short noun phrase from what the lead actually
+// gave us — NEVER a guess (template rule 50a7eca6). No real signal → the generic clause.
+function whyThem(lead) {
+  if (lead.aiUse) return String(lead.aiUse).slice(0, 80);
+  if (lead.teamSize) return `a ${String(lead.teamSize).slice(0, 30)} team running agents`;
+  if (lead.company) return `${String(lead.company).slice(0, 40)}'s agent setup`;
+  if (lead.companyDomain) return `your team at ${lead.companyDomain}`;
+  return "running agents in production"; // generic clause — fair (they hand-raised here), not fabricated
+}
+
+// Fill a SETTER draft from the LOCKED templates (50a7eca6). DRY-RUN: this only stages text;
+// nothing sends. S2 (booked-prep, no ask) for a confirmed booking; S3 (value-first → book)
+// otherwise. Slots: [name] [why-them] [calendly]. Founder voice, ASK = book the call.
+function buildSetterDraft(lead, bookUrl) {
+  const name = (lead.name && lead.name.split(/\s+/)[0]) || "there";
+  const booked = lead.table === "leads" && /booking/i.test(String(lead.source || ""));
+  if (booked) {
+    return {
+      template: "S2-booked-prep",
+      subject: "looking forward — quick prep",
+      body: `Hi ${name}, looking forward to the call. No prep needed on your side. Two things I will likely dig into so we use the time well: (1) where your agents spend tokens today (rereading docs to find what is current is usually most of it), and (2) how many agents and teammates touch the same repo, since the cost compounds there. If you can eyeball those before we talk, great; if not, we cover it live. See you then.`,
+    };
+  }
+  return {
+    template: "S3-not-booked-book",
+    subject: "worth a quick look?",
+    body: `Hi ${name}, thanks for the interest. From what you described (${whyThem(lead)}), there is probably a real token cost hiding in how your agents reread context. Worth a 20 to 30 minute look at where that is happening in your setup? No pitch, just a read on whether it is worth fixing and how. Grab a time that works: ${bookUrl}.`,
+  };
+}
+
 async function main() {
   const cfg = input();
   const tables = Array.isArray(cfg.tables) && cfg.tables.length ? cfg.tables : ["leads", "waitlist", "newsletter"];
   const perTable = Number(cfg.perTable) > 0 ? Number(cfg.perTable) : 200;
   const maxClassify = Number(cfg.maxClassify) > 0 ? Number(cfg.maxClassify) : 60;
   const model = cfg.model || "gpt-4o-mini";
+  const bookUrl = cfg.bookUrl || "https://tsukumo.ch/book?utm_source=donna&utm_medium=outbound";
   const sinceISO = Number(cfg.sinceDays) > 0 ? new Date(Date.now() - Number(cfg.sinceDays) * 864e5).toISOString() : null;
 
   const c = sb();
@@ -169,7 +200,10 @@ async function main() {
     let v = { fit: null, teamIntent: null, confidence: "low", why: "not_classified", model: null };
     if (classified < maxClassify) { v = await classify(l, model); classified++; }
     const { score, tier } = scoreAndTier(l, v);
-    leads.push({ ...l, verdict: v, score, tier });
+    // Stage a setter DRAFT for the actionable tiers (A = owner-surface, B = donna-setter).
+    // C = hold/nurture, no draft. DRY-RUN: text only, nothing sends.
+    const draft = tier === "A" || tier === "B" ? buildSetterDraft(l, bookUrl) : null;
+    leads.push({ ...l, verdict: v, score, tier, draft });
   }
   leads.sort((a, b) => b.score - a.score);
 
@@ -180,10 +214,11 @@ async function main() {
     C: leads.filter((l) => l.tier === "C").length,
   };
 
-  // PHASE 2 TODO (gated on content SETTER template 50a7eca6 + Twenty stage/source contract):
-  //   per A/B lead → fill the SETTER draft → upsert Twenty Person (dedup via twenty.ts) +
-  //   attach the draft as a note = donna's DRAFT-ONLY queue. Tier A → owner surface note.
-  //   ⛔ still zero send — drafts only.
+  // PHASE 2a DONE: each A/B lead now carries a filled SETTER draft (50a7eca6) in `draft`
+  // — the gate-review sample for cmo+owner. PHASE 2b (next): upsert each scored lead into
+  // Twenty (Person, dedup via the paginated client-side match) + attach its draft as a Note
+  // = donna's DRAFT-ONLY queue. Needs TWENTY_API_KEY as a dokan secret + the ported dedup.
+  // ⛔ DRY-RUN throughout — drafts are staged text, nothing sends (owner GO gates live send).
 
   console.log(`::dokan:result::${JSON.stringify({ generated: new Date().toISOString(), dryRun: true, tables, model, counts, leads })}`);
 }

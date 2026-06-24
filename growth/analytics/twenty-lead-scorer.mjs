@@ -88,7 +88,9 @@ for (const p of ppl) {
 function score(rec, clusterSize) {
   let s = 0;
   if (rec.company) s += 40;
-  if (clusterSize >= 2) s += 40;        // 2+ same-domain = a team evaluating us
+  if (clusterSize >= 2 || rec.teamIntent) s += 40; // team: a same-domain cluster OR an explicit teamIntent
+                                                   // self-report ("agents across a team: yes") — the latter is
+                                                   // the stronger signal, and a free-email solo can carry it.
   if (rec.booked) s += 40;              // booked call (opp MEETING+) = strong consulting intent
   else if (rec.hasOpp) s += 20;         // open opp, pre-meeting = some intent
   return Math.min(s, 100);

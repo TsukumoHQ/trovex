@@ -16,6 +16,7 @@ import html as _html
 import re
 
 import mistune
+from mistune.util import safe_entity
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
@@ -64,6 +65,18 @@ class _DocRenderer(mistune.HTMLRenderer):
             except ClassNotFound:
                 pass
         return f'<pre class="md-code"><code>{_html.escape(code)}</code></pre>'
+
+    def link(self, text: str, url: str, title: str | None = None) -> str:
+        # safe_url already neutralises javascript:/data: URLs. Restore
+        # rel="noopener noreferrer" on external links (tabnabbing + referrer
+        # leak) — mistune's default renderer dropped it.
+        safe = self.safe_url(url)
+        s = f'<a href="{safe}"'
+        if title:
+            s += f' title="{safe_entity(title)}"'
+        if safe.startswith(("http://", "https://")):
+            s += ' rel="noopener noreferrer"'
+        return f"{s}>{text}</a>"
 
 
 def render_markdown(content: str) -> tuple[str, list[dict]]:

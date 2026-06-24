@@ -158,6 +158,95 @@ function buildSetterDraft(lead, bookUrl) {
   };
 }
 
+/* ── Twenty upsert (phase 2b) — port of src/lib/twenty.ts dedup (#468) ────────────
+ * Mirror each scored A/B lead into Twenty as a Person + attach its setter draft as a Note
+ * = donna's DRAFT-ONLY queue. DRY-RUN: writes drafts to the CRM, NEVER contacts the prospect
+ * (live send is a separate owner GO). Dedup is the SAME 3-state paginated client-side match
+ * the route uses — Twenty's REST email filter is unreliable, so only a confirmed "absent"
+ * creates; "unknown" skips (never a false-negative dupe). Gated on input.commitTwenty so a
+ * test run can emit the plan without touching the CRM. */
+function twCfg() {
+  const key = process.env.TWENTY_API_KEY;
+  if (!key) return null;
+  const base = (process.env.TWENTY_BASE_URL || "https://api.twenty.com").replace(/\/+$/, "");
+  return { base, key };
+}
+async function twFetch(c, path, init) {
+  try {
+    return await fetch(`${c.base}${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${c.key}`, "Content-Type": "application/json", Accept: "application/json", ...(init?.headers || {}) },
+    });
+  } catch { return null; }
+}
+// 3-state dedup by email (found / absent / unknown). Only "absent" authorizes create.
+async function twFindPerson(c, email) {
+  const target = String(email).trim().toLowerCase();
+  if (!target) return { status: "unknown" };
+  let cursor = null;
+  for (let page = 0; page < 25; page++) {
+    const qs = `/rest/people?limit=200${cursor ? `&starting_after=${encodeURIComponent(cursor)}` : ""}`;
+    const res = await twFetch(c, qs, { method: "GET" });
+    if (!res || !res.ok) return { status: "unknown" };
+    const json = await res.json().catch(() => null);
+    if (!json) return { status: "unknown" };
+    const people = json.data?.people ?? [];
+    for (const p of people) {
+      const e = String(p.emails?.primaryEmail ?? "").trim().toLowerCase();
+      if (e && e === target && p.id) return { status: "found", id: p.id };
+    }
+    const pageInfo = json.pageInfo ?? json.data?.pageInfo;
+    if (!pageInfo) return people.length < 200 ? { status: "absent" } : { status: "unknown" };
+    if (!pageInfo.hasNextPage || !pageInfo.endCursor) return { status: "absent" };
+    cursor = pageInfo.endCursor;
+  }
+  return { status: "unknown" };
+}
+async function twCreatePerson(c, lead) {
+  const parts = String(lead.name || lead.email.split("@")[0]).trim().split(/\s+/);
+  const body = { name: { firstName: (parts.shift() || "").slice(0, 100), lastName: parts.join(" ").slice(0, 100) }, emails: { primaryEmail: lead.email } };
+  const res = await twFetch(c, "/rest/people", { method: "POST", body: JSON.stringify(body) });
+  if (!res || !res.ok) return null;
+  const json = await res.json().catch(() => null);
+  return json?.data?.createPerson?.id || json?.data?.id || null;
+}
+async function twAttachDraftNote(c, personId, lead) {
+  const md = [
+    `Tier ${lead.tier} (score ${lead.score}) — ${lead.draft.template}`,
+    `Hand-raise: ${lead.table}${lead.source ? ` (${lead.source})` : ""}`,
+    lead.verdict?.why ? `ICP: ${lead.verdict.why}` : "",
+    ``,
+    `Subject: ${lead.draft.subject}`,
+    ``,
+    lead.draft.body,
+    ``,
+    `— DRAFT, not sent. Live send = owner GO.`,
+  ].filter((x) => x !== undefined).join("\n");
+  const res = await twFetch(c, "/rest/notes", { method: "POST", body: JSON.stringify({ title: `Setter draft — ${lead.tier}`, bodyV2: { markdown: md } }) });
+  if (!res || !res.ok) return false;
+  const json = await res.json().catch(() => null);
+  const noteId = json?.data?.createNote?.id || json?.data?.id;
+  if (!noteId) return false;
+  await twFetch(c, "/rest/noteTargets", { method: "POST", body: JSON.stringify({ noteId, targetPersonId: personId }) });
+  return true;
+}
+// Upsert one drafted lead. Returns {email, action}. Best-effort: a failure marks 'error',
+// never throws. commit=false => compute the plan (find only), write nothing.
+async function twUpsertLead(c, lead, commit) {
+  try {
+    const found = await twFindPerson(c, lead.email);
+    if (found.status === "unknown") return { email: lead.email, action: "skip_unknown" };
+    if (!commit) return { email: lead.email, action: found.id ? "would_update" : "would_create" };
+    let personId = found.id || null;
+    if (!personId) personId = await twCreatePerson(c, lead);
+    if (!personId) return { email: lead.email, action: "error_no_person" };
+    const noted = await twAttachDraftNote(c, personId, lead);
+    return { email: lead.email, action: found.id ? "updated" : "created", noted };
+  } catch {
+    return { email: lead.email, action: "error" };
+  }
+}
+
 async function main() {
   const cfg = input();
   const tables = Array.isArray(cfg.tables) && cfg.tables.length ? cfg.tables : ["leads", "waitlist", "newsletter"];
@@ -214,13 +303,23 @@ async function main() {
     C: leads.filter((l) => l.tier === "C").length,
   };
 
-  // PHASE 2a DONE: each A/B lead now carries a filled SETTER draft (50a7eca6) in `draft`
-  // — the gate-review sample for cmo+owner. PHASE 2b (next): upsert each scored lead into
-  // Twenty (Person, dedup via the paginated client-side match) + attach its draft as a Note
-  // = donna's DRAFT-ONLY queue. Needs TWENTY_API_KEY as a dokan secret + the ported dedup.
-  // ⛔ DRY-RUN throughout — drafts are staged text, nothing sends (owner GO gates live send).
+  // PHASE 2b: upsert each drafted (A/B) lead into Twenty — Person (3-state dedup) + the
+  // setter draft as a Note = donna's DRAFT-ONLY queue. commitTwenty=false (default) emits
+  // the plan without writing; true writes Person+Note. ⛔ DRY-RUN regardless: drafts only,
+  // nothing is ever sent to the prospect (live send = a separate owner GO).
+  const commitTwenty = cfg.commitTwenty === true;
+  const drafted = leads.filter((l) => l.draft);
+  let twenty = { configured: false, commit: commitTwenty, attempted: 0, results: [] };
+  const tc = twCfg();
+  if (tc && drafted.length) {
+    twenty.configured = true;
+    twenty.attempted = drafted.length;
+    for (const l of drafted) twenty.results.push(await twUpsertLead(tc, l, commitTwenty));
+  } else if (tc) {
+    twenty.configured = true; // no drafted leads this run (e.g. all tier C) — nothing to upsert
+  }
 
-  console.log(`::dokan:result::${JSON.stringify({ generated: new Date().toISOString(), dryRun: true, tables, model, counts, leads })}`);
+  console.log(`::dokan:result::${JSON.stringify({ generated: new Date().toISOString(), dryRun: true, tables, model, counts, twenty, leads })}`);
 }
 
 main().catch((e) => console.log(`::dokan:result::${JSON.stringify({ error: String((e && e.message) || e) })}`));

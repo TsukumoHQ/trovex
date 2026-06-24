@@ -21,7 +21,7 @@ import { join } from 'node:path'
 const PUB = 'public'
 const SECTIONS = ['vs', 'answers', 'glossary']
 // The canonical install command (must match the landing / README / llms.txt).
-const INSTALL = 'uv tool install git+https://github.com/TsukumoHQ/trovex'
+const INSTALL = 'uv tool install trovex'
 
 const missing = []
 let checked = 0

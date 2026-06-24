@@ -48,7 +48,7 @@
         "name": "Run trovex across a fleet of agents",
         "description": "Install trovex, index your repo as one shared store, point every agent at it, and the fleet stops re-deriving the same context.",
         "step": [
-          { "@type": "HowToStep", "name": "Install trovex", "text": "Run `uv tool install git+https://github.com/TsukumoHQ/trovex`." },
+          { "@type": "HowToStep", "name": "Install trovex", "text": "Run `uv tool install trovex`." },
           { "@type": "HowToStep", "name": "Index your repo", "text": "Run `trovex index /path/to/repo` to build the shared store." },
           { "@type": "HowToStep", "name": "Point every agent at it", "text": "Run `trovex serve`; every agent connects over MCP at http://localhost:8765/mcp." },
           { "@type": "HowToStep", "name": "See the shared savings", "text": "One agent writes a record once; the rest read it back instead of re-deriving it. The savings compound across the fleet." },
@@ -91,7 +91,7 @@
     <ol class="qs">
       <li>
         <div class="qs-h">Install trovex.</div>
-        <div class="qs-cmd"><code>uv tool install git+https://github.com/TsukumoHQ/trovex</code><button class="qs-copy" type="button" data-copy="uv tool install git+https://github.com/TsukumoHQ/trovex" data-cmd="install" data-label="copy">copy</button></div>
+        <div class="qs-cmd"><code>uv tool install trovex</code><button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button></div>
       </li>
       <li>
         <div class="qs-h">Index your repo — the shared store.</div>

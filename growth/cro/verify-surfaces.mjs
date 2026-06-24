@@ -21,7 +21,7 @@ const SURFACES = [
     label: "trovex landing",
     url: "https://trovex.dev/",
     // install command (the one above-fold CTA) + hero proof→/savings link (#425) must render.
-    chunk: { re: /\/assets\/main-[A-Za-z0-9_-]+\.js/, want: ["uv tool install git+https://github.com/TsukumoHQ/trovex", "estimate-savings"] },
+    chunk: { re: /\/assets\/main-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex", "estimate-savings"] },
   },
   { label: "for/claude-code", url: "https://trovex.dev/for/claude-code/", want: ["qs-aha"] },
   { label: "for/quickstart.js", url: "https://trovex.dev/for/quickstart.js", want: ["command_copied"] },

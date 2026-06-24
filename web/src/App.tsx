@@ -404,7 +404,7 @@ export default function App() {
                 no scroll, no signup. command_copied = the install-intent signal. */}
             <div className="hero-install">
               <span className="hero-install-lab">install</span>
-              <CopyCmd cmd="uv tool install git+https://github.com/TsukumoHQ/trovex" id="hero-install" />
+              <CopyCmd cmd="uv tool install trovex" id="hero-install" />
             </div>
             {/* One primary action = the install command above. quickstart is the only
                 secondary; the GitHub star (vanity) lives in the nav + start, not here. */}
@@ -495,7 +495,7 @@ export default function App() {
               <h2>Get started.</h2>
               <p>trovex is open source and in public beta. Install it, point your agent at it, and you're running in about a minute. No account, no keys.</p>
               <ol className="start-steps">
-                <li><CopyCmd cmd="uv tool install git+https://github.com/TsukumoHQ/trovex" id="install" /></li>
+                <li><CopyCmd cmd="uv tool install trovex" id="install" /></li>
                 <li><CopyCmd cmd="trovex index /path/to/your/repo" id="index" /></li>
                 <li><CopyCmd cmd={'trovex search "how do we roll back a deploy?"'} id="search" /> and it prints the tokens it saved.</li>
               </ol>

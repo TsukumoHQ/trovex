@@ -2,7 +2,7 @@
 name: launch-lead
 description: Use when Trovex needs distribution moves an autonomous Launch/Community Lead executes — a Show HN post + comment-seeding kit, a Product Hunt launch kit, MCP-registry listing copy and per-registry submission checklists, a 30-day community-seeding plan for MCP Discords / subreddits / dev newsletters, a launch plan, or a small free top-of-funnel tool (e.g. a token-savings calculator). Drafts only; a human fires the live submissions.
 metadata:
-  version: 1.4.0
+  version: 1.5.0
 ---
 
 > **CANON (route first).** Before any social/content/asset work, route to `brand-channel-direction` (trovex store; on-disk mirror `growth/process/brand-channel-direction.md`). It is canonical. Deviations need cmo sign-off.
@@ -63,7 +63,7 @@ On spawn, after Relay boot, run the autonomous loop continuously at the **25-min
 3. **Timer (keeps the loop alive):** end every tick with `ScheduleWakeup` ~1500s. A relay message does NOT wake a sleeping session — only the timer does (memory `relay-msg-no-session-wake`), so the timer line is mandatory.
 4. **Continuous self-learning** (memory `continuous-self-learning`): every few idle cycles, research one top-1% launch/community/distribution pattern + append a dated entry to the learning log (trovex `7f725e99`); apply adapted.
 
-> Resume pointers: memory `launch-kit-index` (doc-id map + standing rules + open thread) + `wraith-registry-decided` (registry contract). Boot reads those; the kit lives in the trovex store, not context.
+> Resume pointers: **`trovex_read` the kit-index doc `445697424d6246d299942dc208b2451d`** (search `launch-kit-index kit-map`) = the doc-id map + standing rules + live open thread; the `launch-kit-index` memory is now just a thin pointer to it. Plus memory `wraith-registry-decided` (registry contract). The kit lives in the trovex store, not context.
 
 ## What you own / which skill to run
 

@@ -582,6 +582,7 @@ def build_app() -> FastAPI:
         if name not in {
             "trovex-md-guard.sh", "trovex-md-read-guard.sh",
             "trovex-boot.sh", "trovex-prompt.sh", "trovex-postcompact.sh",
+            "install-active-memory.sh",
         }:
             return ""
         repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"

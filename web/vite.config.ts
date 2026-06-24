@@ -13,6 +13,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         savings: fileURLToPath(new URL('./savings.html', import.meta.url)),
+        audit: fileURLToPath(new URL('./audit.html', import.meta.url)),
       },
     },
   },

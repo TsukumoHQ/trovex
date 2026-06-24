@@ -108,7 +108,7 @@ function slide5() {
       ...facts.map((f) => h("div", { style: { display: "flex", alignItems: "center", gap: "20px", fontFamily: "Fira Sans", fontWeight: 700, fontSize: "40px", color: C.fg } },
         h("div", { style: { width: "13px", height: "13px", backgroundColor: C.accent } }), h("span", {}, f)))),
     h("div", { style: { display: "flex", flexDirection: "column", gap: "14px" } },
-      h("div", { style: { fontFamily: "Fira Code", fontSize: "21px", color: C.accent, border: `1px solid ${C.border}`, backgroundColor: C.card, borderRadius: "10px", padding: "18px 22px" } }, "uv tool install git+https://github.com/TsukumoHQ/trovex"),
+      h("div", { style: { fontFamily: "Fira Code", fontSize: "21px", color: C.accent, border: `1px solid ${C.border}`, backgroundColor: C.card, borderRadius: "10px", padding: "18px 22px" } }, "uvx trovex"),
       mono(REPO + " · public beta", C.muted, 20)),
   ]);
 }

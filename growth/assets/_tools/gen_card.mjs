@@ -37,6 +37,7 @@ const SHAPES = {
   square:   { w:1080, h:1080, pad:80, big:96, mark:25, sub:28, foot:19, eb:19 },
   portrait: { w:1080, h:1350, pad:84, big:104, mark:26, sub:30, foot:20, eb:20 },
   og:       { w:1200, h:630,  pad:64, big:74, mark:24, sub:25, foot:18, eb:18 },
+  ph:       { w:1270, h:760,  pad:72, big:84, mark:26, sub:27, foot:19, eb:19 },
 };
 // brand: founder = trovex property but DE-BRANDED (no name); trovex = product surface
 // (trovex wordmark + trovex.dev + small 'a tsukumo product' endplate); company = tsukumo.
@@ -207,7 +208,7 @@ const result = {};
 for (const file of files) {
   const cards = JSON.parse(await readFile(file, "utf8"));
   for (const c of cards) {
-    const shape = (c.shape === "portrait" || c.shape === "og") ? c.shape : "square";
+    const shape = (c.shape === "portrait" || c.shape === "og" || c.shape === "ph") ? c.shape : "square";
     const S = SHAPES[shape];
     const png = await render(card(c, S), S);
     if (outDir) { await mkdir(join(outDir), { recursive:true }); await writeFile(join(outDir, `${c.uuid}.png`), png); }

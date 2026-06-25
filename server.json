@@ -3,7 +3,7 @@
   "name": "io.github.tsukumohq/trovex",
   "title": "trovex",
   "description": "Serves coding agents one canonical doc per query instead of rereading the repo — ~60% fewer tokens.",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "websiteUrl": "https://trovex.dev",
   "repository": {
     "url": "https://github.com/TsukumoHQ/trovex",
@@ -14,7 +14,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "trovex",
-      "version": "0.11.0",
+      "version": "0.11.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "streamable-http",

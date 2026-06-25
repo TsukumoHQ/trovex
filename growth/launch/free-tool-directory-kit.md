@@ -127,6 +127,26 @@ Every submit below is **drafts-only here** — a human signs in and fires. Each 
 - [ ] Confirm the link previews correctly (the `/savings` OG card renders the calculator).
 - [ ] Log it (directory, URL, date, live y/n) for the §5 sheet.
 
+#### 2.1.1 DevHunt launch-day run-sheet (drafts only; a human fires)
+
+DevHunt is the best-fit shelf and the one where launch-day effort actually pays: each listing gets its own Google-indexed page, and a strong day keeps it on the homepage shortlist for months (learning-log #8). The listing is a GitHub PR + real user-login voting, so the day-of behaviour matters more than on a passive directory.
+
+**Timing:** submit early in the week (Mon/Tue) so the listing rides the full week on the leaderboard. Have the repo README clean first; it's the click-through surface, and where a dev decides to install (#7).
+
+**Launch-day cadence (this is the part that compounds):**
+- Reply to every comment in your own voice within a few hours. Answer "how is this different from X" plainly, with the real number, no pitch.
+- Support a couple of other makers' tools that day. Genuine, reciprocal. DevHunt's audiences merge when makers show up for each other.
+- Don't: vote-beg, run sockpuppets, or paste the same comment twice. One real answer per thread.
+
+**Comment-reply seeds** (developer-honest starting points — **FLAG: brand-copy, re-check against the brand lock when design's gap-list lands**):
+- *"what's the catch?"* → "none on the tool — it's free, no signup, runs in your browser. the math mirrors the open-source trovex CLI, so you can check it. the number you get is your own, not ours."
+- *"how is this different from just counting tokens?"* → "it's the before/after: what your agents burn rereading the repo to guess the right doc, versus serving one canonical doc per query. ~60% on our repos; yours will differ."
+- *"does it phone home?"* → "no. the calculator is client-side; nothing leaves your browser."
+
+**Cross-post:** hand the social cross-post to social-lead (their lane); don't write social copy here. One low-key "we listed trovex's free token-cost tools on DevHunt" is enough; link second.
+
+**Success read:** judge it on the indexed page + referral over weeks, not the day-one rank (#8). A quiet day-one is not a dead listing.
+
 ### 2.2 AI-tool directories (the agent-token angle)
 
 These index AI/LLM tools; "coding agent token cost" fits the search. Some are big enough to drive real traffic.

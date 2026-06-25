@@ -55,10 +55,10 @@ const CONTENT = {
   // internal-team framing only, never enterprise/multi-tenant/scale. cyan accent.
   dokan: {
     eyebrow: "the script runtime",
-    shots: [{ file: "/tmp/dokan-band.png", w: 2800, h: 826, title: "Deterministic runs, zero LLM inside", accent: "zero LLM inside", eb: "v0.1.0 BETA" }],
-    how: { title: "a runtime that doesn't burn tokens", accent: "doesn't burn tokens", steps: ["agents call deterministic scripts", "the runtime executes, no LLM inside", "tokens stay in the agent, not the platform"], foot: "v0.1.0 beta — internal teams / design partners. Not a public multi-tenant product yet." },
-    trust: { facts: ["zero LLM inside, deterministic execution", "internal-team use today (v0.1.0 beta)", "cyan — the conduit/runtime pillar", "4th pillar of the tsukumo suite"], install: "# v0.1.0 (beta preview)", foot: "tsukumo.ch (v0.1.0 beta)" },
-    og: { title: "Automation that doesn't burn tokens.", accent: "doesn't burn tokens.", sub: "The deterministic execution runtime — zero LLM inside, the expensive AI stays in the agent. v0.1.0 beta.", footRight: "v0.1.0 beta · internal teams" },
+    shots: [{ file: "/tmp/dokan-band.png", w: 2800, h: 826, title: "Deterministic runs, zero LLM inside", accent: "zero LLM inside", eb: "BETA" }],
+    how: { title: "a runtime that doesn't burn tokens", accent: "doesn't burn tokens", steps: ["agents call deterministic scripts", "the runtime executes, no LLM inside", "tokens stay in the agent, not the platform"], foot: "beta — internal teams / design partners. Not a public multi-tenant product yet." },
+    trust: { facts: ["zero LLM inside, deterministic execution", "internal-team use today (beta)", "cyan — the conduit/runtime pillar", "4th pillar of the tsukumo suite"], install: "# beta", foot: "tsukumo.ch (beta)" },
+    og: { title: "Automation that doesn't burn tokens.", accent: "doesn't burn tokens.", sub: "The deterministic execution runtime — zero LLM inside, the expensive AI stays in the agent. beta.", footRight: "beta · internal teams" },
     thumb: "RUNTIME",
   },
 };

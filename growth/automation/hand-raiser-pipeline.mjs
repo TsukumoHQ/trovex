@@ -111,6 +111,13 @@ async function classify(lead, model) {
   } catch { return { fit: null, teamIntent: null, confidence: "low", why: "llm_err", model }; }
 }
 
+// A CONFIRMED booked call (Calendly/assessment intake) is the hottest hand-raise signal —
+// they already committed time. One definition, used by both the score and the draft template,
+// so a Calendly/assessment source can never score as booked yet get the "please book" draft.
+function isBooked(lead) {
+  return lead.table === "leads" && /book|assessment|calendly/i.test(String(lead.source || ""));
+}
+
 // Deterministic score (0-100) + tier. Hand-raiser intent + ICP fit + signal strength.
 function scoreAndTier(lead, v) {
   let s = 0;
@@ -124,6 +131,7 @@ function scoreAndTier(lead, v) {
   if (lead.companyDomain) s += 8;                  // company email, not personal
   if (lead.teamSize) s += 5;                        // told us team size
   if (lead.aiUse) s += 4;                           // told us their agent usage
+  if (isBooked(lead)) s += 35;                      // a confirmed booking → always actionable (≥A floor)
   s = Math.max(0, Math.min(100, s));
   return { score: s, tier: s >= 60 ? "A" : s >= 35 ? "B" : "C" };
 }
@@ -143,7 +151,7 @@ function whyThem(lead) {
 // otherwise. Slots: [name] [why-them] [calendly]. Founder voice, ASK = book the call.
 function buildSetterDraft(lead, bookUrl) {
   const name = (lead.name && lead.name.split(/\s+/)[0]) || "there";
-  const booked = lead.table === "leads" && /booking/i.test(String(lead.source || ""));
+  const booked = isBooked(lead);
   if (booked) {
     return {
       template: "S2-booked-prep",

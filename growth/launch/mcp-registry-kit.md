@@ -49,8 +49,8 @@ Lowercase `trovex` in all prose. No superlatives. Brand prose never names the co
 
 **Name:** `trovex`
 
-**Reverse-DNS name (official registry only):** `io.github.tsukumohq/trovex`
-*(a technical identifier the registry requires, not brand copy. Lowercase — the registry derives + stores the namespace lowercased from the GitHub org; this matches the published root `server.json`.)*
+**Reverse-DNS name (official registry only):** `io.github.TsukumoHQ/trovex`
+*(a technical identifier the registry requires, not brand copy. Case MUST match the GitHub org login EXACTLY — `TsukumoHQ`, not lowercase. The github-OIDC grant is scoped to `io.github.TsukumoHQ/*`; a lowercase name 403s the publish. This matches the published root `server.json`. Lesson learned the hard way on the v0.11.1 → v0.11.2 recovery.)*
 
 **Tagline (≤60 chars):**
 > One canonical doc for your coding agents, ~60% fewer tokens.
@@ -140,18 +140,18 @@ Full per-client setup also lives at `trovex.dev/for/`.
 
 **Why first:** keystone. Feeds PulseMCP, the GitHub MCP Registry (VS Code's MCP view), the Docker MCP Catalog. Do it once, correctly.
 
-**Method:** add a `server.json` at repo root, then publish with the `mcp-publisher` CLI using GitHub auth (the `io.github.tsukumohq/*` namespace verifies ownership via the org).
+**Method:** add a `server.json` at repo root, then publish with the `mcp-publisher` CLI using GitHub auth (the `io.github.TsukumoHQ/*` namespace verifies ownership via the org).
 
 **`server.json` — publish the canonical one at the repo root; do NOT hand-author a copy here.**
 The validated manifest already lives at [`/server.json`](../../server.json) (schema `2025-12-11`) and the PR#52 workflow runs `mcp-publisher publish ./server.json` against it. Maintaining a second copy in this kit only invites drift, so this is a read-only summary of what's in the real file (validated 2026-06-25):
 
-- `name`: `io.github.tsukumohq/trovex` (lowercase — the OIDC-derived GitHub namespace).
+- `name`: `io.github.TsukumoHQ/trovex` (EXACT GitHub org-login case — the github-OIDC grant is `io.github.TsukumoHQ/*`; lowercase 403s).
 - `repository.url`: `https://github.com/TsukumoHQ/trovex`.
 - `version`: `0.11.0` (bump in `pyproject.toml` + `server.json` together each release).
 - `packages[0]`: `registryType: pypi`, `identifier: trovex`, `version: 0.11.0`, `runtimeHint: uvx`, `transport: streamable-http` at `http://localhost:8765/mcp` (trovex runs `uvx trovex serve`, an HTTP MCP server, not stdio).
 - `description`: the tight ~60% one-liner, under the 100-char registry cap.
 
-> **PRE-PUBLISH BLOCKER (verified on live PyPI 2026-06-25):** the github-oidc publish checks the PyPI package for the line `mcp-name: io.github.tsukumohq/trovex` to verify ownership, and trovex 0.11.0 does **not** carry it (absent from the README long-description + `pyproject`). So before publishing: add that `mcp-name:` line to the README (= the PyPI long-description), bump to a new version (0.11.0 is immutable on PyPI), republish to PyPI, sync `server.json` `version`, then tag. Without the marker, `mcp-publisher publish` fails the ownership check. → eng/CTO release lane.
+> **PRE-PUBLISH GATE (the two ways the publish fails — both hit on the v0.11.1 attempt):** the github-oidc publish checks the PyPI package long-description (= README) for the ownership marker `mcp-name: io.github.TsukumoHQ/trovex`, and it must match `server.json` `name` **byte-for-byte, case included**. (1) trovex 0.11.0 carried no marker at all. (2) v0.11.1 carried a *lowercase* marker/name → the registry 403'd because the OIDC grant is scoped to the exact org case `io.github.TsukumoHQ/*`. Recovery each time = a new immutable PyPI version (0.11.0→0.11.1→0.11.2). So before tagging: marker in README == `server.json` `name` == `io.github.TsukumoHQ/trovex` (exact case), bump pyproject + server.json versions together, republish, then tag. → eng/CTO release lane.
 
 **Checklist (human + eng) — fire after the §0 FIRE GATE (PyPI 200) is green:**
 - [ ] **FIRE GATE:** `https://pypi.org/pypi/trovex/json` returns 200 + `uvx trovex --help` runs clean (§0).

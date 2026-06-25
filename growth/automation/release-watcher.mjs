@@ -40,9 +40,10 @@ async function ghReleases(slug) {
 }
 
 // relay send via the call_tool DISPATCHER (raw name:send_message → -32602; must wrap).
-async function notify(subject, content) {
+// monitor-failure-escalation: success/info → cmo P2; failure → CTO P0 (single on-call).
+async function notify(subject, content, to = NOTIFY_TO, priority = 'P2') {
   const rpc = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'call_tool', arguments: { tool: 'send_message', args: {
-    project: 'trovex-growth', as: 'fullstack-lead', to: NOTIFY_TO, priority: 'P1', type: 'notification', subject, content } } } };
+    project: 'trovex-growth', as: 'fullstack-lead', to, priority, type: 'notification', subject, content } } } };
   try {
     const r = await fetch(RELAY, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' }, body: JSON.stringify(rpc) });
     const txt = await r.text();
@@ -66,10 +67,18 @@ for (const slug of REPOS) {
 
 let notified = 0;
 for (const f of fresh) {
+  // SUCCESS/info (a new release = a win) → cmo at P2.
   const ok = await notify(
     `\u{1F680} New release: ${f.repo} ${f.tag}${f.prerelease ? ' (pre)' : ''}`,
-    `${f.repo} cut a release.\n- tag: ${f.tag}\n- name: ${f.name}\n- published: ${f.published_at}\n- ${f.url}`);
+    `${f.repo} cut a release.\n- tag: ${f.tag}\n- name: ${f.name}\n- published: ${f.published_at}\n- ${f.url}`,
+    NOTIFY_TO, 'P2');
   if (ok) notified++;
+}
+
+// FAILURE (a repo's releases couldn't be fetched) → CTO at P0, terse one-liner (monitor-failure-escalation).
+if (errors.length) {
+  await notify(`\u{1F534} release-watcher (431) FETCH FAIL: ${errors.map(e => `${e.slug}=${e.err}`).join(', ')}`,
+    `release-watcher couldn't reach: ${JSON.stringify(errors)}`, 'cto', 'P0');
 }
 
 const result = { window_min: SINCE_MIN, repos: REPOS.length, fresh: fresh.length, notified, notifyTo: NOTIFY_TO, errors, releases: fresh };

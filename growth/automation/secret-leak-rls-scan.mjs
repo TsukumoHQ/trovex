@@ -15,8 +15,9 @@
  *     must return 0 rows. Any anon-readable row = CRITICAL (PII exposed).
  *
  * On any CRITICAL: exit 1 (deterministic verdict, surfaces in dokan history) + a P0 relay alert
- * to fullstack-lead via the relay MCP (same stateless host.docker.internal:8090/mcp path as
- * standup-bot). The anon key is a PUBLISHABLE key (safe, not a secret) passed via DOKAN_INPUT.
+ * to CTO — the single on-call escalation point for monitor failures (memory
+ * monitor-failure-escalation) — via the relay MCP call_tool dispatcher. The anon key is a
+ * PUBLISHABLE key (safe, not a secret) passed via DOKAN_INPUT.
  *
  * INPUT (DOKAN_INPUT): { anon_key (required for RLS probe), sites?, tables?, relay_url? }.
  */
@@ -129,8 +130,8 @@ console.log(`armed=${secretVals.length} self_test=${selfTest} SCAN ${result.ok ?
 // tools/call → name:'call_tool' → arguments:{ tool:'send_message', args:{...} } (verified probe 1772).
 if (critical.length) {
   const rpc = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'call_tool', arguments: { tool: 'send_message', args: {
-    project: 'trovex-growth', as: 'fullstack-lead', to: 'fullstack-lead', priority: 'P0', type: 'task',
-    subject: `SECURITY: ${critical.length} CRITICAL finding(s) — secret-leak/RLS scan`,
+    project: 'trovex-growth', as: 'fullstack-lead', to: 'cto', priority: 'P0', type: 'task',
+    subject: `🔴 SECURITY: ${critical.length} CRITICAL finding(s) — secret-leak/RLS scan (425)`,
     content: 'Weekly scan found CRITICAL: ' + JSON.stringify(critical) + '\nInvestigate now (secret-server-only / RLS deny-all invariant).' } } } };
   try { await fetch(RELAY, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' }, body: JSON.stringify(rpc) }); } catch (e) { console.log('alert send failed:', String(e.name)); }
 }

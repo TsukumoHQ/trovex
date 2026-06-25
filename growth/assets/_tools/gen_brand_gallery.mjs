@@ -132,7 +132,10 @@ function ogCard() {
       titleEl(D.og.title, D.og.accent, 66),
       h("div", { style: { fontFamily: "Fira Sans", fontWeight: 500, fontSize: "26px", lineHeight: 1.36, color: C.soft, maxWidth: "940px" } }, D.og.sub)),
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "Fira Code", fontSize: "21px", borderTop: `1px solid ${C.rule}`, paddingTop: "22px" } },
-      h("span", { style: { color: A } }, P.domain), h("span", { style: { color: C.subtle } }, D.og.footRight)));
+      h("div", { style: { display: "flex", flexDirection: "column" } },
+        h("span", { style: { color: A } }, P.domain),
+        h("span", { style: { color: C.subtle, fontSize: "16px", marginTop: "5px" } }, "a tsukumo studio")),
+      h("span", { style: { color: C.subtle } }, D.og.footRight)));
 }
 function thumb() {
   return h("div", { style: { width: "240px", height: "240px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px", backgroundColor: C.bg, fontFamily: "Fira Code", border: `4px solid ${A}` } },

@@ -321,7 +321,7 @@ async function main() {
   // Public-beta conversion = install-intent (github_clicked), NOT waitlist. The waitlist events
   // (request_access_clicked / waitlist_submitted) are DORMANT by design — no waitlist UI on the
   // public-beta landing — so they read 0/n/a, not a gap. We still fetch them as a dormancy check.
-  const [tvLanding, tvInstall, tvCta, tvSubmit, geoRows, chanRows] = trovexSite
+  const [tvLanding, tvInstall, tvCta, tvSubmit, geoRows, chanRows, tvBooking] = trovexSite
     ? await Promise.all([
         evAgg(trovexSite, w, "landing_view"),
         evAgg(trovexSite, w, "github_clicked"),
@@ -329,8 +329,12 @@ async function main() {
         evAgg(trovexSite, w, "waitlist_submitted"),
         evBreakdown(trovexSite, w, "geo_source", "landing_view"),
         evBreakdown(trovexSite, w, "channel", "landing_view"),
+        // booking_completed fires on trovex.dev/booked (the Calendly thank-you redirect, PR #564) =
+        // the web-measured bottom-funnel conversion: a call actually booked. Cross-checks the Twenty
+        // booked-calls (opp MEETING+) below — web event vs CRM record of the same real event.
+        evAgg(trovexSite, w, "booking_completed"),
       ])
-    : [null, null, null, null, null, null];
+    : [null, null, null, null, null, null, null];
 
   // ---- Blog ROI (Panel E): is the blog (60+ posts) actually paying? ----
   // Blog→install = trovex.dev events attributed to the blog via utm_campaign=blog (set on blog→trovex
@@ -523,6 +527,7 @@ async function main() {
   P(`|--------|------:|`);
   P(`| Booked calls (opp MEETING+, all-time) | ${lmBooked == null ? "n/a" : lmBooked} |`);
   P(`| Booked calls in window (${w.label}) | ${lmBookedWin == null ? "n/a" : lmBookedWin} |`);
+  P(`| ★ Web bookings (\`booking_completed\` on /booked, ${w.label}) | ${trovexSite ? n(tvBooking) : "n/a"} |`);
   P(`| Qualified opportunities (past NEW) | ${n(totalQual)} |`);
   P(`| teamIntent leads (team signal, scored) | ${lmTeam == null ? "n/a" : lmTeam} |`);
   P(`| Tiered leads (A / B / C) | ${lmTiers == null ? "n/a" : `${lmTiers.A} / ${lmTiers.B} / ${lmTiers.C}`}${lmTiers && lmTiers.unset ? ` _(${lmTiers.unset} untiered)_` : ""} |`);

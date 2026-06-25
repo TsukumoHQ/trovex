@@ -43,6 +43,11 @@ const SURFACES = [
   // + the endplate (top-intent consult surface) must point at the booking page, not the bare
   // homepage it used to leak onto (#537) — a revert re-leaks the highest-intent click silently.
   { label: "audit lead magnet", url: "https://trovex.dev/audit", chunk: { re: /\/assets\/audit-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex", "assessment?utm_source=trovex&utm_medium=tool"] } },
+  // reach→aha bridge (#551): the AEO/GEO reach pages (/answers, /vs, /glossary) must carry the
+  // contextual /savings link — the no-install interactive aha. A representative /answers page
+  // is a static HTML page, so assert the bridge link is in the served HTML. A revert that drops
+  // the link (re-stranding reach traffic) alerts here instead of going dark.
+  { label: "reach→savings bridge", url: "https://trovex.dev/answers/reduce-agent-token-costs/", want: ['href="/savings">estimate your own number'] },
   { label: "tsukumo consulting", url: "https://tsukumo.ch/consulting" },
   { label: "tsukumo assessment", url: "https://tsukumo.ch/assessment" },
   { label: "wraith (violet)", url: "https://tsukumo.ch/wraith", want: ["wraith-scope"] },

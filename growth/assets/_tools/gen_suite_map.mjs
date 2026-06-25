@@ -1,7 +1,7 @@
 // gen_suite_map.mjs — one-screen suite map (1200x630) on the locked data-editorial
 // system. Four pillars, each its OWN suite accent (suite-accent-palette):
 // trovex=green, wrai.th=violet, yoru=amber, dokan=cyan. Honest one-liners only,
-// real numbers only. dokan is 4th-pillar PREP -> carries an "in prep" tag (never
+// real numbers only. dokan is 4th-pillar PREP -> carries an "v0.1.0 beta" tag (never
 // implied live). Reusable on repo READMEs + /open-source.
 //
 // Run:  growth/assets/_tools/render.sh gen_suite_map.mjs --no-upload --out /tmp/suite
@@ -30,7 +30,7 @@ const PILLARS = [
   { word: [["trovex", 1]], accent: "#22c55e", role: "canonical context for coding agents", sub: "~60% fewer tokens per lookup" },
   { word: [["wrai", 1], [".", 1], ["th", 1]], accent: "#6e6bf2", role: "the agent control plane", sub: "messaging, memory, task board over MCP" },
   { word: [["yoru", 1]], accent: "#f59e0b", role: "the observability layer", sub: "see what your agents actually did" },
-  { word: [["dokan", 1]], accent: "#22d3ee", role: "the script runtime", sub: "deterministic automation, zero LLM inside", tag: "in prep" },
+  { word: [["dokan", 1]], accent: "#22d3ee", role: "the script runtime", sub: "deterministic automation, zero LLM inside", tag: "v0.1.0 beta" },
 ];
 
 function wordmark(segs, accent, fs) {

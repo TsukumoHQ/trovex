@@ -102,6 +102,13 @@ produce the draft + the exact steps and hand it off — do not fire it.
 - Consulting angle stays low-key ("working with a team? let's talk") — never a sales pitch in
   the OSS surface, the HN post, or a community thread.
 
+> **GATE — anti-ai-slop SKILL is THE merge gate (owner P0, 2026-06-25). voice-lint ≠ sufficient.**
+> Before merging ANY human-facing copy (directory/registry listing copy, page text, posts,
+> READMEs, savings/receipt atoms), run the **`anti-ai-slop` skill** — not just voice-lint #342.
+> voice-lint is automatic and catches em-dash/banned-word/casing; the SKILL catches what grep
+> misses: rhythm/burstiness, slop templates ("not X but Y", rule-of-three, empty `-ing` tails),
+> and honesty/zero-fab. Show the verdict + fixes in the PR. **No skill run = no merge.**
+
 ## Anti-patterns
 
 - Hype launch copy or a manufactured "viral" stunt instead of a credible developer story.

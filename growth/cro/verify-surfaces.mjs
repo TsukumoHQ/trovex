@@ -21,9 +21,10 @@ const SURFACES = [
     label: "trovex landing",
     url: "https://trovex.dev/",
     // install command (the one above-fold CTA) + hero proof→/savings link (#425) must render.
-    // consult-band must land on the BOOK-DIRECT page, not the /consulting explainer (#537) —
-    // a revert that re-leaks team-lead intent onto the explainer alerts here, not silently.
-    chunk: { re: /\/assets\/main-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex", "estimate-savings", "assessment?utm_source=trovex&utm_medium=oss-suite"] },
+    // consult-band = the SOFT ask → the 30-min discovery Call on Tsukumo's Calendly
+    // (owner-validated intent mapping, cmo locked 2026-06-25). A revert that drops or
+    // re-points it (e.g. back onto trovex.dev or the wrong event) alerts here, not silently.
+    chunk: { re: /\/assets\/main-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex", "estimate-savings", "calendly.com/hello-tsukumo/tsukumo-1-hour-call-clone"] },
   },
   { label: "for/claude-code", url: "https://trovex.dev/for/claude-code/", want: ["qs-aha"] },
   { label: "for/quickstart.js", url: "https://trovex.dev/for/quickstart.js", want: ["command_copied"] },

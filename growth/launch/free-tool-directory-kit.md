@@ -56,7 +56,7 @@ Lowercase `trovex` in all prose. No superlatives, no banned words. Brand prose n
 **Long description (~120 words):**
 > Coding agents reread your repo's markdown each session to work out which file is current, then answer from a guess. That reread is most of the doc-lookup token bill — about 60% on our own repos.
 >
-> This calculator lets you put in your own numbers — repo size, how many docs, how often agents look things up — and shows the token cost of rereading versus serving one canonical doc per query. Every field is a labelled, editable assumption, so it's your estimate, not ours. The result is a shareable link, so "my repo would save X" travels on its own.
+> This calculator lets you put in your own numbers (repo size, how many docs, how often agents look things up) and shows the token cost of rereading versus serving one canonical doc per query. Every field is a labelled, editable assumption, so it's your estimate, not ours. The result is a shareable link, so "my repo would save X" travels on its own.
 >
 > No signup, no email wall. Open source (the math mirrors the trovex CLI). It's the discovery front-end for `trovex`, the local MCP server that does this for real.
 

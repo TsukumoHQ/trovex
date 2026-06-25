@@ -21,7 +21,9 @@ const SURFACES = [
     label: "trovex landing",
     url: "https://trovex.dev/",
     // install command (the one above-fold CTA) + hero proof→/savings link (#425) must render.
-    chunk: { re: /\/assets\/main-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex", "estimate-savings"] },
+    // consult-band must land on the BOOK-DIRECT page, not the /consulting explainer (#537) —
+    // a revert that re-leaks team-lead intent onto the explainer alerts here, not silently.
+    chunk: { re: /\/assets\/main-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex", "estimate-savings", "assessment?utm_source=trovex&utm_medium=oss-suite"] },
   },
   { label: "for/claude-code", url: "https://trovex.dev/for/claude-code/", want: ["qs-aha"] },
   { label: "for/quickstart.js", url: "https://trovex.dev/for/quickstart.js", want: ["command_copied"] },
@@ -38,7 +40,9 @@ const SURFACES = [
   { label: "savings-card OG endpoint", url: "https://trovex.dev/api/savings-card", contentType: "image/png" },
   // /audit lead magnet (#519): assert the SPA chunk carries the canonical install cmd
   // (catches a break of the page or an install regression on this lead→consulting surface).
-  { label: "audit lead magnet", url: "https://trovex.dev/audit", chunk: { re: /\/assets\/audit-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex"] } },
+  // + the endplate (top-intent consult surface) must point at the booking page, not the bare
+  // homepage it used to leak onto (#537) — a revert re-leaks the highest-intent click silently.
+  { label: "audit lead magnet", url: "https://trovex.dev/audit", chunk: { re: /\/assets\/audit-[A-Za-z0-9_-]+\.js/, want: ["uv tool install trovex", "assessment?utm_source=trovex&utm_medium=tool"] } },
   { label: "tsukumo consulting", url: "https://tsukumo.ch/consulting" },
   { label: "tsukumo assessment", url: "https://tsukumo.ch/assessment" },
   { label: "wraith (violet)", url: "https://tsukumo.ch/wraith", want: ["wraith-scope"] },

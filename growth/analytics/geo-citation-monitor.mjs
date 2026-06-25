@@ -45,7 +45,7 @@ const OURS = [/(^|\.)trovex\.dev$/, /(^|\.)tsukumo\.ch$/, /(^|\.)wrai\.th$/, /(^
 // Token match for engines that return redirect URLs (real source only in the title). FULL-DOMAIN /
 // org tokens ONLY — bare "trovex" collides with an unrelated company (trovex.ai), which produced a
 // false-positive citation. Require our actual domains or github org so a namesake can't read as us.
-const OURS_TOKENS = ["trovex.dev", "tsukumo.ch", "wrai.th", "yoru.sh", "synergix-lab/trovex", "github.com/synergix-lab"];
+const OURS_TOKENS = ["trovex.dev", "tsukumo.ch", "wrai.th", "yoru.sh", "tsukumohq/trovex", "github.com/tsukumohq"];
 // Known competitors/alternatives — who wins the category (substring match on host+path+title).
 const COMPETITORS = ["repomix", "context-hub", "mem0", "cursor", "claude.md", "claude.ai", "github.com/anthropics", "llmstxt", "aider"];
 

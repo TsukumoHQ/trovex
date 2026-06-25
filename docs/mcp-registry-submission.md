@@ -16,7 +16,7 @@ validated against the official `2025-12-11` schema. What's left is the human-run
 
 | Field | Value |
 |-------|-------|
-| `name` | `io.github.synergix-lab/trovex` (GitHub-namespace; authenticated via GitHub OIDC as the repo owner) |
+| `name` | `io.github.tsukumohq/trovex` (GitHub-namespace; authenticated via GitHub OIDC as the repo owner) |
 | `version` | `0.11.0` (matches `pyproject.toml`) |
 | `packages[0]` | PyPI `trovex`, run with `uvx`, subcommand `serve` |
 | `transport` | `streamable-http` at `http://localhost:8765/mcp` (trovex is a local HTTP MCP server, not stdio) |
@@ -32,12 +32,12 @@ validated against the official `2025-12-11` schema. What's left is the human-run
      uv publish        # needs a PyPI token; or: python -m twine upload dist/*
      ```
    - **Ownership link:** the registry verifies you own the PyPI package by looking for
-     the line `mcp-name: io.github.synergix-lab/trovex` in the package's README/long
+     the line `mcp-name: io.github.tsukumohq/trovex` in the package's README/long
      description. Add that line to the PyPI long description (or wherever the current
      `mcp-publisher` docs require) before publishing, or the publish step will fail
      validation.
-2. **GitHub OIDC auth.** The `io.github.synergix-lab/*` namespace is owned by whoever
-   can authenticate to the `Synergix-lab` GitHub org/repo. Run the publish as that user
+2. **GitHub OIDC auth.** The `io.github.tsukumohq/*` namespace is owned by whoever
+   can authenticate to the `TsukumoHQ` GitHub org/repo. Run the publish as that user
    (interactive `mcp-publisher login github`) or from a GitHub Action with the repo's
    OIDC token.
 
@@ -50,7 +50,7 @@ validated against the official `2025-12-11` schema. What's left is the human-run
 
 # 2. From the trovex repo root (server.json already present):
 mcp-publisher validate          # lint the manifest against the live schema
-mcp-publisher login github      # GitHub OIDC for the io.github.synergix-lab namespace
+mcp-publisher login github      # GitHub OIDC for the io.github.tsukumohq namespace
 mcp-publisher publish           # pushes server.json to the Official Registry
 ```
 

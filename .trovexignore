@@ -11,6 +11,10 @@ SECURITY.md
 LICENSE*
 .claude/*
 #
+# Repo docs that live on disk for repo-readability (runbooks, marketing context):
+.agents/*
+docs/*
+#
 # Blog articles stay publishable source files (they ship as web pages):
 **/blog/**
 #

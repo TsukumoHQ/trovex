@@ -28,6 +28,7 @@ const PRODUCTS = {
   trovex: { accent: "#22c55e", word: ["trovex"], domain: "trovex.dev" },
   wraith: { accent: "#6e6bf2", word: ["wrai", ".", "th"], domain: "tsukumo.ch/wraith" },
   yoru: { accent: "#f59e0b", word: ["yoru"], domain: "yoru.sh" },
+  dokan: { accent: "#22d3ee", word: ["dokan"], domain: "tsukumo.ch" },
 };
 // per-product CONTENT (verbatim, real numbers). shot files are client-safe captures.
 const CONTENT = {
@@ -49,6 +50,16 @@ const CONTENT = {
     trust: { facts: ["local-first, runs on your machine", "SQLite + on-device ONNX embeddings", "no cloud, no API keys", "AGPL core · MIT CLI · MCP-native"], install: "uvx trovex   ·   or: uv tool install trovex", foot: "github.com/TsukumoHQ/trovex · trovex.dev" },
     og: { title: "One canonical doc for your coding agents.", accent: "coding agents.", sub: "~60% fewer tokens per lookup. Local-first, open source.", footRight: "AGPL core / MIT CLI · MCP-native" },
     thumb: "CONTEXT",
+  },
+  // dokan = 4th pillar, PREP (not launched). Copy is PREP-safe + anti-overpromise:
+  // internal-team framing only, never enterprise/multi-tenant/scale. cyan accent.
+  dokan: {
+    eyebrow: "the script runtime",
+    shots: [{ file: "/tmp/dokan-band.png", w: 2800, h: 826, title: "Deterministic runs, zero LLM inside", accent: "zero LLM inside", eb: "IN PREP" }],
+    how: { title: "a runtime that doesn't burn tokens", accent: "doesn't burn tokens", steps: ["agents call deterministic scripts", "the runtime executes, no LLM inside", "tokens stay in the agent, not the platform"], foot: "In prep — internal teams / design partners. Not a public multi-tenant product yet." },
+    trust: { facts: ["zero LLM inside, deterministic execution", "internal-team use today (in prep)", "cyan — the conduit/runtime pillar", "4th pillar of the tsukumo suite"], install: "# in prep — no public release yet", foot: "tsukumo.ch (in prep)" },
+    og: { title: "Automation that doesn't burn tokens.", accent: "doesn't burn tokens.", sub: "The deterministic execution runtime — zero LLM inside, the expensive AI stays in the agent. In prep.", footRight: "in prep · internal teams" },
+    thumb: "RUNTIME",
   },
 };
 

@@ -288,6 +288,15 @@ async function twUpsertLead(c, lead, commit) {
   }
 }
 
+// HARD-FAILURE escalation → CTO at P0 (the machine is too important to break quietly;
+// memory monitor-failure-escalation). call_tool dispatcher. Best-effort, never throws.
+const RELAY = (input().relay_url) || "http://host.docker.internal:8090/mcp";
+async function alertCto(line) {
+  const rpc = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "call_tool", arguments: { tool: "send_message", args: {
+    project: "trovex-growth", as: "fullstack-lead", to: "cto", priority: "P0", type: "task", subject: line, content: line } } } };
+  try { await fetch(RELAY, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json, text/event-stream" }, body: JSON.stringify(rpc) }); } catch {}
+}
+
 async function main() {
   const cfg = input();
   const tables = Array.isArray(cfg.tables) && cfg.tables.length ? cfg.tables : ["leads", "waitlist", "newsletter"];
@@ -301,7 +310,7 @@ async function main() {
     : Number(cfg.sinceDays) > 0 ? new Date(Date.now() - Number(cfg.sinceDays) * 864e5).toISOString() : null;
 
   const c = sb();
-  if (!c) { console.log(`::dokan:result::${JSON.stringify({ error: "no_supabase_secret" })}`); return; }
+  if (!c) { await alertCto("🔴 lead-machine 395 FAILED: no Supabase secret — can't reach the funnel DB"); console.log(`::dokan:result::${JSON.stringify({ error: "no_supabase_secret" })}`); return; }
 
   // 1. read + normalize hand-raisers; dedup by email (keep the hottest surface seen)
   const byEmail = new Map();
@@ -363,8 +372,19 @@ async function main() {
     twenty.configured = true; // no drafted leads this run (e.g. all tier C) — nothing to upsert
   }
 
+  // HARD FAIL: a commit run where EVERY upsert errored = Twenty unreachable/auth-broken → CTO P0.
+  // (skip_unknown/would_* are not errors; all-error means the CRM write is down, leads rotting.)
+  if (commitTwenty && twenty.attempted > 0) {
+    const errs = twenty.results.filter((r) => /error/.test(r.action || "")).length;
+    if (errs === twenty.attempted) await alertCto(`🔴 lead-machine 395 FAILED: Twenty commit — all ${errs}/${twenty.attempted} upserts errored (auth/unreachable)`);
+  }
+
   // sent:false is the hard invariant (no outreach path); committed reflects the Twenty CRM write.
   console.log(`::dokan:result::${JSON.stringify({ generated: new Date().toISOString(), sent: false, committed: commitTwenty, tables, model, counts, twenty, leads })}`);
 }
 
-main().catch((e) => console.log(`::dokan:result::${JSON.stringify({ error: String((e && e.message) || e) })}`));
+main().catch(async (e) => {
+  const msg = String((e && e.message) || e);
+  await alertCto(`🔴 lead-machine 395 FAILED (threw): ${msg}`);
+  console.log(`::dokan:result::${JSON.stringify({ error: msg })}`);
+});

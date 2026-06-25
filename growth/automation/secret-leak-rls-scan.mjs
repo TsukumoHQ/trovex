@@ -115,16 +115,23 @@ const rls = [];
 if (SUPA) { for (const tbl of TABLES) rls.push(await probeTable(tbl)); }
 else findings.push({ severity: 'INFO', kind: 'no_supabase_url' });
 
+// DOKAN_INPUT.forceAlert → inject a synthetic CRITICAL to exercise the real P0-alert path
+// (verifies the relay transport delivers end-to-end). Clearly labelled; not a real finding.
+if (input.forceAlert) findings.push({ severity: 'CRITICAL', kind: 'alert_transport_test', note: 'forceAlert probe — verifies the P0 alert delivers; ignore' });
+
 const critical = findings.filter(f => f.severity === 'CRITICAL');
 const result = { ok: critical.length === 0, critical: critical.length, armed: secretVals.length, self_test: selfTest, findings, rls_probed: rls.length, scanned_bytes: totalBytes };
 console.log(`armed=${secretVals.length} self_test=${selfTest} SCAN ${result.ok ? 'CLEAN' : 'CRITICAL x' + critical.length}`);
 
-// P0 relay alert on CRITICAL (leak-safe: names only)
+// P0 relay alert on CRITICAL (leak-safe: names only).
+// Transport: the relay MCP exposes a `call_tool` DISPATCHER, not the tools directly — a raw
+// `tools/call name:'send_message'` returns -32602 'tool not found'. Must wrap:
+// tools/call → name:'call_tool' → arguments:{ tool:'send_message', args:{...} } (verified probe 1772).
 if (critical.length) {
-  const rpc = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'send_message', arguments: {
+  const rpc = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'call_tool', arguments: { tool: 'send_message', args: {
     project: 'trovex-growth', as: 'fullstack-lead', to: 'fullstack-lead', priority: 'P0', type: 'task',
     subject: `SECURITY: ${critical.length} CRITICAL finding(s) — secret-leak/RLS scan`,
-    content: 'Weekly scan found CRITICAL: ' + JSON.stringify(critical) + '\nInvestigate now (secret-server-only / RLS deny-all invariant).' } } };
+    content: 'Weekly scan found CRITICAL: ' + JSON.stringify(critical) + '\nInvestigate now (secret-server-only / RLS deny-all invariant).' } } } };
   try { await fetch(RELAY, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' }, body: JSON.stringify(rpc) }); } catch (e) { console.log('alert send failed:', String(e.name)); }
 }
 

@@ -1,5 +1,11 @@
 /**
- * dokan script: standup-bot  (dokan script_id 424, schedule_id 55, cron `0 0 6-20/2 * * *`)
+ * dokan script: standup-bot  (dokan script_id 424)
+ *
+ * ⚠️ SUPERSEDED (2026-06-25) by cmo's standup-bot 429 (schedule 60). 424 + schedule 55 were
+ * UNSCHEDULED: the relay MCP changed to a `call_tool` DISPATCHER, so 424's direct
+ * `tools/call name:'send_message'` started returning -32602 'tool not found' (it worked at
+ * build time, before the relay refactor). 429 is the canonical standup-bot. This mirror is
+ * kept for reference only, with the transport corrected below to the call_tool pattern.
  *
  * cmo's idle-enforcement tool. Broadcasts a P0 STANDUP to every trovex-growth agent every
  * 2h, 06:00–20:00. Agents thread their 4-line reply to cmo; cmo culls whoever is idle.
@@ -30,11 +36,12 @@ const BODY = input.content ||
 const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' };
 if (process.env.RELAY_API_KEY) headers['Authorization'] = `Bearer ${process.env.RELAY_API_KEY}`;
 
+// The relay MCP exposes a `call_tool` DISPATCHER, not the tools directly — wrap send_message.
 const rpc = {
   jsonrpc: '2.0', id: 1, method: 'tools/call',
-  params: { name: 'send_message', arguments: {
+  params: { name: 'call_tool', arguments: { tool: 'send_message', args: {
     project: PROJECT, as: AS, to: TO, priority: 'P0', type: 'task', subject: SUBJECT, content: BODY,
-  } },
+  } } },
 };
 
 function parseMcp(text) {

@@ -49,8 +49,8 @@ Lowercase `trovex` in all prose. No superlatives. Brand prose never names the co
 
 **Name:** `trovex`
 
-**Reverse-DNS name (official registry only):** `io.github.TsukumoHQ/trovex`
-*(a technical identifier the registry requires, not brand copy.)*
+**Reverse-DNS name (official registry only):** `io.github.tsukumohq/trovex`
+*(a technical identifier the registry requires, not brand copy. Lowercase — the registry derives + stores the namespace lowercased from the GitHub org; this matches the published root `server.json`.)*
 
 **Tagline (≤60 chars):**
 > One canonical doc for your coding agents, ~60% fewer tokens.
@@ -140,30 +140,18 @@ Full per-client setup also lives at `trovex.dev/for/`.
 
 **Why first:** keystone. Feeds PulseMCP, the GitHub MCP Registry (VS Code's MCP view), the Docker MCP Catalog. Do it once, correctly.
 
-**Method:** add a `server.json` at repo root, then publish with the `mcp-publisher` CLI using GitHub auth (the `io.github.TsukumoHQ/*` namespace verifies ownership via the org).
+**Method:** add a `server.json` at repo root, then publish with the `mcp-publisher` CLI using GitHub auth (the `io.github.tsukumohq/*` namespace verifies ownership via the org).
 
-**`server.json` draft (eng confirms the package coordinates and version before publishing):**
-```json
-{
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.TsukumoHQ/trovex",
-  "description": "Serves agents the one current doc for a query instead of a reread of your repo's markdown.",
-  "repository": {
-    "url": "https://github.com/TsukumoHQ/trovex",
-    "source": "github"
-  },
-  "version": "0.11.0",
-  "packages": [
-    {
-      "registry_type": "pypi",
-      "identifier": "trovex",
-      "version": "0.11.0",
-      "transport": { "type": "stdio" }
-    }
-  ]
-}
-```
-> `description` under 100 chars. `version` = the published release **0.11.0** (bump to match each future release). `packages` = trovex on PyPI as `trovex` (confirmed the publish target). **VERIFY the exact stdio invocation** the CLI runs (`uvx trovex serve --stdio`?) with eng before publishing — ship nothing that doesn't run from a clean machine.
+**`server.json` — publish the canonical one at the repo root; do NOT hand-author a copy here.**
+The validated manifest already lives at [`/server.json`](../../server.json) (schema `2025-12-11`) and the PR#52 workflow runs `mcp-publisher publish ./server.json` against it. Maintaining a second copy in this kit only invites drift, so this is a read-only summary of what's in the real file (validated 2026-06-25):
+
+- `name`: `io.github.tsukumohq/trovex` (lowercase — the OIDC-derived GitHub namespace).
+- `repository.url`: `https://github.com/TsukumoHQ/trovex`.
+- `version`: `0.11.0` (bump in `pyproject.toml` + `server.json` together each release).
+- `packages[0]`: `registryType: pypi`, `identifier: trovex`, `version: 0.11.0`, `runtimeHint: uvx`, `transport: streamable-http` at `http://localhost:8765/mcp` (trovex runs `uvx trovex serve`, an HTTP MCP server, not stdio).
+- `description`: the tight ~60% one-liner, under the 100-char registry cap.
+
+> **PRE-PUBLISH BLOCKER (verified on live PyPI 2026-06-25):** the github-oidc publish checks the PyPI package for the line `mcp-name: io.github.tsukumohq/trovex` to verify ownership, and trovex 0.11.0 does **not** carry it (absent from the README long-description + `pyproject`). So before publishing: add that `mcp-name:` line to the README (= the PyPI long-description), bump to a new version (0.11.0 is immutable on PyPI), republish to PyPI, sync `server.json` `version`, then tag. Without the marker, `mcp-publisher publish` fails the ownership check. → eng/CTO release lane.
 
 **Checklist (human + eng) — fire after the §0 FIRE GATE (PyPI 200) is green:**
 - [ ] **FIRE GATE:** `https://pypi.org/pypi/trovex/json` returns 200 + `uvx trovex --help` runs clean (§0).

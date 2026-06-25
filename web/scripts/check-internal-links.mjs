@@ -18,6 +18,11 @@ import { join } from 'node:path'
 
 const PUB = 'public'
 
+// Vite multi-page entry routes — built from web/*.html (index/savings/audit), served at
+// these paths but NOT present as static public/<route>/index.html files. Treated as always
+// valid, the same exception the root "/" already gets (and the sitemap guard makes).
+const SPA_ROUTES = new Set(['/', '', '/savings', '/audit'])
+
 // --- collect every hand-authored page ---
 const htmlFiles = []
 function walk(dir) {
@@ -72,7 +77,7 @@ for (const file of htmlFiles) {
   // public/ static file) — always valid, same exception the sitemap guard makes.
   for (const h of hrefs) {
     const base = h.split('#')[0].split('?')[0]
-    if (base === '/' || base === '') continue
+    if (SPA_ROUTES.has(base)) continue
     const target = resolveTarget(h)
     if (!target || !existsSync(target)) deadLinks.push({ from: urlPath, href: h })
   }

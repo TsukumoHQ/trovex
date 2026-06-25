@@ -4,8 +4,10 @@ import { track, trackLandingView, trackSectionViews, trackInstallClick, trackTsu
 // trovex is public beta: the primary action is install + a GitHub star. The consult band
 // is the suite→agency handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so
 // tsukumo reads it as source=suite and the loop closes to assessment_request.
+// "let's talk" = intent to book → land on the booking page (inline Calendly), not the
+// /consulting explainer. /savings team-CTA already goes direct to /assessment; this matches it.
 const CONSULT_URL =
-  'https://tsukumo.ch/consulting?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting&utm_content=landing-band'
+  'https://tsukumo.ch/assessment?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting&utm_content=landing-band'
 const reduceMotion =
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches

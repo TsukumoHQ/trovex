@@ -9,7 +9,7 @@ name: Publish to PyPI + MCP Registry
 #   1. Configure PyPI Trusted Publishing for project "trovex" pointing at this repo + this workflow.
 #   2. Confirm the package builds an installable wheel (`uvx trovex` must work post-publish).
 #   3. Ensure the package long-description/README contains the marker line:
-#        mcp-name: io.github.synergix-lab/trovex
+#        mcp-name: io.github.tsukumohq/trovex
 #      (the MCP registry checks this to verify you own the listed package.)
 #   4. Keep server.json `version` in sync with the tag.
 

@@ -1,0 +1,24 @@
+name: brand
+
+# Fails a PR that reintroduces a brand-rule violation on a PUBLIC product surface
+# (README, web/, the served install templates). Rules spec = trovex doc 1dcec9e9
+# (design-lead, locked); the guard is pure-stdlib, no deps. Paths-scoped so it only
+# runs when a public surface (or the guard itself) changes.
+on:
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'web/public/**'
+      - 'web/src/**'
+      - 'web/index.html'
+      - 'src/trovex/templates/**'
+      - 'scripts/brand_guard.py'
+      - '.github/workflows/brand.yml'
+
+jobs:
+  brand:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: brand guard
+        run: python3 scripts/brand_guard.py

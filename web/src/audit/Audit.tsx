@@ -15,7 +15,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { track, trackAuditView, trackTsukumoClick } from '../analytics'
 
-const TSUKUMO = 'https://tsukumo.ch'
+// The endplate is the highest-intent consult surface (dev just finished the self-audit) —
+// land them on the booking page, not the bare homepage they'd have to hunt the CTA on.
+const BOOK_URL = 'https://tsukumo.ch/assessment?utm_source=trovex&utm_medium=tool&utm_campaign=audit-consult'
 
 type Item = { id: string; text: string }
 type Group = { title: string; items: Item[] }
@@ -206,7 +208,7 @@ export default function Audit() {
           That's the kind of thing we help teams do well.{' '}
           <a
             className="audit-consult"
-            href={TSUKUMO}
+            href={BOOK_URL}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => trackTsukumoClick('audit_endplate')}

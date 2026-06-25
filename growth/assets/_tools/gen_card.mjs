@@ -28,7 +28,7 @@ const fonts = [
   { name: "Fira Sans", data: await readFile(join(SYS, "FiraSans-Medium.otf")), weight: 500, style: "normal" },
   { name: "Fira Code", data: await readFile(join(SYS, "FiraCode-Regular.ttf")), weight: 400, style: "normal" },
 ];
-const C = { bg:"#0c0d10", panel:"#101216", ink:"#f3f0e9", soft:"#8b8f98", faint:"#5f636b", rule:"#23262d", track:"#181a1f", green:"#22c55e" };
+const C = { bg:"#0c0d10", panel:"#101216", ink:"#f3f0e9", soft:"#8b8f98", faint:"#5f636b", rule:"#23262d", track:"#181a1f", green:"#22c55e", red:"#f87171" };
 const DOT = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><circle cx="2" cy="2" r="1.3" fill="#ffffff" fill-opacity="0.028"/></svg>').toString("base64")}`;
 const h = (t, p, ...k) => ({ type: t, props: { ...p, children: k.length <= 1 ? k[0] : k } });
 const deDash = (s) => (s || "").replace(/\s*[—–]\s*/g, " · "); // de-em-dash card copy
@@ -135,6 +135,27 @@ function receiptEl(c, S) {
       h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"54px",color:C.green,letterSpacing:"-0.03em"}}, c.totalV)));
 }
 
+// terminal: clone-and-run artifact. c.cmd (the command), c.out:[lines], c.title?
+function terminalEl(c) {
+  const dot = (col)=>h("div",{style:{width:"13px",height:"13px",borderRadius:"50%",backgroundColor:col}});
+  return h("div",{style:{display:"flex",flexDirection:"column",border:`1px solid ${C.rule}`,backgroundColor:"#08090b",borderRadius:"12px"}},
+    h("div",{style:{display:"flex",alignItems:"center",gap:"9px",padding:"16px 20px",borderBottom:`1px solid ${C.rule}`}},
+      dot("#ff5f56"), dot("#ffbd2e"), dot("#27c93f"),
+      c.title?h("div",{style:{fontFamily:"Fira Code",fontSize:"18px",color:C.faint,marginLeft:"10px"}}, c.title):h("div",{})),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:"10px",padding:"26px 24px",fontFamily:"Fira Code",fontSize:"26px"}},
+      h("div",{style:{display:"flex",gap:"12px"}}, h("span",{style:{color:C.green}},"$"), h("span",{style:{color:C.ink}}, c.cmd)),
+      ...(c.out||[]).map(l=>h("div",{style:{color:C.soft}}, l))));
+}
+// diff: unified red/green code diff. c.rows:[{sign:'-'|'+'|' ', t}]
+function diffEl(c) {
+  const line = (r)=>{ const sign=r.sign||" "; const col=sign==="+"?C.green:sign==="-"?C.red:C.faint;
+    const bg=sign==="+"?"rgba(34,197,94,0.08)":sign==="-"?"rgba(248,113,113,0.08)":"transparent";
+    return h("div",{style:{display:"flex",gap:"14px",padding:"5px 18px",backgroundColor:bg,fontFamily:"Fira Code",fontSize:"24px"}},
+      h("span",{style:{color:col,width:"16px"}}, sign), h("span",{style:{color:sign===" "?C.soft:C.ink}}, r.t)); };
+  return h("div",{style:{display:"flex",flexDirection:"column",border:`1px solid ${C.rule}`,backgroundColor:"#08090b",borderRadius:"12px",padding:"14px 0"}},
+    ...c.rows.map(line));
+}
+
 function body(c, S) {
   switch (c.layout) {
     case "stat":    return [c.headline?headlineEl(c.headline,c.accent,S):null, heroEl(c,S), subEl(c.sub,S)].filter(Boolean);
@@ -144,11 +165,13 @@ function body(c, S) {
     case "compare": return [headlineEl(c.headline,c.accent,S), compareEl(c), subEl(c.sub,S)].filter(Boolean);
     case "versus": return [headlineEl(c.headline,c.accent,S), versusEl(c), subEl(c.sub,S)].filter(Boolean);
     case "receipt": return [c.headline?headlineEl(c.headline,c.accent,S):null, receiptEl(c,S), subEl(c.sub,S)].filter(Boolean);
+    case "terminal": return [c.headline?headlineEl(c.headline,c.accent,S):null, terminalEl(c), subEl(c.sub,S)].filter(Boolean);
+    case "diff":    return [c.headline?headlineEl(c.headline,c.accent,S):null, diffEl(c), subEl(c.sub,S)].filter(Boolean);
     default:        return [headlineEl(c.headline,c.accent,S), subEl(c.sub,S)].filter(Boolean); // quote
   }
 }
 function card(c, S) {
-  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist"||c.layout==="compare"||c.layout==="versus";
+  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist"||c.layout==="compare"||c.layout==="versus"||c.layout==="terminal"||c.layout==="diff";
   const unbranded = c.brand === "founder"; // founder account de-branded: accent stays, name goes
   return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,backgroundImage:`url(${DOT})`,backgroundRepeat:"repeat",padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"20px"}},

@@ -15,10 +15,19 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const ROOTS = ['public', 'src', 'index.html']
+// Also scan the FastAPI server-rendered templates — the public install page lives
+// here (src/trovex/templates), NOT under web/, which is the gap that let the install-page
+// synergix leak slip past this guard. Path is relative to web/ (this script's CI cwd).
+const ROOTS = ['public', 'src', 'index.html', '../src/trovex/templates']
 const SCAN = /\.(html|txt|json|webmanifest|tsx?|jsx?|css)$/
 // Strip the allowed technical identifiers before scanning for the brand word.
 const ALLOW = /(github\.com\/TsukumoHQ|TsukumoHQ\/[\w.-]+|io\.github\.tsukumohq)/gi
+// TEMP exception — the LIVE prod host `trovex.prod.synergix.ch` is hard-wired in the
+// served install page + deploy configs. It is a real leak, but fixing it is a prod-host
+// MIGRATION (DNS + redeploy, owner-owned), NOT a find-replace. Tolerate it so the guard
+// can still cover templates for every OTHER leak. REMOVE this the moment the host
+// migrates off synergix.ch. (cto/owner escalation — src/trovex/templates/install.html.)
+const DEFERRED = /trovex\.prod\.synergix\.ch/gi
 const offenders = []
 
 function scan(p) {
@@ -30,7 +39,7 @@ function scan(p) {
     return
   }
   if (!SCAN.test(p)) return
-  const cleaned = readFileSync(p, 'utf8').replace(ALLOW, '')
+  const cleaned = readFileSync(p, 'utf8').replace(ALLOW, '').replace(DEFERRED, '')
   cleaned.split('\n').forEach((line, i) => {
     if (/synergix/i.test(line)) offenders.push(`${p}:${i + 1}: ${line.trim().slice(0, 120)}`)
   })

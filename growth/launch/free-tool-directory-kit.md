@@ -211,6 +211,8 @@ Note: some directories strip query strings or pull the URL from a preview fetch.
 3. **Lead with `/savings`** (cleaner tool category); add `/audit` as a second tool where a maker profile allows it.
 4. **Free path only** — never pay for a fast-track or placement.
 5. **Track every submission** (directory, URL, date, live y/n) in a sheet and hand it to analytics-lead; ask analytics-lead to add the `tool-directory` slugs to the source map.
+6. **Read the payoff as evergreen.** A free-tool directory listing is an SEO and backlink asset, not a launch-day event. A DevHunt page is indexed by Google, and a winning listing stays on the homepage shortlist for months, so the return is slow indexed traffic plus a permanent backlink, measured over weeks. Tell analytics-lead to read `tool-directory` sessions as a compounding line, not a day-one chart. Don't write a listing off because the first day was quiet.
+7. **Reciprocal "featured-on" badge (optional, low effort).** Where a directory hands you a "featured on X" badge, the human can drop it in the `/savings` or `/audit` footer. It's a cheap two-way backlink, the same durable-backlink family as the savings README badge (Variant F, receipt-variants doc `d488d8cd`).
 
 ### Things flagged VERIFY
 - The current free submit path for There's An AI For That, Futurepedia (free tier may be gone), Future Tools, Toolify (§2.2).

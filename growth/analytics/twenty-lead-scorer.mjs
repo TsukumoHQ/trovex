@@ -57,9 +57,16 @@ const ppl = data.data?.people || [];
 // (Verified in the lead-machine sample: warm booked deals were mis-tiered COLD because the scorer
 // was blind to this; the LLM judged empty enrichment. Reading opp stage fixes it at the source.)
 const BOOKED_STAGES = new Set(["MEETING", "PROPOSAL", "CUSTOMER"]);
+// A person can have MORE THAN ONE opportunity. Keep the MOST-ADVANCED stage, not the last one seen —
+// else a later-listed early-stage opp (e.g. a SCREENING) masks an earlier booked one (MEETING+) and
+// the lead is wrongly scored COLD. (Observed: Nicolas had assessment=MEETING + Silverplan=SCREENING.)
+const STAGE_RANK = { NEW: 0, SCREENING: 1, MEETING: 2, PROPOSAL: 3, CUSTOMER: 4 };
 const oppStageByPoc = new Map();
 for (const o of opps?.data?.opportunities || []) {
-  if (o.pointOfContactId) oppStageByPoc.set(o.pointOfContactId, (o.stage || "").toUpperCase());
+  if (!o.pointOfContactId) continue;
+  const stage = (o.stage || "").toUpperCase();
+  const prev = oppStageByPoc.get(o.pointOfContactId);
+  if (prev == null || (STAGE_RANK[stage] ?? -1) > (STAGE_RANK[prev] ?? -1)) oppStageByPoc.set(o.pointOfContactId, stage);
 }
 
 // Junk filter: test/probe rows are not leads — drop them from the report and from clusters so a

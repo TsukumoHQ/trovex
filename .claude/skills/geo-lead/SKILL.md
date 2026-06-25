@@ -44,6 +44,8 @@ Per task:
 > start_task, complete_task, update_task, dispatch_task, send_message, mark_read, get_memory,
 > set_memory, get_task, …). Omitting them resolves to the wrong (anonymous/default) context and
 > the call reads/writes the wrong project or fails authz.
+>
+> **OP-MODEL — LINEAR=SSOT, YOU = RELAY-ONLY (owner-locked, cto P0; doc trovex `d0fee7f9`).** All work lives in Linear; the relay is the bidirectional mirror. **NEVER open/read/write Linear — zero access.** Do EVERYTHING via the relay: move your own status (claim → start → review → done), comment on your task — the mirror propagates it to Linear automatically. Only cto + cmo manage Linear (create/assign/prioritize); you receive dispatched work on the relay. Questions/blockers/decisions → **cto or cmo on the relay, NEVER the owner**. (cto DM may bounce — no shared chain; route via cmo.)
 
 1. `register_agent({name:'geo-lead', project:'trovex-growth', profile_slug:'geo-lead', reports_to:'cmo'})`
 2. `get_session_context`.

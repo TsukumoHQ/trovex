@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d1119" />
+    <!-- Utility confirmation page (Calendly redirect target). No SEO value; keep it out of the index. -->
+    <meta name="robots" content="noindex, follow" />
+    <title>booking confirmed — trovex</title>
+    <meta name="description" content="Your call with the tsukumo team is booked." />
+
+    <!-- Same first-party Plausible setup as the rest of trovex.dev (cookieless, no PII). -->
+    <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+    <script>
+      window.plausible =
+        window.plausible ||
+        function () {
+          ;(window.plausible.q = window.plausible.q || []).push(arguments)
+        }
+      // Booking-completion pixel: a dev who booked a call on tsukumo.ch/assessment is
+      // redirected here by Calendly. This is the funnel's terminal event — fire it so
+      // booking-rate (interested -> booked) is measurable in the same Plausible property
+      // as the consult-clicks, instead of going dark. No PII; a bare goal event.
+      window.plausible('booking_completed')
+    </script>
+
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #0c0d10;
+        color: #e7e9ee;
+        font-family: "Fira Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      .wrap { max-width: 30rem; }
+      .mark {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        background: #22c55e;
+        margin-right: 8px;
+        vertical-align: baseline;
+      }
+      .brand { font-weight: 700; letter-spacing: -0.01em; }
+      h1 { font-size: 1.6rem; margin: 1.2rem 0 0.4rem; font-weight: 700; }
+      p { color: #aab1bd; line-height: 1.55; margin: 0.4rem 0; }
+      a { color: #22c55e; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .next { margin-top: 1.6rem; font-size: 0.95rem; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div><span class="mark"></span><span class="brand">trovex</span></div>
+      <h1>Your call is booked.</h1>
+      <p>You'll get a calendar invite by email. Talk soon.</p>
+      <p class="next">
+        While you wait — <a href="/savings">estimate your token savings →</a>
+      </p>
+    </main>
+  </body>
+</html>

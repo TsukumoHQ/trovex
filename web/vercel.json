@@ -13,6 +13,7 @@
     { "source": "/api/event", "destination": "https://plausible.io/api/event" },
     { "source": "/savings", "destination": "/api/savings" },
     { "source": "/audit", "destination": "/audit.html" },
+    { "source": "/booked", "destination": "/booked.html" },
     { "source": "/blog/(.*)", "destination": "/api/blog-gone?path=$1" }
   ],
   "functions": {

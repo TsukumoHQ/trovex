@@ -25,10 +25,10 @@
  *     commit path — only rows created in the last `sinceMinutes` window are read, so a brand-new
  *     booking lands in donna's Twenty queue in ~10min instead of ~24h. The window (15min) is
  *     DELIBERATELY WIDER than the 10-min cron interval so a delayed run never leaves a gap that
- *     drops a booked lead (never-miss > exactly-once). Semantics = at-least-once: a lead landing
- *     in the ~5min overlap is rarely re-processed → at worst a 2nd identical 'Setter draft' Note,
- *     which donna dedups by eye. Acceptable at this volume (bookings are a handful/week); losing
- *     a booked lead is not. Person-level dedup is exact (3-state email match below).
+ *     drops a booked lead (never-miss). The ~5min overlap means a lead can be processed by two
+ *     consecutive runs — so writes are made idempotent at the source: Person via 3-state email
+ *     dedup (never a dup Person), Note via a 'Setter draft' existence check (never a dup Note).
+ *     Net: at-least-once runs, exactly-once Person + Note.
  * SECRETS (dokan store → env): SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (read the consented
  *   hand-raiser rows; service-role bypasses RLS, server-only — injected as a dokan secret,
  *   never in source), OPENAI_API_KEY (the cheap classify). Degrades to a null verdict, never
@@ -185,8 +185,8 @@ function buildSetterDraft(lead, bookUrl) {
  * Dedup is the SAME 3-state paginated client-side match the route uses — Twenty's REST email
  * filter is unreliable, so only a confirmed "absent" creates; "unknown" skips (never a
  * false-negative dupe). Gated on input.commitTwenty so a test run can emit the plan without
- * touching the CRM. Person-level writes are idempotent (find→update, never a dup Person);
- * Note writes are at-least-once across overlapping poller windows (see header). */
+ * touching the CRM. Both writes are idempotent: Person via 3-state email dedup (never a dup
+ * Person), Note via twPersonHasDraftNote (skip if a 'Setter draft' Note already exists). */
 function twCfg() {
   const key = process.env.TWENTY_API_KEY;
   if (!key) return null;
@@ -232,6 +232,18 @@ async function twCreatePerson(c, lead) {
   const json = await res.json().catch(() => null);
   return json?.data?.createPerson?.id || json?.data?.id || null;
 }
+// Note-idempotency: true if the Person already has a 'Setter draft' Note, false if not,
+// null if the read failed (caller fails OPEN = creates, to never-miss). Twenty REST: the
+// person→notes relation is read via noteTargets filtered by targetPersonId (NOT personId,
+// which 400s), depth=1 to embed each note's title (verified live, probe 1730).
+async function twPersonHasDraftNote(c, personId) {
+  const res = await twFetch(c, `/rest/noteTargets?filter=targetPersonId[eq]:${personId}&depth=1&limit=100`, { method: "GET" });
+  if (!res || !res.ok) return null;
+  const json = await res.json().catch(() => null);
+  if (!json) return null;
+  const targets = json.data?.noteTargets ?? [];
+  return targets.some((t) => String(t?.note?.title || "").startsWith("Setter draft"));
+}
 async function twAttachDraftNote(c, personId, lead) {
   const md = [
     `Tier ${lead.tier} (score ${lead.score}) — ${lead.draft.template}`,
@@ -264,6 +276,11 @@ async function twUpsertLead(c, lead, commit) {
     if (!personId) return { email: lead.email, action: "error_no_person" };
     // tier is the sole responsibility of analytics scorer 422 (single source of truth) —
     // 395 NO LONGER PATCHes Person.tier here (avoids two writers racing the same field).
+    // Note-idempotency (exactly-once notes): skip if a 'Setter draft' Note already exists for
+    // this Person, so overlapping poller windows can't append a duplicate. Fail-open on a read
+    // error (has === null) → create, since a missed draft is worse than a rare dup.
+    const has = await twPersonHasDraftNote(c, personId);
+    if (has === true) return { email: lead.email, action: found.id ? "updated" : "created", noted: false, noteSkipped: "exists" };
     const noted = await twAttachDraftNote(c, personId, lead);
     return { email: lead.email, action: found.id ? "updated" : "created", noted };
   } catch {

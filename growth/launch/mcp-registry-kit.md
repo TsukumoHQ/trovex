@@ -1,11 +1,11 @@
 # trovex — MCP registry listing kit + per-registry submission checklists
 
-**Status:** DRAFT — **FIRE-READY (gated on PyPI live).** Nothing here is submitted live; a human runs each checklist and fires each submit. As of 2026-06-24 the whole kit is flipped to the published-PyPI state (`uvx trovex` / `pip install trovex`, server.json `registry_type: pypi` @ 0.11.0) and is fireable the second the FIRE GATE goes green.
+**Status:** **Official MCP Registry = ✅ LIVE** (`io.github.TsukumoHQ/trovex` @ 0.11.2, published 2026-06-25; PyPI `trovex` 0.11.2 carries the matching `mcp-name` marker). The remaining web-form directories (§2.3–2.7) are still DRAFT/human-fire. Install is `uvx trovex` / `pip install trovex`.
 **Owner:** launch-lead · **Reviewed against:** `.agents/product-marketing-context.md`, the `voice` memory, anti-ai-slop pass.
 
 > **🔥 FIRE SEQUENCE (the human runs, in order, the moment PyPI is live):**
-> 0. **FIRE GATE — ✅ GREEN (2026-06-24):** PyPI returns 200, **trovex 0.11.0 LIVE**, `uvx trovex` resolves + runs. The gate is open — fire steps 1–4 now.
-> 1. **Official MCP Registry** (§2.1) — `server.json` (pypi/`trovex`/0.11.0) at repo root → `mcp-publisher login github` (TsukumoHQ org) → `mcp-publisher publish`. This auto-feeds PulseMCP / GitHub-MCP-Registry (VS Code) / Docker = the biggest passive reach.
+> 0. **FIRE GATE — ✅ GREEN:** PyPI `trovex` 0.11.2 live, `uvx trovex` resolves + runs.
+> 1. **Official MCP Registry — ✅ DONE / LIVE (2026-06-25):** `io.github.TsukumoHQ/trovex` @ 0.11.2 resolves at `registry.modelcontextprotocol.io/v0/servers?search=trovex`. Published via the tag-triggered OIDC workflow (`publish-mcp.yml`), not the interactive CLI. Now auto-feeds PulseMCP (~1wk) / GitHub-MCP-Registry (VS Code) / Docker. CONTRACT for any re-publish: `server.json` `name` == the README `mcp-name:` marker, **byte-for-byte incl. case** (`io.github.TsukumoHQ/trovex`); a case mismatch 403s (cost us the 0.11.0→0.11.1→0.11.2 recovery).
 > 2. **Glama** (§2.3) → **awesome-mcp-servers PR** (§2.4, needs the Glama badge) → **mcp.so** (§2.5).
 > 3. **Fire-now directories** (§2.6): MCPMarket.com, mcp.directory (+ `/submit-skill`), mcpserverfinder — all now take the clean `uvx` install.
 > 4. Verify each resolves; log each (registry, URL, date, live y/n). Then ping cmo.
@@ -136,9 +136,9 @@ Full per-client setup also lives at `trovex.dev/for/`.
 
 ## 2. Per-registry checklists
 
-### 2.1 Official MCP Registry — `registry.modelcontextprotocol.io`
+### 2.1 Official MCP Registry — `registry.modelcontextprotocol.io` — ✅ LIVE (2026-06-25)
 
-**Why first:** keystone. Feeds PulseMCP, the GitHub MCP Registry (VS Code's MCP view), the Docker MCP Catalog. Do it once, correctly.
+**Status:** DONE. `io.github.TsukumoHQ/trovex` @ 0.11.2 is published and resolves. The steps below are the kept-for-the-record method + the re-publish runbook for each future release (the workflow `publish-mcp.yml` runs it on a version tag). **Why it was the keystone:** feeds PulseMCP, the GitHub MCP Registry (VS Code's MCP view), the Docker MCP Catalog — one publish, several shelves.
 
 **Method:** add a `server.json` at repo root, then publish with the `mcp-publisher` CLI using GitHub auth (the `io.github.TsukumoHQ/*` namespace verifies ownership via the org).
 

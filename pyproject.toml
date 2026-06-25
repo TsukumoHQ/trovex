@@ -1,10 +1,10 @@
 [project]
 name = "trovex"
-version = "0.11.0"
+version = "0.11.1"
 description = "Trovex — token-efficient routing for agent-generated .md docs. MCP + Web UI."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{name = "Synergix"}]
+authors = [{name = "TsukumoHQ"}]
 license = "AGPL-3.0-or-later"
 keywords = ["mcp", "llm", "context", "coding-agents", "embeddings", "rag", "documentation", "token-efficiency"]
 classifiers = [

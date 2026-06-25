@@ -24,6 +24,7 @@ const KEY_LOCATION = input.keyLocation || (KEY ? `https://${HOST}/${KEY}.txt` : 
 const SINCE_HOURS = Number(input.sinceHours) > 0 ? Number(input.sinceHours) : 0; // 0 = all urls in sitemap
 const DRY = input.dryRun === true || !KEY; // no key → can't submit → dry
 const MAX = Number(input.max) > 0 ? Number(input.max) : 10000;
+const RELAY = input.relay_url || 'http://host.docker.internal:8090/mcp'; // for failure→CTO alerts
 const cutoff = SINCE_HOURS > 0 ? Date.now() - SINCE_HOURS * 3600_000 : 0;
 
 async function get(url) {
@@ -45,8 +46,19 @@ function parseSitemap(xml) {
   return out;
 }
 
+// Failure escalation → CTO at P0 (memory monitor-failure-escalation). call_tool dispatcher.
+// Success is SILENT (routine green = no notify, per the rule).
+async function alertCto(line) {
+  const rpc = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'call_tool', arguments: { tool: 'send_message', args: {
+    project: 'trovex-growth', as: 'fullstack-lead', to: 'cto', priority: 'P0', type: 'task', subject: line, content: line } } } };
+  try { await fetch(RELAY, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' }, body: JSON.stringify(rpc) }); } catch {}
+}
+
 const sm = await get(SITEMAP);
-if (!sm.text) { console.log(`::dokan:result:: ${JSON.stringify({ ok: false, error: `sitemap_fetch_${sm.status || sm.err}`, sitemap: SITEMAP })}`); process.exit(0); }
+if (!sm.text) {
+  await alertCto(`🔴 indexnow-submit (432) ${HOST}: sitemap fetch FAILED (${sm.status || sm.err}) ${SITEMAP}`);
+  console.log(`::dokan:result:: ${JSON.stringify({ ok: false, error: `sitemap_fetch_${sm.status || sm.err}`, sitemap: SITEMAP })}`); process.exit(0);
+}
 const all = parseSitemap(sm.text);
 const selected = (cutoff ? all.filter(u => u.lastmod && u.lastmod >= cutoff) : all).map(u => u.loc).slice(0, MAX);
 
@@ -59,6 +71,8 @@ if (selected.length && !DRY) {
     clearTimeout(t);
     submit = { attempted: true, http_status: r.status, ok: r.status === 200 || r.status === 202 };
   } catch (e) { clearTimeout(t); submit = { attempted: true, ok: false, error: String(e.cause?.code || e.name) }; }
+  // FAILURE (IndexNow rejected / unreachable) → CTO P0. Success = silent.
+  if (!submit.ok) await alertCto(`🔴 indexnow-submit (432) ${HOST}: submit FAILED (${submit.http_status || submit.error}, ${selected.length} urls)`);
 }
 
 const result = { ok: true, host: HOST, sitemap_urls: all.length, selected: selected.length, window_hours: SINCE_HOURS || 'all', dryRun: DRY, key_present: !!KEY, submit, sample: selected.slice(0, 5) };

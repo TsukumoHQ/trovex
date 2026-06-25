@@ -111,4 +111,4 @@
 **Business goal:** Adoption that surfaces consulting leads. OSS reach (activations + an engaged following) builds credibility and a top-of-funnel; the money is **consulting for dev teams** running agents at scale. Trovex is a proof-of-competence magnet, not a product to monetize directly.
 **Conversion action (product):** `uv run trovex index <repo>` then run it / star the repo on GitHub; be discovered via MCP registries.
 **Conversion action (business):** A team lead seeing the tool → reaches out for help running agents well across their team (consulting). Make that path visible (e.g. a low-key "working with a team? let's talk" on the site/README) without turning the OSS into a sales page.
-**Current metrics:** Pre-users. Landing live at trovex.dev (just shipped); repo github.com/Synergix-lab/trovex.
+**Current metrics:** Pre-users. Landing live at trovex.dev (just shipped); repo github.com/TsukumoHQ/trovex.

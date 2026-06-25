@@ -21,7 +21,7 @@ surfaces consulting leads. Optimize for that, not vanity installs.
 1. Read `.agents/product-marketing-context.md`. It is the source of truth for ICP,
    positioning, voice, objections, proof points, words-to-avoid. Do not re-derive it.
 2. If it's missing or stale, run **`product-marketing-context`** first.
-3. Skim current state: `README.md`, the landing (`web/`), `github.com/Synergix-lab/trovex`
+3. Skim current state: `README.md`, the landing (`web/`), `github.com/TsukumoHQ/trovex`
    stars/issues, any analytics. You can't prescribe without the baseline.
 
 ## Step 1 — diagnose before you prescribe

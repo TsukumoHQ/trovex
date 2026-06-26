@@ -1,23 +1,23 @@
 [Unit]
 Description=trovex — token-efficient .md routing (MCP + UI)
-Documentation=https://trovex.prod.synergix.ch
+Documentation=https://trovex.example.com
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=synxadmin
-Group=synxadmin
-WorkingDirectory=/home/synxadmin/Exposemd
-EnvironmentFile=-/home/synxadmin/.trovex-data/env
-Environment=PATH=/home/synxadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
-Environment=TROVEX_PROJECT_ROOT=/home/synxadmin/synergix_prod
-Environment=TROVEX_DATA_DIR=/home/synxadmin/.trovex-data
+User=trovex
+Group=trovex
+WorkingDirectory=/home/trovex/trovex
+EnvironmentFile=-/home/trovex/.trovex-data/env
+Environment=PATH=/home/trovex/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=TROVEX_PROJECT_ROOT=/home/trovex/docs-repo
+Environment=TROVEX_DATA_DIR=/home/trovex/.trovex-data
 Environment=TROVEX_HOST=0.0.0.0
 Environment=TROVEX_PORT=8770
-Environment=FASTEMBED_CACHE_PATH=/home/synxadmin/.trovex-data/fastembed_cache
-Environment=HF_HOME=/home/synxadmin/.trovex-data/hf_cache
-ExecStart=/home/synxadmin/Exposemd/.venv/bin/uvicorn trovex.server:build_app --factory --host 0.0.0.0 --port 8770
+Environment=FASTEMBED_CACHE_PATH=/home/trovex/.trovex-data/fastembed_cache
+Environment=HF_HOME=/home/trovex/.trovex-data/hf_cache
+ExecStart=/home/trovex/trovex/.venv/bin/uvicorn trovex.server:build_app --factory --host 0.0.0.0 --port 8770
 Restart=on-failure
 RestartSec=5
 
@@ -26,7 +26,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/home/synxadmin/.trovex-data /home/synxadmin/.cache
+ReadWritePaths=/home/trovex/.trovex-data /home/trovex/.cache
 
 [Install]
 WantedBy=multi-user.target

@@ -13,7 +13,7 @@
 #                  "command": "/abs/path/trovex-md-read-guard.sh" } ] } ] }
 set -euo pipefail
 
-TROVEX_URL="${TROVEX_URL:-https://trovex.prod.synergix.ch}"
+TROVEX_URL="${TROVEX_URL:-http://localhost:8765}"
 
 allow() { exit 0; }
 

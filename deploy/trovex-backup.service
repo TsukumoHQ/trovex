@@ -4,8 +4,8 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-User=synxadmin
-Group=synxadmin
-WorkingDirectory=/home/synxadmin/Exposemd
-Environment=TROVEX_DATA_DIR=/home/synxadmin/.trovex-data
-ExecStart=/home/synxadmin/Exposemd/.venv/bin/trovex backup
+User=trovex
+Group=trovex
+WorkingDirectory=/home/trovex/trovex
+Environment=TROVEX_DATA_DIR=/home/trovex/.trovex-data
+ExecStart=/home/trovex/trovex/.venv/bin/trovex backup

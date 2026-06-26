@@ -44,6 +44,32 @@ _re_tag = re.compile(TAG_RE)
 MAX_TAGS = 10
 MAX_TAG_LEN = 50
 
+# qpath is a path *substring* filter (finding 3): cap length and restrict to a
+# sane path charset so a pathological/oversized value can't reach the LIKE query.
+MAX_QPATH_LEN = 200
+QPATH_RE = re.compile(r"^[A-Za-z0-9 ._/\-]+$")
+
+# Upper bound on the content a regex-based helper (_snippet) will scan, so a very
+# large doc body can't drive pathological regex cost (finding 3).
+SNIPPET_SCAN_CAP = 20_000
+
+# Hook names servable via /hooks/<name> (finding 2) — an exact allowlist.
+HOOK_ALLOWLIST = frozenset({
+    "trovex-md-guard.sh", "trovex-md-read-guard.sh",
+    "trovex-boot.sh", "trovex-prompt.sh", "trovex-postcompact.sh",
+    "trovex-sessionend.sh", "install-active-memory.sh",
+})
+
+
+def _safe_hook_name(name: str) -> bool:
+    """A hook name is servable only if it's in the allowlist AND is a bare
+    filename — no separators, parent refs, or percent-encoding (finding 2)."""
+    if name not in HOOK_ALLOWLIST:
+        return False
+    if any(c in name for c in ("/", "\\", "%")) or ".." in name:
+        return False
+    return Path(name).name == name
+
 
 def _redact(s: str | None, n: int = 20) -> str:
     """Truncate a user query/string before it reaches the logs (finding 8) — we
@@ -119,6 +145,9 @@ def _relative_time(seconds_ago: float) -> str:
 def _snippet(content: str, n: int = 160) -> str:
     """A short plain-text preview of a doc body for the store cards."""
     import re
+    # Only the head of the doc matters for a 160-char preview; capping the input
+    # keeps the regex passes O(cap), not O(doc size) (finding 3).
+    content = (content or "")[:SNIPPET_SCAN_CAP]
     text = re.sub(r"^---\n.*?\n---\n", "", content, flags=re.DOTALL)  # frontmatter
     text = re.sub(r"```[\s\S]*?```", " ", text)                       # code blocks
     text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)            # heading marks
@@ -128,9 +157,32 @@ def _snippet(content: str, n: int = 160) -> str:
 
 
 def _write_authorized(request: Request) -> bool:
-    """Mirror the MCP write gate for the HTTP /api write endpoints."""
+    """Mirror the MCP write gate for the HTTP /api write endpoints. The token is
+    auto-generated + persisted by default (fail-closed); empty only under the
+    TROVEX_ALLOW_UNAUTH_WRITES opt-in. See config.resolve_write_token."""
     tok = get_state().settings.write_token
     return (not tok) or (request.headers.get("x-trovex-write-token") == tok)
+
+
+_UNAUTH_MSG = (
+    "unauthorized — send the X-TROVEX-Write-Token header (token at "
+    "<data_dir>/.write_token, or set TROVEX_WRITE_TOKEN)"
+)
+
+
+def _unauthorized() -> JSONResponse:
+    return JSONResponse({"error": _UNAUTH_MSG}, status_code=403)
+
+
+_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def _is_loopback(request: Request) -> bool:
+    """True when the request originates from the same machine. Used to bootstrap
+    the local browser UI with the auto-generated write token without exposing it
+    to remote clients."""
+    client = request.client
+    return bool(client and client.host in _LOOPBACK_HOSTS)
 
 
 def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -145,7 +197,19 @@ def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    get_state()  # warm up
+    state = get_state()  # warm up
+    # Retention (finding 5): drop query-log rows older than the configured window
+    # so the local DB doesn't grow unbounded and old (potentially sensitive)
+    # query text isn't retained forever.
+    try:
+        from .usage import purge_old_queries
+        deleted = purge_old_queries(
+            state.searcher.db, state.settings.query_retention_days
+        )
+        if deleted:
+            log.info("purged %d query-log rows past retention", deleted)
+    except Exception:  # noqa: BLE001 — retention must never block startup
+        log.debug("query-log retention purge failed", exc_info=True)
     async with mcp.session_manager.run():
         yield
 
@@ -380,7 +444,13 @@ def build_app() -> FastAPI:
         source: str = "",
         sort: str = "recent",
         limit: int = 100,
-    ) -> HTMLResponse:
+    ):
+        # Validate the path filter (finding 3): bounded length + a path-shaped
+        # charset → 422 on anything malformed, before it reaches the LIKE query.
+        if qpath and (len(qpath) > MAX_QPATH_LEN or not QPATH_RE.match(qpath)):
+            return JSONResponse(
+                {"error": f"invalid qpath: {_redact(qpath)!r}"}, status_code=422
+            )
         trovex_data = _docs_query(qpath, status, sort, limit, source)
         return templates.TemplateResponse(request, "_docs_table.html", trovex_data)
 
@@ -417,7 +487,7 @@ def build_app() -> FastAPI:
     async def api_doc_delete(ext_id: str, request: Request) -> JSONResponse:
         """Delete a trovex-owned doc. Updates go through trovex_write (same id)."""
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         ok = get_state().store.delete(ext_id)
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
 
@@ -473,7 +543,7 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_collection_create(request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         body, err = await _read_json(request)
         if err:
             return err
@@ -488,7 +558,7 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_collection_delete(name: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         get_state().store.delete_collection(name)
         return JSONResponse({"deleted": True})
 
@@ -500,12 +570,17 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_doc_restore(ext_id: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         body, err = await _read_json(request)
         if err:
             return err
+        # Numeric-cast safety (finding 4): a non-integer version_id is a 400, not
+        # an uncaught 500. bool is an int subclass but never a valid version id.
+        raw = body.get("version_id", 0)
+        if isinstance(raw, bool) or not isinstance(raw, (int, str)):
+            return JSONResponse({"error": "version_id must be an integer"}, status_code=400)
         try:
-            version_id = int(body.get("version_id", 0))
+            version_id = int(raw)
         except (TypeError, ValueError):
             return JSONResponse({"error": "version_id must be an integer"}, status_code=400)
         ok = get_state().store.restore_version(ext_id, version_id)
@@ -515,7 +590,7 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         body, err = await _read_json(request)
         if err:
             return err
@@ -589,7 +664,7 @@ def build_app() -> FastAPI:
         current-state record from a free summary (PostCompact's compact_summary,
         no LLM). Distil-from-transcript is step 4. Write-gated."""
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         body, err = await _read_json(request)
         if err:
             return err
@@ -648,7 +723,7 @@ def build_app() -> FastAPI:
         # Write-gated like the other mutating endpoints (finding 2): a full
         # reindex is an admin/token-only operation, not anonymous.
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         state = get_state()
         stats = state.indexer.reindex(state.settings.project_root)
         return JSONResponse(stats)
@@ -681,7 +756,7 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_backup(request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         from . import backup as backup_mod
         state = get_state()
         dest = backup_mod.make_backup(state.settings.data_dir / "trovex.db", state.settings.data_dir)
@@ -697,20 +772,37 @@ def build_app() -> FastAPI:
         ).fetchone()["c"]
         return templates.TemplateResponse(request, "install.html", {"total": total})
 
+    @app.get("/api/write-token")
+    async def api_write_token(request: Request) -> JSONResponse:
+        """Hand the auto-generated write token to a SAME-MACHINE browser so the
+        local UI can issue writes without the operator copying it by hand. Refused
+        for non-loopback clients, so a network-exposed instance never leaks it.
+        Returns no token when writes are open (TROVEX_ALLOW_UNAUTH_WRITES)."""
+        if not _is_loopback(request):
+            return _unauthorized()
+        return JSONResponse({"token": get_state().settings.write_token})
+
     @app.get("/hooks/{name}", response_class=PlainTextResponse)
-    async def hook_download(name: str) -> str:
-        if name not in {
-            "trovex-md-guard.sh", "trovex-md-read-guard.sh",
-            "trovex-boot.sh", "trovex-prompt.sh", "trovex-postcompact.sh",
-            "trovex-sessionend.sh", "install-active-memory.sh",
-        }:
-            return ""
+    async def hook_download(name: str) -> PlainTextResponse:
+        # Allowlist + traversal/encoding check before touching the filesystem.
+        if not _safe_hook_name(name):
+            return PlainTextResponse("not found", status_code=404)
+        # Serve from the configurable hooks dir first (TROVEX_HOOKS_DIR; defaults
+        # to ~/.claude/hooks, no hardcoded user), then the bundled repo copy.
+        hooks_dir = get_state().settings.hooks_dir.expanduser()
         repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"
-        for base in (Path("/home/synxadmin/.claude/hooks"), repo_hooks):
-            path = base / name
-            if path.exists():
-                return path.read_text()
-        return ""
+        for base in (hooks_dir, repo_hooks):
+            try:
+                base_resolved = base.resolve()
+                path = (base_resolved / name).resolve()
+            except OSError:
+                continue
+            # Defence in depth: the resolved file must stay inside its base dir.
+            if base_resolved not in path.parents:
+                continue
+            if path.is_file():
+                return PlainTextResponse(path.read_text())
+        return PlainTextResponse("not found", status_code=404)
 
     # ── Usage page ───────────────────────────────────────────────────
 
@@ -988,6 +1080,11 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
     ]
 
     # Tokens from query (alphanumeric runs >= 2 chars) for inline highlighting.
+    # The `[a-zA-Z0-9]{2,}` class is deliberately restrictive: terms are plain
+    # alphanumerics, so when they're later `re.escape`d and matched against the
+    # HTML-escaped text in _highlight(), a term can never span/split an HTML
+    # entity (e.g. `&amp;`) — no ReDoS, no broken markup. Don't widen this class
+    # without revisiting _highlight()'s escaping assumption.
     import re as _re
     highlight_terms = sorted(
         {t for t in _re.findall(r"[a-zA-Z0-9]{2,}", q.lower()) if len(t) >= 2},

@@ -28,11 +28,16 @@ mcp = FastMCP(
         enable_dns_rebinding_protection=True,
         allowed_hosts=[
             "127.0.0.1:*", "localhost:*", "[::1]:*",
+            # Docker host alias — a containerized agent / dokan job reaches the MCP (the
+            # only write path) at host.docker.internal:8765. Resolves to the host only
+            # inside Docker, not internet-reachable, so the rebind risk is minimal.
+            "host.docker.internal", "host.docker.internal:*",
             "trovex.prod.synergix.ch", "trovex.prod.synergix.ch:*",
             *EXTRA_HOSTS,
         ],
         allowed_origins=[
             "http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*",
+            "http://host.docker.internal:*",
             "https://trovex.prod.synergix.ch",
             *EXTRA_ORIGINS,
         ],

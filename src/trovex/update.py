@@ -11,6 +11,7 @@ printed command) — we never mutate the user's environment behind their back.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -55,6 +56,15 @@ def _parse(v: str) -> tuple[int, ...]:
 def is_newer(latest: str, installed: str) -> bool:
     """True only when latest > installed — the no-downgrade guard."""
     return _parse(latest) > _parse(installed)
+
+
+def is_dev_build(version: str) -> bool:
+    """True if the installed version looks like a dev / source / editable build
+    (hatch-vcs ``.devN``, a local ``+g<hash>``, or a ``dirty`` marker). The
+    auto-updater refuses to clobber such a build unless ``--force`` (wraith
+    contract point 4 — protect contributors running from source)."""
+    v = version.lower()
+    return "dev" in v or "+" in v or "dirty" in v or bool(re.search(r"g[0-9a-f]{7}", v))
 
 
 def _default_cache_path() -> Path:

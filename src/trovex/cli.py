@@ -128,21 +128,37 @@ def _print_update_notice() -> None:
 
 @app.command()
 def update(
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Bypass the no-downgrade + dev-build guards (explicit reinstall/downgrade)."
+    ),
     check_only: bool = typer.Option(False, "--check", help="Only check; don't run the upgrade."),
 ) -> None:
-    """Check GitHub for a newer trovex release and upgrade it (uv tool / pip)."""
-    from .update import check_for_update, notice_line, upgrade_command
+    """Check GitHub for a newer trovex release and upgrade it (uv tool / pip).
 
+    Follows the fleet auto-updater contract: pinned org, semver no-downgrade,
+    a dev-build guard (won't clobber a source build), and offline fail-safe.
+    """
+    from .update import check_for_update, installed_version, is_dev_build, notice_line, upgrade_command
+
+    installed = installed_version()
     info = check_for_update(force=True)
     if info is None:
         console.print("Couldn't reach GitHub to check for updates (offline?). Try again later.")
         return
-    if not info.newer:
-        console.print(f"trovex {info.installed} is up to date.")
-        return
-    console.print(notice_line(info) or "")
     if check_only:
+        console.print(notice_line(info) or f"trovex {info.installed} is up to date.")
         return
+    if not force:
+        if is_dev_build(installed):
+            console.print(
+                f"trovex {installed} looks like a dev/source build — refusing to auto-update "
+                "(it would clobber local work). Use --force to override."
+            )
+            return
+        if not info.newer:
+            console.print(f"trovex {info.installed} is up to date.")
+            return
+    console.print(notice_line(info) or f"Reinstalling trovex {info.latest} (--force).")
     cmd = upgrade_command()
     console.print(f"Running: {' '.join(cmd)}")
     import subprocess
@@ -151,6 +167,11 @@ def update(
         subprocess.run(cmd, check=False)  # noqa: S603 — pinned uv/pip upgrade command
     except (OSError, ValueError) as e:
         console.print(f"[red]Upgrade failed:[/red] {e}\nRun it manually: {' '.join(cmd)}")
+        return
+    console.print(
+        f"Done. Restart `trovex serve` to load the new version, then `trovex update --check` "
+        f"to confirm v{info.latest}."
+    )
 
 
 @app.command()

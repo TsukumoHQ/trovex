@@ -10,6 +10,7 @@ from trovex.update import (
     _parse,
     cached_notice,
     check_for_update,
+    is_dev_build,
     is_newer,
     notice_line,
     upgrade_command,
@@ -127,3 +128,49 @@ def test_cli_update_check_reports_newer(monkeypatch):
     )
     res = CliRunner().invoke(cli.app, ["update", "--check"])
     assert res.exit_code == 0 and "v0.11.7" in res.output
+
+
+def test_is_dev_build():
+    assert is_dev_build("0.11.6") is False
+    assert is_dev_build("v1.0.0") is False
+    assert is_dev_build("0.11.7.dev2") is True
+    assert is_dev_build("0.11.6+gabc1234") is True
+    assert is_dev_build("0.11.6.dirty") is True
+
+
+def test_cli_update_refuses_dev_build_without_force(monkeypatch):
+    # Contract point 4: a dev/source build must NOT be auto-updated (no subprocess).
+    import subprocess
+
+    from typer.testing import CliRunner
+
+    import trovex.cli as cli
+
+    monkeypatch.setattr("trovex.update.installed_version", lambda: "0.11.6.dev2+gabc1234")
+    monkeypatch.setattr(
+        "trovex.update.check_for_update", lambda **k: UpdateInfo("0.11.6.dev2", "v0.11.7", True)
+    )
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append(a))
+    res = CliRunner().invoke(cli.app, ["update"])
+    assert res.exit_code == 0
+    assert "dev" in res.output.lower() and "force" in res.output.lower()
+    assert calls == []  # upgrade was refused
+
+
+def test_cli_update_force_runs_on_dev_build(monkeypatch):
+    import subprocess
+
+    from typer.testing import CliRunner
+
+    import trovex.cli as cli
+
+    monkeypatch.setattr("trovex.update.installed_version", lambda: "0.11.6.dev2")
+    monkeypatch.setattr(
+        "trovex.update.check_for_update", lambda **k: UpdateInfo("0.11.6.dev2", "v0.11.7", True)
+    )
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append(a))
+    res = CliRunner().invoke(cli.app, ["update", "--force"])
+    assert res.exit_code == 0
+    assert len(calls) == 1  # --force bypassed the dev-build guard and ran the upgrade

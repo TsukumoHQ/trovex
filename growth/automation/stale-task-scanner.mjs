@@ -12,7 +12,7 @@
  *   {project, name:'task-stale', agent?, payload:{...}} → {"emitted":true,"event":"event:task-stale"}.
  *   wraith's rule routes it → P0 '⏰ stale <task>, move it' to `agent` (+ cto escalation when escalate=true).
  *
- * STALE thresholds (from dispatched_at, the only anchor the list exposes; CTO scope 2026-06-26):
+ * STALE thresholds (idle measured from `last_activity_at`, wraith's live field; CTO scope 2026-06-26):
  * CLAIMED work only — accepted >1.5h, in-progress >1.5h. PENDING is NOT nudged (unclaimed = no owner).
  * ESCALATE at ≥2× the threshold.
  * ASSIGNEE: profile_slug (native tasks) → else parse `**Lane:** <agent>` from the description →
@@ -81,8 +81,10 @@ function thresholdFor(status) {
   return null; // blocked/in-review/done/cancelled are not "stale" here
 }
 function resolveAgent(t) {
-  const slug = (t.profile_slug || '').trim();
-  if (slug) return slug;
+  // assigned_to is the clean relay agent (wraith populated it); profile_slug next; lane-parse the
+  // description as a last resort; else omit (wraith resolves relay-side via linear_routing).
+  const direct = (t.assigned_to || t.claimed_by || t.profile_slug || '').trim();
+  if (direct) return direct;
   const m = /\*\*Lane:\*\*\s*`?([a-z0-9][a-z0-9-]+)`?/i.exec(t.description || '');
   return m ? m[1].toLowerCase() : null;
 }
@@ -103,7 +105,9 @@ function resolveAgent(t) {
   for (const t of list.tasks) {
     const th = thresholdFor(t.status);
     if (th == null) continue;
-    const age = ageHours(t.dispatched_at);
+    // idle = time since the last agent activity (wraith's live `last_activity_at`, bumped on every status
+    // transition/claim). Fallback to dispatched_at only if the field is missing. This is TRUE idle, not board-age.
+    const age = ageHours(t.last_activity_at || t.dispatched_at);
     if (age == null || age < th) continue;
 
     const escalate = age >= th * 2;

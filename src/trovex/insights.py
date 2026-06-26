@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .db import like_escape
+
 
 def top_queries(db, since: float, limit: int = 10) -> list[dict]:
     """Most-asked queries (case-insensitive grouping)."""
@@ -293,13 +295,15 @@ def suggest_queries(db, prefix: str, limit: int = 6) -> list[dict]:
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
+    # Escape LIKE wildcards in the user prefix so `%`/`_` match literally
+    # (a prefix of "%" must not turn this into a match-all autocomplete).
     rows = db.execute(
         """SELECT LOWER(query) AS q, COUNT(*) AS n, MAX(ts) AS last_ts
            FROM mcp_queries
-           WHERE LOWER(query) LIKE ? || '%'
+           WHERE LOWER(query) LIKE ? || '%' ESCAPE '\\'
            GROUP BY LOWER(query)
            ORDER BY n DESC, last_ts DESC
            LIMIT ?""",
-        (prefix.lower(), limit),
+        (like_escape(prefix.lower()), limit),
     ).fetchall()
     return [dict(r) for r in rows]

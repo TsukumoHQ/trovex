@@ -66,14 +66,14 @@ Lowercase `trovex` in all prose. No superlatives. Brand prose never names the co
 > trovex indexes your repo's markdown and returns the single current doc that answers a query: a `path:line` pointer with a freshness marker, not a reread.
 
 **Short description (~50 words — directories with a summary field):**
-> Your coding agents reread the repo every session to guess which `.md` is current, then answer from a guess. trovex indexes the markdown and returns the one canonical doc for a query as a `path:line` pointer with a freshness marker. About 60% fewer tokens per lookup. Runs locally.
+> Your coding agents reread the repo every session to guess which `.md` is current, then answer from a guess. trovex indexes the markdown and returns the one canonical doc for a query as a `path:line` pointer with a freshness marker. About 60% fewer tokens per .md lookup (modeled median, varies by repo). Runs locally.
 
 **Long description (~150 words — directories that take prose):**
 > Your coding agents reread your repo's markdown every session to work out which file is current, then answer from a guess. You pay for that on every session, every agent, every teammate.
 >
 > trovex indexes the markdown and exposes one MCP tool. Your agent asks a question; trovex returns the single current doc that answers it as a `path:line` pointer with a freshness marker (canonical, stale, or duplicate), and serves just the section that answers instead of the whole file. Agents also write what they learn back through one shared point, so every agent and teammate reads the same source of truth instead of re-deriving it.
 >
-> About 60% fewer tokens on doc lookups, same context quality. Runs locally: vectors in SQLite, embeddings via ONNX, no cloud and no API keys. Public beta, AGPL-3.0.
+> About 60% fewer tokens per .md lookup (modeled median; ~38–79% by repo). Runs locally: vectors in SQLite, embeddings via ONNX, no cloud and no API keys. Public beta, AGPL-3.0.
 
 **Install (PyPI — trovex is published, `trovex` on PyPI):**
 ```bash
@@ -123,7 +123,7 @@ Full per-client setup also lives at `trovex.dev/for/`.
 
 **License:** AGPL-3.0-or-later (CLIs MIT).
 
-**Proof line (the real number only):** about 60% fewer tokens per doc lookup; the local dashboard shows would-have-read vs. actual. Public beta. No customers, testimonials, or star counts yet — don't invent any.
+**Proof line (the honest number, per analytics `sixty-percent-public-claim-standard`):** about 60% fewer tokens per .md lookup — **modeled** (avoided rereads, not a measured A/B), median ~60% (~38–79% by repo); the local dashboard shows would-have-read vs. actual, so a reader checks it on their own repo. Public beta. No customers, testimonials, or star counts yet — don't invent any.
 
 **Screenshots to capture (hand to design, or grab from the running app):**
 1. Terminal: `trovex index` finishing with a one-line "indexed N docs".

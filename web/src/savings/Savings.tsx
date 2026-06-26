@@ -174,7 +174,17 @@ export default function Savings() {
   // link/post shares (utm_medium=referral, campaign=savings-calculator).
   const badgeHref =
     'https://trovex.dev/savings?utm_source=savings-badge&utm_medium=referral&utm_campaign=savings-calculator'
-  const badge = `[![trovex saves ~${pct}% of doc-lookup tokens](https://img.shields.io/badge/trovex-~${pct}%25%20fewer%20tokens-22c55e)](${badgeHref})`
+  // A DYNAMIC shields.io endpoint badge (not a baked-in number): shields fetches
+  // /savings/badge with these inputs and recomputes, so the honesty gate is enforced
+  // server-side and one embed stays live. Carry only the 6 numeric inputs (no UTM, no PII).
+  const badgeEndpoint = (() => {
+    const p = new URLSearchParams()
+    ;(Object.keys(QS) as (keyof Inputs)[]).forEach((k) => p.set(QS[k], String(inp[k])))
+    return `https://trovex.dev/savings/badge?${p.toString()}`
+  })()
+  const badge = `[![trovex saves ~${pct}% of doc-lookup tokens](https://img.shields.io/endpoint?url=${encodeURIComponent(
+    badgeEndpoint,
+  )})](${badgeHref})`
 
   async function copy(text: string, format: string) {
     try {

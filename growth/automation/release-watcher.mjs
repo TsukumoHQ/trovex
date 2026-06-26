@@ -6,6 +6,10 @@
  * suite repos and relay-notifies cmo on a fresh release. Runs in dokan (zero-local); this
  * .mjs is the review mirror.
  *
+ * ESCALATION (memory monitor-failure-escalation): a release → cmo at P1 (an announcement
+ * trigger: cmo must act — social/site/registry, not just read). FAILURE (a repo's releases
+ * couldn't be fetched) → CTO at P0 (the single on-call point).
+ *
  * NEW-detect: a release whose published_at is within the `sinceMinutes` window. No persistent
  * store, so the window is ≥ the cron interval (never-miss); a rare duplicate notify on the
  * overlap is acceptable for a low-frequency event (a release notif is cheap, a missed one isn't).
@@ -40,7 +44,7 @@ async function ghReleases(slug) {
 }
 
 // relay send via the call_tool DISPATCHER (raw name:send_message → -32602; must wrap).
-// monitor-failure-escalation: success/info → cmo P2; failure → CTO P0 (single on-call).
+// monitor-failure-escalation: a release → cmo P1 (announcement trigger); failure → CTO P0.
 async function notify(subject, content, to = NOTIFY_TO, priority = 'P2') {
   const rpc = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'call_tool', arguments: { tool: 'send_message', args: {
     project: 'trovex-growth', as: 'fullstack-lead', to, priority, type: 'notification', subject, content } } } };
@@ -67,11 +71,11 @@ for (const slug of REPOS) {
 
 let notified = 0;
 for (const f of fresh) {
-  // SUCCESS/info (a new release = a win) → cmo at P2.
+  // SUCCESS (a new release) → cmo at P1: a release is an announcement trigger (social/site/registry), not just FYI.
   const ok = await notify(
     `\u{1F680} New release: ${f.repo} ${f.tag}${f.prerelease ? ' (pre)' : ''}`,
     `${f.repo} cut a release.\n- tag: ${f.tag}\n- name: ${f.name}\n- published: ${f.published_at}\n- ${f.url}`,
-    NOTIFY_TO, 'P2');
+    NOTIFY_TO, 'P1');
   if (ok) notified++;
 }
 

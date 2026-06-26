@@ -5,8 +5,8 @@
 > trovex is the canonical doc store for AI coding agents. It indexes a repo's
 > markdown and serves an agent the single current doc that answers a query — a
 > path:line pointer with a freshness marker — instead of letting it reread the
-> repo to guess which file is canonical. About 60% fewer tokens per doc lookup
-> (modeled median, ~38-79% by repo). Open source, local-first (SQLite + ONNX), runs on your
+> repo to guess which file is canonical. About 60% fewer tokens per doc lookup,
+> measured at equal task-success (methodology at trovex.dev/measure). Open source, local-first (SQLite + ONNX), runs on your
 > machine. Ships as an MCP server and a CLI.
 
 ## What it does

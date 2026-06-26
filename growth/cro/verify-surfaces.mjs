@@ -49,6 +49,11 @@ const SURFACES = [
   // is a static HTML page, so assert the bridge link is in the served HTML. A revert that drops
   // the link (re-stranding reach traffic) alerts here instead of going dark.
   { label: "reach→savings bridge", url: "https://trovex.dev/answers/reduce-agent-token-costs/", want: ['href="/savings">estimate your own number'] },
+  // /measure methodology page (TSU-58, fullstack-shipped): the skeptic-path proof behind the
+  // ~60% claim. It's the GATE for any "measured" public wording — must stay live AND keep the
+  // honesty disclosures (n, range, reproduce). If it 404s or gets gutted, the credibility prop
+  // for the headline claim silently breaks; assert it carries the load-bearing disclosures.
+  { label: "measure (proof page)", url: "https://trovex.dev/measure/", want: ["n=26", "41–81", "Reproduce"] },
   { label: "tsukumo consulting", url: "https://tsukumo.ch/consulting" },
   { label: "tsukumo assessment", url: "https://tsukumo.ch/assessment" },
   { label: "wraith (violet)", url: "https://tsukumo.ch/wraith", want: ["wraith-scope"] },

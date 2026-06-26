@@ -401,7 +401,7 @@ export default function App() {
             {/* Above-fold proof of the aha (the savings number). The dashboard below is the
                 visual proof, but it sits below the fold — this carries the ~60% up top. */}
             <p className="hero-proof">
-              <b>~60% fewer tokens</b> per .md lookup · modeled median (~38–79% by repo) ·{' '}
+              <b>~60% fewer tokens</b> per .md lookup — measured at equal task-success (median 69%, range 41–81%, n=26 on our repo, LLM-judged) ·{' '}
               <a className="hero-proof-link" href="/measure/" onClick={() => track('cta_clicked', { cta_id: 'methodology', location: 'hero' })}>how we measure →</a>{' · '}
               <a className="hero-proof-link" href="/savings" onClick={() => track('cta_clicked', { cta_id: 'estimate-savings', location: 'hero' })}>estimate it on your numbers →</a>
             </p>
@@ -443,8 +443,8 @@ export default function App() {
               <p>Read the code and run it yourself. Fork it if you want. No lock-in. The CLI is MIT.</p>
             </div>
             <div className="trust-card">
-              <div className="trust-h">~60% fewer tokens, modeled</div>
-              <p>Modeled from the reads trovex avoids: it serves the one canonical doc instead of the top few candidates your agent would otherwise read, and the savings view shows the difference on your own repo.</p>
+              <div className="trust-h">~60% fewer tokens, measured</div>
+              <p>Measured at equal task-success on our own repo — median 69%, n=26 queries, LLM-judged — and modeled to about the same ~60% from the reads trovex avoids. The savings view shows the difference on your own repo. <a className="hero-proof-link" href="/measure/">see how we measure →</a></p>
             </div>
           </div>
         </section>

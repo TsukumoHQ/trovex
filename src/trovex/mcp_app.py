@@ -3,6 +3,7 @@
 Single tool, minimal output by design — see project README for rationale.
 """
 
+import logging
 import os
 import time
 
@@ -11,6 +12,8 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from .state import get_state
 from .store import TROVEX_SOURCE_ID, extract_section
+
+log = logging.getLogger("trovex.mcp")
 
 # Allow override via env so the same code runs locally and behind Traefik.
 EXTRA_HOSTS = [h for h in os.environ.get("TROVEX_MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
@@ -82,8 +85,8 @@ def trovex(q: str, summary: bool = False) -> str:
                 would_have_read_tokens=cached["whr"],
                 top_result_tokens=cached["top_tokens"],
             )
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 — logging must never break the tool
+            log.debug("log_query (cache-hit path) failed", exc_info=True)
         return cached["output"]
 
     # Fetch a wider candidate pool when reranking is possible.
@@ -116,13 +119,13 @@ def trovex(q: str, summary: bool = False) -> str:
             # the same list and metrics would be meaningless.
             pre_rerank_paths=pre_rerank_paths if rerank_info else None,
         )
-    except Exception:
-        pass  # never let logging break the tool
+    except Exception:  # noqa: BLE001 — logging must never break the tool
+        log.debug("log_query failed", exc_info=True)
     try:
         _qcache.put(db, q, summary, ver, out, len(results),
                     would_have_read, top_tokens, resp_tokens)
-    except Exception:
-        pass  # cache is best-effort, never block the tool
+    except Exception:  # noqa: BLE001 — cache is best-effort, never block the tool
+        log.debug("query-cache put failed", exc_info=True)
     return out
 
 
@@ -303,8 +306,8 @@ def _log_retrieval(state, query: str, hits: list, response: str, t0: float) -> N
             elapsed_ms=int((time.perf_counter() - t0) * 1000),
             would_have_read_tokens=would_have_read, top_result_tokens=0,
         )
-    except Exception:
-        pass  # never let logging break a tool
+    except Exception:  # noqa: BLE001 — logging must never break a tool
+        log.debug("log_query (chunk path) failed", exc_info=True)
 
 
 @mcp.tool()

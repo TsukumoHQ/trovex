@@ -26,7 +26,7 @@ import sqlite_vec
 
 from .chunking import chunk_markdown
 from .config import Settings
-from .db import open_db
+from .db import like_escape, open_db
 from .embedder import Embedder, build_embedder
 
 TROVEX_SOURCE_ID = "trovex"
@@ -191,9 +191,11 @@ class SqliteStore:
             params.append(kind)
         if q:
             # Lightweight browse filter (title/content substring) — NOT semantic
-            # search; that lives on /search via search_chunks.
-            where.append("(d.title LIKE ? OR d.content LIKE ?)")
-            params += [f"%{q}%", f"%{q}%"]
+            # search; that lives on /search via search_chunks. Escape LIKE
+            # wildcards so a bare `%`/`_` filters literally, not match-all.
+            where.append("(d.title LIKE ? ESCAPE '\\' OR d.content LIKE ? ESCAPE '\\')")
+            pat = f"%{like_escape(q)}%"
+            params += [pat, pat]
         rows = self.db.execute(
             f"""SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,
                        d.mtime, GROUP_CONCAT(t.tag) AS tags
@@ -215,8 +217,9 @@ class SqliteStore:
             where.append("kind = ?")
             params.append(kind)
         if q:
-            where.append("(title LIKE ? OR content LIKE ?)")
-            params += [f"%{q}%", f"%{q}%"]
+            where.append("(title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')")
+            pat = f"%{like_escape(q)}%"
+            params += [pat, pat]
         return self.db.execute(
             f"SELECT COUNT(*) AS c FROM docs WHERE {' AND '.join(where)}", params
         ).fetchone()["c"]

@@ -68,6 +68,19 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8765
 
+    # Rate limiting (slowapi, keyed by client IP). Empty disables a class.
+    # Format: "<count>/<period>" e.g. "30/minute". Applies to the HTTP API only;
+    # the MCP transport is gated by write_token, not these.
+    rate_limit_search: str = "30/minute"
+    rate_limit_write: str = "10/minute"
+
+    # UI / API page sizes + caps (were hardcoded; overridable via TROVEX_* env).
+    search_page_size: int = 12      # results per page on /search
+    store_page_size: int = 60       # cards per page on /store
+    search_limit_max: int = 20      # /api/search & /api/boot `limit`/`k` ceiling
+    sparkline_w: int = 100          # inline activity sparkline width (px)
+    sparkline_h: int = 30           # inline activity sparkline height (px)
+
     # Ranking weights
     freshness_half_life_days: float = 90.0
 

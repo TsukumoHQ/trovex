@@ -145,6 +145,9 @@ def _relative_time(seconds_ago: float) -> str:
 def _snippet(content: str, n: int = 160) -> str:
     """A short plain-text preview of a doc body for the store cards."""
     import re
+    # Only the head of the doc matters for a 160-char preview; capping the input
+    # keeps the regex passes O(cap), not O(doc size) (finding 3).
+    content = (content or "")[:SNIPPET_SCAN_CAP]
     text = re.sub(r"^---\n.*?\n---\n", "", content, flags=re.DOTALL)  # frontmatter
     text = re.sub(r"```[\s\S]*?```", " ", text)                       # code blocks
     text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)            # heading marks
@@ -154,9 +157,32 @@ def _snippet(content: str, n: int = 160) -> str:
 
 
 def _write_authorized(request: Request) -> bool:
-    """Mirror the MCP write gate for the HTTP /api write endpoints."""
+    """Mirror the MCP write gate for the HTTP /api write endpoints. The token is
+    auto-generated + persisted by default (fail-closed); empty only under the
+    TROVEX_ALLOW_UNAUTH_WRITES opt-in. See config.resolve_write_token."""
     tok = get_state().settings.write_token
     return (not tok) or (request.headers.get("x-trovex-write-token") == tok)
+
+
+_UNAUTH_MSG = (
+    "unauthorized — send the X-TROVEX-Write-Token header (token at "
+    "<data_dir>/.write_token, or set TROVEX_WRITE_TOKEN)"
+)
+
+
+def _unauthorized() -> JSONResponse:
+    return JSONResponse({"error": _UNAUTH_MSG}, status_code=403)
+
+
+_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def _is_loopback(request: Request) -> bool:
+    """True when the request originates from the same machine. Used to bootstrap
+    the local browser UI with the auto-generated write token without exposing it
+    to remote clients."""
+    client = request.client
+    return bool(client and client.host in _LOOPBACK_HOSTS)
 
 
 def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -406,7 +432,13 @@ def build_app() -> FastAPI:
         source: str = "",
         sort: str = "recent",
         limit: int = 100,
-    ) -> HTMLResponse:
+    ):
+        # Validate the path filter (finding 3): bounded length + a path-shaped
+        # charset → 422 on anything malformed, before it reaches the LIKE query.
+        if qpath and (len(qpath) > MAX_QPATH_LEN or not QPATH_RE.match(qpath)):
+            return JSONResponse(
+                {"error": f"invalid qpath: {_redact(qpath)!r}"}, status_code=422
+            )
         trovex_data = _docs_query(qpath, status, sort, limit, source)
         return templates.TemplateResponse(request, "_docs_table.html", trovex_data)
 
@@ -1031,6 +1063,11 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
     ]
 
     # Tokens from query (alphanumeric runs >= 2 chars) for inline highlighting.
+    # The `[a-zA-Z0-9]{2,}` class is deliberately restrictive: terms are plain
+    # alphanumerics, so when they're later `re.escape`d and matched against the
+    # HTML-escaped text in _highlight(), a term can never span/split an HTML
+    # entity (e.g. `&amp;`) — no ReDoS, no broken markup. Don't widen this class
+    # without revisiting _highlight()'s escaping assumption.
     import re as _re
     highlight_terms = sorted(
         {t for t in _re.findall(r"[a-zA-Z0-9]{2,}", q.lower()) if len(t) >= 2},

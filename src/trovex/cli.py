@@ -124,6 +124,102 @@ def measure(
     console.print(report(log_path, baseline_days, current_days))
 
 
+_DEFAULT_QUERIES = [
+    "how do I install this",
+    "how do I run the tests",
+    "how do I configure it",
+    "what is the architecture",
+    "how do I deploy",
+    "what are the main commands or API",
+    "how do I contribute",
+    "what license is this under",
+]
+
+
+def _load_queries(path: Path | None) -> list[str]:
+    """Queries from a file (one per line) or the built-in starter set."""
+    if path is None:
+        return list(_DEFAULT_QUERIES)
+    try:
+        return [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    except OSError:
+        return []
+
+
+@app.command()
+def bench(
+    repo: Path = typer.Argument(..., help="Repo/dir with .md docs to benchmark."),
+    queries: Path | None = typer.Option(
+        None, "--queries", help="File of doc-lookup questions, one per line (default: a built-in starter set)."
+    ),
+    eval_mode: bool = typer.Option(
+        False, "--eval", help="Full answer+judge A/B (needs OPENAI_API_KEY); default is the cheap token-model."
+    ),
+    k: int = typer.Option(3, "--k", help="Baseline candidate count (top-k read)."),
+    model: str = typer.Option("gpt-5.4-mini", help="LLM for --eval (answers + judges)."),
+) -> None:
+    """Benchmark trovex's token savings on YOUR repo — the method is the claim, run it yourself.
+
+    Default = the token-accounting MODEL (no LLM, instant): the cost of reading the 1 routed
+    canonical doc vs the top-k candidates. --eval = the full answer+judge A/B counted at EQUAL
+    task-success (needs a key). Reports the distribution (median + spread), not a max.
+    """
+    import os
+    import tempfile
+
+    from .embedder import build_embedder
+
+    # Check the key BEFORE the (slow) index, so --eval without a key fails fast.
+    key = os.environ.get("OPENAI_API_KEY") if eval_mode else None
+    if eval_mode and not key:
+        console.print("[red]--eval needs OPENAI_API_KEY in your environment.[/red]")
+        raise typer.Exit(1)
+
+    qs = _load_queries(queries)
+    if not qs:
+        console.print("[red]No queries.[/red] Provide --queries FILE (one question per line).")
+        raise typer.Exit(1)
+
+    with tempfile.TemporaryDirectory() as td:
+        settings = Settings(data_dir=Path(td), sources_config_path=Path(td) / "none.yaml")
+        emb = build_embedder(settings.embed_model)
+        stats = Indexer(settings, embedder=emb).reindex(root=repo.resolve())
+        if not stats.get("added"):
+            console.print(f"[yellow]No .md indexed under {repo}.[/yellow]")
+            raise typer.Exit(1)
+        searcher = Searcher(settings, embedder=emb)
+
+        if eval_mode:
+            from openai import OpenAI
+
+            from .eval_bench import EvalQuery, format_eval_report, run_eval
+            from .eval_llm import make_answer_fn, make_content_fn, make_judge_fn
+
+            client = OpenAI(api_key=key, timeout=60.0)
+            report = run_eval(
+                [EvalQuery(q, "user") for q in qs],
+                searcher,
+                answer_fn=make_answer_fn(client, model),
+                judge_fn=make_judge_fn(client, model),
+                content_fn=make_content_fn(),
+                baseline_k=k,
+            )
+            console.print(
+                format_eval_report(report, query_source=f"{len(qs)} queries on {repo.name} (answer+judge, {model})")
+            )
+        else:
+            from .benchmark import format_report, run_benchmark
+
+            r = run_benchmark(searcher, qs, limit=max(k, 5))
+            console.print(
+                format_report(
+                    r,
+                    repo=str(repo),
+                    query_source=f"{len(qs)} queries (token-accounting MODEL — add --eval for the answer-quality A/B)",
+                )
+            )
+
+
 @app.command()
 def stats() -> None:
     """Show indexing stats."""

@@ -76,7 +76,11 @@ async function mcp(base, tool, args = {}) {
   const esc = (v) => String(v == null ? '' : v).replace(/\|/g, '\\|');
   const schedRows = [...schedules].sort((a, b) => a.schedule_id - b.schedule_id)
     .map((s) => `| ${s.schedule_id} | ${s.script_id} | ${esc(s.script_name || s.script || byId.get(s.script_id)?.name)} | \`${esc(s.cron)}\` | ${esc(byId.get(s.script_id)?.created_by) || '?'} |`);
-  const scriptRows = [...scripts].sort((a, b) => a.id - b.id)
+  // Filter the dev/junk scripts (one-off test scripts, probes) so the live-state table is signal, not 200 rows of noise.
+  const JUNK = /^(t|a|b|c|echo|hello|proc|http-test|voice-lint|design-render)$/i;
+  const JUNKISH = /(probe|fuzztest|^det-|^nt-|-dbg\d?$|-echo$|input-echo|dokan-input)/i;
+  const realScripts = scripts.filter((s) => !JUNK.test(s.name || '') && !JUNKISH.test(s.name || ''));
+  const scriptRows = [...realScripts].sort((a, b) => a.id - b.id)
     .map((s) => `| ${s.id} | ${esc(s.name)} | ${esc(s.runtime)} | ${esc(s.created_by) || '?'} |`);
 
   const block = [
@@ -90,7 +94,7 @@ async function mcp(base, tool, args = {}) {
     '|---|---|---|---|---|',
     ...schedRows,
     '',
-    `### Live scripts (${scripts.length})`,
+    `### Live scripts (${realScripts.length} real, ${scripts.length - realScripts.length} junk/test hidden)`,
     '| id | name | runtime | created_by |',
     '|---|---|---|---|',
     ...scriptRows,

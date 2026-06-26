@@ -35,13 +35,13 @@ mcp = FastMCP(
             # only write path) at host.docker.internal:8765. Resolves to the host only
             # inside Docker, not internet-reachable, so the rebind risk is minimal.
             "host.docker.internal", "host.docker.internal:*",
-            "trovex.prod.synergix.ch", "trovex.prod.synergix.ch:*",
+            # Extra hosts (e.g. a real deploy domain) come from TROVEX_MCP_ALLOWED_HOSTS —
+            # never hardcode a deploy host in the public repo.
             *EXTRA_HOSTS,
         ],
         allowed_origins=[
             "http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*",
             "http://host.docker.internal:*",
-            "https://trovex.prod.synergix.ch",
             *EXTRA_ORIGINS,
         ],
     ),

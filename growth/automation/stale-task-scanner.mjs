@@ -12,8 +12,9 @@
  *   {project, name:'task-stale', agent?, payload:{...}} → {"emitted":true,"event":"event:task-stale"}.
  *   wraith's rule routes it → P0 '⏰ stale <task>, move it' to `agent` (+ cto escalation when escalate=true).
  *
- * STALE thresholds (from dispatched_at, the only anchor the list exposes): pending >1h, accepted >1h,
- * in-progress (no last-update field) >8h. ESCALATE at ≥2× the threshold.
+ * STALE thresholds (from dispatched_at, the only anchor the list exposes; CTO scope 2026-06-26):
+ * CLAIMED work only — accepted >1.5h, in-progress >1.5h. PENDING is NOT nudged (unclaimed = no owner).
+ * ESCALATE at ≥2× the threshold.
  * ASSIGNEE: profile_slug (native tasks) → else parse `**Lane:** <agent>` from the description →
  * else OMIT `agent` (Linear tasks are often unassigned; wraith default-routes). dispatched_by is the
  * dispatcher, never the assignee.
@@ -33,7 +34,10 @@ const prevState = (input.prev_result && input.prev_result.state) || null;
 const DRY = !!input.dryRun;
 const ONLY = input.onlyTaskId || null;          // controlled test: only this task is eligible to fire
 const MAX_FIRE = Number.isInteger(input.maxFire) ? input.maxFire : 10; // burst guard/run (list is priority-sorted → nudge hottest first; rest fire next runs)
-const TH = Object.assign({ pending: 1, accepted: 1, inProgress: 8 }, input.thresholds || {}); // hours
+// CTO scope (2026-06-26): nudge only CLAIMED work (accepted + in-progress) idle >~1.5h. PENDING is
+// NOT emitted — an unclaimed task has no owner to nudge (wraith resolves the assignee relay-side; we
+// don't filter on it, we just don't nudge un-started tasks). pending kept here only as an opt-in override.
+const TH = Object.assign({ accepted: 1.5, inProgress: 1.5 }, input.thresholds || {}); // hours
 const RELAY = input.relay_url || 'http://host.docker.internal:8090/mcp';
 const RELAY_BASE = input.relay_base || 'http://host.docker.internal:8090';
 const NOW = Date.now();
@@ -70,7 +74,8 @@ async function emit(body) {
 
 function ageHours(iso) { const t = Date.parse(iso || ''); return t ? (NOW - t) / 3.6e6 : null; }
 function thresholdFor(status) {
-  if (status === 'pending') return TH.pending;
+  // PENDING is intentionally NOT nudged (unclaimed = no owner). Opt back in only via input.thresholds.pending.
+  if (status === 'pending') return TH.pending ?? null;
   if (status === 'accepted') return TH.accepted;
   if (status === 'in-progress') return TH.inProgress;
   return null; // blocked/in-review/done/cancelled are not "stale" here

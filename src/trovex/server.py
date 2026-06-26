@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import logging
+import re
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,17 +18,73 @@ from fastapi.responses import (
     RedirectResponse,
 )
 from fastapi.templating import Jinja2Templates
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from . import insights as insights_mod
 from . import savings as savings_mod
 from .boot import boot_pointers
 from .capture import capture_state
+from .db import like_escape
 from .markdown import PYGMENTS_CSS, render_markdown
 from .mcp_app import mcp
 from .state import get_state
 from .usage import UserHeaderMiddleware
 
+log = logging.getLogger("trovex.server")
+
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+# Validation patterns for free-text filter params (finding 6). kind is a bare
+# slug; tags allow `/` (owner/alpha scope) but nothing else exotic.
+KIND_RE = r"^[A-Za-z0-9_-]+$"
+TAG_RE = r"^[A-Za-z0-9_/-]+$"
+_re_tag = re.compile(TAG_RE)
+MAX_TAGS = 10
+MAX_TAG_LEN = 50
+
+
+def _redact(s: str | None, n: int = 20) -> str:
+    """Truncate a user query/string before it reaches the logs (finding 8) — we
+    never need the full text to debug, and it may carry sensitive content."""
+    s = s or ""
+    return s[:n] + "…" if len(s) > n else s
+
+
+def _rate_limit(get_value):
+    """slowapi limit factory reading the live setting, so a `429` class can be
+    tuned (or disabled with an empty string) via TROVEX_RATE_LIMIT_* env."""
+    def _value() -> str:
+        v = get_value()
+        # An empty setting disables the class — return a very high ceiling so the
+        # decorator stays valid while effectively never tripping.
+        return v or "1000000/minute"
+    return _value
+
+
+async def _read_json(request: Request) -> tuple[dict | None, JSONResponse | None]:
+    """Parse a JSON request body, returning (body, None) or (None, 400-response).
+
+    Replaces the unguarded ``await request.json()`` (finding 7): malformed JSON
+    now yields a clean 400 instead of an unhandled 500."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as e:
+        log.info("rejected malformed JSON body: %s", e.__class__.__name__)
+        return None, JSONResponse({"error": "invalid JSON body"}, status_code=400)
+    if not isinstance(body, dict):
+        return None, JSONResponse({"error": "expected a JSON object"}, status_code=400)
+    return body, None
+
+
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """429 for over-limit clients (finding 4). Plain JSON, with a Retry hint."""
+    return JSONResponse(
+        {"error": "rate limit exceeded", "detail": str(exc.limit.limit)},
+        status_code=429,
+        headers={"Retry-After": "60"},
+    )
 
 EXAMPLE_QUERIES = [
     "auth JWT", "qdrant vector", "RAG architecture",
@@ -148,6 +207,20 @@ def build_app() -> FastAPI:
     # docs_url=None frees the /docs path for our own browse page.
     app = FastAPI(title="trovex", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(UserHeaderMiddleware)
+
+    # Per-IP rate limiting (finding 4). The limiter + its in-memory window live on
+    # this app instance, so each build_app() starts clean (test isolation). Limits
+    # are read live from settings, so TROVEX_RATE_LIMIT_* tunes them per class.
+    limiter = Limiter(key_func=get_remote_address)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+    search_limit = limiter.limit(_rate_limit(lambda: get_state().settings.rate_limit_search))
+    write_limit = limiter.limit(_rate_limit(lambda: get_state().settings.rate_limit_write))
+
+    # `limit` ceilings sourced from settings (finding 9), captured at build time.
+    cfg = get_state().settings
+    search_max = cfg.search_limit_max
+
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["avatar_color"] = _avatar_color
     templates.env.filters["highlight"] = _highlight
@@ -233,7 +306,9 @@ def build_app() -> FastAPI:
         saved_this = sum(savings_series)
         saved_prev = sum(d["saved"] for d in series14[-14:-7]) if len(series14) >= 8 else 0
         saved_delta_pct = ((saved_this - saved_prev) / saved_prev) if saved_prev else None
-        savings_spark = _sparkline(savings_series)
+        savings_spark = _sparkline(
+            savings_series, w=state.settings.sparkline_w, h=state.settings.sparkline_h
+        )
 
         # Activity this week — writes touch mtime, so these are "written / updated",
         # not net-new growth. Labelled as such in the UI (no fake +growth delta).
@@ -275,6 +350,7 @@ def build_app() -> FastAPI:
         )
 
     @app.get("/search", response_class=HTMLResponse)
+    @search_limit
     async def search_html(request: Request, q: str = "", summary: bool = False,
                           tag: list[str] = Query(default=[]), kind: str = "",
                           sort: str = "relevance", page: int = 1) -> HTMLResponse:
@@ -337,6 +413,7 @@ def build_app() -> FastAPI:
         )
 
     @app.delete("/api/doc/{ext_id}")
+    @write_limit
     async def api_doc_delete(ext_id: str, request: Request) -> JSONResponse:
         """Delete a trovex-owned doc. Updates go through trovex_write (same id)."""
         if not _write_authorized(request):
@@ -350,7 +427,8 @@ def build_app() -> FastAPI:
         """The trovex-owned doc store — browse + quick title/text filter. Semantic
         search lives on /search (this `q` is a lightweight view filter, paginated
         like the rest of the browse)."""
-        store = get_state().store
+        state = get_state()
+        store = state.store
         now = _now()
         f_tag, f_kind = tag, kind
         if collection:
@@ -358,7 +436,7 @@ def build_app() -> FastAPI:
             f_tag = cf.get("tag", f_tag)
             f_kind = cf.get("kind", f_kind)
         page = max(1, page)
-        per = 60
+        per = state.settings.store_page_size
 
         def card(d, snippet):
             return {
@@ -392,10 +470,13 @@ def build_app() -> FastAPI:
         return JSONResponse(get_state().store.list_collections())
 
     @app.post("/api/collections")
+    @write_limit
     async def api_collection_create(request: Request) -> JSONResponse:
         if not _write_authorized(request):
             return JSONResponse({"error": "unauthorized"}, status_code=403)
-        body = await request.json()
+        body, err = await _read_json(request)
+        if err:
+            return err
         name = (body.get("name") or "").strip()
         if not name:
             return JSONResponse({"error": "name required"}, status_code=400)
@@ -404,6 +485,7 @@ def build_app() -> FastAPI:
         return JSONResponse({"ok": True, "name": name, "filter": flt})
 
     @app.delete("/api/collections/{name}")
+    @write_limit
     async def api_collection_delete(name: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
             return JSONResponse({"error": "unauthorized"}, status_code=403)
@@ -415,18 +497,28 @@ def build_app() -> FastAPI:
         return JSONResponse(get_state().store.list_versions(ext_id))
 
     @app.post("/api/doc/{ext_id}/restore")
+    @write_limit
     async def api_doc_restore(ext_id: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
             return JSONResponse({"error": "unauthorized"}, status_code=403)
-        body = await request.json()
-        ok = get_state().store.restore_version(ext_id, int(body.get("version_id", 0)))
+        body, err = await _read_json(request)
+        if err:
+            return err
+        try:
+            version_id = int(body.get("version_id", 0))
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "version_id must be an integer"}, status_code=400)
+        ok = get_state().store.restore_version(ext_id, version_id)
         return JSONResponse({"restored": ok}, status_code=200 if ok else 404)
 
     @app.post("/api/doc/{ext_id}/tags")
+    @write_limit
     async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
             return JSONResponse({"error": "unauthorized"}, status_code=403)
-        body = await request.json()
+        body, err = await _read_json(request)
+        if err:
+            return err
         tags = get_state().store.set_tags(
             ext_id,
             add=[t.strip() for t in (body.get("add") or "").split(",") if t.strip()],
@@ -437,15 +529,31 @@ def build_app() -> FastAPI:
     # ── JSON API ─────────────────────────────────────────────────────
 
     @app.get("/api/search")
+    @search_limit
     async def api_search(
-        q: str = Query(..., min_length=1),
-        limit: int = Query(5, ge=1, le=20),
+        request: Request,
+        q: str = Query(..., min_length=1, max_length=500),
+        limit: int = Query(5, ge=1, le=search_max),
         summary: bool = False,
-        kind: str | None = Query(None, description="filter to one doc kind, e.g. 'record'"),
+        kind: str | None = Query(
+            None, max_length=MAX_TAG_LEN, pattern=KIND_RE,
+            description="filter to one doc kind, e.g. 'record'",
+        ),
         tags: str | None = Query(None, description="comma-separated tags; any-match scope"),
     ) -> JSONResponse:
         state = get_state()
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+        if tag_list:
+            # Validate tags (finding 6): bounded count + slug shape, reject malformed.
+            if len(tag_list) > MAX_TAGS:
+                return JSONResponse(
+                    {"error": f"too many tags (max {MAX_TAGS})"}, status_code=422
+                )
+            for t in tag_list:
+                if len(t) > MAX_TAG_LEN or not _re_tag.match(t):
+                    return JSONResponse(
+                        {"error": f"invalid tag: {_redact(t)!r}"}, status_code=422
+                    )
         results = state.searcher.search(q, limit=limit, kind=kind, tags=tag_list)
         return JSONResponse([
             {
@@ -459,11 +567,13 @@ def build_app() -> FastAPI:
         ])
 
     @app.get("/api/boot")
+    @search_limit
     async def api_boot(
-        agent: str = Query(..., min_length=1),
-        k: int = Query(5, ge=1, le=20),
+        request: Request,
+        agent: str = Query(..., min_length=1, max_length=MAX_TAG_LEN),
+        k: int = Query(5, ge=1, le=search_max),
         floor: float = Query(0.62, ge=0.0, le=1.0),
-        q: str | None = Query(None, description="override the generic boot query"),
+        q: str | None = Query(None, max_length=500, description="override the generic boot query"),
     ) -> JSONResponse:
         """Active-memory recall: the agent's own records as a ~80-token pointer
         pack (RFC 330e7d43, step 2). Read-only; empty when nothing clears
@@ -473,13 +583,16 @@ def build_app() -> FastAPI:
         )
 
     @app.post("/api/capture")
+    @write_limit
     async def api_capture(request: Request) -> JSONResponse:
         """Active-memory capture (RFC 330e7d43, step 3): upsert an agent's
         current-state record from a free summary (PostCompact's compact_summary,
         no LLM). Distil-from-transcript is step 4. Write-gated."""
         if not _write_authorized(request):
             return JSONResponse({"error": "unauthorized"}, status_code=403)
-        body = await request.json()
+        body, err = await _read_json(request)
+        if err:
+            return err
         agent = (body.get("agent") or "").strip()
         if not agent:
             return JSONResponse({"captured": False, "reason": "no agent"}, status_code=400)
@@ -530,7 +643,12 @@ def build_app() -> FastAPI:
         )
 
     @app.post("/api/reindex")
-    async def api_reindex() -> JSONResponse:
+    @write_limit
+    async def api_reindex(request: Request) -> JSONResponse:
+        # Write-gated like the other mutating endpoints (finding 2): a full
+        # reindex is an admin/token-only operation, not anonymous.
+        if not _write_authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
         state = get_state()
         stats = state.indexer.reindex(state.settings.project_root)
         return JSONResponse(stats)
@@ -560,6 +678,7 @@ def build_app() -> FastAPI:
         return JSONResponse(backup_mod.list_backups(get_state().settings.data_dir))
 
     @app.post("/api/backup")
+    @write_limit
     async def api_backup(request: Request) -> JSONResponse:
         if not _write_authorized(request):
             return JSONResponse({"error": "unauthorized"}, status_code=403)
@@ -725,9 +844,11 @@ def build_app() -> FastAPI:
         )
 
     @app.get("/api/suggest")
-    async def api_suggest(q: str = "") -> JSONResponse:
+    async def api_suggest(q: str = Query("", max_length=200)) -> JSONResponse:
         state = get_state()
         db = state.searcher.db
+        # Log the query truncated (finding 8) — never the full user text.
+        log.debug("suggest q=%r", _redact(q))
         return JSONResponse(insights_mod.suggest_queries(db, q))
 
     @app.get("/savings", response_class=HTMLResponse)
@@ -791,7 +912,7 @@ def _render_search(request: Request, templates: Jinja2Templates, q: str, summary
     now = _now()
     tags = [t for t in (tags or []) if t]
     page = max(1, page)
-    per = 12
+    per = state.settings.search_page_size
 
     def _u(**over) -> str:
         """Build a /search URL from current state with overrides (q/kind/sort/tags/page)."""
@@ -914,8 +1035,8 @@ def _docs_query(qpath: str, status: str, sort: str, limit: int,
     where = ["workspace_id = 'default'"]
     params: list[Any] = []
     if qpath:
-        where.append("path LIKE ?")
-        params.append(f"%{qpath}%")
+        where.append("path LIKE ? ESCAPE '\\'")
+        params.append(f"%{like_escape(qpath)}%")
     if status:
         where.append("status = ?")
         params.append(status)

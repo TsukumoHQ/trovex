@@ -40,4 +40,11 @@ jobs:
       - name: ruff check
         run: uv run ruff check src tests
       - name: pytest
+        # Includes tests/test_security.py — the registry-scan hardening
+        # (LIKE-escape, reindex-auth, symlink-skip, rate-limit-429, validation)
+        # so a regression fails CI, not just the audit.
         run: uv run pytest -q
+      - name: pip-audit (fail on any known vuln in the dep graph)
+        # Security gate: the Python equivalent of `npm audit`. Non-zero exit on any
+        # known advisory. --skip-editable skips the local trovex package itself.
+        run: uv run --with pip-audit pip-audit --skip-editable

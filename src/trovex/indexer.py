@@ -1,3 +1,4 @@
+import fnmatch
 import hashlib
 import re
 import time
@@ -14,6 +15,38 @@ FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 TITLE_RE = re.compile(r"^\s*#\s+(.+)$", re.MULTILINE)
 AGENT_FRONTMATTER_KEYS = ("agent", "author", "generator", "created_by")
 
+TROVEXIGNORE = ".trovexignore"
+
+
+def _load_ignore_patterns(root: Path) -> list[str]:
+    """Read glob patterns from <root>/.trovexignore (gitignore-ish: one per line,
+    `#` comments and blanks skipped). Returns [] if the file is absent/unreadable."""
+    f = root / TROVEXIGNORE
+    try:
+        lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    return [s.strip() for s in lines if s.strip() and not s.strip().startswith("#")]
+
+
+def _is_ignored(rel_posix: str, patterns: list[str]) -> bool:
+    """Match a source-relative POSIX path against .trovexignore globs. We match the
+    full relative path, every parent prefix, and the basename — so `docs/*`,
+    `**/blog/**`, and bare `SECURITY.md` all behave as a user expects."""
+    name = rel_posix.rsplit("/", 1)[-1]
+    parts = rel_posix.split("/")
+    candidates = {rel_posix, name}
+    # every directory prefix, so a dir pattern like `growth/social/**` or `docs/*`
+    # matches files nested under it.
+    for i in range(1, len(parts)):
+        candidates.add("/".join(parts[:i]) + "/")
+        candidates.add("/".join(parts[: i + 1]))
+    for pat in patterns:
+        p = pat.rstrip("/")
+        if any(fnmatch.fnmatch(c, pat) or fnmatch.fnmatch(c, p) for c in candidates):
+            return True
+    return False
+
 
 class Indexer:
     def __init__(self, settings: Settings, embedder: Embedder | None = None):
@@ -24,9 +57,24 @@ class Indexer:
     def scan(self, root: Path) -> Iterator[Path]:
         ignore = set(self.settings.ignore_dirs)
         max_size = self.settings.max_file_size_bytes
+        root_resolved = root.resolve()
+        ignore_patterns = _load_ignore_patterns(root)
         for ext in ("md", "mdx", "markdown"):
             for p in root.rglob(f"*.{ext}"):
-                if any(part in ignore for part in p.relative_to(root).parts):
+                rel = p.relative_to(root)
+                if any(part in ignore for part in rel.parts):
+                    continue
+                # Path-traversal / symlink guard: a .md that is a symlink (or sits
+                # under a symlinked dir) pointing outside the source root — e.g.
+                # /etc/passwd — must NOT be indexed. Canonicalize and require the
+                # real target to stay inside the root.
+                try:
+                    real = p.resolve()
+                except OSError:
+                    continue
+                if real != root_resolved and not real.is_relative_to(root_resolved):
+                    continue
+                if ignore_patterns and _is_ignored(rel.as_posix(), ignore_patterns):
                     continue
                 try:
                     if p.stat().st_size > max_size:

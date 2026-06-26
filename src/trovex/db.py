@@ -3,6 +3,26 @@ from pathlib import Path
 
 import sqlite_vec
 
+# Backslash is the escape char we declare with `ESCAPE '\'` on LIKE clauses.
+LIKE_ESCAPE_CHAR = "\\"
+
+
+def like_escape(s: str) -> str:
+    """Escape LIKE wildcards (% and _) plus the escape char itself, so user
+    input used inside a ``%...%`` substring filter matches *literally*.
+
+    Pair every escaped value with ``ESCAPE '\\'`` in the SQL, e.g.::
+
+        WHERE path LIKE ? ESCAPE '\\'   -- param: f"%{like_escape(qpath)}%"
+
+    Without this, ``qpath='%'`` (or ``_``) is a wildcard and matches everything.
+    """
+    return (
+        s.replace(LIKE_ESCAPE_CHAR, LIKE_ESCAPE_CHAR * 2)
+        .replace("%", LIKE_ESCAPE_CHAR + "%")
+        .replace("_", LIKE_ESCAPE_CHAR + "_")
+    )
+
 
 def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)

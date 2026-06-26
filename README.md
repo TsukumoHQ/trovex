@@ -177,6 +177,13 @@ PRs welcome.
 Questions, or comparing notes with other people running agents? Join the community Slack:
 [tsukumo.ch/slack](https://tsukumo.ch/slack).
 
+## Security
+
+trovex is **local-first and single-tenant**: it runs on your machine, indexes your docs, and
+serves your agents. Set `TROVEX_WRITE_TOKEN` to gate every mutation behind the
+`X-TROVEX-Write-Token` header. The trust model, what's hardened, and how to report a
+vulnerability are documented in [`SECURITY.md`](SECURITY.md).
+
 ## License
 
 trovex is licensed under the **GNU AGPL-3.0-or-later** (see [`LICENSE`](LICENSE)). You can

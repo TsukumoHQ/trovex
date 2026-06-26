@@ -558,12 +558,17 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_doc_restore(ext_id: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         body, err = await _read_json(request)
         if err:
             return err
+        # Numeric-cast safety (finding 4): a non-integer version_id is a 400, not
+        # an uncaught 500. bool is an int subclass but never a valid version id.
+        raw = body.get("version_id", 0)
+        if isinstance(raw, bool) or not isinstance(raw, (int, str)):
+            return JSONResponse({"error": "version_id must be an integer"}, status_code=400)
         try:
-            version_id = int(body.get("version_id", 0))
+            version_id = int(raw)
         except (TypeError, ValueError):
             return JSONResponse({"error": "version_id must be an integer"}, status_code=400)
         ok = get_state().store.restore_version(ext_id, version_id)

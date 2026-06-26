@@ -183,6 +183,15 @@ trovex is licensed under the **GNU AGPL-3.0-or-later** (see [`LICENSE`](LICENSE)
 self-host and modify it freely; if you run a modified version as a network service, AGPL
 requires you to share your changes.
 
+## Part of the suite
+
+trovex is the **context** layer of a four-part open-source suite for running AI coding agents in production, built by [tsukumo](https://tsukumo.ch):
+
+- **trovex** — context: serve agents the one canonical doc per query instead of rereading the repo (~60% fewer tokens per lookup; method at [trovex.dev/measure](https://trovex.dev/measure)).
+- **[wrai.th](https://github.com/TsukumoHQ/WRAI.TH)** — orchestration: run and coordinate a fleet of agents.
+- **[yoru](https://yoru.sh)** — observability: session receipts of what each agent actually did.
+- **[dokan](https://github.com/TsukumoHQ/dokan)** — deterministic execution: run the agent's settled, repeatable work as scripts in clean containers, no model in the loop.
+
 ## Working with a team?
 
 trovex is free to run yourself. If your team is rolling out coding agents at scale and wants

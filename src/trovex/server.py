@@ -197,7 +197,19 @@ def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    get_state()  # warm up
+    state = get_state()  # warm up
+    # Retention (finding 5): drop query-log rows older than the configured window
+    # so the local DB doesn't grow unbounded and old (potentially sensitive)
+    # query text isn't retained forever.
+    try:
+        from .usage import purge_old_queries
+        deleted = purge_old_queries(
+            state.searcher.db, state.settings.query_retention_days
+        )
+        if deleted:
+            log.info("purged %d query-log rows past retention", deleted)
+    except Exception:  # noqa: BLE001 — retention must never block startup
+        log.debug("query-log retention purge failed", exc_info=True)
     async with mcp.session_manager.run():
         yield
 

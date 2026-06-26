@@ -115,7 +115,7 @@
     <p class="lead-answer">Not much, for this job. You run the index yourself, a one-time command that takes about a minute and re-runs as docs change, rather than a service doing it for you. There's no hosted dashboard for a whole org out of the box. In exchange you keep your code on your machine, pay no per-token embedding bill, and get the same retrieval saving. For most teams that's the right trade.</p>
 
     <h2>How trovex does it</h2>
-    <p class="lead-answer"><a href="/">trovex</a> is the open-source, local-first MCP server described above: index a repo, serve agents one current answer per query, write back what they learn so the next agent reads it. It reports the tokens it saved, so the number is measured on your repo. See the per-scenario math in <a href="/answers/token-cost-of-agent-context/">what context costs your agents</a>.</p>
+    <p class="lead-answer"><a href="/">trovex</a> is the open-source, local-first MCP server described above: index a repo, serve agents one current answer per query, write back what they learn so the next agent reads it. It reports the tokens it saved, so you see the real number on your own repo. See the per-scenario math in <a href="/answers/token-cost-of-agent-context/">what context costs your agents</a>.</p>
     <div class="cmd mono" style="display:inline-block;margin-top:14px;">$ uv run trovex index /path/to/repo</div>
 
     <div class="related">

@@ -44,6 +44,32 @@ _re_tag = re.compile(TAG_RE)
 MAX_TAGS = 10
 MAX_TAG_LEN = 50
 
+# qpath is a path *substring* filter (finding 3): cap length and restrict to a
+# sane path charset so a pathological/oversized value can't reach the LIKE query.
+MAX_QPATH_LEN = 200
+QPATH_RE = re.compile(r"^[A-Za-z0-9 ._/\-]+$")
+
+# Upper bound on the content a regex-based helper (_snippet) will scan, so a very
+# large doc body can't drive pathological regex cost (finding 3).
+SNIPPET_SCAN_CAP = 20_000
+
+# Hook names servable via /hooks/<name> (finding 2) — an exact allowlist.
+HOOK_ALLOWLIST = frozenset({
+    "trovex-md-guard.sh", "trovex-md-read-guard.sh",
+    "trovex-boot.sh", "trovex-prompt.sh", "trovex-postcompact.sh",
+    "trovex-sessionend.sh", "install-active-memory.sh",
+})
+
+
+def _safe_hook_name(name: str) -> bool:
+    """A hook name is servable only if it's in the allowlist AND is a bare
+    filename — no separators, parent refs, or percent-encoding (finding 2)."""
+    if name not in HOOK_ALLOWLIST:
+        return False
+    if any(c in name for c in ("/", "\\", "%")) or ".." in name:
+        return False
+    return Path(name).name == name
+
 
 def _redact(s: str | None, n: int = 20) -> str:
     """Truncate a user query/string before it reaches the logs (finding 8) — we
@@ -648,7 +674,7 @@ def build_app() -> FastAPI:
         # Write-gated like the other mutating endpoints (finding 2): a full
         # reindex is an admin/token-only operation, not anonymous.
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         state = get_state()
         stats = state.indexer.reindex(state.settings.project_root)
         return JSONResponse(stats)
@@ -697,20 +723,37 @@ def build_app() -> FastAPI:
         ).fetchone()["c"]
         return templates.TemplateResponse(request, "install.html", {"total": total})
 
+    @app.get("/api/write-token")
+    async def api_write_token(request: Request) -> JSONResponse:
+        """Hand the auto-generated write token to a SAME-MACHINE browser so the
+        local UI can issue writes without the operator copying it by hand. Refused
+        for non-loopback clients, so a network-exposed instance never leaks it.
+        Returns no token when writes are open (TROVEX_ALLOW_UNAUTH_WRITES)."""
+        if not _is_loopback(request):
+            return _unauthorized()
+        return JSONResponse({"token": get_state().settings.write_token})
+
     @app.get("/hooks/{name}", response_class=PlainTextResponse)
-    async def hook_download(name: str) -> str:
-        if name not in {
-            "trovex-md-guard.sh", "trovex-md-read-guard.sh",
-            "trovex-boot.sh", "trovex-prompt.sh", "trovex-postcompact.sh",
-            "trovex-sessionend.sh", "install-active-memory.sh",
-        }:
-            return ""
+    async def hook_download(name: str) -> PlainTextResponse:
+        # Allowlist + traversal/encoding check before touching the filesystem.
+        if not _safe_hook_name(name):
+            return PlainTextResponse("not found", status_code=404)
+        # Serve from the configurable hooks dir first (TROVEX_HOOKS_DIR; defaults
+        # to ~/.claude/hooks, no hardcoded user), then the bundled repo copy.
+        hooks_dir = get_state().settings.hooks_dir.expanduser()
         repo_hooks = Path(__file__).resolve().parent.parent.parent / "deploy" / "hooks"
-        for base in (Path("/home/synxadmin/.claude/hooks"), repo_hooks):
-            path = base / name
-            if path.exists():
-                return path.read_text()
-        return ""
+        for base in (hooks_dir, repo_hooks):
+            try:
+                base_resolved = base.resolve()
+                path = (base_resolved / name).resolve()
+            except OSError:
+                continue
+            # Defence in depth: the resolved file must stay inside its base dir.
+            if base_resolved not in path.parents:
+                continue
+            if path.is_file():
+                return PlainTextResponse(path.read_text())
+        return PlainTextResponse("not found", status_code=404)
 
     # ── Usage page ───────────────────────────────────────────────────
 

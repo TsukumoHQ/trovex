@@ -79,22 +79,42 @@ function cardFields(cards) {
   return out;
 }
 
+// visible copy in a hand-authored brand SVG (web/public/*.svg): aria-label + every <text>
+// inner string. A claim baked into a graphic is the same risk surface as a card spec, so the
+// same honesty gate applies (cmo GO 2026-06-26). Site brand assets are never a study → study:false.
+function svgFields(svg) {
+  const out = [];
+  for (const m of svg.matchAll(/aria-label="([^"]*)"/g)) if (m[1].trim()) out.push({ path: "aria-label", v: m[1], study: false });
+  for (const m of svg.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/g)) {
+    const inner = m[1].replace(/<[^>]+>/g, "").trim(); // strip <tspan> etc., keep the words
+    if (inner) out.push({ path: "<text>", v: inner, study: false });
+  }
+  return out;
+}
+
 let errors = 0, warns = 0;
-const files = process.argv.slice(2).filter((a) => a.endsWith(".json"));
-if (!files.length) { console.error("usage: lint_spec.mjs <spec.json> [...]"); process.exit(2); }
+const files = process.argv.slice(2).filter((a) => a.endsWith(".json") || a.endsWith(".svg"));
+if (!files.length) { console.error("usage: lint_spec.mjs <spec.json|brand.svg> [...]"); process.exit(2); }
 
 for (const file of files) {
-  let spec;
-  try { spec = JSON.parse(await readFile(file, "utf8")); }
-  catch (e) { console.error(`✗ ${file}: invalid JSON — ${e.message}`); errors++; continue; }
-  const isCards = Array.isArray(spec); // card-spec file = array of single cards (gen_card.mjs)
-  const slug = isCards ? `${spec.length} cards` : (spec.slug || "(no slug)");
-  const fields = isCards ? cardFields(spec) : copyFields(spec);
+  const isSvg = file.endsWith(".svg");
+  let spec, isCards = false, slug, fields;
+  if (isSvg) {
+    const raw = await readFile(file, "utf8");
+    slug = file.split("/").pop();
+    fields = svgFields(raw);
+  } else {
+    try { spec = JSON.parse(await readFile(file, "utf8")); }
+    catch (e) { console.error(`✗ ${file}: invalid JSON — ${e.message}`); errors++; continue; }
+    isCards = Array.isArray(spec); // card-spec file = array of single cards (gen_card.mjs)
+    slug = isCards ? `${spec.length} cards` : (spec.slug || "(no slug)");
+    fields = isCards ? cardFields(spec) : copyFields(spec);
+  }
   const fileErrs = [];
 
   for (const { path, v, study } of fields) {
-    // dash is a HARD error only for carousels (gen_carousel renders body raw); gen_card auto-de-dashes
-    if (!isCards && DASH.test(v)) fileErrs.push(`${path}: em/en dash in body copy → de-dash (use ':' or '·'). «${v.match(/.{0,18}[—–].{0,18}/)[0].trim()}»`);
+    // dash is a HARD error only for carousels (gen_carousel renders body raw); gen_card auto-de-dashes; svg is hand-authored
+    if (!isCards && !isSvg && DASH.test(v)) fileErrs.push(`${path}: em/en dash in body copy → de-dash (use ':' or '·'). «${v.match(/.{0,18}[—–].{0,18}/)[0].trim()}»`);
     for (const re of BANNED) if (re.test(v)) fileErrs.push(`${path}: banned phrase /${re.source}/ → ${re.source === "synergix" ? "remove" : "use public-beta / install + star"}. «${v.slice(0, 60)}»`);
     // honesty/claim gate — study-tagged fields exempt where noted (external measurements are
     // real). A field that NAMES a study inline ("Stanford measured 35-40%") is exempt too.
@@ -105,12 +125,14 @@ for (const file of files) {
       if (re.test(target)) fileErrs.push(`${path}: ${msg}. «${v.slice(0, 60)}»`);
     }
   }
-  // warns: overflow risk (carousel-shaped only)
-  (isCards ? [] : spec.slides || []).forEach((s, i) => {
-    if (s.heroValue && s.heroValue.length > 7) { console.warn(`⚠ ${slug} slides[${i}].heroValue "${s.heroValue}" is ${s.heroValue.length} chars — may clip at 230px`); warns++; }
-  });
-  const allTitles = [spec.cover?.title, ...(spec.slides || []).map((s) => s.title), spec.cta?.title].filter(Boolean);
-  for (const t of allTitles) if (t.length > 52) { console.warn(`⚠ ${slug}: title "${t.slice(0,40)}…" is ${t.length} chars — shrinks small`); warns++; }
+  // warns: overflow risk (carousel-shaped only; svg/card specs skip)
+  if (!isSvg) {
+    (isCards ? [] : spec.slides || []).forEach((s, i) => {
+      if (s.heroValue && s.heroValue.length > 7) { console.warn(`⚠ ${slug} slides[${i}].heroValue "${s.heroValue}" is ${s.heroValue.length} chars — may clip at 230px`); warns++; }
+    });
+    const allTitles = [spec.cover?.title, ...(spec.slides || []).map((s) => s.title), spec.cta?.title].filter(Boolean);
+    for (const t of allTitles) if (t.length > 52) { console.warn(`⚠ ${slug}: title "${t.slice(0,40)}…" is ${t.length} chars — shrinks small`); warns++; }
+  }
 
   if (fileErrs.length) { console.error(`✗ ${slug} (${file})`); fileErrs.forEach((e) => console.error(`    ${e}`)); errors += fileErrs.length; }
   else console.log(`✓ ${slug}`);

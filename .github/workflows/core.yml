@@ -31,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # hatch-vcs derives the version from git tags (uv sync builds editable)
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true

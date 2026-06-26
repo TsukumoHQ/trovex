@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # hatch-vcs derives the package version from the git tag at build
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,6 +51,13 @@ jobs:
 
       - name: Authenticate to MCP Registry (GitHub OIDC)
         run: ./mcp-publisher login github-oidc
+
+      - name: Sync server.json version to the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.json.tmp
+          mv server.json.tmp server.json
+          echo "server.json synced to $VERSION"
 
       - name: Publish to MCP Registry
         run: ./mcp-publisher publish ./server.json

@@ -180,8 +180,12 @@ Questions, or comparing notes with other people running agents? Join the communi
 ## Security
 
 trovex is **local-first and single-tenant**: it runs on your machine, indexes your docs, and
-serves your agents. Set `TROVEX_WRITE_TOKEN` to gate every mutation behind the
-`X-TROVEX-Write-Token` header. The trust model, what's hardened, and how to report a
+serves your agents. Mutations are gated behind the `X-TROVEX-Write-Token` header — and the
+default is **fail-closed**: with no token configured, trovex auto-generates a per-instance
+token on first run and persists it to `<data_dir>/.write_token` (chmod 600), so a
+network-exposed instance does not accept anonymous writes. Set `TROVEX_WRITE_TOKEN` to share
+one token across machines, or `TROVEX_ALLOW_UNAUTH_WRITES=1` to deliberately run with open
+writes on a trusted localhost. The trust model, what's hardened, and how to report a
 vulnerability are documented in [`SECURITY.md`](SECURITY.md).
 
 ## License

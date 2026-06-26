@@ -219,3 +219,172 @@ def test_malformed_json_body_is_400(tmp_path):
         assert r.json()["error"] == "invalid JSON body"
     finally:
         state_mod.reset_state()
+
+
+# ── Round 2 · Finding 1: write-auth is fail-closed by default ────────
+
+def test_write_token_auto_generated_and_persisted(tmp_path):
+    """With no env token and no opt-in, resolve_write_token() mints a persisted
+    per-instance token (fail-closed), not the open-writes default."""
+    settings = _make_settings(tmp_path)
+    assert settings.write_token == ""           # nothing configured
+    tok = settings.resolve_write_token()
+    assert tok                                   # a real token was produced
+    token_file = tmp_path / ".write_token"
+    assert token_file.exists()
+    assert token_file.read_text().strip() == tok
+    # A second resolve reuses the same persisted token (stable across boots).
+    assert _make_settings(tmp_path).resolve_write_token() == tok
+    # 0600 perms (owner-only) where the platform supports it.
+    import os
+    import stat
+    mode = stat.S_IMODE(os.stat(token_file).st_mode)
+    if os.name == "posix":
+        assert mode == 0o600
+
+
+def test_writes_require_auto_token_by_default(tmp_path):
+    """A default instance (no env token, no opt-in) denies an anonymous write and
+    accepts it only with the auto-generated token — the new default posture."""
+    (tmp_path / "project").mkdir()
+    settings = _make_settings(tmp_path)
+    settings.write_token = settings.resolve_write_token()  # what get_state() does
+    assert settings.write_token
+    _inject_state(settings)
+    try:
+        client = TestClient(build_app())
+        # No token header → denied (fail-closed).
+        assert client.post("/api/capture", json={"agent": "a", "summary": "x"}).status_code == 403
+        # Correct auto-token → allowed.
+        ok = client.post(
+            "/api/capture",
+            json={"agent": "a", "summary": "x"},
+            headers={"x-trovex-write-token": settings.write_token},
+        )
+        assert ok.status_code == 200
+    finally:
+        state_mod.reset_state()
+
+
+def test_allow_unauth_writes_opt_in_keeps_writes_open(tmp_path):
+    """The explicit TROVEX_ALLOW_UNAUTH_WRITES escape hatch resolves to an empty
+    token → writes open (only intended for localhost / trusted networks)."""
+    settings = _make_settings(tmp_path, allow_unauth_writes=True)
+    assert settings.resolve_write_token() == ""
+    settings.write_token = settings.resolve_write_token()
+    _inject_state(settings)
+    try:
+        client = TestClient(build_app())
+        assert client.post("/api/capture", json={"agent": "a", "summary": "x"}).status_code == 200
+    finally:
+        state_mod.reset_state()
+
+
+def test_write_token_endpoint_refuses_non_loopback(tmp_path):
+    """/api/write-token only answers same-machine clients; the TestClient's
+    default host ('testclient') is not loopback → refused."""
+    settings = _make_settings(tmp_path)
+    settings.write_token = settings.resolve_write_token()
+    _inject_state(settings)
+    try:
+        client = TestClient(build_app())
+        assert client.get("/api/write-token").status_code == 403
+    finally:
+        state_mod.reset_state()
+
+
+# ── Round 2 · Finding 2: hook download — traversal + configurable dir ──
+
+def test_hook_download_rejects_traversal(tmp_path):
+    _inject_state(_make_settings(tmp_path))
+    try:
+        client = TestClient(build_app())
+        # A traversal / non-allowlisted name is rejected (404), never served.
+        assert client.get("/hooks/..%2f..%2fetc%2fpasswd").status_code == 404
+        assert client.get("/hooks/not-a-real-hook.sh").status_code == 404
+    finally:
+        state_mod.reset_state()
+
+
+def test_hook_dir_is_configurable(tmp_path):
+    hooks = tmp_path / "myhooks"
+    hooks.mkdir()
+    (hooks / "trovex-boot.sh").write_text("#!/bin/sh\necho hi\n", encoding="utf-8")
+    settings = _make_settings(tmp_path, hooks_dir=hooks)
+    _inject_state(settings)
+    try:
+        client = TestClient(build_app())
+        r = client.get("/hooks/trovex-boot.sh")
+        assert r.status_code == 200
+        assert "echo hi" in r.text
+    finally:
+        state_mod.reset_state()
+
+
+# ── Round 2 · Finding 3: qpath validation ────────────────────────────
+
+def test_docs_partial_rejects_malformed_qpath(tmp_path):
+    _inject_state(_make_settings(tmp_path))
+    try:
+        client = TestClient(build_app())
+        # Illegal char in the path filter → 422.
+        assert client.get("/docs/partial", params={"qpath": "a;b|c"}).status_code == 422
+        # Over the length cap → 422.
+        assert client.get("/docs/partial", params={"qpath": "a" * 300}).status_code == 422
+        # A sane path filter still renders (200).
+        assert client.get("/docs/partial", params={"qpath": "src/trovex"}).status_code == 200
+    finally:
+        state_mod.reset_state()
+
+
+# ── Round 2 · Finding 4: numeric-cast safety ─────────────────────────
+
+def test_restore_rejects_non_integer_version(tmp_path):
+    settings = _make_settings(tmp_path)
+    settings.write_token = settings.resolve_write_token()
+    _inject_state(settings)
+    hdr = {"x-trovex-write-token": settings.write_token}
+    try:
+        client = TestClient(build_app())
+        # A non-numeric version_id is a 400, not an uncaught 500.
+        r = client.post("/api/doc/whatever/restore", json={"version_id": "abc"}, headers=hdr)
+        assert r.status_code == 400
+        # A bool is not a valid version id either.
+        r2 = client.post("/api/doc/whatever/restore", json={"version_id": True}, headers=hdr)
+        assert r2.status_code == 400
+    finally:
+        state_mod.reset_state()
+
+
+# ── Round 2 · Finding 5: query-log retention + secret redaction ──────
+
+def test_purge_old_queries_drops_aged_rows(tmp_path):
+    from trovex.usage import log_query, purge_old_queries
+    store = _inject_state(_make_settings(tmp_path))
+    try:
+        db = store.db
+        log_query(db, "recent query", 1, False, response_tokens_est=1, elapsed_ms=1)
+        # Backdate one row well past the retention window.
+        old_ts = __import__("time").time() - 200 * 86400
+        db.execute("UPDATE mcp_queries SET ts = ? WHERE query = ?", (old_ts, "recent query"))
+        db.commit()
+        assert db.execute("SELECT COUNT(*) AS c FROM mcp_queries").fetchone()["c"] == 1
+        removed = purge_old_queries(db, 90)
+        assert removed == 1
+        assert db.execute("SELECT COUNT(*) AS c FROM mcp_queries").fetchone()["c"] == 0
+        # Retention disabled (<= 0) keeps everything.
+        log_query(db, "keep me", 1, False, response_tokens_est=1, elapsed_ms=1)
+        assert purge_old_queries(db, 0) == 0
+        assert db.execute("SELECT COUNT(*) AS c FROM mcp_queries").fetchone()["c"] == 1
+    finally:
+        state_mod.reset_state()
+
+
+def test_query_secret_redaction():
+    from trovex.usage import redact_secrets
+    assert redact_secrets("email me at alice@example.com please") == \
+        "email me at [redacted] please"
+    assert "[redacted]" in redact_secrets("use sk-abcdefghijklmnopqrstuvwx for the call")
+    assert "[redacted]" in redact_secrets("api_key=supersecretvalue123")
+    # An ordinary query is left intact.
+    assert redact_secrets("how do we roll back a deploy?") == "how do we roll back a deploy?"

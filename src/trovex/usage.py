@@ -8,10 +8,48 @@ and logs the query for the dashboard.
 from __future__ import annotations
 
 import contextvars
+import re
 import time
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+
+# Conservative secret/PII patterns redacted from query text before it's stored
+# (finding 5). Each is anchored to a recognisable shape so ordinary queries
+# aren't mangled — we'd rather miss an exotic secret than redact real words.
+_SECRET_PATTERNS = [
+    re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"),                 # email
+    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),                    # OpenAI-style key
+    re.compile(r"\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{16,}\b"),  # GitHub token
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),            # Slack token
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),                        # AWS access key id
+    # key=value secrets, e.g. api_key=..., token: ..., password=...
+    re.compile(
+        r"(?i)\b(api[_-]?key|secret|token|password|passwd|authorization|bearer)"
+        r"\b\s*[:=]\s*\S+"
+    ),
+]
+
+
+def redact_secrets(text: str) -> str:
+    """Replace obvious secrets / emails in free text with `[redacted]` so they
+    aren't persisted in the query log. Best-effort, pattern-based."""
+    if not text:
+        return text
+    for pat in _SECRET_PATTERNS:
+        text = pat.sub("[redacted]", text)
+    return text
+
+
+def purge_old_queries(db, retention_days: int) -> int:
+    """Delete mcp_queries rows older than retention_days; returns rows removed.
+    retention_days <= 0 disables purging. Cascades to mcp_query_results via FK."""
+    if retention_days is None or retention_days <= 0:
+        return 0
+    cutoff = time.time() - retention_days * 86400
+    cur = db.execute("DELETE FROM mcp_queries WHERE ts < ?", (cutoff,))
+    db.commit()
+    return cur.rowcount or 0
 
 current_user: contextvars.ContextVar[str] = contextvars.ContextVar(
     "trovex_current_user", default="unknown"
@@ -92,7 +130,7 @@ def log_query(db, query: str, n_results: int, summary: bool,
             reranked, llm_model, llm_tokens_in, llm_tokens_out, llm_elapsed_ms,
             pre_top1_path, top1_changed, top1_lift, top5_overlap)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (time.time(), current_user.get(), query[:500],
+        (time.time(), current_user.get(), redact_secrets(query)[:500],
          n_results, int(summary), response_tokens_est, elapsed_ms,
          would_have_read_tokens, top_result_tokens,
          1 if rerank_info else 0,

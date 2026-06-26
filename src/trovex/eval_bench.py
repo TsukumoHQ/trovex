@@ -14,11 +14,22 @@ analytics' taxonomy; the published number is the equal-success median + spread.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from statistics import median, quantiles
 
 # Analytics' representative taxonomy (the set must cover all 8, weighted to real frequency).
 CATEGORIES = ("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8")
+
+
+@dataclass(frozen=True)
+class EvalQuery:
+    """A pre-registered query: text + its honest category (C1-C8) + whether the answer is
+    in the corpus (False = a C6 miss-case, where 'correct' means the model ABSTAINS)."""
+
+    query: str
+    category: str
+    in_corpus: bool = True
 
 
 @dataclass(frozen=True)
@@ -158,3 +169,52 @@ def format_eval_report(r: EvalReport, *, query_source: str = "") -> str:
         lines.append("")
         lines.append(f"⚠ {r.n_trovex_loss} quality-loss(es) — report these; they cap the honest claim.")
     return "\n".join(lines)
+
+
+# ── LLM-in-loop driver ───────────────────────────────────────────────
+# answer_fn/judge_fn/content_fn are INJECTED so this is hermetic-testable (mock them) and
+# the real run plugs in BYOK-LLM answer/judge + store/file content retrieval.
+
+
+def _est_tokens(text: str) -> int:
+    """Cheap ~4-chars/token estimate. The real run should pin the model's tokenizer +
+    disclose it (guard 6); this default keeps the harness dependency-free."""
+    return max(0, len(text) // 4)
+
+
+def eval_query(
+    eq: EvalQuery,
+    searcher,
+    *,
+    answer_fn: Callable[[str, str], tuple[str, int]],
+    judge_fn: Callable[[EvalQuery, str], bool],
+    content_fn: Callable[[object], str],
+    baseline_k: int = 3,
+    count_tokens: Callable[[str], int] = _est_tokens,
+) -> QueryEval:
+    """Run ONE query through both arms. trovex arm = the 1 routed canonical doc (+ its
+    routing/index OVERHEAD, guard 4); baseline arm = the realistic alternative (full read
+    of the top-k candidates). Same answer_fn + judge_fn on both.
+    answer_fn(query, context) -> (answer_text, answer_tokens)."""
+    results = searcher.search(eq.query, limit=baseline_k)
+    trovex_ctx = content_fn(results[0]) if results else ""
+    baseline_ctx = "\n\n".join(content_fn(r) for r in results[:baseline_k])
+    overhead = count_tokens(searcher.format_minimal(results)) if results else 0
+
+    t_ans, t_ans_tok = answer_fn(eq.query, trovex_ctx)
+    b_ans, b_ans_tok = answer_fn(eq.query, baseline_ctx)
+
+    trovex = ArmResult(
+        correct=judge_fn(eq, t_ans),
+        tokens=count_tokens(trovex_ctx) + t_ans_tok + overhead,
+    )
+    baseline = ArmResult(
+        correct=judge_fn(eq, b_ans),
+        tokens=count_tokens(baseline_ctx) + b_ans_tok,
+    )
+    return QueryEval(query=eq.query, category=eq.category, trovex=trovex, baseline=baseline)
+
+
+def run_eval(eval_queries: list[EvalQuery], searcher, **kw) -> EvalReport:
+    """Score a pre-registered set → the equal-success-gated per-category distribution."""
+    return aggregate([eval_query(eq, searcher, **kw) for eq in eval_queries])

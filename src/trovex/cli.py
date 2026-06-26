@@ -146,6 +146,14 @@ def _load_queries(path: Path | None) -> list[str]:
         return []
 
 
+def _bench_json(result) -> str:
+    """Machine-readable JSON of a BenchResult / EvalReport (both dataclasses)."""
+    import json
+    from dataclasses import asdict
+
+    return json.dumps(asdict(result), default=str)
+
+
 @app.command()
 def bench(
     repo: Path = typer.Argument(..., help="Repo/dir with .md docs to benchmark."),
@@ -157,6 +165,7 @@ def bench(
     ),
     k: int = typer.Option(3, "--k", help="Baseline candidate count (top-k read)."),
     model: str = typer.Option("gpt-5.4-mini", help="LLM for --eval (answers + judges)."),
+    json_out: bool = typer.Option(False, "--json", help="Emit machine-readable JSON (median, spread, per-query/category)."),
 ) -> None:
     """Benchmark trovex's token savings on YOUR repo — the method is the claim, run it yourself.
 
@@ -204,20 +213,26 @@ def bench(
                 content_fn=make_content_fn(),
                 baseline_k=k,
             )
-            console.print(
-                format_eval_report(report, query_source=f"{len(qs)} queries on {repo.name} (answer+judge, {model})")
-            )
+            if json_out:
+                print(_bench_json(report))
+            else:
+                console.print(
+                    format_eval_report(report, query_source=f"{len(qs)} queries on {repo.name} (answer+judge, {model})")
+                )
         else:
             from .benchmark import format_report, run_benchmark
 
             r = run_benchmark(searcher, qs, limit=max(k, 5))
-            console.print(
-                format_report(
-                    r,
-                    repo=str(repo),
-                    query_source=f"{len(qs)} queries (token-accounting MODEL — add --eval for the answer-quality A/B)",
+            if json_out:
+                print(_bench_json(r))
+            else:
+                console.print(
+                    format_report(
+                        r,
+                        repo=str(repo),
+                        query_source=f"{len(qs)} queries (token-accounting MODEL — add --eval for the answer-quality A/B)",
+                    )
                 )
-            )
 
 
 @app.command()

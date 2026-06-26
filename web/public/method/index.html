@@ -92,7 +92,7 @@
       <h2>Building</h2>
 
       <h3>4. Don't make the agent re-derive</h3>
-      <p>Before an agent does anything useful, it reads candidate files to find which one is current. That work is pure overhead, and it repeats every session, every agent, every teammate. Locate the answer once, serve it, and stop paying to re-find it. Serving one canonical answer instead of read-and-rank is about <strong>60% fewer tokens per lookup</strong> (measured, not asserted).</p>
+      <p>Before an agent does anything useful, it reads candidate files to find which one is current. That work is pure overhead, and it repeats every session, every agent, every teammate. Locate the answer once, serve it, and stop paying to re-find it. Serving one canonical answer instead of read-and-rank is about <strong>60% fewer tokens per lookup</strong> (modeled median; ~38-79% by repo).</p>
 
       <h3>5. Ground before you reason</h3>
       <p>When an agent gets real work wrong, the failure is usually procedural, not a reasoning gap: it worked from a stale runbook and reasoned perfectly from a wrong premise. Fix the premise first. Grounding the agent in the current constraints moves the outcome more than a model upgrade, and costs nothing in model spend.</p>

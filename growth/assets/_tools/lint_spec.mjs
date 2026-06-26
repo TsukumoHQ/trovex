@@ -19,23 +19,41 @@ import { readFile } from "node:fs/promises";
 const DASH = /[—–]/;
 const BANNED = [/private beta/i, /request access/i, /request beta access/i, /beta-waitlist/i, /#waitlist/i, /synergix/i];
 
+// claim/honesty gate (sixty-percent-public-claim-standard + voice). The ~60% figure is
+// MODELED; 'measured' is public ONLY once trovex.dev/method ships the signed disclosures
+// (TSU-58) — until then any 'measured' on OUR surface is unbacked. EXTERNAL studies
+// (METR/DORA/GitClear/Stanford/Apple/ETH/Veracode/arXiv) legitimately say 'measured' about
+// THEIR result, so study-tagged fields are exempt from the measured/74% rules.
+const STUDY = /arxiv|\bmetr\b|\bdora\b|gitclear|stanford|\bapple\b|\beth\b|veracode|slopcode|the research/i;
+const CLAIM = [
+  // [regex, study-exempt?, message]
+  [/\bmeasured\b/i, true,  "our-claim 'measured' is unbacked until /method discloses → use 'modeled' (study numbers are exempt)"],
+  [/~?\s*74\s*%/,    true,  "74% is the cherry-picked max, never the headline → lead with ~60% modeled median + range ~38-79%"],
+  [/\bsame answers?\b/i, false, "unbacked answer-parity claim → drop 'same answer(s)'; keep only the token claim"],
+  [/\bai[- ]powered\b/i, false, "banned hype term 'AI-powered' (voice) → name the mechanism"],
+  [/\b(Trovex|Tsukumo|Wraith|Yoru|Dokan)\b/, false, "wordmark must be lowercase (TsukumoHQ org id excepted)"],
+];
+const TSUKUMO_HQ = /TsukumoHQ/; // GitHub org identifier — legit, not a wordmark violation
+
 // pull every BODY copy string from a spec, each tagged with its field path (kicker/source excluded)
 function copyFields(spec) {
   const out = [];
-  const push = (path, v) => { if (typeof v === "string" && v.trim()) out.push({ path, v }); };
+  const base = STUDY.test(`${spec.kicker || ""} ${spec.source || ""}`);
+  const push = (path, v, study) => { if (typeof v === "string" && v.trim()) out.push({ path, v, study }); };
   const c = spec.cover || {};
-  push("cover.title", c.title); push("cover.sub", c.sub);
+  push("cover.title", c.title, base); push("cover.sub", c.sub, base);
   (spec.slides || []).forEach((s, i) => {
     const p = `slides[${i}]`;
-    push(`${p}.title`, s.title); push(`${p}.body`, s.body);
-    push(`${p}.heroValue`, s.heroValue); push(`${p}.heroLabel`, s.heroLabel);
-    (s.items || []).forEach((it, j) => push(`${p}.items[${j}]`, it));
-    (s.tiles || []).forEach((t, j) => { push(`${p}.tiles[${j}].value`, t.value); push(`${p}.tiles[${j}].label`, t.label); });
-    (s.pairs || []).forEach((pr, j) => { push(`${p}.pairs[${j}].broke`, pr.broke); push(`${p}.pairs[${j}].fix`, pr.fix); });
-    (s.data || []).forEach((d, j) => { push(`${p}.data[${j}].label`, d.label); push(`${p}.data[${j}].value`, d.value); });
+    const st = base || STUDY.test(`${s.source || ""} ${s.title || ""}`);
+    push(`${p}.title`, s.title, st); push(`${p}.body`, s.body, st);
+    push(`${p}.heroValue`, s.heroValue, st); push(`${p}.heroLabel`, s.heroLabel, st);
+    (s.items || []).forEach((it, j) => push(`${p}.items[${j}]`, it, st));
+    (s.tiles || []).forEach((t, j) => { push(`${p}.tiles[${j}].value`, t.value, st); push(`${p}.tiles[${j}].label`, t.label, st); });
+    (s.pairs || []).forEach((pr, j) => { push(`${p}.pairs[${j}].broke`, pr.broke, st); push(`${p}.pairs[${j}].fix`, pr.fix, st); });
+    (s.data || []).forEach((d, j) => { push(`${p}.data[${j}].label`, d.label, st); push(`${p}.data[${j}].value`, d.value, st); });
   });
   const cta = spec.cta || {};
-  push("cta.title", cta.title); push("cta.sub", cta.sub);
+  push("cta.title", cta.title, base); push("cta.sub", cta.sub, base);
   return out;
 }
 
@@ -46,7 +64,8 @@ function cardFields(cards) {
   const out = [];
   cards.forEach((c, i) => {
     const p = `card[${i}:${c.uuid ?? "?"}]`;
-    const push = (path, v) => { if (typeof v === "string" && v.trim()) out.push({ path, v }); };
+    const st = STUDY.test(`${c.source || ""} ${c.kicker || ""}`);
+    const push = (path, v) => { if (typeof v === "string" && v.trim()) out.push({ path, v, study: st }); };
     push(`${p}.headline`, c.headline); push(`${p}.sub`, c.sub);
     push(`${p}.heroValue`, c.heroValue); push(`${p}.heroLabel`, c.heroLabel);
     (c.cols || []).forEach((col, j) => { push(`${p}.cols[${j}].head`, col.head); push(`${p}.cols[${j}].body`, col.body); });
@@ -73,10 +92,18 @@ for (const file of files) {
   const fields = isCards ? cardFields(spec) : copyFields(spec);
   const fileErrs = [];
 
-  for (const { path, v } of fields) {
+  for (const { path, v, study } of fields) {
     // dash is a HARD error only for carousels (gen_carousel renders body raw); gen_card auto-de-dashes
     if (!isCards && DASH.test(v)) fileErrs.push(`${path}: em/en dash in body copy → de-dash (use ':' or '·'). «${v.match(/.{0,18}[—–].{0,18}/)[0].trim()}»`);
     for (const re of BANNED) if (re.test(v)) fileErrs.push(`${path}: banned phrase /${re.source}/ → ${re.source === "synergix" ? "remove" : "use public-beta / install + star"}. «${v.slice(0, 60)}»`);
+    // honesty/claim gate — study-tagged fields exempt where noted (external measurements are
+    // real). A field that NAMES a study inline ("Stanford measured 35-40%") is exempt too.
+    const fieldStudy = study || STUDY.test(v);
+    for (const [re, studyExempt, msg] of CLAIM) {
+      if (studyExempt && fieldStudy) continue;
+      const target = re === CLAIM[4][0] ? v.replace(TSUKUMO_HQ, "") : v; // org id isn't a wordmark violation
+      if (re.test(target)) fileErrs.push(`${path}: ${msg}. «${v.slice(0, 60)}»`);
+    }
   }
   // warns: overflow risk (carousel-shaped only)
   (isCards ? [] : spec.slides || []).forEach((s, i) => {

@@ -7,9 +7,9 @@
  * Vercel webhook was declined (it needs a public endpoint = exposes the backbone); this is zero
  * surface. This .mjs is the review mirror; the live script runs in dokan.
  *
- * ROUTING (memory monitor-failure-escalation, owner 2026-06-25: monitors are TECHNICAL → CTO only,
- * failures P0, successes low). Defaults: ERROR/CANCELED → cto P0; READY → cto P3. All overridable
- * via input (errorTo/readyTo/errorPrio/readyPrio) so CTO can re-route without a code change.
+ * ROUTING (monitor-failure-escalation + CTO scope 2026-06-26: READY is the EXPECTED case, per-deploy
+ * ping = noise). Defaults: ERROR/CANCELED → cto P1 (the actionable signal); READY → SUPPRESSED (no ping,
+ * still in ::dokan:result::). Overridable via input (errorTo/readyTo/errorPrio/readyPrio/notifyReady).
  *
  * STATE (feed_prev_result): DOKAN_INPUT.prev_result.state = { <project>: <last-notified uid> }.
  * Notify ONLY when the latest prod deployment is in a NEW terminal state we haven't seen — never
@@ -38,8 +38,11 @@ const PROJECTS = Array.isArray(input.projects) && input.projects.length ? input.
 ];
 const ERROR_TO = input.errorTo || 'cto';
 const READY_TO = input.readyTo || 'cto';
-const ERROR_PRIO = input.errorPrio || 'P0';
+const ERROR_PRIO = input.errorPrio || 'P1';     // CTO 2026-06-26: ERROR/FAILED = the actionable signal → P1
 const READY_PRIO = input.readyPrio || 'P3';
+// CTO 2026-06-26: a prod deploy READY is the EXPECTED case — one ping per deploy is noise. Suppress by
+// default (the run still records it in ::dokan:result::); opt back in via notifyReady (e.g. a digest later).
+const NOTIFY_READY = input.notifyReady === true;
 const RELAY = input.relay_url || 'http://host.docker.internal:8090/mcp';
 const TERMINAL = new Set(['READY', 'ERROR', 'CANCELED']);
 
@@ -98,16 +101,26 @@ function line(d) {
     state[d.name] = d.uid;                                   // record before notifying (no re-spam)
     if (seeding) continue;                                   // first run: record current, don't backfill
     const isFail = d.state === 'ERROR' || d.state === 'CANCELED';
+    if (!isFail && !NOTIFY_READY) { notified.push({ name: d.name, state: d.state, uid: d.uid, to: null, sent: 'suppressed' }); continue; } // READY = expected, no ping
     const ok = await notify(isFail ? ERROR_TO : READY_TO, isFail ? ERROR_PRIO : READY_PRIO, `Vercel deploy ${d.state}: ${d.name}`, line(d));
     notified.push({ name: d.name, state: d.state, uid: d.uid, to: isFail ? ERROR_TO : READY_TO, sent: ok });
   }
 
-  // The watcher is BLIND if EVERY project fetch failed (token revoked / Vercel API down) → one CTO P0.
-  if (!seeding && errors.length === PROJECTS.length) {
-    await notify('cto', 'P0', 'Vercel deploy-watcher BLIND', `🔴 vercel-deploy-watcher: all ${errors.length} project fetches failed — ${errors.map((e) => `${e.name}=${e.err}`).join(', ')}`);
+  // BLIND = EVERY project fetch failed (token revoked / Vercel API down). EDGE-dedup via state._blind so a
+  // persistent outage alerts ONCE (healthy→blind), not every tick — else a dead VERCEL_TOKEN spams cto every run.
+  const blind = errors.length === PROJECTS.length;
+  const wasBlind = !!(prevState && prevState._blind);
+  state._blind = blind;
+  let blindAlert = null;
+  if (!seeding && blind && !wasBlind) {
+    await notify('cto', 'P1', 'Vercel deploy-watcher BLIND', `🔴 vercel-deploy-watcher blind — all ${errors.length} fetches failed (${errors.map((e) => e.err).join(',')}). Check VERCEL_TOKEN (CLI OAuth tokens rotate — use a long-lived access token).`);
+    blindAlert = 'blind';
+  } else if (!seeding && !blind && wasBlind) {
+    await notify('cto', 'P3', 'Vercel deploy-watcher recovered', `🟢 vercel-deploy-watcher can reach the Vercel API again.`);
+    blindAlert = 'recovery';
   }
 
-  const result = { checked: PROJECTS.length, seeding, notified, errors, state };
+  const result = { checked: PROJECTS.length, seeding, blind, blindAlert, notified, errors, state };
   console.log(`vercel-deploy-watcher: ${notified.length} notified, ${errors.length} errors${seeding ? ' (seeded)' : ''}`);
   console.log(`::dokan:result:: ${JSON.stringify(result)}`);
 })();

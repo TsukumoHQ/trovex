@@ -259,7 +259,8 @@ export default function Savings() {
           </div>
           <p className="sv-estimate">
             An estimate on the inputs you set, using the same model as trovex's own savings number.
-            Install trovex to measure the real figure on your repo.
+            Install trovex to measure the real figure on your repo.{' '}
+            <a className="sv-estimate-link" href="/measure">How we measured the ~60% →</a>
           </p>
 
           <a className="sv-cta" href={INSTALL_HREF} onClick={() => trackInstallClick()} target="_blank" rel="noopener noreferrer">

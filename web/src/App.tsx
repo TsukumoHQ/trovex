@@ -401,7 +401,7 @@ export default function App() {
             {/* Above-fold proof of the aha (the savings number). The dashboard below is the
                 visual proof, but it sits below the fold — this carries the ~60% up top. */}
             <p className="hero-proof">
-              <b>~60% fewer tokens</b> per lookup · same answers · measured, not marketing ·{' '}
+              <b>~60% fewer tokens</b> per .md lookup · modeled median (~38–79% by repo) ·{' '}
               <a className="hero-proof-link" href="/savings" onClick={() => track('cta_clicked', { cta_id: 'estimate-savings', location: 'hero' })}>estimate it on your numbers →</a>
             </p>
             {/* The install command IS the primary action (uv pattern): copy + run,
@@ -442,8 +442,8 @@ export default function App() {
               <p>Read the code and run it yourself. Fork it if you want. No lock-in. The CLI is MIT.</p>
             </div>
             <div className="trust-card">
-              <div className="trust-h">~60% fewer tokens, measured</div>
-              <p>Counted, not marketing: trovex serves the one canonical doc instead of the top few candidates your agent would otherwise read, and shows you the difference.</p>
+              <div className="trust-h">~60% fewer tokens, modeled</div>
+              <p>Modeled from the reads trovex avoids: it serves the one canonical doc instead of the top few candidates your agent would otherwise read, and the savings view shows the difference on your own repo.</p>
             </div>
           </div>
         </section>

@@ -18,7 +18,7 @@ freshness marker (canonical / stale / duplicate), and serves just the section th
 instead of the whole file. Agents also write what they learn back through one shared point,
 so every agent and teammate reads the same source of truth instead of re-deriving it.
 
-About **60% fewer tokens** on doc lookups, same context quality. Runs locally: vectors in
+About **60% fewer tokens** on doc lookups, modeled on our own repo (it varies by yours). Runs locally: vectors in
 SQLite, embeddings via ONNX, no cloud or API keys.
 
 ## What you're installing

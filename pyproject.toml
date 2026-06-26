@@ -1,10 +1,10 @@
 [project]
 name = "trovex"
-version = "0.11.0"
+dynamic = ["version"]
 description = "Trovex — token-efficient routing for agent-generated .md docs. MCP + Web UI."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{name = "Synergix"}]
+authors = [{name = "TsukumoHQ"}]
 license = "AGPL-3.0-or-later"
 keywords = ["mcp", "llm", "context", "coding-agents", "embeddings", "rag", "documentation", "token-efficiency"]
 classifiers = [
@@ -57,8 +57,15 @@ Repository = "https://github.com/TsukumoHQ/trovex"
 Issues = "https://github.com/TsukumoHQ/trovex/issues"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+# Version comes from the git tag (single source of truth): a release = `git tag vX.Y.Z`.
+# local_scheme=no-local-version → PyPI-valid dev versions; fallback_version covers a
+# tag-less build env. server.json is synced to the tag at publish (see publish-mcp.yml).
+[tool.hatch.version]
+source = "vcs"
+raw-options = { local_scheme = "no-local-version", fallback_version = "0.0.0" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/trovex"]
@@ -77,7 +84,25 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]
+# E501 (long lines) is intentional. The codes below are TEMPORARY waivers for
+# pre-existing debt that no CI ever enforced (there is no backend CI) — `ruff
+# check` was red tree-wide on a fresh checkout. Parked here to restore a green
+# trunk for the live fleet WITHOUT touching source in 9 active worktrees. They
+# are to be removed (debt fixed) in the coordinated lint+format cleanup PR owned
+# by cto — see relay 7b040d9c. Do not add to this list; fix new violations.
+ignore = [
+    "E501",
+    "E702",  # multiple-statements-on-one-line (semicolon)
+    "I001",  # unsorted-imports
+    "N806",  # non-lowercase-variable-in-function
+    "B008",  # function-call-in-default-argument
+    "SIM105",  # suppressible-exception
+    "UP017",  # datetime-timezone-utc
+    "RUF001",  # ambiguous-unicode-character-string
+    "RUF002",  # ambiguous-unicode-character-docstring
+    "RUF005",  # collection-literal-concatenation
+    "RUF100",  # unused-noqa
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

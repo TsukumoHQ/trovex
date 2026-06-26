@@ -288,9 +288,13 @@ async function main() {
   }
 
   // Plausible cross-check: assessment_request total + suite-sourced.
-  const [assessAll, assessSuite] = await Promise.all([
+  // booking_completed fires on TSUKUMO.CH (the center — booking converges there post-realignment
+  // SSOT 8e2d74e7; trovex.dev/booked was killed PR #569). Web-measured bottom-funnel conversion =
+  // a call actually booked; cross-checks the Twenty booked-calls in Panel F.
+  const [assessAll, assessSuite, tsBooking] = await Promise.all([
     evAgg(tsukumoSite, w, "assessment_request"),
     evAgg(tsukumoSite, w, "assessment_request", ";event:props:source==suite"),
+    evAgg(tsukumoSite, w, "booking_completed"),
   ]);
 
   // ===== PANEL B — trovex waitlist funnel (beta primary conversion) =====
@@ -523,6 +527,7 @@ async function main() {
   P(`|--------|------:|`);
   P(`| Booked calls (opp MEETING+, all-time) | ${lmBooked == null ? "n/a" : lmBooked} |`);
   P(`| Booked calls in window (${w.label}) | ${lmBookedWin == null ? "n/a" : lmBookedWin} |`);
+  P(`| ★ Web bookings (\`booking_completed\` on tsukumo.ch, ${w.label}) | ${tsukumoSite ? n(tsBooking) : "n/a"} |`);
   P(`| Qualified opportunities (past NEW) | ${n(totalQual)} |`);
   P(`| teamIntent leads (team signal, scored) | ${lmTeam == null ? "n/a" : lmTeam} |`);
   P(`| Tiered leads (A / B / C) | ${lmTiers == null ? "n/a" : `${lmTiers.A} / ${lmTiers.B} / ${lmTiers.C}`}${lmTiers && lmTiers.unset ? ` _(${lmTiers.unset} untiered)_` : ""} |`);

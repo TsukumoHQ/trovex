@@ -7,8 +7,13 @@
 README.md
 CLAUDE.md
 AGENTS.md
+SECURITY.md
 LICENSE*
 .claude/*
+#
+# Repo docs that live on disk for repo-readability (runbooks, marketing context):
+.agents/*
+docs/*
 #
 # Blog articles stay publishable source files (they ship as web pages):
 **/blog/**
@@ -24,7 +29,8 @@ growth/social/**
 # copy is mirrored to the trovex store (SSOT) per the growth/social precedent.
 growth/process/**
 #
-# Launch registry kits: copy-paste submission payloads + per-registry checklists a
-# human fires by hand, not centralized docs. Owned by launch-lead.
+# Launch kits: copy-paste submission payloads + per-registry/directory checklists
+# a human fires by hand, not centralized docs. Owned by launch-lead.
 growth/launch/mcp-registry-kit.md
 growth/launch/wraith-mcp-registry-kit.md
+growth/launch/free-tool-directory-kit.md

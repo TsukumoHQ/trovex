@@ -1,5 +1,5 @@
 /**
- * dokan script: hand-raiser-pipeline (DRY-RUN — zero live send)
+ * dokan script: hand-raiser-pipeline (zero live send; commitTwenty writes DRAFTS to the CRM)
  *
  * cmo redirect (5219587a / GO doc 2fcc61ce): the lead machine's contact source is
  * HAND-RAISERS (people who gave us their email: Calendly bookings, contact/form fills,
@@ -7,15 +7,28 @@
  * signal, handled by lead-pipeline.mjs). Same engine: enrich → cheap-LLM ICP classify →
  * score → tier A/B/C → ::dokan:result:: (the tiered queue donna works).
  *
- * ⛔ DRY-RUN: this script ONLY reads + scores + tiers + emits the queue. It NEVER sends
- * anything (no email/Gmail/Telegram) and does not write to Twenty here — the setter-draft
- * fill + Twenty upsert is phase 2 (gated on content's SETTER template doc 50a7eca6 + the
- * Twenty stage/source contract). Live send = a separate owner GO.
+ * ⛔ NO SEND (hard invariant): reads → scores → tiers → drafts → (commitTwenty) writes a
+ * Person + a 'Setter draft' Note to Twenty = donna's queue. It NEVER sends outreach — there
+ * is NO email/Gmail/Telegram/Calendly-send path in this script. Sending is donna's separate,
+ * human-gated step. commitTwenty=true (the CRM write) is owner-approved; live OUTREACH stays
+ * a separate human action. commitTwenty=false (default) = plan-only, writes nothing.
  *
  * RUNTIME: node (dokan). No external deps — global fetch.
  * INPUT  : env DOKAN_INPUT (JSON), all optional:
  *   { tables:["leads","waitlist","newsletter"], perTable:200, maxClassify:60,
- *     model:"gpt-4o-mini", sinceDays:0 }
+ *     model:"gpt-4o-mini", sinceDays:0, sinceMinutes:0, commitTwenty:false }
+ *
+ * TWO RUN MODES (same script):
+ *   - DAILY FULL (sched 40, 06:23, commitTwenty:false): visibility backstop — scores the
+ *     whole queue, emits ::dokan:result::, writes nothing.
+ *   - 10-MIN POLLER (commitTwenty:true, sinceMinutes:15, tables:["leads"]): the near-real-time
+ *     commit path — only rows created in the last `sinceMinutes` window are read, so a brand-new
+ *     booking lands in donna's Twenty queue in ~10min instead of ~24h. The window (15min) is
+ *     DELIBERATELY WIDER than the 10-min cron interval so a delayed run never leaves a gap that
+ *     drops a booked lead (never-miss). The ~5min overlap means a lead can be processed by two
+ *     consecutive runs — so writes are made idempotent at the source: Person via 3-state email
+ *     dedup (never a dup Person), Note via a 'Setter draft' existence check (never a dup Note).
+ *     Net: at-least-once runs, exactly-once Person + Note.
  * SECRETS (dokan store → env): SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (read the consented
  *   hand-raiser rows; service-role bypasses RLS, server-only — injected as a dokan secret,
  *   never in source), OPENAI_API_KEY (the cheap classify). Degrades to a null verdict, never
@@ -111,6 +124,13 @@ async function classify(lead, model) {
   } catch { return { fit: null, teamIntent: null, confidence: "low", why: "llm_err", model }; }
 }
 
+// A CONFIRMED booked call (Calendly/assessment intake) is the hottest hand-raise signal —
+// they already committed time. One definition, used by both the score and the draft template,
+// so a Calendly/assessment source can never score as booked yet get the "please book" draft.
+function isBooked(lead) {
+  return lead.table === "leads" && /book|assessment|calendly/i.test(String(lead.source || ""));
+}
+
 // Deterministic score (0-100) + tier. Hand-raiser intent + ICP fit + signal strength.
 function scoreAndTier(lead, v) {
   let s = 0;
@@ -124,6 +144,7 @@ function scoreAndTier(lead, v) {
   if (lead.companyDomain) s += 8;                  // company email, not personal
   if (lead.teamSize) s += 5;                        // told us team size
   if (lead.aiUse) s += 4;                           // told us their agent usage
+  if (isBooked(lead)) s += 35;                      // a confirmed booking → always actionable (≥A floor)
   s = Math.max(0, Math.min(100, s));
   return { score: s, tier: s >= 60 ? "A" : s >= 35 ? "B" : "C" };
 }
@@ -138,12 +159,12 @@ function whyThem(lead) {
   return "running agents in production"; // generic clause — fair (they hand-raised here), not fabricated
 }
 
-// Fill a SETTER draft from the LOCKED templates (50a7eca6). DRY-RUN: this only stages text;
-// nothing sends. S2 (booked-prep, no ask) for a confirmed booking; S3 (value-first → book)
-// otherwise. Slots: [name] [why-them] [calendly]. Founder voice, ASK = book the call.
+// Fill a SETTER draft from the LOCKED templates (50a7eca6). This only stages text; nothing
+// sends. S2 (booked-prep, no ask) for a confirmed booking; S3 (value-first → book) otherwise.
+// Slots: [name] [why-them] [calendly]. Founder voice, ASK = book the call.
 function buildSetterDraft(lead, bookUrl) {
   const name = (lead.name && lead.name.split(/\s+/)[0]) || "there";
-  const booked = lead.table === "leads" && /booking/i.test(String(lead.source || ""));
+  const booked = isBooked(lead);
   if (booked) {
     return {
       template: "S2-booked-prep",
@@ -160,11 +181,12 @@ function buildSetterDraft(lead, bookUrl) {
 
 /* ── Twenty upsert (phase 2b) — port of src/lib/twenty.ts dedup (#468) ────────────
  * Mirror each scored A/B lead into Twenty as a Person + attach its setter draft as a Note
- * = donna's DRAFT-ONLY queue. DRY-RUN: writes drafts to the CRM, NEVER contacts the prospect
- * (live send is a separate owner GO). Dedup is the SAME 3-state paginated client-side match
- * the route uses — Twenty's REST email filter is unreliable, so only a confirmed "absent"
- * creates; "unknown" skips (never a false-negative dupe). Gated on input.commitTwenty so a
- * test run can emit the plan without touching the CRM. */
+ * = donna's DRAFT-ONLY queue. NEVER contacts the prospect (outreach is a separate human step).
+ * Dedup is the SAME 3-state paginated client-side match the route uses — Twenty's REST email
+ * filter is unreliable, so only a confirmed "absent" creates; "unknown" skips (never a
+ * false-negative dupe). Gated on input.commitTwenty so a test run can emit the plan without
+ * touching the CRM. Both writes are idempotent: Person via 3-state email dedup (never a dup
+ * Person), Note via twPersonHasDraftNote (skip if a 'Setter draft' Note already exists). */
 function twCfg() {
   const key = process.env.TWENTY_API_KEY;
   if (!key) return null;
@@ -210,6 +232,18 @@ async function twCreatePerson(c, lead) {
   const json = await res.json().catch(() => null);
   return json?.data?.createPerson?.id || json?.data?.id || null;
 }
+// Note-idempotency: true if the Person already has a 'Setter draft' Note, false if not,
+// null if the read failed (caller fails OPEN = creates, to never-miss). Twenty REST: the
+// person→notes relation is read via noteTargets filtered by targetPersonId (NOT personId,
+// which 400s), depth=1 to embed each note's title (verified live, probe 1730).
+async function twPersonHasDraftNote(c, personId) {
+  const res = await twFetch(c, `/rest/noteTargets?filter=targetPersonId[eq]:${personId}&depth=1&limit=100`, { method: "GET" });
+  if (!res || !res.ok) return null;
+  const json = await res.json().catch(() => null);
+  if (!json) return null;
+  const targets = json.data?.noteTargets ?? [];
+  return targets.some((t) => String(t?.note?.title || "").startsWith("Setter draft"));
+}
 async function twAttachDraftNote(c, personId, lead) {
   const md = [
     `Tier ${lead.tier} (score ${lead.score}) — ${lead.draft.template}`,
@@ -240,16 +274,27 @@ async function twUpsertLead(c, lead, commit) {
     let personId = found.id || null;
     if (!personId) personId = await twCreatePerson(c, lead);
     if (!personId) return { email: lead.email, action: "error_no_person" };
-    // Write the score band into Twenty's Person `tier` SELECT field (analytics-lead schema,
-    // field 7a9addd2; exact options "A"/"B"/"C" — any other string 400s). Powers Panel F.
-    const tiered = ["A", "B", "C"].includes(lead.tier)
-      ? !!(await twFetch(c, `/rest/people/${personId}`, { method: "PATCH", body: JSON.stringify({ tier: lead.tier }) }))
-      : false;
+    // tier is the sole responsibility of analytics scorer 422 (single source of truth) —
+    // 395 NO LONGER PATCHes Person.tier here (avoids two writers racing the same field).
+    // Note-idempotency (exactly-once notes): skip if a 'Setter draft' Note already exists for
+    // this Person, so overlapping poller windows can't append a duplicate. Fail-open on a read
+    // error (has === null) → create, since a missed draft is worse than a rare dup.
+    const has = await twPersonHasDraftNote(c, personId);
+    if (has === true) return { email: lead.email, action: found.id ? "updated" : "created", noted: false, noteSkipped: "exists" };
     const noted = await twAttachDraftNote(c, personId, lead);
-    return { email: lead.email, action: found.id ? "updated" : "created", noted, tiered };
+    return { email: lead.email, action: found.id ? "updated" : "created", noted };
   } catch {
     return { email: lead.email, action: "error" };
   }
+}
+
+// HARD-FAILURE escalation → CTO at P0 (the machine is too important to break quietly;
+// memory monitor-failure-escalation). call_tool dispatcher. Best-effort, never throws.
+const RELAY = (input().relay_url) || "http://host.docker.internal:8090/mcp";
+async function alertCto(line) {
+  const rpc = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "call_tool", arguments: { tool: "send_message", args: {
+    project: "trovex-growth", as: "fullstack-lead", to: "cto", priority: "P0", type: "task", subject: line, content: line } } } };
+  try { await fetch(RELAY, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json, text/event-stream" }, body: JSON.stringify(rpc) }); } catch {}
 }
 
 async function main() {
@@ -259,10 +304,13 @@ async function main() {
   const maxClassify = Number(cfg.maxClassify) > 0 ? Number(cfg.maxClassify) : 60;
   const model = cfg.model || "gpt-4o-mini";
   const bookUrl = cfg.bookUrl || "https://tsukumo.ch/book?utm_source=donna&utm_medium=outbound";
-  const sinceISO = Number(cfg.sinceDays) > 0 ? new Date(Date.now() - Number(cfg.sinceDays) * 864e5).toISOString() : null;
+  // sinceMinutes (poller window) takes precedence over sinceDays (daily). null = full table.
+  const sinceISO = Number(cfg.sinceMinutes) > 0
+    ? new Date(Date.now() - Number(cfg.sinceMinutes) * 6e4).toISOString()
+    : Number(cfg.sinceDays) > 0 ? new Date(Date.now() - Number(cfg.sinceDays) * 864e5).toISOString() : null;
 
   const c = sb();
-  if (!c) { console.log(`::dokan:result::${JSON.stringify({ error: "no_supabase_secret" })}`); return; }
+  if (!c) { await alertCto("🔴 lead-machine 395 FAILED: no Supabase secret — can't reach the funnel DB"); console.log(`::dokan:result::${JSON.stringify({ error: "no_supabase_secret" })}`); return; }
 
   // 1. read + normalize hand-raisers; dedup by email (keep the hottest surface seen)
   const byEmail = new Map();
@@ -295,7 +343,7 @@ async function main() {
     if (classified < maxClassify) { v = await classify(l, model); classified++; }
     const { score, tier } = scoreAndTier(l, v);
     // Stage a setter DRAFT for the actionable tiers (A = owner-surface, B = donna-setter).
-    // C = hold/nurture, no draft. DRY-RUN: text only, nothing sends.
+    // C = hold/nurture, no draft. Text only, nothing sends.
     const draft = tier === "A" || tier === "B" ? buildSetterDraft(l, bookUrl) : null;
     leads.push({ ...l, verdict: v, score, tier, draft });
   }
@@ -310,8 +358,8 @@ async function main() {
 
   // PHASE 2b: upsert each drafted (A/B) lead into Twenty — Person (3-state dedup) + the
   // setter draft as a Note = donna's DRAFT-ONLY queue. commitTwenty=false (default) emits
-  // the plan without writing; true writes Person+Note. ⛔ DRY-RUN regardless: drafts only,
-  // nothing is ever sent to the prospect (live send = a separate owner GO).
+  // the plan without writing; true writes Person+Note. NO SEND regardless: drafts only,
+  // nothing is ever sent to the prospect (outreach is a separate human step).
   const commitTwenty = cfg.commitTwenty === true;
   const drafted = leads.filter((l) => l.draft);
   let twenty = { configured: false, commit: commitTwenty, attempted: 0, results: [] };
@@ -324,7 +372,19 @@ async function main() {
     twenty.configured = true; // no drafted leads this run (e.g. all tier C) — nothing to upsert
   }
 
-  console.log(`::dokan:result::${JSON.stringify({ generated: new Date().toISOString(), dryRun: true, tables, model, counts, twenty, leads })}`);
+  // HARD FAIL: a commit run where EVERY upsert errored = Twenty unreachable/auth-broken → CTO P0.
+  // (skip_unknown/would_* are not errors; all-error means the CRM write is down, leads rotting.)
+  if (commitTwenty && twenty.attempted > 0) {
+    const errs = twenty.results.filter((r) => /error/.test(r.action || "")).length;
+    if (errs === twenty.attempted) await alertCto(`🔴 lead-machine 395 FAILED: Twenty commit — all ${errs}/${twenty.attempted} upserts errored (auth/unreachable)`);
+  }
+
+  // sent:false is the hard invariant (no outreach path); committed reflects the Twenty CRM write.
+  console.log(`::dokan:result::${JSON.stringify({ generated: new Date().toISOString(), sent: false, committed: commitTwenty, tables, model, counts, twenty, leads })}`);
 }
 
-main().catch((e) => console.log(`::dokan:result::${JSON.stringify({ error: String((e && e.message) || e) })}`));
+main().catch(async (e) => {
+  const msg = String((e && e.message) || e);
+  await alertCto(`🔴 lead-machine 395 FAILED (threw): ${msg}`);
+  console.log(`::dokan:result::${JSON.stringify({ error: msg })}`);
+});

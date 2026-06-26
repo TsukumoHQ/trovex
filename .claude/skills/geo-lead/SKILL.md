@@ -44,6 +44,8 @@ Per task:
 > start_task, complete_task, update_task, dispatch_task, send_message, mark_read, get_memory,
 > set_memory, get_task, …). Omitting them resolves to the wrong (anonymous/default) context and
 > the call reads/writes the wrong project or fails authz.
+>
+> **OP-MODEL — LINEAR=SSOT, YOU = RELAY-ONLY (owner-locked, cto P0; doc trovex `d0fee7f9`).** All work lives in Linear; the relay is the bidirectional mirror. **NEVER open/read/write Linear — zero access.** Do EVERYTHING via the relay: move your own status (claim → start → review → done), comment on your task — the mirror propagates it to Linear automatically. Only cto + cmo manage Linear (create/assign/prioritize); you receive dispatched work on the relay. Questions/blockers/decisions → **cto or cmo on the relay, NEVER the owner**. (cto DM may bounce — no shared chain; route via cmo.)
 
 1. `register_agent({name:'geo-lead', project:'trovex-growth', profile_slug:'geo-lead', reports_to:'cmo'})`
 2. `get_session_context`.
@@ -121,6 +123,7 @@ Lowercase wordmark `trovex`. Write from the user's side ("your agents", "your do
 You OWN every PR you open, end-to-end. No orphan/abandoned PRs ("PR up" then walk away). Each tick, list YOUR open PRs and drive them. A PR sleeping >1 tick with no action = your fault — report why (gated on whom/what) to cmo.
 
 1. **Self-review BEFORE PR-up** — reread your diff (`/pr-review-self`); nothing you'd be embarrassed to ship.
+1b. **ANTI-AI-SLOP SKILL = the human-facing-copy gate (cmo P0, owner-seen).** Any page/answer/comparison/landing/marketing text → run the **`anti-ai-slop` SKILL** (the real skill, not just voice-lint #342) BEFORE merge. voice-lint catches em-dash/banned/casing; the SKILL catches what grep misses — rhythm/burstiness, phrase templates ("not X but Y", rule-of-three, empty -ing tails, twin antithesis), honesty/zero-fab. The PR body MUST show the verdict + fixes. **No skill = no merge.** (voice-lint necessary, NOT sufficient.)
 2. **CI/guards GREEN** — fix until green, never leave red. (web/ pages: run the `check:*` gates locally first.)
 3. **Drive to merge** — self-merge if your lane allows (docs/static-content/low-risk per autonomy-rules), else push to the GATE (cmo prose-gate/review) and RELANCE until a decision. A dozing PR is on you, not the reviewer.
 4. **Verify LIVE** — curl the deployed change (200, change actually in prod). Schema pages: confirm JSON-LD ships (use `growth/analytics/geo-deploy-verify.mjs`).

@@ -1,16 +1,16 @@
 # trovex — MCP registry listing kit + per-registry submission checklists
 
-**Status:** DRAFT — **FIRE-READY (gated on PyPI live).** Nothing here is submitted live; a human runs each checklist and fires each submit. As of 2026-06-24 the whole kit is flipped to the published-PyPI state (`uvx trovex` / `pip install trovex`, server.json `registry_type: pypi` @ 0.11.0) and is fireable the second the FIRE GATE goes green.
+**Status:** **Official MCP Registry = ✅ LIVE** (`io.github.TsukumoHQ/trovex` @ 0.11.2, published 2026-06-25; PyPI `trovex` 0.11.2 carries the matching `mcp-name` marker). The remaining web-form directories (§2.3–2.7) are still DRAFT/human-fire. Install is `uvx trovex` / `pip install trovex`.
 **Owner:** launch-lead · **Reviewed against:** `.agents/product-marketing-context.md`, the `voice` memory, anti-ai-slop pass.
 
 > **🔥 FIRE SEQUENCE (the human runs, in order, the moment PyPI is live):**
-> 0. **FIRE GATE — ✅ GREEN (2026-06-24):** PyPI returns 200, **trovex 0.11.0 LIVE**, `uvx trovex` resolves + runs. The gate is open — fire steps 1–4 now.
-> 1. **Official MCP Registry** (§2.1) — `server.json` (pypi/`trovex`/0.11.0) at repo root → `mcp-publisher login github` (TsukumoHQ org) → `mcp-publisher publish`. This auto-feeds PulseMCP / GitHub-MCP-Registry (VS Code) / Docker = the biggest passive reach.
+> 0. **FIRE GATE — ✅ GREEN:** PyPI `trovex` 0.11.2 live, `uvx trovex` resolves + runs.
+> 1. **Official MCP Registry — ✅ DONE / LIVE (2026-06-25):** `io.github.TsukumoHQ/trovex` @ 0.11.2 resolves at `registry.modelcontextprotocol.io/v0/servers?search=trovex`. Published via the tag-triggered OIDC workflow (`publish-mcp.yml`), not the interactive CLI. Now auto-feeds PulseMCP (~1wk) / GitHub-MCP-Registry (VS Code) / Docker. CONTRACT for any re-publish: `server.json` `name` == the README `mcp-name:` marker, **byte-for-byte incl. case** (`io.github.TsukumoHQ/trovex`); a case mismatch 403s (cost us the 0.11.0→0.11.1→0.11.2 recovery).
 > 2. **Glama** (§2.3) → **awesome-mcp-servers PR** (§2.4, needs the Glama badge) → **mcp.so** (§2.5).
 > 3. **Fire-now directories** (§2.6): MCPMarket.com, mcp.directory (+ `/submit-skill`), mcpserverfinder — all now take the clean `uvx` install.
 > 4. Verify each resolves; log each (registry, URL, date, live y/n). Then ping cmo.
 > **Voice/brand:** lowercase `trovex`, no superlatives, no "Synergix", real ~60% number. Drafts→human-fires; nothing auto-submits.
-**Verified against README:** repo `github.com/TsukumoHQ/trovex`, install `uvx trovex` / `pip install trovex` (PyPI `trovex` 0.11.0), landing `trovex.dev`. (2026-06-24 — flipped from git-install on PyPI publish)
+**Verified against README:** repo `github.com/TsukumoHQ/trovex`, install `uvx trovex` / `pip install trovex` (PyPI `trovex` 0.11.2), landing `trovex.dev`.
 **Supersedes:** the older `mcp-registries.md` that lived here before the trovex-store migration (#238). It used the old `Synergix-lab` repo and the old `git clone + uv run` install. Both are corrected here.
 
 Scope: this is Play 1 — registry/directory listings only. The Show HN and Product Hunt one-shots are a separate play; do not fire them from this kit.
@@ -25,15 +25,15 @@ The one with the most reach is the official registry. Publish once and it propag
 
 Being listed is not the same as getting installs. The install signal is verified ownership, a versioned release, a one-line install that actually runs, and a number a reader can reproduce. trovex has the number (~60% fewer tokens per lookup) and the one-line install. The gap is below.
 
-### The package blocker — CLEARED (PyPI)
+### The package — PUBLISHED (PyPI)
 
-The official registry hosts metadata, not code: your server points at a package in a registry it supports (PyPI, npm, NuGet, Docker/OCI, or MCPB). **trovex 0.11.0 is published to PyPI as `trovex`** — so the registry_type is **`pypi`**, identifier **`trovex`** (the §2.1 `server.json` is ready to publish). No MCPB / hosted-endpoint detour needed.
+The official registry hosts metadata, not code: your server points at a package in a registry it supports (PyPI, npm, NuGet, Docker/OCI, or MCPB). **trovex is published to PyPI as `trovex`** (current 0.11.2) — so the registry_type is **`pypi`**, identifier **`trovex`**. No MCPB / hosted-endpoint detour needed.
 
-> **🔥 FIRE GATE — ✅ GREEN (2026-06-24):** PyPI returns 200, **trovex 0.11.0 is LIVE** (`name: trovex`, `requires_python >=3.11`), and `uvx trovex` resolves + runs from PyPI. The package blocker is cleared — the official-registry publish + every directory below is fireable now. (registry-presence-monitor `136` also flips trovex/pypi → LIVE on its daily run.)
+> **✅ PUBLISHED:** PyPI `trovex` 0.11.2 is LIVE (`uvx trovex` resolves + runs), and the **Official MCP Registry listing is LIVE** (§2.1). The remaining web-form directories below are human-fireable now. (registry-presence-monitor `136` probes trovex/pypi on its daily run.)
 
 ### Submit order (most reach first)
 
-1. Official MCP Registry — once the package blocker is cleared. Feeds PulseMCP / VS Code / Docker for free.
+1. Official MCP Registry — ✅ DONE / LIVE (§2.1). Auto-feeds PulseMCP / VS Code / Docker for free.
 2. PulseMCP — auto-ingests from the official registry; only touch the form if it doesn't appear.
 3. Glama — web form; a Glama listing gates the awesome-mcp PR, so do it before #4.
 4. awesome-mcp-servers — GitHub PR; needs the Glama listing first.
@@ -50,7 +50,7 @@ Lowercase `trovex` in all prose. No superlatives. Brand prose never names the co
 **Name:** `trovex`
 
 **Reverse-DNS name (official registry only):** `io.github.TsukumoHQ/trovex`
-*(a technical identifier the registry requires, not brand copy.)*
+*(a technical identifier the registry requires, not brand copy. Case MUST match the GitHub org login EXACTLY — `TsukumoHQ`, not lowercase. The github-OIDC grant is scoped to `io.github.TsukumoHQ/*`; a lowercase name 403s the publish. This matches the published root `server.json`. Lesson learned the hard way on the v0.11.1 → v0.11.2 recovery.)*
 
 **Tagline (≤60 chars):**
 > One canonical doc for your coding agents, ~60% fewer tokens.
@@ -136,40 +136,28 @@ Full per-client setup also lives at `trovex.dev/for/`.
 
 ## 2. Per-registry checklists
 
-### 2.1 Official MCP Registry — `registry.modelcontextprotocol.io`
+### 2.1 Official MCP Registry — `registry.modelcontextprotocol.io` — ✅ LIVE (2026-06-25)
 
-**Why first:** keystone. Feeds PulseMCP, the GitHub MCP Registry (VS Code's MCP view), the Docker MCP Catalog. Do it once, correctly.
+**Status:** DONE. `io.github.TsukumoHQ/trovex` @ 0.11.2 is published and resolves. The steps below are the kept-for-the-record method + the re-publish runbook for each future release (the workflow `publish-mcp.yml` runs it on a version tag). **Why it was the keystone:** feeds PulseMCP, the GitHub MCP Registry (VS Code's MCP view), the Docker MCP Catalog — one publish, several shelves.
 
 **Method:** add a `server.json` at repo root, then publish with the `mcp-publisher` CLI using GitHub auth (the `io.github.TsukumoHQ/*` namespace verifies ownership via the org).
 
-**`server.json` draft (eng confirms the package coordinates and version before publishing):**
-```json
-{
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.TsukumoHQ/trovex",
-  "description": "Serves agents the one current doc for a query instead of a reread of your repo's markdown.",
-  "repository": {
-    "url": "https://github.com/TsukumoHQ/trovex",
-    "source": "github"
-  },
-  "version": "0.11.0",
-  "packages": [
-    {
-      "registry_type": "pypi",
-      "identifier": "trovex",
-      "version": "0.11.0",
-      "transport": { "type": "stdio" }
-    }
-  ]
-}
-```
-> `description` under 100 chars. `version` = the published release **0.11.0** (bump to match each future release). `packages` = trovex on PyPI as `trovex` (confirmed the publish target). **VERIFY the exact stdio invocation** the CLI runs (`uvx trovex serve --stdio`?) with eng before publishing — ship nothing that doesn't run from a clean machine.
+**`server.json` — publish the canonical one at the repo root; do NOT hand-author a copy here.**
+The validated manifest already lives at [`/server.json`](../../server.json) (schema `2025-12-11`) and the PR#52 workflow runs `mcp-publisher publish ./server.json` against it. Maintaining a second copy in this kit only invites drift, so this is a read-only summary of what's in the real file (validated 2026-06-25):
+
+- `name`: `io.github.TsukumoHQ/trovex` (EXACT GitHub org-login case — the github-OIDC grant is `io.github.TsukumoHQ/*`; lowercase 403s).
+- `repository.url`: `https://github.com/TsukumoHQ/trovex`.
+- `version`: `0.11.2` (bump in `pyproject.toml` + `server.json` together each release).
+- `packages[0]`: `registryType: pypi`, `identifier: trovex`, `version: 0.11.2`, `runtimeHint: uvx`, `transport: streamable-http` at `http://localhost:8765/mcp` (trovex runs `uvx trovex serve`, an HTTP MCP server, not stdio).
+- `description`: the tight ~60% one-liner, under the 100-char registry cap.
+
+> **PRE-PUBLISH GATE (the two ways the publish fails — both hit on the v0.11.1 attempt):** the github-oidc publish checks the PyPI package long-description (= README) for the ownership marker `mcp-name: io.github.TsukumoHQ/trovex`, and it must match `server.json` `name` **byte-for-byte, case included**. (1) trovex 0.11.0 carried no marker at all. (2) v0.11.1 carried a *lowercase* marker/name → the registry 403'd because the OIDC grant is scoped to the exact org case `io.github.TsukumoHQ/*`. Recovery each time = a new immutable PyPI version (0.11.0→0.11.1→0.11.2). So before tagging: marker in README == `server.json` `name` == `io.github.TsukumoHQ/trovex` (exact case), bump pyproject + server.json versions together, republish, then tag. → eng/CTO release lane.
 
 **Checklist (human + eng) — fire after the §0 FIRE GATE (PyPI 200) is green:**
 - [ ] **FIRE GATE:** `https://pypi.org/pypi/trovex/json` returns 200 + `uvx trovex --help` runs clean (§0).
-- [ ] Add `server.json` to repo root; `version` = `0.11.0` (the release tag).
+- [ ] `server.json` at repo root; `version` == the release tag (currently `0.11.2`).
 - [ ] Install `mcp-publisher` per the official docs.
-- [ ] `mcp-publisher login github` (must be someone with rights on the `TsukumoHQ` org).
+- [ ] Auth: the `publish-mcp.yml` workflow does this non-interactively via `mcp-publisher login github-oidc` on a version tag (preferred). Manual fallback: `mcp-publisher login github` (someone with rights on the `TsukumoHQ` org).
 - [ ] Tag the release and push the tag.
 - [ ] `mcp-publisher publish` from repo root.
 - [ ] Confirm it resolves at `registry.modelcontextprotocol.io` and the REST API returns it.
@@ -328,7 +316,7 @@ Note: some registries auto-fill the homepage from the repo's metadata and strip 
 
 ## 5. Handoff summary (for the human who fires these)
 
-1. **Eng first:** clear the package blocker (§0) — PyPI publish is the clean path. Add `server.json`. Confirm the stdio invocation.
+1. **Official registry: DONE** — published + live (§2.1). Future releases auto-publish on a version tag via `publish-mcp.yml`; keep `server.json` `version` == the tag and the README `mcp-name:` marker == `server.json` `name` (exact case).
 2. **Then submit in order:** Official → (PulseMCP auto) → Glama → awesome-mcp PR → mcp.so → mcpservers.org + secondary → cursor.directory + per-client.
 3. **Track every submission** (registry, URL, date, live y/n) and hand the sheet to analytics-lead.
 4. **Re-publish the official registry** on each new release tag so listings don't go stale.

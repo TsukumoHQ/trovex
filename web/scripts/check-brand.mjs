@@ -15,7 +15,10 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const ROOTS = ['public', 'src', 'index.html']
+// Also scan the FastAPI server-rendered templates — the public install page lives
+// here (src/trovex/templates), NOT under web/, which is the gap that let the install-page
+// synergix leak slip past this guard. Path is relative to web/ (this script's CI cwd).
+const ROOTS = ['public', 'src', 'index.html', '../src/trovex/templates']
 const SCAN = /\.(html|txt|json|webmanifest|tsx?|jsx?|css)$/
 // Strip the allowed technical identifiers before scanning for the brand word.
 const ALLOW = /(github\.com\/TsukumoHQ|TsukumoHQ\/[\w.-]+|io\.github\.tsukumohq)/gi

@@ -100,6 +100,8 @@ def capture_state(
         content,
         kind="record",
         ext_id=doc_id,
-        tags=[f"owner/{agent}", "type/current-state", f"capture/{reason}"],
+        # lower-cased so the owner tag matches /api/boot's scope regardless of
+        # the agent name's case (the store lower-cases tags on write anyway).
+        tags=[f"owner/{agent.lower()}", "type/current-state", f"capture/{reason}"],
     )
     return {"captured": True, "doc_id": doc_id, "tokens": max(1, len(content) // 4)}

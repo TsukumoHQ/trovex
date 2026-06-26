@@ -1,0 +1,43 @@
+name: core
+
+# Gates the Python core (src/trovex + tests): ruff lint + the pytest suite.
+# This is the root-cause fix for the silent-debt incident — `ruff check` now runs
+# on every PR, so lint debt can never accrue unnoticed again. It is a REQUIRED
+# check in branch protection.
+#
+# Why no `paths:` filter on pull_request: a path-filtered REQUIRED check leaves
+# PRs that don't touch those paths stuck "Expected — waiting" forever (the
+# workflow never triggers, so the required context never reports). So this always
+# runs on PRs — it's fast (~13s) and hermetic (BagEmbedder, no model download).
+# Push-to-main stays path-scoped (no merge to block there).
+#
+# NOTE: `ruff format --check` is intentionally NOT gated yet — the tree has a
+# pre-existing 21-file format reflow deferred to a coordinated PR (cto-owned).
+# That PR adds the format-check step here AND removes the temporary lint waivers
+# in pyproject [tool.ruff.lint]. Until then this gate = lint + tests.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/core.yml'
+  pull_request:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # hatch-vcs derives the version from git tags (uv sync builds editable)
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev
+      - name: ruff check
+        run: uv run ruff check src tests
+      - name: pytest
+        run: uv run pytest -q

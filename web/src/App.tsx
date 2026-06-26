@@ -2,10 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { track, trackLandingView, trackSectionViews, trackInstallClick, trackTsukumoClick, trackNewsletterSignup, getAttribution } from './analytics'
 
 // trovex is public beta: the primary action is install + a GitHub star. The consult band
-// is the suite→agency handoff (experiments-batch-1.md E2): it crosses to tsukumo, UTM'd so
-// tsukumo reads it as source=suite and the loop closes to assessment_request.
+// is the suite→Tsukumo handoff: trovex is one of four OSS products that feed Tsukumo
+// consulting (booking converges on Tsukumo, never trovex.dev — SSOT 8e2d74e7).
+// By owner-validated intent (cmo locked 2026-06-25): this band is the SOFT, low-friction
+// ask → the 30-min discovery Call (the "tsukumo-1-hour-call-clone" slug IS the 30-min,
+// owner-confirmed). High-intent surfaces (/audit endplate, /savings) go to the longer
+// AI Engineering Assessment instead.
 const CONSULT_URL =
-  'https://tsukumo.ch/consulting?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting&utm_content=landing-band'
+  'https://calendly.com/hello-tsukumo/tsukumo-1-hour-call-clone?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting&utm_content=landing-band'
 const reduceMotion =
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches

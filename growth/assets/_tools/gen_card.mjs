@@ -28,7 +28,7 @@ const fonts = [
   { name: "Fira Sans", data: await readFile(join(SYS, "FiraSans-Medium.otf")), weight: 500, style: "normal" },
   { name: "Fira Code", data: await readFile(join(SYS, "FiraCode-Regular.ttf")), weight: 400, style: "normal" },
 ];
-const C = { bg:"#0c0d10", panel:"#101216", ink:"#f3f0e9", soft:"#8b8f98", faint:"#5f636b", rule:"#23262d", track:"#181a1f", green:"#22c55e" };
+const C = { bg:"#0c0d10", panel:"#101216", ink:"#f3f0e9", soft:"#8b8f98", faint:"#5f636b", rule:"#23262d", track:"#181a1f", green:"#22c55e", red:"#f87171" };
 const DOT = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><circle cx="2" cy="2" r="1.3" fill="#ffffff" fill-opacity="0.028"/></svg>').toString("base64")}`;
 const h = (t, p, ...k) => ({ type: t, props: { ...p, children: k.length <= 1 ? k[0] : k } });
 const deDash = (s) => (s || "").replace(/\s*[—–]\s*/g, " · "); // de-em-dash card copy
@@ -36,9 +36,13 @@ const deDash = (s) => (s || "").replace(/\s*[—–]\s*/g, " · "); // de-em-das
 const SHAPES = {
   square:   { w:1080, h:1080, pad:80, big:96, mark:25, sub:28, foot:19, eb:19 },
   portrait: { w:1080, h:1350, pad:84, big:104, mark:26, sub:30, foot:20, eb:20 },
+  og:       { w:1200, h:630,  pad:64, big:74, mark:24, sub:25, foot:18, eb:18 },
+  ph:       { w:1270, h:760,  pad:72, big:84, mark:26, sub:27, foot:19, eb:19 },
 };
-const brandFor = (b) => (b === "founder" ? "trovex" : "tsukumo");
-const domainFor = (b) => (b === "founder" ? "trovex.dev" : "tsukumo.ch");
+// brand: founder = trovex property but DE-BRANDED (no name); trovex = product surface
+// (trovex wordmark + trovex.dev + small 'a tsukumo product' endplate); company = tsukumo.
+const brandFor = (b) => (b === "company" || b === "tsukumo") ? "tsukumo" : "trovex";
+const domainFor = (b) => brandFor(b) === "tsukumo" ? "tsukumo.ch" : "trovex.dev";
 const tfs = (S, str) => { const n = (str||"").length; if (n > 64) return S.big - 34; if (n > 42) return S.big - 18; return S.big; };
 
 function wordmark(word, fs) {
@@ -82,6 +86,22 @@ function twocolEl(cols) {
       h("div",{style:{fontFamily:"Fira Code",fontSize:"19px",color:i===cols.length-1?C.green:C.soft,letterSpacing:"0.02em"}}, deDash(col.head)),
       h("div",{style:{fontFamily:"Fira Sans",fontWeight:500,fontSize:"27px",color:C.ink,lineHeight:1.25}}, deDash(col.body)))));
 }
+// versus: honest comparison table — rows of {criterion, us, them, win?:'us'|'them'}.
+// the winner cell per row is green (and `win` CAN be 'them' — show their strengths too).
+function versusEl(c) {
+  const cell = (txt, win) => h("div",{style:{display:"flex",flex:1,padding:"14px 16px",fontFamily:"Fira Sans",fontWeight:win?700:500,fontSize:"23px",lineHeight:1.22,color:win?C.green:C.ink}}, deDash(txt));
+  const head = h("div",{style:{display:"flex",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"10px"}},
+    h("div",{style:{display:"flex",flex:1.1,fontFamily:"Fira Code",fontSize:"18px",color:C.faint,padding:"0 16px"}}, ""),
+    h("div",{style:{display:"flex",flex:1,alignItems:"center",gap:"9px",padding:"0 16px"}},
+      h("div",{style:{width:"16px",height:"16px",backgroundColor:C.green}}), h("div",{style:{fontFamily:"Fira Code",fontSize:"20px",color:C.ink,letterSpacing:"0.02em"}}, deDash(c.versus.us))),
+    h("div",{style:{display:"flex",flex:1,fontFamily:"Fira Code",fontSize:"20px",color:C.soft,padding:"0 16px",letterSpacing:"0.02em"}}, deDash(c.versus.them)));
+  const rows = c.rows.map((r,i)=>h("div",{style:{display:"flex",alignItems:"stretch",borderTop:i?`1px solid ${C.track}`:"none"}},
+    h("div",{style:{display:"flex",flex:1.1,padding:"14px 16px",fontFamily:"Fira Code",fontSize:"18px",color:C.soft}}, deDash(r.criterion)),
+    cell(r.us, r.win==="us"), cell(r.them, r.win==="them")));
+  const out = [head, ...rows];
+  if (c.pick) out.push(h("div",{style:{display:"flex",borderTop:`1px solid ${C.rule}`,marginTop:"4px",paddingTop:"14px",fontFamily:"Fira Sans",fontWeight:500,fontSize:"22px",color:C.soft,lineHeight:1.3}}, deDash(c.pick)));
+  return h("div",{style:{display:"flex",flexDirection:"column",border:`1px solid ${C.rule}`,backgroundColor:C.panel,borderRadius:"14px",padding:"22px 18px"}}, ...out);
+}
 function checklistEl(items) {
   const check = h("div",{style:{display:"flex",width:"34px",height:"34px",minWidth:"34px",borderRadius:"7px",border:`1.5px solid ${C.green}`,backgroundColor:"rgba(34,197,94,0.08)",alignItems:"center",justifyContent:"center"}},
     h("div",{style:{width:"9px",height:"16px",borderRight:`3px solid ${C.green}`,borderBottom:`3px solid ${C.green}`,transform:"rotate(45deg)",marginTop:"-3px"}}));
@@ -116,6 +136,27 @@ function receiptEl(c, S) {
       h("div",{style:{fontFamily:"Archivo",fontWeight:800,fontSize:"54px",color:C.green,letterSpacing:"-0.03em"}}, c.totalV)));
 }
 
+// terminal: clone-and-run artifact. c.cmd (the command), c.out:[lines], c.title?
+function terminalEl(c) {
+  const dot = (col)=>h("div",{style:{width:"13px",height:"13px",borderRadius:"50%",backgroundColor:col}});
+  return h("div",{style:{display:"flex",flexDirection:"column",border:`1px solid ${C.rule}`,backgroundColor:"#08090b",borderRadius:"12px"}},
+    h("div",{style:{display:"flex",alignItems:"center",gap:"9px",padding:"16px 20px",borderBottom:`1px solid ${C.rule}`}},
+      dot("#ff5f56"), dot("#ffbd2e"), dot("#27c93f"),
+      c.title?h("div",{style:{fontFamily:"Fira Code",fontSize:"18px",color:C.faint,marginLeft:"10px"}}, c.title):h("div",{})),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:"10px",padding:"26px 24px",fontFamily:"Fira Code",fontSize:"26px"}},
+      h("div",{style:{display:"flex",gap:"12px"}}, h("span",{style:{color:C.green}},"$"), h("span",{style:{color:C.ink}}, c.cmd)),
+      ...(c.out||[]).map(l=>h("div",{style:{color:C.soft}}, l))));
+}
+// diff: unified red/green code diff. c.rows:[{sign:'-'|'+'|' ', t}]
+function diffEl(c) {
+  const line = (r)=>{ const sign=r.sign||" "; const col=sign==="+"?C.green:sign==="-"?C.red:C.faint;
+    const bg=sign==="+"?"rgba(34,197,94,0.08)":sign==="-"?"rgba(248,113,113,0.08)":"transparent";
+    return h("div",{style:{display:"flex",gap:"14px",padding:"5px 18px",backgroundColor:bg,fontFamily:"Fira Code",fontSize:"24px"}},
+      h("span",{style:{color:col,width:"16px"}}, sign), h("span",{style:{color:sign===" "?C.soft:C.ink}}, r.t)); };
+  return h("div",{style:{display:"flex",flexDirection:"column",border:`1px solid ${C.rule}`,backgroundColor:"#08090b",borderRadius:"12px",padding:"14px 0"}},
+    ...c.rows.map(line));
+}
+
 function body(c, S) {
   switch (c.layout) {
     case "stat":    return [c.headline?headlineEl(c.headline,c.accent,S):null, heroEl(c,S), subEl(c.sub,S)].filter(Boolean);
@@ -123,12 +164,15 @@ function body(c, S) {
     case "twocol":  return [headlineEl(c.headline,c.accent,S), twocolEl(c.cols), subEl(c.sub,S)].filter(Boolean);
     case "checklist": return [headlineEl(c.headline,c.accent,S), checklistEl(c.items), subEl(c.sub,S)].filter(Boolean);
     case "compare": return [headlineEl(c.headline,c.accent,S), compareEl(c), subEl(c.sub,S)].filter(Boolean);
+    case "versus": return [headlineEl(c.headline,c.accent,S), versusEl(c), subEl(c.sub,S)].filter(Boolean);
     case "receipt": return [c.headline?headlineEl(c.headline,c.accent,S):null, receiptEl(c,S), subEl(c.sub,S)].filter(Boolean);
+    case "terminal": return [c.headline?headlineEl(c.headline,c.accent,S):null, terminalEl(c), subEl(c.sub,S)].filter(Boolean);
+    case "diff":    return [c.headline?headlineEl(c.headline,c.accent,S):null, diffEl(c), subEl(c.sub,S)].filter(Boolean);
     default:        return [headlineEl(c.headline,c.accent,S), subEl(c.sub,S)].filter(Boolean); // quote
   }
 }
 function card(c, S) {
-  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist"||c.layout==="compare";
+  const dataLed = c.layout==="bars"||c.layout==="twocol"||c.layout==="receipt"||c.layout==="stat"||c.layout==="checklist"||c.layout==="compare"||c.layout==="versus"||c.layout==="terminal"||c.layout==="diff";
   const unbranded = c.brand === "founder"; // founder account de-branded: accent stays, name goes
   return h("div",{style:{width:`${S.w}px`,height:`${S.h}px`,display:"flex",flexDirection:"column",justifyContent:"space-between",backgroundColor:C.bg,backgroundImage:`url(${DOT})`,backgroundRepeat:"repeat",padding:`${S.pad}px`,fontFamily:"Fira Sans"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.rule}`,paddingBottom:"20px"}},
@@ -136,7 +180,7 @@ function card(c, S) {
       c.kicker?h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.eb}px`,color:C.soft,letterSpacing:"0.04em"}}, deDash(c.kicker)):h("div",{})),
     h("div",{style:{display:"flex",flexDirection:"column",gap:"30px",flex:1,justifyContent:dataLed?"flex-start":"center",paddingTop:dataLed?"48px":"0"}}, ...body(c,S)),
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.rule}`,paddingTop:"20px"}},
-      h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.soft}}, c.source?`source: ${deDash(c.source)}`:""),
+      h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.soft}}, c.source?`source: ${deDash(c.source)}` : (c.brand==="trovex"?"a tsukumo product":"")),
       unbranded ? h("div",{}) : h("div",{style:{fontFamily:"Fira Code",fontSize:`${S.foot}px`,color:C.green}}, domainFor(c.brand))));
 }
 
@@ -164,7 +208,7 @@ const result = {};
 for (const file of files) {
   const cards = JSON.parse(await readFile(file, "utf8"));
   for (const c of cards) {
-    const shape = c.shape === "portrait" ? "portrait" : "square";
+    const shape = (c.shape === "portrait" || c.shape === "og" || c.shape === "ph") ? c.shape : "square";
     const S = SHAPES[shape];
     const png = await render(card(c, S), S);
     if (outDir) { await mkdir(join(outDir), { recursive:true }); await writeFile(join(outDir, `${c.uuid}.png`), png); }

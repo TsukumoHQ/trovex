@@ -1,0 +1,23 @@
+[
+  {"uuid":"vs-claude-md","brand":"trovex","shape":"portrait","layout":"versus","kicker":"trovex vs · honest","headline":"trovex vs a CLAUDE.md file","accent":"a CLAUDE.md file","versus":{"us":"trovex","them":"CLAUDE.md"},"rows":[
+    {"criterion":"setup","us":"one local process, ~1-min","them":"one file, zero infra","win":"them"},
+    {"criterion":"routes to the right doc","us":"yes, one canonical answer","them":"no, fixed text","win":"us"},
+    {"criterion":"freshness signal","us":"canonical / stale / dup","them":"none","win":"us"},
+    {"criterion":"scales to many docs","us":"cost scales with the question","them":"one blob, loaded whole","win":"us"},
+    {"criterion":"tokens per lookup","us":"~60% fewer","them":"full file each session","win":"us"}
+  ],"sub":"pick CLAUDE.md for a small project with fixed conventions. pick trovex when knowledge spans many drifting docs or several agents need the same answer. most teams use both."},
+  {"uuid":"vs-repomix","brand":"trovex","shape":"portrait","layout":"versus","kicker":"trovex vs · honest","headline":"trovex vs repomix","accent":"repomix","versus":{"us":"trovex","them":"repomix"},"rows":[
+    {"criterion":"best for","us":"repeated, targeted lookups","them":"one-shot whole-repo Qs","win":"them"},
+    {"criterion":"tokens, repeated lookup","us":"~60% fewer, one section","them":"whole pack, every time","win":"us"},
+    {"criterion":"routes to the right doc","us":"yes","them":"no, sends everything","win":"us"},
+    {"criterion":"freshness signal","us":"canonical / stale / dup","them":"static snapshot","win":"us"},
+    {"criterion":"write-back memory","us":"record once, all read","them":"none","win":"us"}
+  ],"sub":"pick repomix for a one-time audit or onboarding a model to an unfamiliar repo. pick trovex for the steady stream of specific questions. many use both: repomix to bootstrap, trovex for ongoing lookups."},
+  {"uuid":"vs-cursor-memory","brand":"trovex","shape":"portrait","layout":"versus","kicker":"trovex vs · honest","headline":"trovex vs Cursor memory","accent":"Cursor memory","versus":{"us":"trovex","them":"Cursor memory"},"rows":[
+    {"criterion":"zero setup in-editor","us":"one local process","them":"yes, if you live in Cursor","win":"them"},
+    {"criterion":"works across clients","us":"any MCP client","them":"Cursor only","win":"us"},
+    {"criterion":"shared across teammates","us":"one store, all read","them":"individual / per-project","win":"us"},
+    {"criterion":"freshness signal","us":"canonical / stale / dup","them":"static rules","win":"us"},
+    {"criterion":"routes to the right doc","us":"one canonical answer","them":"rules load wholesale","win":"us"}
+  ],"sub":"pick Cursor memory if you work entirely in Cursor and want zero setup. pick trovex when you use more than one client or teammates need the same current docs. they layer."}
+]

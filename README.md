@@ -67,6 +67,70 @@ claude mcp add --transport http trovex http://localhost:8765/mcp
 For **Cursor**, one click (after `trovex serve`):
 [**Add trovex to Cursor**](cursor://anysphere.cursor-deeplink/mcp/install?name=trovex&config=eyJ1cmwiOiJodHRwOi8vbG9jYWxob3N0Ojg3NjUvbWNwIn0=)
 
+## How it works
+
+trovex turns your repo's markdown into one queryable, canonical store, then serves each
+agent the single current doc that answers a question — not a pile of candidates to rank.
+
+```mermaid
+flowchart LR
+  A["Your repo<br/>.md files"] -->|trovex index| B["Chunk + parse"]
+  B --> C["Embed locally<br/>ONNX · bge-small"]
+  C --> D[("sqlite-vec<br/>vector store")]
+  Q["Agent question"] -->|MCP| E["Route + rerank"]
+  D --> E
+  E --> F["One canonical doc<br/>path:line + freshness"]
+  F --> G["Agent answers from<br/>the current doc"]
+```
+
+Four ideas do the work:
+
+- **Canonical, not complete.** For each question there should be one doc that answers it.
+  trovex marks every doc canonical / stale / duplicate, so retrieval can prefer the one
+  that's still true — a stale doc is exactly as similar to a query as the current one, so
+  similarity alone can't tell them apart.
+- **Route, then serve the section.** A query returns a `path:line` pointer to the one doc
+  and just the section that answers — not the whole file, and not the top-k pile your agent
+  would otherwise read and rank itself. Closing that gap is where the tokens are saved.
+- **Local by default.** Indexing, embeddings (ONNX, `bge-small-en-v1.5`) and vector search
+  (sqlite-vec) all run on your machine. No cloud, no API key, no network call to answer a query.
+- **A shared write-back path.** Agents store what they learn once (`trovex_write`) in
+  trovex's own store; every other agent and teammate reads it back (`trovex_read`) instead
+  of re-deriving it.
+
+The read-and-write loop that keeps every agent on the same source of truth:
+
+```mermaid
+sequenceDiagram
+  participant A as Agent
+  participant T as trovex (MCP)
+  participant S as Store (sqlite-vec)
+  A->>T: trovex("how do we roll back a deploy?")
+  T->>S: route + rerank candidates
+  S-->>T: one canonical doc
+  T-->>A: path:line + section + freshness
+  A->>T: trovex_write("rollback runbook: …")
+  T->>S: upsert (dedupes near-copies)
+  Note over S: the next agent reads it back via trovex_read
+```
+
+## Prove it on your own repo
+
+The ~60% is a claim you can run, not a number to take on faith. Two commands:
+
+```bash
+trovex bench /path/to/your/repo          # token-accounting model — instant, no LLM, no key
+trovex bench /path/to/your/repo --eval   # full answer+judge A/B at equal task-success (needs OPENAI_API_KEY)
+```
+
+`bench` reports the distribution (median + spread), not a best case: the cost of reading the
+one routed canonical doc versus the top-k candidates an unaided agent would read. `--eval`
+goes further — both arms answer, an LLM judges, and a saving counts only when both answer
+correctly. Full method and our own numbers are at [trovex.dev/measure](https://trovex.dev/measure).
+
+Already running trovex through the md-guard hook? `trovex measure` compares your real `.md`
+token consumption before and after, from the hook's baseline log.
+
 ## MCP tools
 
 - `trovex(q)` — route a question to the right on-disk `.md` and get back `path:line` pointers

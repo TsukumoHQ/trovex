@@ -80,6 +80,16 @@ function thresholdFor(status) {
   if (status === 'in-progress') return TH.inProgress;
   return null; // blocked/in-review/done/cancelled are not "stale" here
 }
+// A task can be BLOCKED while its status stays 'in-progress' (block_task on a Linear-mirrored task
+// sets blocked_reason + blocked_periods but does NOT flip the status — yoru-dev, 2026-06-26). Treat
+// an OPEN blocked period (last entry has `start`, no `end`) as currently-blocked → don't nudge it.
+function isBlocked(t) {
+  let bp = t.blocked_periods;
+  if (typeof bp === 'string') { try { bp = JSON.parse(bp); } catch { return false; } }
+  if (!Array.isArray(bp) || bp.length === 0) return false;
+  const last = bp[bp.length - 1];
+  return !!(last && last.start && !last.end);
+}
 function resolveAgent(t) {
   // assigned_to is the clean relay agent (wraith populated it); profile_slug next; lane-parse the
   // description as a last resort; else omit (wraith resolves relay-side via linear_routing).
@@ -105,6 +115,7 @@ function resolveAgent(t) {
   for (const t of list.tasks) {
     const th = thresholdFor(t.status);
     if (th == null) continue;
+    if (isBlocked(t)) continue; // currently blocked (open blocked_period) — don't nudge, even if status stays in-progress
     // idle = time since the last agent activity (wraith's live `last_activity_at`, bumped on every status
     // transition/claim). Fallback to dispatched_at only if the field is missing. This is TRUE idle, not board-age.
     const age = ageHours(t.last_activity_at || t.dispatched_at);

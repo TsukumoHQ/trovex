@@ -1,19 +1,19 @@
 [Unit]
-Description=trovex reindex — pull synergix_prod and reindex .md docs
+Description=trovex reindex — pull docs-repo and reindex .md docs
 After=network-online.target
 
 [Service]
 Type=oneshot
-User=synxadmin
-Group=synxadmin
-WorkingDirectory=/home/synxadmin/Exposemd
-EnvironmentFile=-/home/synxadmin/.trovex-data/env
-Environment=PATH=/home/synxadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
-Environment=TROVEX_DATA_DIR=/home/synxadmin/.trovex-data
-Environment=FASTEMBED_CACHE_PATH=/home/synxadmin/.trovex-data/fastembed_cache
-Environment=HF_HOME=/home/synxadmin/.trovex-data/hf_cache
-ExecStartPre=-/usr/bin/git -C /home/synxadmin/synergix_prod fetch --quiet
-ExecStartPre=-/usr/bin/git -C /home/synxadmin/synergix_prod reset --hard origin/main
-ExecStartPre=-/usr/bin/git -C /home/synxadmin/obsidian/synergix-prod pull --quiet --rebase
-ExecStartPre=-/usr/bin/git -C /home/synxadmin/obsidian/synergix-dev pull --quiet --rebase
-ExecStart=/home/synxadmin/Exposemd/.venv/bin/trovex index
+User=trovex
+Group=trovex
+WorkingDirectory=/home/trovex/trovex
+EnvironmentFile=-/home/trovex/.trovex-data/env
+Environment=PATH=/home/trovex/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=TROVEX_DATA_DIR=/home/trovex/.trovex-data
+Environment=FASTEMBED_CACHE_PATH=/home/trovex/.trovex-data/fastembed_cache
+Environment=HF_HOME=/home/trovex/.trovex-data/hf_cache
+ExecStartPre=-/usr/bin/git -C /home/trovex/docs-repo fetch --quiet
+ExecStartPre=-/usr/bin/git -C /home/trovex/docs-repo reset --hard origin/main
+ExecStartPre=-/usr/bin/git -C /home/trovex/obsidian/docs-repo pull --quiet --rebase
+ExecStartPre=-/usr/bin/git -C /home/trovex/obsidian/docs-repo-dev pull --quiet --rebase
+ExecStart=/home/trovex/trovex/.venv/bin/trovex index

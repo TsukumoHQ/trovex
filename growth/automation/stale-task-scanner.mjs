@@ -13,7 +13,7 @@
  *   wraith's rule routes it → P0 '⏰ stale <task>, move it' to `agent` (+ cto escalation when escalate=true).
  *
  * STALE thresholds (idle measured from `last_activity_at`, wraith's live field; CTO scope 2026-06-26):
- * CLAIMED work only — accepted >1.5h, in-progress >1.5h. PENDING is NOT nudged (unclaimed = no owner).
+ * CLAIMED work only — accepted >3h, in-progress >3h (escalate at 6h). PENDING is NOT nudged (unclaimed = no owner).
  * ESCALATE at ≥2× the threshold.
  * ASSIGNEE: profile_slug (native tasks) → else parse `**Lane:** <agent>` from the description →
  * else OMIT `agent` (Linear tasks are often unassigned; wraith default-routes). dispatched_by is the
@@ -37,7 +37,7 @@ const MAX_FIRE = Number.isInteger(input.maxFire) ? input.maxFire : 10; // burst 
 // CTO scope (2026-06-26): nudge only CLAIMED work (accepted + in-progress) idle >~1.5h. PENDING is
 // NOT emitted — an unclaimed task has no owner to nudge (wraith resolves the assignee relay-side; we
 // don't filter on it, we just don't nudge un-started tasks). pending kept here only as an opt-in override.
-const TH = Object.assign({ accepted: 1.5, inProgress: 1.5 }, input.thresholds || {}); // hours
+const TH = Object.assign({ accepted: 3, inProgress: 3 }, input.thresholds || {}); // hours (CTO+wraith 2026-06-26: stale=3h idle, escalate=6h=2×)
 const RELAY = input.relay_url || 'http://host.docker.internal:8090/mcp';
 const RELAY_BASE = input.relay_base || 'http://host.docker.internal:8090';
 const NOW = Date.now();

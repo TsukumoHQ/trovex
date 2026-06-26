@@ -64,6 +64,9 @@ Per-client setup (Claude Code, Cursor, Windsurf, Cline, Zed, Roo) is at
 claude mcp add --transport http trovex http://localhost:8765/mcp
 ```
 
+For **Cursor**, one click (after `trovex serve`):
+[**Add trovex to Cursor**](cursor://anysphere.cursor-deeplink/mcp/install?name=trovex&config=eyJ1cmwiOiJodHRwOi8vbG9jYWxob3N0Ojg3NjUvbWNwIn0=)
+
 ## MCP tools
 
 - `trovex(q)` — route a question to the right on-disk `.md` and get back `path:line` pointers

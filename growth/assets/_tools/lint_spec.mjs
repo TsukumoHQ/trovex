@@ -19,19 +19,20 @@ import { readFile } from "node:fs/promises";
 const DASH = /[—–]/;
 const BANNED = [/private beta/i, /request access/i, /request beta access/i, /beta-waitlist/i, /#waitlist/i, /synergix/i];
 
-// claim/honesty gate (sixty-percent-public-claim-standard + voice). The ~60% figure is
-// MODELED; 'measured' is public ONLY once trovex.dev/method ships the signed disclosures
-// (TSU-58) — until then any 'measured' on OUR surface is unbacked. EXTERNAL studies
-// (METR/DORA/GitClear/Stanford/Apple/ETH/Veracode/arXiv) legitimately say 'measured' about
-// THEIR result, so study-tagged fields are exempt from the measured/74% rules.
+// claim/honesty gate (sixty-percent-public-claim-standard + voice). 'measured' is now BACKED
+// fleet-wide: trovex.dev/measure ships the signed disclosures (TSU-58; analytics+cmo GO
+// 2026-06-26), so the old "measured is unbacked" block is RETIRED. What still holds: the
+// published HEADLINE stays the conservative ~60% floor, and 74%/big-counts are NEVER the
+// headline. EXTERNAL studies (METR/DORA/GitClear/Stanford/Apple/ETH/Veracode/arXiv) cite
+// their own % legitimately → study-tagged fields are exempt from the 74% rule.
 const STUDY = /arxiv|\bmetr\b|\bdora\b|gitclear|stanford|\bapple\b|\beth\b|veracode|slopcode|the research/i;
+const WORDMARK = /\b(Trovex|Tsukumo|Wraith|Yoru|Dokan)\b/;
 const CLAIM = [
   // [regex, study-exempt?, message]
-  [/\bmeasured\b/i, true,  "our-claim 'measured' is unbacked until /method discloses → use 'modeled' (study numbers are exempt)"],
-  [/~?\s*74\s*%/,    true,  "74% is the cherry-picked max, never the headline → lead with ~60% modeled median + range ~38-79%"],
+  [/~?\s*74\s*%/,    true,  "74% is the cherry-picked max, never the headline → lead with ~60% (floor) + range 41-81%"],
   [/\bsame answers?\b/i, false, "unbacked answer-parity claim → drop 'same answer(s)'; keep only the token claim"],
   [/\bai[- ]powered\b/i, false, "banned hype term 'AI-powered' (voice) → name the mechanism"],
-  [/\b(Trovex|Tsukumo|Wraith|Yoru|Dokan)\b/, false, "wordmark must be lowercase (TsukumoHQ org id excepted)"],
+  [WORDMARK, false, "wordmark must be lowercase (TsukumoHQ org id excepted)"],
 ];
 const TSUKUMO_HQ = /TsukumoHQ/; // GitHub org identifier — legit, not a wordmark violation
 
@@ -121,7 +122,7 @@ for (const file of files) {
     const fieldStudy = study || STUDY.test(v);
     for (const [re, studyExempt, msg] of CLAIM) {
       if (studyExempt && fieldStudy) continue;
-      const target = re === CLAIM[4][0] ? v.replace(TSUKUMO_HQ, "") : v; // org id isn't a wordmark violation
+      const target = re === WORDMARK ? v.replace(TSUKUMO_HQ, "") : v; // org id isn't a wordmark violation
       if (re.test(target)) fileErrs.push(`${path}: ${msg}. «${v.slice(0, 60)}»`);
     }
   }

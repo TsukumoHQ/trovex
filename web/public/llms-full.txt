@@ -7,6 +7,7 @@
 > (SQLite + ONNX), runs on your machine. Ships as an MCP server and a CLI.
 
 - Website: https://trovex.dev
+- Methodology / the receipt behind the ~60%: https://trovex.dev/measure (measured 69% at equal task-success across 26 pre-registered queries, range 41-81%, LLM-judged; headline conservative ~60%; reproduce-it-yourself harness)
 - Access: public beta — the repository is public; install from https://github.com/TsukumoHQ/trovex (a star helps)
 - Repository: https://github.com/TsukumoHQ/trovex (public)
 - Community: https://tsukumo.ch/slack (questions and setup help)

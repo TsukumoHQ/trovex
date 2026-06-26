@@ -1,6 +1,6 @@
 # =============================================================================
 # trovex — Host service (systemd) exposed via Traefik
-# trovex.prod.synergix.ch -> host:8770  (docker0 bridge gateway 172.17.0.1)
+# trovex.example.com -> host:8770  (docker0 bridge gateway 172.17.0.1)
 #
 # Serves: SSR UI (/), JSON API (/api/*), MCP HTTP (/mcp/)
 #
@@ -14,7 +14,7 @@
 http:
   routers:
     trovex:
-      rule: "Host(`trovex.prod.synergix.ch`)"
+      rule: "Host(`trovex.example.com`)"
       entrypoints:
         - websecure
       tls: {}

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/synxadmin/Exposemd/deploy/hooks/trovex-md-guard.sh"
+            "command": "$CLAUDE_PROJECT_DIR/deploy/hooks/trovex-md-guard.sh"
           }
         ]
       }

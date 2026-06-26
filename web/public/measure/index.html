@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/measure/" />
+  <title>How we measure trovex's ~60% — trovex</title>
+  <meta name="description" content="The receipt behind trovex's ~60% fewer tokens per .md lookup: modeled median ~63%, measured 69% at equal task-success (range 41–81%) across 26 pre-registered queries. The method, the limits, and how to check it on your own repo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/measure/" />
+  <meta property="og:title" content="How we measure trovex's ~60%" />
+  <meta property="og:description" content="The receipt: modeled ~63%, measured 69% at equal task-success across 26 pre-registered queries. The method, the limits, and how to check it yourself." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="How we measure trovex's ~60%" />
+  <meta name="twitter:description" content="The receipt: modeled ~63%, measured 69% at equal task-success across 26 pre-registered queries — with the limits stated." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "trovex",
+          "item": "https://trovex.dev/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "How we measure",
+          "item": "https://trovex.dev/measure/"
+        }
+      ]
+    },
+    {
+      "@type": "Article",
+      "headline": "How we measure trovex's ~60%",
+      "description": "The receipt behind trovex's ~60% fewer tokens per .md lookup: modeled median ~63%, measured 69% at equal task-success (range 41–81%) across 26 pre-registered queries — with the limits stated and a path to reproduce it.",
+      "url": "https://trovex.dev/measure/",
+      "author": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+      "publisher": { "@type": "Organization", "name": "trovex", "url": "https://trovex.dev/" },
+      "datePublished": "2026-06-26",
+      "about": ["token efficiency", "benchmark methodology", "AI coding agents", "retrieval evaluation"]
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / Measure
+    </nav>
+
+    <h1>How we measure trovex's <span class="ac">~60%</span></h1>
+    <p class="deck">trovex's public number is <strong>~60% fewer tokens per <code>.md</code> doc-lookup</strong>. This page is the receipt: how we got it, what it covers, where it falls short, and how to check it on your own repo. ~60% is the conservative floor two separate methods both clear; we publish it deliberately lower than what we measured.</p>
+
+    <section style="margin-top:44px;">
+      <h2>The number</h2>
+      <ul>
+        <li><strong>Modeled estimate:</strong> median ~63%. A per-query model of the reads an agent avoids, assuming the unaided baseline reads the top-3 candidate docs.</li>
+        <li><strong>Measured (answer-and-judge A/B):</strong> median <strong>69% at equal task-success</strong>, range <strong>41–81%</strong> (p25–p75).</li>
+        <li><strong>What we publish:</strong> <strong>~60%</strong>, the conservative floor under both. The reduction is on doc-lookup token spend, not a whole session.</li>
+      </ul>
+    </section>
+
+    <section style="margin-top:36px;">
+      <h2>How we measured it</h2>
+      <ul>
+        <li><strong>26 pre-registered queries</strong> across eight categories (C1–C8), fixed before the run.</li>
+        <li><strong>Corpus:</strong> trovex's own repo, 61 <code>.md</code> docs. One corpus, our own.</li>
+        <li><strong>Both arms answer; an LLM judges.</strong> The judge (gpt-5.4-mini) scores whether each answer is responsive. No gold or human answers.</li>
+        <li><strong>Baseline arm</strong> reads the top-3 candidate docs. <strong>trovex arm</strong> reads the one routed canonical doc plus its routing and index overhead, which we count against trovex.</li>
+        <li><strong>A saving counts only when both arms answer correctly.</strong> Fewer tokens at worse quality does not count.</li>
+      </ul>
+    </section>
+
+    <section style="margin-top:36px;">
+      <h2>What it doesn't cover</h2>
+      <p>The honest limits are the point; without them "measured" is just marketing.</p>
+      <ul>
+        <li>n=26 is small, and it's a single corpus (ours).</li>
+        <li>An LLM judges responsiveness; there are no human or gold answers.</li>
+        <li>trovex got 3 answers wrong (wrong doc, or abstained when an answer existed).</li>
+        <li>The needle-in-a-large-corpus category (C8) underperformed this run. We don't claim it as a strength.</li>
+      </ul>
+    </section>
+
+    <section style="margin-top:36px;">
+      <h2>Check it yourself</h2>
+      <p>The method is the claim, not a fixed percentage.</p>
+      <ul>
+        <li>Reproduce our run: the harness (<code>eval_bench.py</code> + <code>eval_llm.py</code>) and the pre-registered query set are public.</li>
+        <li>On your own repo: the in-product savings view (<code>trovex measure</code>) shows your number. A doc-light repo saves less, and we'd rather say so.</li>
+      </ul>
+    </section>
+
+    <div class="cta">
+      <h2>See it on your own repo.</h2>
+      <p>Point trovex at your repo and it prints the tokens it saved on each lookup — your number, not ours.</p>
+      <div class="cta-row">
+        <a class="btn" href="/savings">estimate on your numbers</a>
+        <a class="btn btn-ghost" href="/method/">the method behind it</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>© 2026 trovex · one source of truth for your agents' docs</small>
+    </div>
+  </footer>
+</body>
+</html>

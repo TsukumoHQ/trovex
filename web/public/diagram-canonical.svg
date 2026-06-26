@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-label="Without trovex an agent rereads several markdown files to guess which is current. With trovex it gets one canonical section by path and line with a freshness marker. About 60 percent fewer tokens for the same answer.">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-label="Without trovex an agent rereads several markdown files to guess which is current. With trovex it gets one canonical section by path and line with a freshness marker. About 60 percent fewer tokens per doc lookup.">
   <defs>
     <style>
       .sans { font-family: 'Fira Sans','Segoe UI',system-ui,-apple-system,sans-serif; }
@@ -102,6 +102,6 @@
   <g transform="translate(600,755)">
     <rect x="-175" y="-32" width="350" height="64" rx="32" fill="#0f1a14" stroke="#22c55e" stroke-width="1.5"/>
     <text class="sans" x="0" y="-3" font-size="26" font-weight="700" fill="#22c55e" text-anchor="middle">~60% fewer tokens</text>
-    <text class="sans" x="0" y="21" font-size="17" font-weight="400" fill="#9aa6b8" text-anchor="middle">same answer, on doc lookups</text>
+    <text class="sans" x="0" y="21" font-size="17" font-weight="400" fill="#9aa6b8" text-anchor="middle">per doc lookup (modeled)</text>
   </g>
 </svg>

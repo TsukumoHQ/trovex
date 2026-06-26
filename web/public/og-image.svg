@@ -16,7 +16,7 @@
     <text x="80" y="150" font-size="34" font-weight="600" fill="#9aa6b8" letter-spacing="0.08em">trovex</text>
     <text x="80" y="300" font-size="76" font-weight="700" fill="#e6edf3">The canonical doc store</text>
     <text x="80" y="392" font-size="76" font-weight="700" fill="#e6edf3">for your <tspan fill="#22c55e">coding agents</tspan>.</text>
-    <text x="80" y="470" font-size="34" font-weight="400" fill="#9aa6b8">One source of truth. Same answers, about</text>
+    <text x="80" y="470" font-size="34" font-weight="400" fill="#9aa6b8">One source of truth. About</text>
     <text x="80" y="516" font-size="34" font-weight="400" fill="#9aa6b8"><tspan fill="#e6edf3" font-weight="600">60% fewer tokens</tspan> per lookup.</text>
   </g>
   <g font-family="'Fira Code','SF Mono',ui-monospace,monospace">

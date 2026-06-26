@@ -417,7 +417,7 @@ def build_app() -> FastAPI:
     async def api_doc_delete(ext_id: str, request: Request) -> JSONResponse:
         """Delete a trovex-owned doc. Updates go through trovex_write (same id)."""
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         ok = get_state().store.delete(ext_id)
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
 
@@ -473,7 +473,7 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_collection_create(request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         body, err = await _read_json(request)
         if err:
             return err
@@ -488,7 +488,7 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_collection_delete(name: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         get_state().store.delete_collection(name)
         return JSONResponse({"deleted": True})
 
@@ -515,7 +515,7 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         body, err = await _read_json(request)
         if err:
             return err
@@ -589,7 +589,7 @@ def build_app() -> FastAPI:
         current-state record from a free summary (PostCompact's compact_summary,
         no LLM). Distil-from-transcript is step 4. Write-gated."""
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         body, err = await _read_json(request)
         if err:
             return err
@@ -681,7 +681,7 @@ def build_app() -> FastAPI:
     @write_limit
     async def api_backup(request: Request) -> JSONResponse:
         if not _write_authorized(request):
-            return JSONResponse({"error": "unauthorized"}, status_code=403)
+            return _unauthorized()
         from . import backup as backup_mod
         state = get_state()
         dest = backup_mod.make_backup(state.settings.data_dir / "trovex.db", state.settings.data_dir)

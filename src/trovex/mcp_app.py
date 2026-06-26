@@ -130,14 +130,22 @@ def trovex(q: str, summary: bool = False) -> str:
 
 
 def _authorized() -> bool:
-    """Writes require the shared token (X-TROVEX-Write-Token) when one is configured.
-    Empty token = open (back-compat). Gates trovex_write / trovex_tag / trovex_delete."""
+    """Writes require the shared token via the X-TROVEX-Write-Token header.
+
+    By default the token is auto-generated and persisted to
+    ``<data_dir>/.write_token`` (see config.resolve_write_token), so a write is
+    closed unless the caller presents it. An empty token only happens when
+    TROVEX_ALLOW_UNAUTH_WRITES is set (opt-in open writes).
+    Gates trovex_write / trovex_tag / trovex_delete."""
     from .usage import current_write_token
     tok = get_state().settings.write_token
     return (not tok) or (current_write_token.get() == tok)
 
 
-_DENY = "(unauthorized — set the X-TROVEX-Write-Token header to the shared write token)"
+_DENY = (
+    "(unauthorized — send the X-TROVEX-Write-Token header. The token is at "
+    "<data_dir>/.write_token, or set TROVEX_WRITE_TOKEN to a shared value.)"
+)
 
 
 def _as_taglist(v) -> list[str]:

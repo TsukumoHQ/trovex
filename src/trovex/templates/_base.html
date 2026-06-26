@@ -636,11 +636,26 @@
 </main>
 <script>
   // Shared write token for UI write actions (delete / tag / collection / backup).
-  // Set once on /settings; kept in localStorage and sent as X-TROVEX-Write-Token.
+  // Set once on /settings, or auto-bootstrapped below; kept in localStorage and
+  // sent as X-TROVEX-Write-Token.
   window.trovexWriteHeaders = function () {
     var t = localStorage.getItem('trovexWriteToken');
     return t ? { 'X-TROVEX-Write-Token': t } : {};
   };
+
+  // Local-UI convenience: if no token is stored yet, ask the server for the
+  // auto-generated one. The endpoint only answers same-machine (loopback)
+  // requests, so a remote browser gets nothing and writes stay closed.
+  (function () {
+    if (localStorage.getItem('trovexWriteToken')) return;
+    fetch('/api/write-token').then(function (r) {
+      return r.ok ? r.json() : null;
+    }).then(function (d) {
+      if (d && d.token) {
+        try { localStorage.setItem('trovexWriteToken', d.token); } catch (e) {}
+      }
+    }).catch(function () {});
+  })();
 </script>
 <script>
   // Theme toggle — persist the explicit choice; pre-paint script reads it next load.

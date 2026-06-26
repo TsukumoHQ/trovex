@@ -1,8 +1,14 @@
+import logging
+import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+log = logging.getLogger("trovex.config")
+
+WRITE_TOKEN_FILE = ".write_token"
 
 
 @dataclass(frozen=True)
@@ -110,3 +116,33 @@ class Settings(BaseSettings):
                 return sources
         # Single-source fallback (legacy behaviour).
         return [Source(id="code", label=self.project_root.name, root=self.project_root.resolve())]
+
+
+def _load_or_create_write_token(data_dir: Path) -> str:
+    """Return the persisted per-instance write token, creating it on first run.
+
+    Stored at ``<data_dir>/.write_token`` with 0600 perms so only the running
+    user can read it. If the file can't be persisted (e.g. a read-only data dir),
+    fall back to an ephemeral in-process token — still closed, never open.
+    """
+    path = data_dir / WRITE_TOKEN_FILE
+    try:
+        if path.exists():
+            tok = path.read_text(encoding="utf-8").strip()
+            if tok:
+                return tok
+        data_dir.mkdir(parents=True, exist_ok=True)
+        tok = secrets.token_urlsafe(32)
+        path.write_text(tok, encoding="utf-8")
+        try:
+            path.chmod(0o600)
+        except OSError:
+            log.warning("could not chmod 600 the write-token file at %s", path)
+        return tok
+    except OSError:
+        log.warning(
+            "could not persist a write token under %s — using an ephemeral one; "
+            "set TROVEX_WRITE_TOKEN to a fixed value to write from other tools",
+            data_dir,
+        )
+        return secrets.token_urlsafe(32)

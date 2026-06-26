@@ -18,7 +18,7 @@ freshness marker (canonical / stale / duplicate), and serves just the section th
 instead of the whole file. Agents also write what they learn back through one shared point,
 so every agent and teammate reads the same source of truth instead of re-deriving it.
 
-About **60% fewer tokens** on doc lookups, modeled on our own repo (it varies by yours). Runs locally: vectors in
+About **60% fewer tokens** on doc lookups, measured at equal task-success on our own repo (it varies by yours). Runs locally: vectors in
 SQLite, embeddings via ONNX, no cloud or API keys.
 
 ## What you're installing
@@ -28,7 +28,7 @@ A 30-second trust check, since the decision happens on the README, not the direc
 - **First-party, open source.** Built and run in production by [tsukumo](https://tsukumo.ch), the team behind it. AGPL-3.0-or-later.
 - **Local-first, nothing leaves your machine.** Vectors in SQLite, embeddings via ONNX. No cloud, no API keys, no network call to answer a query.
 - **Confined writes, no shell.** Six MCP tools: three read-only (`trovex`, `trovex_read`, `trovex_search`) and three that mutate only trovex's own doc store (`trovex_write`, `trovex_tag`, `trovex_delete`). No shell execution, no writes to your source files.
-- **The ~60% is reproducible.** Measured on real repos; `trovex search` prints the savings on yours (method in the [benchmark writeup](https://tsukumo.ch/blog/the-token-cost-of-agents-rereading-docs)).
+- **The ~60% is reproducible.** Measured at equal task-success on our own repo (median 69%, ~41–81% by repo, n=26, LLM-judged); `trovex search` prints the savings on yours. Full method at [trovex.dev/measure](https://trovex.dev/measure).
 
 ## Quick start
 
@@ -94,7 +94,7 @@ Humans read trovex-owned docs at `/doc/{id}` in the rendered reader. To make age
   one current doc with an explicit marker. [More](https://trovex.dev/vs/vector-db-rag/).
 
 The reasoning behind the ~60% number is written up in
-[the token cost of agents rereading docs](https://tsukumo.ch/blog/the-token-cost-of-agents-rereading-docs).
+[the benchmark methodology](https://trovex.dev/measure).
 
 ## Stack
 

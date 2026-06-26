@@ -402,6 +402,7 @@ export default function App() {
                 visual proof, but it sits below the fold — this carries the ~60% up top. */}
             <p className="hero-proof">
               <b>~60% fewer tokens</b> per .md lookup · modeled median (~38–79% by repo) ·{' '}
+              <a className="hero-proof-link" href="/measure/" onClick={() => track('cta_clicked', { cta_id: 'methodology', location: 'hero' })}>how we measure →</a>{' · '}
               <a className="hero-proof-link" href="/savings" onClick={() => track('cta_clicked', { cta_id: 'estimate-savings', location: 'hero' })}>estimate it on your numbers →</a>
             </p>
             {/* The install command IS the primary action (uv pattern): copy + run,

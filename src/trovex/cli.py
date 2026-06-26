@@ -107,7 +107,50 @@ def serve(
 
     from .server import build_app
 
+    _print_update_notice()
     uvicorn.run(build_app(), host=host, port=port)
+
+
+def _print_update_notice() -> None:
+    """Light, fail-safe startup notice for long-running commands. Honors the 24h
+    cache and never raises — a version check must never break or slow `serve`."""
+    try:
+        from .update import check_for_update, notice_line
+
+        info = check_for_update()
+        if info is not None:
+            line = notice_line(info)
+            if line:
+                console.print(f"[dim]{line}[/dim]")
+    except Exception:
+        pass
+
+
+@app.command()
+def update(
+    check_only: bool = typer.Option(False, "--check", help="Only check; don't run the upgrade."),
+) -> None:
+    """Check GitHub for a newer trovex release and upgrade it (uv tool / pip)."""
+    from .update import check_for_update, notice_line, upgrade_command
+
+    info = check_for_update(force=True)
+    if info is None:
+        console.print("Couldn't reach GitHub to check for updates (offline?). Try again later.")
+        return
+    if not info.newer:
+        console.print(f"trovex {info.installed} is up to date.")
+        return
+    console.print(notice_line(info) or "")
+    if check_only:
+        return
+    cmd = upgrade_command()
+    console.print(f"Running: {' '.join(cmd)}")
+    import subprocess
+
+    try:
+        subprocess.run(cmd, check=False)  # noqa: S603 — pinned uv/pip upgrade command
+    except (OSError, ValueError) as e:
+        console.print(f"[red]Upgrade failed:[/red] {e}\nRun it manually: {' '.join(cmd)}")
 
 
 @app.command()

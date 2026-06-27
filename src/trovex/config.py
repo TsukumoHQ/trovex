@@ -106,8 +106,12 @@ class Settings(BaseSettings):
         r"WIP",
     ]
 
-    # Server
-    host: str = "0.0.0.0"
+    # Server. Default to loopback: trovex is a local dev tool and the dashboard +
+    # query-log views (/usage, /insights) are read-open, so an all-interfaces bind
+    # would expose your team's query text to anyone who can reach the port. Set
+    # TROVEX_HOST=0.0.0.0 (or `serve --host`) to opt into a public/LAN/Docker bind;
+    # _run_server warns loudly when you do.
+    host: str = "127.0.0.1"
     port: int = 8765
 
     # Rate limiting (slowapi, keyed by client IP). Empty disables a class.

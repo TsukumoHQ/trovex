@@ -99,18 +99,36 @@ def search(
             )
 
 
-@app.command()
-def serve(
-    host: str = typer.Option("0.0.0.0"),
-    port: int = typer.Option(8765),
-) -> None:
-    """Start the MCP + Web UI server."""
+_ALL_IFACES = {"0.0.0.0", "::", "[::]"}
+
+
+def _run_server(host: str, port: int) -> None:
+    """Launch uvicorn, warning loudly on an all-interfaces bind. The dashboard and
+    query-log views (/usage, /insights) are read-open, so a public bind exposes your
+    team's query text to anyone who can reach the port — keep it on 127.0.0.1 unless
+    it sits behind an authenticated proxy."""
     import uvicorn
 
     from .server import build_app
 
-    _print_update_notice()
+    if host in _ALL_IFACES:
+        console.print(
+            f"[yellow]⚠ trovex is binding ALL interfaces ({host}:{port}). The dashboard "
+            "and query-log views (/usage, /insights) are read-open — anyone who can reach "
+            "this port sees your query text. Use 127.0.0.1 (default) or front it with an "
+            "authenticated proxy for shared/remote use.[/yellow]"
+        )
     uvicorn.run(build_app(), host=host, port=port)
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(8765),
+) -> None:
+    """Start the MCP + Web UI server."""
+    _print_update_notice()
+    _run_server(host, port)
 
 
 @app.command()
@@ -685,11 +703,7 @@ def onboard() -> None:
         f"[dim]Serving at[/dim] [cyan]http://localhost:{settings.port}[/cyan] "
         "[dim](Ctrl-C to stop)…[/dim]"
     )
-    import uvicorn
-
-    from .server import build_app
-
-    uvicorn.run(build_app(), host=settings.host, port=settings.port)
+    _run_server(settings.host, settings.port)
 
 
 @app.command(name="backfill-chunks")

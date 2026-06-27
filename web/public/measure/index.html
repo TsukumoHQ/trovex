@@ -118,9 +118,10 @@
       <h2>Check it yourself</h2>
       <p>The method is the claim, not a fixed percentage.</p>
       <ul>
-        <li>Reproduce our run: the harness (<code>eval_bench.py</code> + <code>eval_llm.py</code>) and the pre-registered query set are public.</li>
-        <li>On your own repo: the in-product savings view (<code>trovex measure</code>) shows your number. A doc-light repo saves less, and we'd rather say so.</li>
+        <li>Reproduce our run: <code>uvx trovex bench &lt;repo&gt;</code> runs the benchmark on any repo. The default is the per-query token model; <code>--eval</code> runs the LLM-judge A/B at equal task-success; <code>--json</code> gives machine-readable output. The pre-registered query set is public.</li>
+        <li>On your own repo: point it at your docs and you get your own before-and-after, not our number. A doc-light repo saves less, and we would rather say so.</li>
       </ul>
+      <p>Full method &rarr; <a href="/method/">/method</a>.</p>
     </section>
 
     <div class="cta">

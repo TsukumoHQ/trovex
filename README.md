@@ -8,6 +8,10 @@
 
 **trovex — one canonical doc for your coding agents, ~60% fewer tokens.**
 
+<p align="center">
+  <a href="https://tsukumo.ch/discord?utm_source=github&utm_medium=readme&utm_campaign=discord&utm_content=trovex"><img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white" alt="Join the tsukumo community on Discord"></a>
+</p>
+
 Your coding agents (Claude Code, Cursor, Windsurf, Zed, any MCP client) reread the repo
 every session to work out which `.md` is current, then answer from a guess. You pay for
 that on every session, every agent, every teammate.
@@ -174,8 +178,9 @@ trovex is in public beta. Install it, run it on your repo, and if it saves you t
 [GitHub star](https://github.com/TsukumoHQ/trovex) helps other devs find it. Issues and
 PRs welcome.
 
-Questions, or comparing notes with other people running agents? Join the community Slack:
-[tsukumo.ch/slack](https://tsukumo.ch/slack).
+Questions, or comparing notes with other people running agents? Join the community on Discord:
+[tsukumo.ch/discord](https://tsukumo.ch/discord?utm_source=github&utm_medium=readme&utm_campaign=discord&utm_content=community)
+(also on [Slack](https://tsukumo.ch/slack)).
 
 ## Security
 

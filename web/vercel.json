@@ -6,7 +6,9 @@
   "redirects": [
     { "source": "/beta", "destination": "/", "permanent": true },
     { "source": "/beta/", "destination": "/", "permanent": true },
-    { "source": "/blog", "destination": "https://tsukumo.ch/blog", "permanent": true }
+    { "source": "/blog", "destination": "https://tsukumo.ch/blog", "permanent": true },
+    { "source": "/methodology", "destination": "/method", "permanent": true },
+    { "source": "/methodology/", "destination": "/method", "permanent": true }
   ],
   "rewrites": [
     { "source": "/js/script.js", "destination": "https://plausible.io/js/script.js" },

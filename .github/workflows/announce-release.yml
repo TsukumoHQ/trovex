@@ -1,0 +1,43 @@
+name: Announce release to Discord
+
+# Posts a Discord embed to the #releases channel whenever a GitHub Release is
+# published. The webhook URL lives in the repo secret DISCORD_RELEASE_WEBHOOK
+# (Settings -> Secrets and variables -> Actions). Publishing a Release is the
+# announce signal; plain tag pushes (which drive publish-mcp.yml) stay silent.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.release.prerelease }}
+    steps:
+      - name: Post release to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          TAG: ${{ github.event.release.tag_name }}
+          NAME: ${{ github.event.release.name }}
+          URL: ${{ github.event.release.html_url }}
+          BODY: ${{ github.event.release.body }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "DISCORD_RELEASE_WEBHOOK not set — skipping." >&2
+            exit 0
+          fi
+          title="${NAME:-$TAG}"
+          # Discord embed descriptions cap at 4096; trim release notes well under it.
+          desc=$(printf '%s' "$BODY" | head -c 1500)
+          payload=$(jq -n \
+            --arg title "🚀 ${REPO}  ${title}" \
+            --arg url "$URL" \
+            --arg desc "$desc" \
+            '{username: "trovex releases",
+              embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')
+          curl -fsS -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"

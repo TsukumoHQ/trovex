@@ -5,6 +5,7 @@ Single tool, minimal output by design — see project README for rationale.
 
 import logging
 import os
+import secrets
 import time
 
 from mcp.server.fastmcp import FastMCP
@@ -161,7 +162,9 @@ def _authorized() -> bool:
     from .usage import current_write_token
 
     tok = get_state().settings.write_token
-    return (not tok) or (current_write_token.get() == tok)
+    if not tok:
+        return True
+    return secrets.compare_digest(current_write_token.get() or "", tok)
 
 
 _DENY = (

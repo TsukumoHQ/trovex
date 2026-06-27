@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/TsukumoHQ/trovex/main/growth/assets/brand/readme-hero.png" alt="trovex — one canonical doc for your coding agents, ~60% fewer tokens." width="100%">
+  <img src="https://raw.githubusercontent.com/TsukumoHQ/trovex/main/.github/assets/readme-hero.png" alt="trovex — one canonical doc for your coding agents, ~60% fewer tokens." width="100%">
 </p>
 
 <!-- mcp-name: io.github.TsukumoHQ/trovex -->

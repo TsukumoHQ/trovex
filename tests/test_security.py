@@ -178,6 +178,33 @@ def test_search_rate_limit_returns_429(tmp_path):
         state_mod.reset_state()
 
 
+def test_search_partial_is_rate_limited(tmp_path):
+    # /search/partial does the same embed+fusion cost as /search (a paid embed call
+    # per hit); without the gate an anon client loops it to burn the operator's spend.
+    settings = _make_settings(tmp_path, rate_limit_search="2/minute")
+    _inject_state(settings)
+    try:
+        client = TestClient(build_app())
+        assert client.get("/search/partial", params={"q": "x"}).status_code == 200
+        assert client.get("/search/partial", params={"q": "x"}).status_code == 200
+        assert client.get("/search/partial", params={"q": "x"}).status_code == 429
+    finally:
+        state_mod.reset_state()
+
+
+def test_search_routes_cap_query_length(tmp_path):
+    # An over-long q must 422 before it reaches the embedder, on both search surfaces.
+    _inject_state(_make_settings(tmp_path))
+    try:
+        client = TestClient(build_app())
+        toolong = "a" * 501
+        assert client.get("/search", params={"q": toolong}).status_code == 422
+        assert client.get("/search/partial", params={"q": toolong}).status_code == 422
+        assert client.get("/store", params={"q": "a" * 201}).status_code == 422
+    finally:
+        state_mod.reset_state()
+
+
 def test_write_rate_limit_returns_429(tmp_path):
     settings = _make_settings(tmp_path, rate_limit_write="1/minute")
     _inject_state(settings)

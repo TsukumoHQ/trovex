@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import secrets
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -175,7 +176,9 @@ def _write_authorized(request: Request) -> bool:
     auto-generated + persisted by default (fail-closed); empty only under the
     TROVEX_ALLOW_UNAUTH_WRITES opt-in. See config.resolve_write_token."""
     tok = get_state().settings.write_token
-    return (not tok) or (request.headers.get("x-trovex-write-token") == tok)
+    if not tok:
+        return True
+    return secrets.compare_digest(request.headers.get("x-trovex-write-token") or "", tok)
 
 
 _UNAUTH_MSG = (
@@ -441,7 +444,7 @@ def build_app() -> FastAPI:
     @search_limit
     async def search_html(
         request: Request,
-        q: str = "",
+        q: str = Query("", max_length=500),
         summary: bool = False,
         tag: list[str] = Query(default=[]),
         kind: str = "",
@@ -455,15 +458,18 @@ def build_app() -> FastAPI:
         )
 
     @app.get("/search/partial", response_class=HTMLResponse)
+    @search_limit
     async def search_partial(
         request: Request,
-        q: str = "",
+        q: str = Query("", max_length=500),
         summary: bool = False,
         tag: list[str] = Query(default=[]),
         kind: str = "",
         sort: str = "relevance",
         page: int = 1,
     ) -> HTMLResponse:
+        # Same embed+fusion cost as /search (a paid embed call per hit) — MUST carry the
+        # same rate-limit + q length cap, else an anon client loops it to burn OpenAI spend.
         return _render_search(
             request, templates, q, summary, partial=True, tags=tag, kind=kind, sort=sort, page=page
         )
@@ -535,7 +541,7 @@ def build_app() -> FastAPI:
         tag: str = "",
         kind: str = "",
         collection: str = "",
-        q: str = "",
+        q: str = Query("", max_length=200),
         page: int = 1,
     ) -> HTMLResponse:
         """The trovex-owned doc store — browse + quick title/text filter. Semantic

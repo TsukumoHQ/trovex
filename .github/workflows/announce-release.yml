@@ -1,13 +1,22 @@
 name: Announce release to Discord
 
-# Posts a Discord embed to the #releases channel whenever a GitHub Release is
-# published. The webhook URL lives in the repo secret DISCORD_RELEASE_WEBHOOK
-# (Settings -> Secrets and variables -> Actions). Publishing a Release is the
-# announce signal; plain tag pushes (which drive publish-mcp.yml) stay silent.
+# On every version tag (v*), posts to two Discord channels:
+#   - #release   (DISCORD_RELEASE_WEBHOOK)   -> short announce embed
+#   - #changelog (DISCORD_CHANGELOG_WEBHOOK) -> full release notes
+# Tag push is the reliable signal (the same one publish-mcp.yml uses); GitHub
+# `release` events do NOT fire Actions for PAT-created releases on this repo.
+# workflow_dispatch allows a manual test run against an existing tag without
+# cutting a new version. Each webhook is independent — an unset one is skipped.
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to announce (e.g. v0.11.7)"
+        required: true
 
 permissions:
   contents: read
@@ -15,29 +24,41 @@ permissions:
 jobs:
   announce:
     runs-on: ubuntu-latest
-    if: ${{ !github.event.release.prerelease }}
     steps:
-      - name: Post release to Discord
+      - name: Post to Discord
         env:
-          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
-          TAG: ${{ github.event.release.tag_name }}
-          NAME: ${{ github.event.release.name }}
-          URL: ${{ github.event.release.html_url }}
-          BODY: ${{ github.event.release.body }}
+          RELEASE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          CHANGELOG_WEBHOOK: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          if [ -z "${WEBHOOK:-}" ]; then
-            echo "DISCORD_RELEASE_WEBHOOK not set — skipping." >&2
-            exit 0
-          fi
-          title="${NAME:-$TAG}"
-          # Discord embed descriptions cap at 4096; trim release notes well under it.
-          desc=$(printf '%s' "$BODY" | head -c 1500)
-          payload=$(jq -n \
-            --arg title "🚀 ${REPO}  ${title}" \
-            --arg url "$URL" \
-            --arg desc "$desc" \
+          url="https://github.com/${REPO}/releases/tag/${TAG}"
+          # Release notes if a GitHub Release exists for this tag; else a default line.
+          body=$(gh api "repos/${REPO}/releases/tags/${TAG}" --jq '.body' 2>/dev/null || true)
+          [ -z "$body" ] && body="New release: ${TAG}"
+
+          post() { # $1=webhook  $2=json payload
+            [ -z "$1" ] && return 0
+            curl -fsS -H "Content-Type: application/json" -d "$2" "$1"
+          }
+
+          # #release — short announce, points readers to #changelog for detail.
+          announce=$(jq -n \
+            --arg title "🚀 ${REPO}  ${TAG}" \
+            --arg url "$url" \
+            --arg desc "New release is out. Full notes in #changelog." \
             '{username: "trovex releases",
               embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')
-          curl -fsS -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"
+          post "$RELEASE_WEBHOOK" "$announce"
+
+          # #changelog — full notes (Discord embed description caps at 4096).
+          desc=$(printf '%s' "$body" | head -c 4000)
+          changelog=$(jq -n \
+            --arg title "📝 Changelog — ${TAG}" \
+            --arg url "$url" \
+            --arg desc "$desc" \
+            '{username: "trovex changelog",
+              embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')
+          post "$CHANGELOG_WEBHOOK" "$changelog"

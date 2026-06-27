@@ -3,7 +3,7 @@ name: review-trovex
 description: Domain self-review for the trovex lane (Python/FastAPI/sqlite-vec/MCP backend + Vite/React web + the doc-router & Active-Memory subsystem). Run on your OWN diff as the LAST step before posting a PR; paste the verdict in the PR body. Catches the trovex-specific gotchas a generic review misses — gate command, Active-Memory invariants, brand/host leaks, registry case, PyPI immutability, secrets, md-guard/SSOT. Use when you finished a trovex change in a .worktrees/ branch.
 metadata:
   author: fullstack-trovex
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # review-trovex — trovex-lane self-review gate
@@ -57,6 +57,13 @@ git diff origin/main...HEAD | grep -nE '^\+.*(TODO|FIXME|print\(|console\.log)'
 - **Self-merge** only if ALL: green gate + isolated + single-lane + no schema + no prod deploy + no release tag + no shared/cross-lane file + no human-facing copy.
 - **PR-to-cto** if ANY: schema/migration, prod deploy, release tag/release-adjacent, cross-lane or shared surface (CI config, another lane's files), human-facing copy, or a change that could turn trunk RED.
 - TRUNK-GREEN IS SACRED: never merge onto/while RED. Found trunk RED → ping cto, don't pile on.
+
+## Step 8 — Product Q&A (AX self-report — STANDING DUTY, enforced)
+You are a FIRST USER of the tools you build/run on (trovex / wrai.th / dokan / yoru). Your friction = the roadmap. Spec = trovex doc `b8e05fa3`; method = `2a0f3aa1` (agent-experience-AX-research).
+- **WHEN**: on a CTO "product interview" call → answer THAT tick (don't defer); **and** standing — fold ≥1 *fresh* friction/footgun into your standup DOGFOOD line every cycle. Silence ≠ "no problems".
+- **THE RULE**: blunt, friction is the gold, do NOT flatter. **Trace-grounded** — cite a real call / doc-id / error / retry / token-cost; claims must be log-confirmable (cto triangulates vs telemetry). No confabulation — if you can't tie it to evidence, mark `hypothesis`. Flag **"I build this"** on trovex (bias-weight). Name ≥1 thing that works fine (falsify the please-reflex).
+- **6 Qs per tool you USE**: (1) JOB — job-to-be-done; (2) WIN — what saves the most; (3) FRICTION — cite the step you worked around; (4) MISSING — the ONE 10x change; (5) FOOTGUN — cite what misled/broke silently; (6) AGENT-LENS — how YOU (an agent, polling on a timer) use it vs a human.
+- **SUBMIT**: reply to cto, type `response`, subject `AX Q&A: trovex`. One block per tool; skip tools you didn't use this cycle.
 
 ## Self-verdict (paste in the PR body)
 - **✅ ship** — gate green, diff narrow, invariants held, no leak/secret/number issue.

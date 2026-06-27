@@ -68,3 +68,17 @@ def test_growth_is_a_private_prefix():
 def test_no_private_paths_tracked():
     """growth/ must not be tracked in the public repo — the durable anti-regression gate."""
     assert bg.tracked_private_paths() == []
+
+
+def test_legacy_regex_matches_package_leaks():
+    # The shipped-package gate: synergix / synxadmin / ctx.prod must hard-fail.
+    assert bg.LEGACY_RE.search("host = 'trovex.prod.synergix.ch'")
+    assert bg.LEGACY_RE.search("ExecStart=/home/synxadmin/synergix_prod serve")
+    assert bg.LEGACY_RE.search("served from ctx.prod")
+    assert not bg.LEGACY_RE.search("host: str = '0.0.0.0'")  # clean default
+    assert not bg.LEGACY_RE.search("const ctx = canvas.getContext('2d')")  # bare ctx, not the host
+
+
+def test_package_is_legacy_clean():
+    """src/trovex + deploy must carry no synergix/synxadmin/ctx.prod — it ships to PyPI."""
+    assert bg.legacy_package_leaks() == []

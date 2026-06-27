@@ -36,17 +36,25 @@ SCAN_EXT = {".md", ".html", ".txt", ".json", ".webmanifest", ".tsx", ".ts", ".js
 # Copy rules (fabricated Nx, wordmark case) only apply to PROSE/rendered text, not code
 # files — a wordmark in a code comment or a "2x" in CSS is not human-facing marketing copy.
 PROSE_EXT = {".md", ".html", ".txt"}
-SKIP_DIRS = {"node_modules", "dist", ".next"}
+SKIP_DIRS = {"node_modules", "dist", ".next", "__pycache__"}
+
+# The legacy brand/host/infra names must not leak into the SHIPPED PACKAGE either. The
+# copy SCOPE above is web/README only, so a `synergix` / `synxadmin` / `ctx.prod` remnant
+# in src/trovex or deploy/ would ride into the PyPI wheel UNCAUGHT (every uvx user + the
+# repo sees it). Hard-fail on it here so the cleanup can never silently regress.
+PACKAGE_SCOPE = ["src/trovex", "deploy"]
+PACKAGE_EXT = {".py", ".sh", ".service", ".timer", ".yml", ".yaml", ".toml", ".cfg", ".env"}
+LEGACY_RE = re.compile(r"synergix|synxadmin|Synergix-lab|ctx\.(prod|synergix)", re.IGNORECASE)
 
 # Allowlist — functional identifiers stripped from a line BEFORE rule checks, so they
 # never trip a rule (server.json name is CamelCase by design; install cmds; analytics).
 ALLOW = re.compile(
-    r"(io\.github\.TsukumoHQ/trovex"          # mcp-name marker + server.json name (correct case)
-    r"|github\.com/TsukumoHQ[\w./-]*"          # repo URLs
-    r"|TsukumoHQ/[\w.-]+"                       # org/repo identifiers
-    r"|uvx?\s+trovex|uv\s+tool\s+install"      # install commands
+    r"(io\.github\.TsukumoHQ/trovex"  # mcp-name marker + server.json name (correct case)
+    r"|github\.com/TsukumoHQ[\w./-]*"  # repo URLs
+    r"|TsukumoHQ/[\w.-]+"  # org/repo identifiers
+    r"|uvx?\s+trovex|uv\s+tool\s+install"  # install commands
     r"|data-domain|/api/event|/js/script\.js"  # Plausible
-    r"|application/ld\+json"                    # JSON-LD block marker
+    r"|application/ld\+json"  # JSON-LD block marker
     r")",
     re.IGNORECASE,
 )
@@ -85,7 +93,11 @@ def _rule4_acidlime(line: str) -> bool:
 def _rule5_dokan(line: str) -> bool:
     if "dokan" not in line.lower():
         return False
-    return bool(re.search(r"production-grade|enterprise-grade|infinite scale|multi-tenant", line, re.IGNORECASE))
+    return bool(
+        re.search(
+            r"production-grade|enterprise-grade|infinite scale|multi-tenant", line, re.IGNORECASE
+        )
+    )
 
 
 # (n, description, fn, prose_only) — prose_only rules skip code files.
@@ -133,11 +145,39 @@ def tracked_private_paths() -> list[str]:
     try:
         out = subprocess.run(
             ["git", "ls-files", "-z", "--", *PRIVATE_PREFIXES],
-            cwd=ROOT, capture_output=True, text=True, check=False,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
         ).stdout
     except OSError:
         return []
     return [p for p in out.split("\0") if p]
+
+
+def legacy_package_leaks() -> list[str]:
+    """Legacy brand/host/infra names (synergix / synxadmin / ctx.prod) in the SHIPPED
+    PACKAGE (src/trovex + deploy) — these ride into the PyPI wheel, so they hard-fail
+    regardless of the copy SCOPE which only covers web/README."""
+    hits: list[str] = []
+    for r in PACKAGE_SCOPE:
+        p = ROOT / r
+        if not p.exists():
+            continue
+        for f in p.rglob("*"):
+            if not f.is_file() or (set(f.parts) & SKIP_DIRS) or f.suffix not in PACKAGE_EXT:
+                continue
+            try:
+                text = f.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for i, raw in enumerate(text.splitlines(), 1):
+                if LEGACY_RE.search(raw):
+                    rel = f.relative_to(ROOT)
+                    hits.append(
+                        f"{rel}:{i} — LEGACY brand/host in shipped package — {raw.strip()[:100]}"
+                    )
+    return hits
 
 
 def main() -> int:
@@ -152,17 +192,30 @@ def main() -> int:
             print(f"  … +{len(private) - 20} more")
         print("")
 
+    leaks = legacy_package_leaks()
+    if leaks:
+        print("✗ Brand guard FAILED — legacy brand/host in the SHIPPED PACKAGE (ships to PyPI):")
+        print("  synergix / synxadmin / ctx.prod must not appear in src/trovex or deploy/.")
+        print("  Replace with a generic placeholder; this is what every uvx user would see.\n")
+        for leak in leaks:
+            print("  " + leak)
+        print("")
+
     offenders = scan()
     if offenders:
         print("✗ Brand guard FAILED — brand-rule violations on public surfaces:")
-        print("  (rules spec: trovex doc 1dcec9e9; fix the surface, or update the doc if a rule is wrong)\n")
+        print(
+            "  (rules spec: trovex doc 1dcec9e9; fix the surface, or update the doc if a rule is wrong)\n"
+        )
         for o in offenders:
             print("  " + o)
         print("")
 
-    if private or offenders:
+    if private or offenders or leaks:
         return 1
-    print("✓ Brand guard: no private paths tracked, no brand-rule violations on public surfaces.")
+    print(
+        "✓ Brand guard: no private paths, no brand-rule violations, no legacy leak in the package."
+    )
     return 0
 
 

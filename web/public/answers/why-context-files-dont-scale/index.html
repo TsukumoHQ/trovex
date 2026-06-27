@@ -123,6 +123,10 @@
     <p class="lead-answer"><a href="/">trovex</a> is an open-source, local-first MCP server that handles the second layer. It indexes your repo's markdown and answers a query with the single current doc (a <code>path:line</code> pointer, marked canonical, stale, or duplicate, down to the section), so the agent reads one right answer instead of sifting candidates or carrying your whole project in its prompt. It runs on your machine (vectors in SQLite, ONNX embeddings, no cloud or API keys) and cuts about <strong>60% of the tokens per lookup</strong>. See the measured breakdown in <a href="/answers/token-cost-of-agent-context/">what context costs your agents</a>.</p>
     <div class="cmd mono" style="display:inline-block;margin-top:14px;">$ uv run trovex index /path/to/repo</div>
 
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Rolling agents out across a team? tsukumo, the studio behind trovex, consults on doing it well at scale. <a href="https://calendly.com/hello-tsukumo/tsukumo-1-hour-call-clone?utm_source=trovex&amp;utm_medium=oss-suite&amp;utm_campaign=consulting&amp;utm_content=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
     <div class="related">
       <div class="l">Related questions</div>
       <ul>

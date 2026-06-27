@@ -8,6 +8,7 @@
  *     signal). location = <section>-<slug>, e.g. answers-reduce-agent-token-costs
  *     or glossary-canonical-doc.
  *   - github_clicked — a click on any GitHub link (conversion proxy).
+ *   - consult_clicked — a click on the soft tsukumo discovery-call band (funnel handoff).
  *
  * One file, both sections: a dev arriving from an AI-engine citation can install
  * in place instead of bouncing to the landing. Section + slug are derived from
@@ -48,9 +49,10 @@
       }
 
       var a = t && t.closest ? t.closest('a[href]') : null
-      if (a && /github\.com/i.test(a.getAttribute('href') || '')) {
-        track('github_clicked', { location: loc })
-      }
+      if (!a) return
+      var href = a.getAttribute('href') || ''
+      if (/github\.com/i.test(href)) track('github_clicked', { location: loc })
+      else if (/calendly\.com/i.test(href) || a.hasAttribute('data-consult')) track('consult_clicked', { location: loc })
     },
     true,
   )

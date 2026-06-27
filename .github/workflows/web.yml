@@ -30,3 +30,26 @@ jobs:
       - run: npm run typecheck:api
       - run: npm test
       - run: npm run build
+
+  # Reach: after a PROD deploy (push to main), nudge IndexNow (Bing/Yandex — Bing powers
+  # ~87% of ChatGPT's web citations) to recrawl the live sitemap. PROD only: gated on a
+  # push to main, never on PRs/previews. No secret — the public key file at the domain
+  # root is the auth. IndexNow dedupes + rate-limits server-side, so re-pinging the full
+  # sitemap every content deploy is safe and idempotent. needs: build so a red build never
+  # pings stale URLs.
+  indexnow:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Let the Vercel prod deploy settle
+        run: sleep 90
+      - name: Ping IndexNow with the live sitemap URLs
+        run: npm run indexnow

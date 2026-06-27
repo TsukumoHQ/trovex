@@ -17,7 +17,7 @@ from trovex.config import Settings, Source
 from trovex.indexer import Indexer
 from trovex.search import Searcher
 from trovex.status import compute_status
-from trovex.store import SqliteStore, extract_section
+from trovex.store import SqliteStore, extract_section, replace_section
 
 DIM = 384
 
@@ -76,6 +76,54 @@ def test_get_unknown_returns_none(store):
     assert store.get("does-not-exist") is None
 
 
+def test_resolve_ext_id_accepts_unique_prefix(store):
+    full = store.put("# Doc\n\nbody")
+    assert store.resolve_ext_id(full) == full  # exact
+    assert store.resolve_ext_id(full[:8]) == full  # unique short prefix
+    assert store.resolve_ext_id(full[:8].upper()) == full  # LIKE is case-insensitive — forgiving
+    assert store.resolve_ext_id("zzzzzzzz") is None  # absent
+    assert store.resolve_ext_id("") is None
+
+
+def test_resolve_ext_id_ambiguous_prefix_is_none(store):
+    # Two ids sharing a prefix → ambiguous → None (never silently pick one).
+    store.put("# A\n\na", ext_id="dupprefix-aaaa")
+    store.put("# B\n\nb", ext_id="dupprefix-bbbb")
+    assert store.resolve_ext_id("dupprefix-") is None
+    assert store.resolve_ext_id("dupprefix-aaaa") == "dupprefix-aaaa"  # full still resolves
+
+
+def test_replace_section_patches_in_place():
+    doc = "# Title\n\nintro\n\n## Standing\n\nold body\n\n## Other\n\nkeep me"
+    patched = replace_section(doc, "Standing", "## Standing\n\nNEW body")
+    assert patched is not None
+    assert "NEW body" in patched
+    assert "old body" not in patched
+    assert "keep me" in patched  # sibling section untouched
+    assert "intro" in patched  # preamble untouched
+    # The patched doc still has both headings.
+    assert patched.count("## ") == 2
+
+
+def test_replace_section_missing_heading_returns_none():
+    doc = "# Title\n\n## Standing\n\nbody"
+    assert replace_section(doc, "Nonexistent", "whatever") is None  # caller MUST hard-error
+
+
+def test_section_write_roundtrip_preserves_siblings(store):
+    body = "# Notes\n\n## Alpha\n\nalpha-one\n\n## Beta\n\nbeta-one"
+    ext_id = store.put(body, kind="record")
+    # Read a section, edit it, write it back — the data-loss-safe path.
+    sec = extract_section(store.get(ext_id).content, "Alpha")
+    assert sec == "## Alpha\n\nalpha-one"
+    patched = replace_section(store.get(ext_id).content, "Alpha", "## Alpha\n\nalpha-TWO")
+    store.put(patched, ext_id=ext_id, kind="record")
+    doc = store.get(ext_id)
+    assert "alpha-TWO" in doc.content
+    assert "beta-one" in doc.content  # the other section survived (no whole-doc clobber)
+    assert len(store.list_docs()) == 1  # still one doc
+
+
 def test_read_by_query_routes_to_right_doc(settings, store):
     """trovex_read's query path: search restricted to source_id='trovex' returns the
     matching doc's ext_id, which the Store resolves to content."""
@@ -92,10 +140,12 @@ def test_read_by_query_routes_to_right_doc(settings, store):
 def test_search_filters_by_kind_and_tags(settings, store):
     """The /api/boot scope path: doc-level search narrows to a kind and/or an owner
     tag, so an agent recalls only its OWN records — not the whole store. Scope first."""
-    rec = store.put("# Auth incident\n\njwt token signature failed",
-                    kind="record", tags=["owner/alpha"])
-    note = store.put("# Auth note\n\njwt token signature failed",
-                     tags=["owner/beta"])  # kind None → a normal living doc
+    rec = store.put(
+        "# Auth incident\n\njwt token signature failed", kind="record", tags=["owner/alpha"]
+    )
+    note = store.put(
+        "# Auth note\n\njwt token signature failed", tags=["owner/beta"]
+    )  # kind None → a normal living doc
 
     searcher = Searcher(settings, embedder=BagEmbedder())
 
@@ -104,18 +154,19 @@ def test_search_filters_by_kind_and_tags(settings, store):
     assert {r.path for r in base} == {rec, note}
 
     # kind filter → only the record.
-    by_kind = searcher.search("jwt token signature", limit=5,
-                              source_ids=["trovex"], kind="record")
+    by_kind = searcher.search("jwt token signature", limit=5, source_ids=["trovex"], kind="record")
     assert [r.path for r in by_kind] == [rec]
 
     # tag filter (any-match) → only the alpha-owned doc.
-    by_tag = searcher.search("jwt token signature", limit=5,
-                             source_ids=["trovex"], tags=["owner/alpha"])
+    by_tag = searcher.search(
+        "jwt token signature", limit=5, source_ids=["trovex"], tags=["owner/alpha"]
+    )
     assert [r.path for r in by_tag] == [rec]
 
     # kind AND tags are ANDed: record ∧ owner/beta matches neither doc.
-    scoped = searcher.search("jwt token signature", limit=5,
-                             source_ids=["trovex"], kind="record", tags=["owner/beta"])
+    scoped = searcher.search(
+        "jwt token signature", limit=5, source_ids=["trovex"], kind="record", tags=["owner/beta"]
+    )
     assert scoped == []
 
 
@@ -124,12 +175,15 @@ def test_boot_pointers_scopes_to_owner_records(settings, store):
     kind=record) — not other agents', not non-record docs. Scope first."""
     from trovex.boot import boot_pointers
 
-    store.put("# fullstack state\n\njwt token signature work in flight",
-              kind="record", tags=["owner/fullstack"])
-    store.put("# cmo state\n\njwt token signature current state",
-              kind="record", tags=["owner/cmo"])
-    store.put("# fullstack note\n\njwt token signature",
-              tags=["owner/fullstack"])  # owned but NOT a record
+    store.put(
+        "# fullstack state\n\njwt token signature work in flight",
+        kind="record",
+        tags=["owner/fullstack"],
+    )
+    store.put("# cmo state\n\njwt token signature current state", kind="record", tags=["owner/cmo"])
+    store.put(
+        "# fullstack note\n\njwt token signature", tags=["owner/fullstack"]
+    )  # owned but NOT a record
 
     searcher = Searcher(settings, embedder=BagEmbedder())
     boot = boot_pointers(searcher, "fullstack", floor=0.0)
@@ -145,8 +199,8 @@ def test_extract_title_fallbacks():
     from trovex.store import _extract_title
 
     assert _extract_title("# Real H1\n\nbody") == "Real H1"
-    assert _extract_title("## Sub only\n\nbody") == "Sub only"          # H2 → first heading
-    assert _extract_title("text first\n\n# Later H1") == "Later H1"     # H1 preferred over a line
+    assert _extract_title("## Sub only\n\nbody") == "Sub only"  # H2 → first heading
+    assert _extract_title("text first\n\n# Later H1") == "Later H1"  # H1 preferred over a line
     assert _extract_title("---\ntitle: From FM\n---\n\nplain body") == "From FM"  # frontmatter
     assert _extract_title("just a sentence, no heading") == "just a sentence, no heading"
     assert _extract_title("") == "Untitled"
@@ -157,8 +211,7 @@ def test_boot_empty_when_no_owner_records(settings, store):
     """No scoped record → empty pack, zero cost (unknown agent injects nothing)."""
     from trovex.boot import boot_pointers
 
-    store.put("# someone else\n\njwt token signature",
-              kind="record", tags=["owner/other"])
+    store.put("# someone else\n\njwt token signature", kind="record", tags=["owner/other"])
     searcher = Searcher(settings, embedder=BagEmbedder())
     boot = boot_pointers(searcher, "nobody", floor=0.0)
 
@@ -174,7 +227,8 @@ def test_capture_then_boot_roundtrip(settings, store):
     from trovex.capture import capture_state
 
     res = capture_state(
-        store, "cmo",
+        store,
+        "cmo",
         "Shipped /api/capture. Next: distil path. Gotcha: hooks no-op if trovex down.",
         reason="postcompact",
     )
@@ -333,6 +387,7 @@ def test_delete_removes_doc_and_embedding(store):
     assert store.get(eid) is None
     # gone from the search index too (no ghost result)
     from trovex.search import Searcher
+
     searcher = Searcher(store.settings, embedder=BagEmbedder())
     assert searcher.search("temp doc", limit=5, source_ids=["trovex"]) == []
     # idempotent: deleting again reports not-found

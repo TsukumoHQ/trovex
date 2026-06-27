@@ -28,8 +28,12 @@ import { downloadReceiptCard } from './receiptCard'
 
 const GITHUB = 'https://github.com/TsukumoHQ/trovex'
 const INSTALL_HREF = `${GITHUB}?utm_source=trovex&utm_medium=tool&utm_campaign=savings-calculator`
+// LINKS canon: /assessment is a non-/go destination (no slug), so this UTM is built by the
+// dokan link-builder (#454, run 3491), never hand-rolled. source=savings = surface
+// attribution (parallel to the landing's s=landing); cmo GO'd it + routed analytics to
+// register 'savings' in the map (taxonomy 6d8fd05c §2 + tsukumo analytics.ts).
 const CONSULT_HREF =
-  'https://tsukumo.ch/assessment?utm_source=trovex&utm_medium=tool&utm_campaign=savings-calculator-consult'
+  'https://tsukumo.ch/assessment?utm_source=savings&utm_medium=tool&utm_campaign=savings-calculator-consult&utm_content=calculator-consult'
 const POINTER_TOKENS = 80 // the trovex() pointer response size (small, constant)
 
 // Honesty gates.

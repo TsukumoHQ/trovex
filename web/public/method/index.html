@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0b0e14" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="canonical" href="https://trovex.dev/method/" />
-  <title>The Canonical Context Method — trovex</title>
+  <title>The Canonical Context Method: trovex</title>
   <meta name="description" content="Practices for running coding agents on real work. The model is the part you can't control; the context you feed it is the part you can. Nine principles for keeping that context one current, canonical answer instead of a pile of candidates the agent has to guess from." />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
   <meta property="og:type" content="article" />
@@ -111,8 +111,25 @@
       <p>A source of truth degrades the moment a second copy appears. Before you write a new doc, search for the one that already covers the question and update that instead. Pruning duplicates isn't cleanup you do later; it's how the canon stays canonical.</p>
 
       <h3>9. Measure the tax</h3>
-      <p>The cost of an agent re-finding docs is invisible because you meet it one cheap lookup at a time. It only shows up at the end of the month as "why is our spend creeping up." Measure the doc-locating slice directly so you can watch it shrink when you fix it. We measure trovex's own that way — <a href="/measure/">see the proof</a>.</p>
+      <p>The cost of an agent re-finding docs is invisible because you meet it one cheap lookup at a time. It only shows up at the end of the month as "why is our spend creeping up." Measure the doc-locating slice directly so you can watch it shrink when you fix it. We measure trovex's own that way: <a href="/measure/">see the proof</a>.</p>
       <p class="repro">Reproduce our run: <code>uvx trovex bench &lt;repo&gt;</code> (<code>--eval</code> for the LLM-judge A/B at equal task-success, <code>--json</code> for machine-readable output). The pre-registered query set is public. For the interactive version that estimates your own repo, see <a href="/measure/">/measure</a>.</p>
+    </section>
+
+    <section style="margin-top:36px;">
+      <h2>The number, and how we got it</h2>
+
+      <h3>The number</h3>
+      <ul>
+        <li><strong>Modeled estimate:</strong> median ~63%. A per-query model of the reads an agent avoids, assuming the unaided baseline reads the top-3 candidate docs.</li>
+        <li><strong>Measured (answer-and-judge A/B):</strong> median 69% at equal task-success, range 41–81% (p25–p75).</li>
+        <li><strong>What we publish:</strong> ~60%, the conservative floor under both.</li>
+      </ul>
+
+      <h3>How we measured it</h3>
+      <p>26 pre-registered queries across eight categories (C1–C8), fixed before the run; corpus = trovex's own repo, 61 .md docs; both arms answer, an LLM judge (gpt-5.4-mini) scores responsiveness, no gold or human answers; baseline reads top-3, trovex reads the one routed doc plus its routing+index overhead counted against it; a saving counts only when both arms answer correctly.</p>
+
+      <h3>What it doesn't cover</h3>
+      <p>n=26 is small, single corpus; an LLM judges, no gold/human answers; trovex got 3 answers wrong; the needle-in-a-large-corpus category (C8) underperformed, not claimed as a strength.</p>
     </section>
 
     <div class="cta">

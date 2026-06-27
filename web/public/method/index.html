@@ -112,6 +112,7 @@
 
       <h3>9. Measure the tax</h3>
       <p>The cost of an agent re-finding docs is invisible because you meet it one cheap lookup at a time. It only shows up at the end of the month as "why is our spend creeping up." Measure the doc-locating slice directly so you can watch it shrink when you fix it. We measure trovex's own that way — <a href="/measure/">see the proof</a>.</p>
+      <p class="repro">Reproduce our run: <code>uvx trovex bench &lt;repo&gt;</code> (<code>--eval</code> for the LLM-judge A/B at equal task-success, <code>--json</code> for machine-readable output). The pre-registered query set is public. For the interactive version that estimates your own repo, see <a href="/measure/">/measure</a>.</p>
     </section>
 
     <div class="cta">

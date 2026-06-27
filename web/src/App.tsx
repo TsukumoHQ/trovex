@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { track, trackLandingView, trackSectionViews, trackInstallClick, trackTsukumoClick, trackNewsletterSignup, getAttribution } from './analytics'
+import { track, trackLandingView, trackSectionViews, trackInstallClick, trackTsukumoClick, trackNewsletterSignup, trackOssAdopt, getAttribution } from './analytics'
 
 // trovex is public beta: the primary action is install + a GitHub star. The consult band
 // is the suite→Tsukumo handoff: trovex is one of four OSS products that feed Tsukumo
@@ -268,6 +268,8 @@ const FEATURES = [
 
 // trovex is open source + public beta — the install command is the conversion.
 const GITHUB = 'https://github.com/TsukumoHQ/trovex'
+// Community: the canonical /discord redirect (swappable + UTM-tracked), not raw discord.gg.
+const DISCORD_HERO = 'https://tsukumo.ch/discord?utm_source=trovex&utm_medium=site&utm_campaign=discord&utm_content=hero'
 // Public-beta support channel (one redirect everyone links — tsukumo.ch/slack).
 const SLACK_URL = 'https://tsukumo.ch/slack'
 // Sibling OSS tool in the tsukumo suite — now has its own landing (live).
@@ -424,6 +426,9 @@ export default function App() {
                 secondary; the GitHub star (vanity) lives in the nav + start, not here. */}
             <div className="hero-cta">
               <a className="btn btn-ghost" href="#start" onClick={() => track('cta_clicked', { cta_id: 'quickstart', location: 'hero' })}>quickstart</a>
+              {/* Secondary, beside quickstart — keeps the install command the one primary action.
+                  Fires the canonical oss_adopt('discord') so the rollout is measurable. */}
+              <a className="btn btn-ghost" href={DISCORD_HERO} target="_blank" rel="noopener noreferrer" onClick={() => trackOssAdopt('discord')}>join Discord</a>
             </div>
             <a className="hero-see" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'hero' })}>see it work ↓</a>
           </div>

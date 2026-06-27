@@ -127,6 +127,11 @@ td.feat { color: var(--fg-muted); }
 .cta-row { margin-top: 18px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .note { color: var(--fg-subtle); font-size: 0.88rem; margin-top: 14px; }
 
+/* consulting handoff — quiet suite→tsukumo strip, not a competing CTA */
+.consult-band { margin: 40px 0 0; padding: 16px 22px; border-radius: 12px; background: var(--accent-soft); border: 1px solid var(--accent-line); }
+.consult-band p { margin: 0; color: var(--fg-muted); font-size: 0.95rem; line-height: 1.5; }
+.consult-band a { color: var(--accent); font-weight: 600; white-space: nowrap; }
+
 /* related links */
 .related { margin: 48px 0 0; }
 .related .l { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg-subtle); font-weight: 600; }

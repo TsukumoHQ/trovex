@@ -130,6 +130,9 @@ a { color: inherit; text-decoration: none; }
 .hero-install .cmd-row { flex: 1; min-width: 0; justify-content: space-between; }
 .hero-install .cmd-row code { font-size: 14px; color: var(--fg); overflow-wrap: anywhere; }
 @media (max-width: 480px) { .hero-install { flex-direction: column; align-items: stretch; gap: 8px; } .hero-install-lab { text-align: left; } }
+.hero-need { margin: 10px auto 0; font-size: 13px; color: var(--fg-subtle); letter-spacing: 0.01em; }
+.hero-need a { color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--accent-line); transition: color .15s; }
+.hero-need a:hover { color: var(--accent); }
 .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
 .hero-see { display: inline-block; margin-top: 18px; font-size: 13px; color: var(--fg-subtle); text-decoration: none; letter-spacing: 0.01em; transition: color .15s; }
 .hero-see:hover { color: var(--fg-muted); }
@@ -303,6 +306,7 @@ a { color: inherit; text-decoration: none; }
 .hero h1       { animation: fadeUp .85s var(--ease) both; }
 .hero .deck    { animation: fadeUp .85s var(--ease) .12s both; }
 .hero-proof    { animation: fadeUp .85s var(--ease) .18s both; }
+.hero-need     { animation: fadeUp .85s var(--ease) .20s both; }
 .hero-cta      { animation: fadeUp .85s var(--ease) .22s both; }
 .hero .cmd     { animation: fadeUp .85s var(--ease) .30s both; }
 .stage-wrap    { animation: fadeUp 1s var(--ease) .40s both; }
@@ -331,6 +335,10 @@ a { color: inherit; text-decoration: none; }
 .start-steps code { font-size: 13px; }
 /* Activation→retention bridge: after the aha (step 3 prints the savings), point the
    dev at the per-tool setup pages so they can actually wire their agent. Nav, not prose. */
+.start-try { max-width: 60ch; margin: -8px auto 10px; font-size: 14px; color: var(--fg-subtle); letter-spacing: 0.01em; }
+.start-try-cmd { max-width: 60ch; margin: 0 auto 28px; display: flex; justify-content: center; }
+.start-try-cmd .cmd-row { background: var(--bg-input); border: 1px solid var(--accent-line); border-radius: var(--radius); padding: 9px 12px; }
+.start-try-cmd .cmd-row code { font-size: 13px; }
 .start-setup { max-width: 60ch; margin: -12px auto 28px; font-size: 14px; color: var(--fg-subtle); letter-spacing: 0.01em; }
 .start-setup a { color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--accent-line); transition: color .15s; }
 .start-setup a:hover { color: var(--accent); }

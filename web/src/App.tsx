@@ -411,6 +411,15 @@ export default function App() {
               <span className="hero-install-lab">install</span>
               <CopyCmd cmd="uv tool install trovex" id="hero-install" />
             </div>
+            {/* Kills the silent `command not found: uv` dead-end on the primary path, and
+                routes the not-ready-to-install dev to the zero-install uvx taste at #start —
+                the shortest route to the savings number. Both mirror the README. */}
+            <p className="hero-need">
+              needs{' '}
+              <a href="https://docs.astral.sh/uv/getting-started/installation/" target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'uv-docs', location: 'hero' })}>uv</a>
+              {' · '}
+              <a href="#start" onClick={() => track('cta_clicked', { cta_id: 'try-no-install', location: 'hero' })}>try it with no install ↓</a>
+            </p>
             {/* One primary action = the install command above. quickstart is the only
                 secondary; the GitHub star (vanity) lives in the nav + start, not here. */}
             <div className="hero-cta">
@@ -504,6 +513,10 @@ export default function App() {
                 <li><CopyCmd cmd="trovex index /path/to/your/repo" id="index" /></li>
                 <li><CopyCmd cmd={'trovex search "how do we roll back a deploy?"'} id="search" /> and it prints the tokens it saved.</li>
               </ol>
+              {/* The zero-install escape hatch (README): one command, nothing installed,
+                  still prints the savings number. Lowest-commitment path to the aha. */}
+              <p className="start-try">Not ready to install? Run one command, nothing installed — it still prints the tokens saved:</p>
+              <div className="start-try-cmd"><CopyCmd cmd={'uvx trovex search "how do we roll back a deploy?"'} id="uvx-try" /></div>
               <p className="start-setup">
                 Then point your agent at it:{' '}
                 <a href="/for/claude-code" onClick={() => track('setup_clicked', { location: 'start', tool: 'claude-code' })}>Claude Code</a> ·{' '}

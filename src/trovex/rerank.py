@@ -83,7 +83,7 @@ def _rerank(
     system = (
         "You rank documentation snippets for relevance to a developer's query. "
         "Markers: ★ canonical (preferred), ◯ plan, ✗ stale (avoid), ⚠ duplicate. "
-        "Return ONLY a JSON object {\"order\": [indices]} with the most relevant first. "
+        'Return ONLY a JSON object {"order": [indices]} with the most relevant first. '
         "Include every input index exactly once. No prose."
     )
     user = f"Query: {query}\n\nCandidates:\n" + "\n".join(indexed_snippets)

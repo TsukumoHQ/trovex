@@ -102,8 +102,12 @@ def chunk_markdown(content: str, max_tokens: int = DEFAULT_MAX_TOKENS) -> list[C
     chunks: list[Chunk] = []
     for sec_path, text in sections:
         for piece in _split_to_size(text, max_tokens):
-            chunks.append(Chunk(
-                index=len(chunks), heading_path=sec_path,
-                text=piece, tokens_est=_est_tokens(piece),
-            ))
+            chunks.append(
+                Chunk(
+                    index=len(chunks),
+                    heading_path=sec_path,
+                    text=piece,
+                    tokens_est=_est_tokens(piece),
+                )
+            )
     return chunks

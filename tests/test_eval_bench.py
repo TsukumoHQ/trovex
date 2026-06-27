@@ -48,7 +48,10 @@ def searcher(tmp_path):
     )
     store = SqliteStore(settings, embedder=_Bag())
     for i in range(5):
-        store.put(f"# Auth {i}\n\njwt token session refresh expiry rotation handler variant {i}", tags=[f"d/{i}"])
+        store.put(
+            f"# Auth {i}\n\njwt token session refresh expiry rotation handler variant {i}",
+            tags=[f"d/{i}"],
+        )
     return Searcher(settings, embedder=_Bag())
 
 
@@ -92,16 +95,16 @@ def test_miss_case_both_abstain_counts_as_equal_success():
 
 def test_aggregate_gates_and_surfaces_losses():
     evals = [
-        _q("C1", True, 100, True, 300),   # counted, ~0.67
-        _q("C1", True, 200, True, 400),   # counted, 0.50
-        _q("C7", False, 50, True, 300),   # LOSS, not counted
-        _q("C8", True, 80, False, 300),   # trovex-only win, not counted
-        _q("C6", True, 40, True, 50),     # counted, 0.20
+        _q("C1", True, 100, True, 300),  # counted, ~0.67
+        _q("C1", True, 200, True, 400),  # counted, 0.50
+        _q("C7", False, 50, True, 300),  # LOSS, not counted
+        _q("C8", True, 80, False, 300),  # trovex-only win, not counted
+        _q("C6", True, 40, True, 50),  # counted, 0.20
     ]
     r = aggregate(evals)
     assert r.n_queries == 5
-    assert r.n_equal_success == 3            # C1x2 + C6
-    assert r.n_trovex_loss == 1              # the C7 loss is surfaced
+    assert r.n_equal_success == 3  # C1x2 + C6
+    assert r.n_trovex_loss == 1  # the C7 loss is surfaced
     assert r.median_saving is not None and 0.0 <= r.median_saving <= 1.0
     cats = {c.category: c for c in r.per_category}
     assert cats["C7"].n_trovex_loss == 1

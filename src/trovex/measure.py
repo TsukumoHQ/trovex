@@ -110,7 +110,9 @@ def report(log_path: Path, baseline_days: int = 7, current_days: int = 7) -> str
 
     if baseline.n_reads > 0 and current.n_reads > 0:
         delta_pct = (1 - current.tokens_per_read / baseline.tokens_per_read) * 100
-        verdict = "✓ HIT" if delta_pct >= 60 else ("~ on track" if delta_pct >= 30 else "✗ below target")
+        verdict = (
+            "✓ HIT" if delta_pct >= 60 else ("~ on track" if delta_pct >= 30 else "✗ below target")
+        )
         lines.append("")
         lines.append(f"Δ tokens/read: {delta_pct:+.1f}%  (target: -60%)  {verdict}")
 

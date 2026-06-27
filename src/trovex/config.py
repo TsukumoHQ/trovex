@@ -18,6 +18,7 @@ class Source:
     The id is used as foreign key in docs.source_id and shown as a pill in UI.
     Should be short, kebab-case, stable (renaming = reindex).
     """
+
     id: str
     label: str
     root: Path
@@ -71,10 +72,25 @@ class Settings(BaseSettings):
     # Indexing
     max_file_size_bytes: int = 1_000_000
     ignore_dirs: list[str] = [
-        "node_modules", ".venv", "venv", ".git", "dist", "build",
-        ".next", ".nuxt", "target", "vendor", "__pycache__",
-        ".pytest_cache", ".ruff_cache", "fastembed_cache", ".trovex-cache",
-        ".tox", "site-packages", ".idea", ".vscode",
+        "node_modules",
+        ".venv",
+        "venv",
+        ".git",
+        "dist",
+        "build",
+        ".next",
+        ".nuxt",
+        "target",
+        "vendor",
+        "__pycache__",
+        ".pytest_cache",
+        ".ruff_cache",
+        "fastembed_cache",
+        ".trovex-cache",
+        ".tox",
+        "site-packages",
+        ".idea",
+        ".vscode",
         # Agent workspaces — full repo copies per agent, all duplicates
         "worktrees",
     ]
@@ -83,7 +99,11 @@ class Settings(BaseSettings):
     stale_age_days: int = 90
     dup_cosine_threshold: float = 0.90
     plan_path_patterns: list[str] = [
-        r"PLAN[_\-]", r"_PLAN\.md$", r"^plans/", r"DRAFT", r"WIP",
+        r"PLAN[_\-]",
+        r"_PLAN\.md$",
+        r"^plans/",
+        r"DRAFT",
+        r"WIP",
     ]
 
     # Server
@@ -97,11 +117,11 @@ class Settings(BaseSettings):
     rate_limit_write: str = "10/minute"
 
     # UI / API page sizes + caps (were hardcoded; overridable via TROVEX_* env).
-    search_page_size: int = 12      # results per page on /search
-    store_page_size: int = 60       # cards per page on /store
-    search_limit_max: int = 20      # /api/search & /api/boot `limit`/`k` ceiling
-    sparkline_w: int = 100          # inline activity sparkline width (px)
-    sparkline_h: int = 30           # inline activity sparkline height (px)
+    search_page_size: int = 12  # results per page on /search
+    store_page_size: int = 60  # cards per page on /store
+    search_limit_max: int = 20  # /api/search & /api/boot `limit`/`k` ceiling
+    sparkline_w: int = 100  # inline activity sparkline width (px)
+    sparkline_h: int = 30  # inline activity sparkline height (px)
 
     # Ranking weights
     freshness_half_life_days: float = 90.0
@@ -109,6 +129,7 @@ class Settings(BaseSettings):
     def resolved_embed_dim(self) -> int:
         """Return the dim matching embed_model, fall back to declared embed_dim."""
         from .embedder import model_dim
+
         return model_dim(self.embed_model) or self.embed_dim
 
     def resolve_write_token(self) -> str:

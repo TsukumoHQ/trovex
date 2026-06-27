@@ -137,12 +137,12 @@ def rerank_stats(db, since: float) -> dict:
     Anything else → $0 (we don't guess on unknown models).
     """
     PRICING = {
-        "gpt-5.5":       (5.00, 30.00),
-        "gpt-5.4":       (2.50, 15.00),
-        "gpt-5.4-mini":  (0.75,  4.50),
-        "gpt-4.1-nano":  (0.10,  0.40),
-        "gpt-4o":        (2.50, 10.00),
-        "gpt-4o-mini":   (0.15,  0.60),
+        "gpt-5.5": (5.00, 30.00),
+        "gpt-5.4": (2.50, 15.00),
+        "gpt-5.4-mini": (0.75, 4.50),
+        "gpt-4.1-nano": (0.10, 0.40),
+        "gpt-4o": (2.50, 10.00),
+        "gpt-4o-mini": (0.15, 0.60),
     }
 
     rows = db.execute(
@@ -172,14 +172,16 @@ def rerank_stats(db, since: float) -> dict:
         price_in, price_out = PRICING.get(r["llm_model"], (0.0, 0.0))
         cost = (r["tin"] / 1_000_000) * price_in + (r["tout"] / 1_000_000) * price_out
         total_cost += cost
-        by_model.append({
-            "model": r["llm_model"],
-            "queries": r["n"],
-            "tokens_in": r["tin"],
-            "tokens_out": r["tout"],
-            "avg_ms": int(r["avg_ms"]),
-            "cost_usd": cost,
-        })
+        by_model.append(
+            {
+                "model": r["llm_model"],
+                "queries": r["n"],
+                "tokens_in": r["tin"],
+                "tokens_out": r["tout"],
+                "avg_ms": int(r["avg_ms"]),
+                "cost_usd": cost,
+            }
+        )
 
     return {
         "total_queries": total,
@@ -212,8 +214,11 @@ def rerank_divergence(db, since: float) -> dict:
 
     if total == 0:
         return {
-            "total": 0, "changed": 0, "changed_pct": 0,
-            "avg_lift": 0, "avg_top5_overlap": 5,
+            "total": 0,
+            "changed": 0,
+            "changed_pct": 0,
+            "avg_lift": 0,
+            "avg_top5_overlap": 5,
             "lift_distribution": [0] * 20,
             "verdict": "no data",
             "verdict_class": "muted",

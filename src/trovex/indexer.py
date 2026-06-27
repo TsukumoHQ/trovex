@@ -92,8 +92,7 @@ class Indexer:
                 sources = self.settings.load_sources()
 
         start = time.time()
-        agg = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0,
-               "by_source": []}
+        agg = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0, "by_source": []}
         embed_batch: list[tuple[int, str]] = []
 
         for source in sources:
@@ -110,9 +109,7 @@ class Indexer:
                     continue
                 rel_path = str(path.relative_to(sr))
                 seen_paths.add(rel_path)
-                content_hash = hashlib.sha256(
-                    content.encode("utf-8", errors="replace")
-                ).hexdigest()
+                content_hash = hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
 
                 existing = self.db.execute(
                     """SELECT id, content_hash FROM docs
@@ -135,8 +132,17 @@ class Indexer:
                         """UPDATE docs SET content_hash=?, size_bytes=?, tokens_est=?,
                            mtime=?, last_indexed=?, title=?, absolute_path=?, author_agent=?
                            WHERE id=?""",
-                        (content_hash, stat.st_size, tokens_est, stat.st_mtime, now,
-                         title, str(path), author, existing["id"]),
+                        (
+                            content_hash,
+                            stat.st_size,
+                            tokens_est,
+                            stat.st_mtime,
+                            now,
+                            title,
+                            str(path),
+                            author,
+                            existing["id"],
+                        ),
                     )
                     doc_id = existing["id"]
                     s_updated += 1
@@ -146,8 +152,19 @@ class Indexer:
                            size_bytes, tokens_est, mtime, first_indexed, last_indexed,
                            title, author_agent)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (source.id, rel_path, str(path), content_hash, stat.st_size,
-                         tokens_est, stat.st_mtime, now, now, title, author),
+                        (
+                            source.id,
+                            rel_path,
+                            str(path),
+                            content_hash,
+                            stat.st_size,
+                            tokens_est,
+                            stat.st_mtime,
+                            now,
+                            now,
+                            title,
+                            author,
+                        ),
                     )
                     doc_id = cur.lastrowid
                     s_added += 1
@@ -184,19 +201,27 @@ class Indexer:
             agg["updated"] += s_updated
             agg["unchanged"] += s_unchanged
             agg["removed"] += s_removed
-            agg["by_source"].append({
-                "id": source.id, "label": source.label,
-                "added": s_added, "updated": s_updated,
-                "unchanged": s_unchanged, "removed": s_removed,
-            })
+            agg["by_source"].append(
+                {
+                    "id": source.id,
+                    "label": source.label,
+                    "added": s_added,
+                    "updated": s_updated,
+                    "unchanged": s_unchanged,
+                    "removed": s_removed,
+                }
+            )
 
         if embed_batch:
             self._flush_embeddings(embed_batch)
-        added = agg["added"]; updated = agg["updated"]
-        unchanged = agg["unchanged"]; removed = agg["removed"]
+        added = agg["added"]
+        updated = agg["updated"]
+        unchanged = agg["unchanged"]
+        removed = agg["removed"]
 
         # Recompute status (plan / stale / duplicate / canonical) after indexing
         from .status import compute_status
+
         status_stats = compute_status(self.db, self.settings)
 
         elapsed = time.time() - start
@@ -207,9 +232,13 @@ class Indexer:
         )
         self.db.commit()
         return {
-            "added": added, "updated": updated, "unchanged": unchanged,
-            "removed": removed, "duration_sec": elapsed,
-            "status": status_stats, "by_source": agg["by_source"],
+            "added": added,
+            "updated": updated,
+            "unchanged": unchanged,
+            "removed": removed,
+            "duration_sec": elapsed,
+            "status": status_stats,
+            "by_source": agg["by_source"],
         }
 
     def _flush_embeddings(self, batch: list[tuple[int, str]]) -> None:
@@ -237,7 +266,13 @@ class Indexer:
         m = TITLE_RE.search(stripped[:2000])
         if m:
             return m.group(1).strip()
-        return fallback.removesuffix(".md").removesuffix(".mdx").replace("_", " ").replace("-", " ").title()
+        return (
+            fallback.removesuffix(".md")
+            .removesuffix(".mdx")
+            .replace("_", " ")
+            .replace("-", " ")
+            .title()
+        )
 
     @staticmethod
     def _extract_author(content: str) -> str | None:

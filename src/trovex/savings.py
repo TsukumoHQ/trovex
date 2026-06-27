@@ -20,10 +20,10 @@ from dataclasses import dataclass
 class SavingsRow:
     user: str
     queries: int
-    would_have_read: int        # ∑ top-3 result tokens
-    response_tokens: int        # ∑ trovex output tokens
-    actual_read: int            # ∑ top-1 result tokens (what they likely Read after trovex)
-    saved: int                  # would_have_read - actual_read - response_tokens
+    would_have_read: int  # ∑ top-3 result tokens
+    response_tokens: int  # ∑ trovex output tokens
+    actual_read: int  # ∑ top-1 result tokens (what they likely Read after trovex)
+    saved: int  # would_have_read - actual_read - response_tokens
 
     @property
     def ratio(self) -> float:
@@ -46,11 +46,16 @@ def per_user(db, since: float) -> list[SavingsRow]:
     out = []
     for r in rows:
         saved = max(0, r["whr"] - r["topr"] - r["resp"])
-        out.append(SavingsRow(
-            user=r["user"], queries=r["queries"],
-            would_have_read=r["whr"], response_tokens=r["resp"],
-            actual_read=r["topr"], saved=saved,
-        ))
+        out.append(
+            SavingsRow(
+                user=r["user"],
+                queries=r["queries"],
+                would_have_read=r["whr"],
+                response_tokens=r["resp"],
+                actual_read=r["topr"],
+                saved=saved,
+            )
+        )
     return out
 
 
@@ -80,9 +85,16 @@ def daily_series(db, since: float, until: float) -> list[dict]:
     from datetime import datetime, timezone
 
     n_days = max(1, math.ceil((until - since) / 86400))
-    day_start = datetime.fromtimestamp(since, tz=timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0,
-    ).timestamp()
+    day_start = (
+        datetime.fromtimestamp(since, tz=timezone.utc)
+        .replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        .timestamp()
+    )
 
     buckets = []
     for i in range(n_days):
@@ -97,12 +109,14 @@ def daily_series(db, since: float, until: float) -> list[dict]:
             (bucket_from, bucket_to),
         ).fetchone()
         saved = max(0, r["whr"] - r["topr"] - r["resp"])
-        buckets.append({
-            "day": datetime.fromtimestamp(bucket_from, tz=timezone.utc).strftime("%a %d"),
-            "ts": bucket_from,
-            "saved": saved,
-            "queries": r["q"],
-        })
+        buckets.append(
+            {
+                "day": datetime.fromtimestamp(bucket_from, tz=timezone.utc).strftime("%a %d"),
+                "ts": bucket_from,
+                "saved": saved,
+                "queries": r["q"],
+            }
+        )
     return buckets
 
 
@@ -117,7 +131,4 @@ def top_queries(db, since: float, limit: int = 10) -> list[dict]:
            LIMIT ?""",
         (since, limit),
     ).fetchall()
-    return [
-        {**dict(r), "saved": max(0, r["whr"] - r["topr"] - r["resp"])}
-        for r in rows
-    ]
+    return [{**dict(r), "saved": max(0, r["whr"] - r["topr"] - r["resp"])} for r in rows]

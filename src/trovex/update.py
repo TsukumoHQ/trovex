@@ -123,7 +123,11 @@ def check_for_update(
 
     if not force:
         cached = _read_cache(path)
-        if cached and isinstance(cached.get("ts"), (int, float)) and (now - cached["ts"]) < CACHE_TTL:
+        if (
+            cached
+            and isinstance(cached.get("ts"), (int, float))
+            and (now - cached["ts"]) < CACHE_TTL
+        ):
             latest = cached.get("latest")
             if isinstance(latest, str):
                 return UpdateInfo(installed, latest, is_newer(latest, installed))
@@ -162,7 +166,9 @@ def cached_notice(cache_path: Path | None = None) -> str | None:
         cached = _read_cache(path)
         if not cached or not isinstance(cached.get("latest"), str):
             return None
-        info = UpdateInfo(installed_version(), cached["latest"], is_newer(cached["latest"], installed_version()))
+        info = UpdateInfo(
+            installed_version(), cached["latest"], is_newer(cached["latest"], installed_version())
+        )
         return notice_line(info)
     except Exception:
         return None

@@ -73,7 +73,9 @@ def test_judge_parses_and_passes_exists():
     assert make_judge_fn(yes, "gpt-5.4-mini")(EvalQuery("q", "C1"), "a good answer") is True
     assert yes.calls[0]["messages"][-1]["content"].find("EXISTS: yes") != -1
     no = FakeClient("WRONG")
-    assert make_judge_fn(no, "gpt-5.4-mini")(EvalQuery("q", "C6", in_corpus=False), "made up") is False
+    assert (
+        make_judge_fn(no, "gpt-5.4-mini")(EvalQuery("q", "C6", in_corpus=False), "made up") is False
+    )
     assert no.calls[0]["messages"][-1]["content"].find("EXISTS: no") != -1
 
 

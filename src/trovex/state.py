@@ -46,8 +46,11 @@ def get_state() -> AppState:
         indexer = Indexer(settings, embedder=embedder)
         store = SqliteStore(settings, embedder=embedder)
         _state = AppState(
-            settings=settings, embedder=embedder,
-            searcher=searcher, indexer=indexer, store=store,
+            settings=settings,
+            embedder=embedder,
+            searcher=searcher,
+            indexer=indexer,
+            store=store,
         )
     return _state
 

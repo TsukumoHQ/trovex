@@ -33,10 +33,13 @@ JUDGE_SYS = (
 def _chat(client, model: str, system: str, user: str, max_tok: int) -> tuple[str, int]:
     """One chat call → (text, completion_tokens). gpt-5*/o-series drop temperature + use
     max_completion_tokens (mirrors capture.py)."""
-    params: dict = {"model": model, "messages": [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-    ]}
+    params: dict = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    }
     if model.startswith(("gpt-5", "o1", "o3", "o4")):
         params["max_completion_tokens"] = max_tok
     else:

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "trovex",
+  "description": "Local-first MCP server that serves coding agents one canonical doc per query — a path:line pointer with a canonical/stale/duplicate freshness marker — instead of rereading the repo. Indexes your markdown, routes a question to the single current doc, and gives agents a shared write-back store.",
+  "folders": [],
+  "excludeFolders": ["src", "web", "tests", "deploy", "scripts", "growth", ".github", "node_modules", "dist", ".venv", ".worktrees"],
+  "excludeFiles": [],
+  "rules": [
+    "Install with `uv tool install trovex`, then `trovex index <repo>` to index a repo's markdown.",
+    "trovex is an MCP server: run `trovex serve` and connect over HTTP at http://localhost:8765/mcp.",
+    "Call the `trovex(query)` tool to get the one canonical doc that answers a question (a path:line pointer with a canonical/stale/duplicate freshness marker), not a pile of files to rank.",
+    "Use `trovex_write` / `trovex_read` for the shared agent-memory store; `trovex_search` for passage-level retrieval with tag filters.",
+    "Local-first: indexing, embeddings (ONNX) and vector search (sqlite-vec) run on your machine with no cloud or API key.",
+    "Verify token savings on your own repo with `trovex bench <repo>` (add `--eval` for the answer+judge A/B). Method and numbers: https://trovex.dev/measure"
+  ]
+}

@@ -41,3 +41,6 @@ growth/analytics/reports/.simap-cookies.tmp
 
 # growth/ = private marketing ops (owner ruled PRIVÉ, purged from history 2026-06-27)
 growth/
+
+# Internal planning doc — migrated to the trovex store (rien en md public, tout dans trovex)
+REFONTE.md

@@ -269,11 +269,11 @@ const FEATURES = [
 // trovex is open source + public beta — the install command is the conversion.
 const GITHUB = 'https://github.com/TsukumoHQ/trovex'
 // Community: the canonical /discord redirect (swappable + UTM-tracked), not raw discord.gg.
-const DISCORD_HERO = 'https://tsukumo.ch/discord?utm_source=trovex&utm_medium=site&utm_campaign=discord&utm_content=hero'
+const DISCORD_HERO = 'https://tsukumo.ch/go/discord?s=landing'
 // Public-beta support channel (one redirect everyone links — tsukumo.ch/slack).
 const SLACK_URL = 'https://tsukumo.ch/slack'
 // Sibling OSS tool in the tsukumo suite — now has its own landing (live).
-const WRAITH_URL = 'https://tsukumo.ch/wraith?utm_source=trovex&utm_medium=oss-suite&utm_campaign=wraith'
+const WRAITH_URL = 'https://tsukumo.ch/go/wraith?s=landing'
 // Shared newsletter hub — ONE Resend audience across the suite (fullstack contract).
 // source_site routes attribution; CORS allows trovex.dev. Privacy controller = tsukumo.
 const NEWSLETTER_API = 'https://tsukumo.ch/api/newsletter'
@@ -577,7 +577,7 @@ export default function App() {
             <a href="/savings" onClick={() => track('cta_clicked', { cta_id: 'savings', location: 'footer' })}>Savings</a>
             <a href={SLACK_URL} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'slack', location: 'footer' })}>Slack</a>
             <a
-              href="https://tsukumo.ch/?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting"
+              href="https://tsukumo.ch/go/site?s=landing"
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => trackTsukumoClick('footer')}

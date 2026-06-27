@@ -29,6 +29,22 @@ file="$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')"
 [ -n "$file" ] || allow
 case "$file" in *.md | *.mdx | *.markdown) ;; *) allow ;; esac
 
+# Scope: this guard owns ONLY the trovex repo's SSOT .md. A SKILL.md (disk persona,
+# never SSOT) or any .md that lives in a DIFFERENT repo (e.g. TsukumoHQ/skills) is
+# that repo's own file — never block it. Without this, the guard treated EVERY .md
+# on disk as trovex SSOT and blocked foreign-repo edits (TSU-79).
+case "$(basename "$file")" in SKILL.md) allow ;; esac
+self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P || true)"
+trovex_root="$(git -C "$self_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "$trovex_root" ]; then
+  trovex_root="$(cd "$trovex_root" 2>/dev/null && pwd -P || printf '%s' "$trovex_root")"
+  file_real="$(cd "$(dirname "$file")" 2>/dev/null && pwd -P || true)/$(basename "$file")"
+  case "$file_real" in
+    "$trovex_root"/*) ;;   # inside the trovex repo (incl. its worktrees) → keep guarding
+    *) allow ;;            # outside trovex → not our SSOT, let it write
+  esac
+fi
+
 # .trovexignore — zone franche: any matching path stays a real file on disk.
 root="$(git -C "$(dirname "$file")" rev-parse --show-toplevel 2>/dev/null || pwd)"
 ignore="$root/.trovexignore"

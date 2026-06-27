@@ -3,7 +3,7 @@ name: review-tsukumo
 description: fullstack-lead's self-review gate for the tsukumo SITE + lead-machine + dokan-infra lane. Run as the LAST step before opening a PR / completing a task, on YOUR OWN diff. A real checklist of THIS lane's hard constraints (secrets server-only, RLS deny-all, relay call_tool transport, dokan governance, lead-machine 0-send/commitTwenty, Tsukumo=center, copy-gate), not a rubber stamp. High-signal only. Use when finishing a fullstack-lead change in trovex web/api, tsukumo app/api, a dokan script, or the lead pipeline.
 metadata:
   author: fullstack-lead
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # review-tsukumo — fullstack-lead lane self-review gate
@@ -108,6 +108,23 @@ Format: `<desc> — branch <name> — review-tsukumo: ✅ ship (N files)`
   + no release tag + no cross-lane/shared file + no human-facing copy.
 - **PR-to-CTO**: schema/migration, prod deploy, release tag, cross-lane surface, trunk-RED risk,
   human-facing copy, AND **any skill change** (shared fleet tooling).
+
+## Step 7 — Product Q&A (AX self-report) — STANDING DUTY (owner, doc b8e05fa3)
+You are a FIRST USER of trovex / wrai.th / dokan (and yoru where you touch it). Your daily UX is
+the most honest product signal we have. This duty rides this review skill — no separate scaffold.
+
+**Cadence:**
+- **Every CTO interview call** → full report: for EACH tool you actually used, 6 blunt answers —
+  **JOB / WIN / FRICTION / MISSING / FOOTGUN / AGENT-LENS**. Submit to cto as type **`response`**,
+  subject **`AX Q&A: tsukumo`** (your lane).
+- **Every standup** → at least ONE *fresh* friction in your DOGFOOD line (not a repeat).
+
+**Rules (or it's noise):**
+- **Trace-grounded**: cite a REAL call/log/moment from THIS session (a tool error, a silent miss,
+  a workaround you actually did). No confabulation — if you didn't hit it, don't invent it.
+- **Friction is the gold** — don't flatter the tool; MISSING = the ONE change that'd most help.
+- **Flag `I build this`** on any tool you author on (e.g. dokan scripts) so cto weights for bias.
+- AGENT-LENS = what's different about how an AGENT uses it vs a human (the whole point).
 
 ## Anti-patterns
 - Don't rubber-stamp — if a check doesn't apply, say so explicitly; don't skip a check that does.

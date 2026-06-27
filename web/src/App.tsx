@@ -8,8 +8,7 @@ import { track, trackLandingView, trackSectionViews, trackInstallClick, trackTsu
 // ask → the 30-min discovery Call (the "tsukumo-1-hour-call-clone" slug IS the 30-min,
 // owner-confirmed). High-intent surfaces (/audit endplate, /savings) go to the longer
 // AI Engineering Assessment instead.
-const CONSULT_URL =
-  'https://calendly.com/hello-tsukumo/tsukumo-1-hour-call-clone?utm_source=trovex&utm_medium=oss-suite&utm_campaign=consulting&utm_content=landing-band'
+const CONSULT_URL = 'https://tsukumo.ch/go/call?s=landing'
 const reduceMotion =
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches

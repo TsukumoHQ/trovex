@@ -179,8 +179,7 @@ trovex is in public beta. Install it, run it on your repo, and if it saves you t
 PRs welcome.
 
 Questions, or comparing notes with other people running agents? Join the community on Discord:
-[tsukumo.ch/discord](https://tsukumo.ch/discord?utm_source=github&utm_medium=readme&utm_campaign=discord&utm_content=community)
-(also on [Slack](https://tsukumo.ch/slack)).
+[tsukumo.ch/discord](https://tsukumo.ch/discord?utm_source=github&utm_medium=readme&utm_campaign=discord&utm_content=community).
 
 ## Security
 

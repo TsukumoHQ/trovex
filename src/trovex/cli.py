@@ -73,7 +73,9 @@ def search(
     query: str = typer.Argument(..., help="Query string"),
     limit: int = typer.Option(5, "-n", "--limit"),
     summary: bool = typer.Option(False, "--summary", help="Include 50-word summaries"),
-    savings: bool = typer.Option(True, "--savings/--no-savings", help="Show the per-query token-savings estimate."),
+    savings: bool = typer.Option(
+        True, "--savings/--no-savings", help="Show the per-query token-savings estimate."
+    ),
 ) -> None:
     """Search the index for relevant docs."""
     settings = Settings()
@@ -111,6 +113,34 @@ def serve(
     uvicorn.run(build_app(), host=host, port=port)
 
 
+@app.command()
+def mcp() -> None:
+    """Serve the MCP server over stdio — the transport .mcpb registry bundles launch.
+
+    Same tools as `trovex serve` (HTTP), but spoken over stdin/stdout for a client
+    that launches trovex directly (MCP registries / .mcpb bundles). stdout is the
+    JSON-RPC channel, so ALL logging and any first-run model-download chatter are
+    forced to stderr — they never corrupt the stream. Blocks until the client closes.
+    """
+    import contextlib
+    import logging
+    import sys
+
+    from .mcp_app import mcp as mcp_server
+    from .state import get_state
+
+    # stdout belongs to JSON-RPC — pin every log to stderr.
+    logging.basicConfig(level=logging.WARNING, stream=sys.stderr, force=True)
+
+    # Warm up the singleton state (builds the embedder; the first ever run may download
+    # the ONNX model and print progress) with stdout redirected to stderr, so the
+    # warm-up cannot write a byte to the JSON-RPC channel. After this stdout is pristine.
+    with contextlib.redirect_stdout(sys.stderr):
+        get_state()
+
+    mcp_server.run(transport="stdio")
+
+
 def _print_update_notice() -> None:
     """Light, fail-safe startup notice for long-running commands. Honors the 24h
     cache and never raises — a version check must never break or slow `serve`."""
@@ -129,7 +159,10 @@ def _print_update_notice() -> None:
 @app.command()
 def update(
     force: bool = typer.Option(
-        False, "--force", "-f", help="Bypass the no-downgrade + dev-build guards (explicit reinstall/downgrade)."
+        False,
+        "--force",
+        "-f",
+        help="Bypass the no-downgrade + dev-build guards (explicit reinstall/downgrade).",
     ),
     check_only: bool = typer.Option(False, "--check", help="Only check; don't run the upgrade."),
 ) -> None:
@@ -138,7 +171,13 @@ def update(
     Follows the fleet auto-updater contract: pinned org, semver no-downgrade,
     a dev-build guard (won't clobber a source build), and offline fail-safe.
     """
-    from .update import check_for_update, installed_version, is_dev_build, notice_line, upgrade_command
+    from .update import (
+        check_for_update,
+        installed_version,
+        is_dev_build,
+        notice_line,
+        upgrade_command,
+    )
 
     installed = installed_version()
     info = check_for_update(force=True)
@@ -178,13 +217,15 @@ def update(
 def measure(
     log_path: Path = typer.Option(
         Path.home() / ".claude" / "trovex-baseline.jsonl",
-        "--log", help="Path to trovex-baseline.jsonl from the hook.",
+        "--log",
+        help="Path to trovex-baseline.jsonl from the hook.",
     ),
     baseline_days: int = typer.Option(7, help="Length of baseline window."),
     current_days: int = typer.Option(7, help="Length of current window."),
 ) -> None:
     """Compare baseline vs current .md token consumption from hook logs."""
     from .measure import report
+
     console.print(report(log_path, baseline_days, current_days))
 
 
@@ -222,14 +263,20 @@ def _bench_json(result) -> str:
 def bench(
     repo: Path = typer.Argument(..., help="Repo/dir with .md docs to benchmark."),
     queries: Path | None = typer.Option(
-        None, "--queries", help="File of doc-lookup questions, one per line (default: a built-in starter set)."
+        None,
+        "--queries",
+        help="File of doc-lookup questions, one per line (default: a built-in starter set).",
     ),
     eval_mode: bool = typer.Option(
-        False, "--eval", help="Full answer+judge A/B (needs OPENAI_API_KEY); default is the cheap token-model."
+        False,
+        "--eval",
+        help="Full answer+judge A/B (needs OPENAI_API_KEY); default is the cheap token-model.",
     ),
     k: int = typer.Option(3, "--k", help="Baseline candidate count (top-k read)."),
     model: str = typer.Option("gpt-5.4-mini", help="LLM for --eval (answers + judges)."),
-    json_out: bool = typer.Option(False, "--json", help="Emit machine-readable JSON (median, spread, per-query/category)."),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON (median, spread, per-query/category)."
+    ),
 ) -> None:
     """Benchmark trovex's token savings on YOUR repo — the method is the claim, run it yourself.
 
@@ -281,7 +328,10 @@ def bench(
                 print(_bench_json(report))
             else:
                 console.print(
-                    format_eval_report(report, query_source=f"{len(qs)} queries on {repo.name} (answer+judge, {model})")
+                    format_eval_report(
+                        report,
+                        query_source=f"{len(qs)} queries on {repo.name} (answer+judge, {model})",
+                    )
                 )
         else:
             from .benchmark import format_report, run_benchmark
@@ -305,15 +355,9 @@ def stats() -> None:
     settings = Settings()
     db = open_db_for_read(settings)
     total = db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
-    by_status = db.execute(
-        "SELECT status, COUNT(*) AS c FROM docs GROUP BY status"
-    ).fetchall()
-    total_tokens = db.execute(
-        "SELECT COALESCE(SUM(tokens_est), 0) AS t FROM docs"
-    ).fetchone()["t"]
-    last_run = db.execute(
-        "SELECT * FROM index_runs ORDER BY ts DESC LIMIT 1"
-    ).fetchone()
+    by_status = db.execute("SELECT status, COUNT(*) AS c FROM docs GROUP BY status").fetchall()
+    total_tokens = db.execute("SELECT COALESCE(SUM(tokens_est), 0) AS t FROM docs").fetchone()["t"]
+    last_run = db.execute("SELECT * FROM index_runs ORDER BY ts DESC LIMIT 1").fetchone()
 
     console.print(f"[bold]Total docs:[/bold] {total}")
     console.print(f"[bold]Total tokens indexed:[/bold] {total_tokens:,}")
@@ -364,24 +408,34 @@ def prune(
         else:
             canon = "[red]NO canonical (dup_of_id null/missing)[/red]"
             orphans += 1
-        console.print(f"  #{r['id']} {r['ext_id'] or '[dim](no ext_id)[/dim]'}  [dim]{(r['title'] or '')[:40]}[/dim]  → {canon}")
+        console.print(
+            f"  #{r['id']} {r['ext_id'] or '[dim](no ext_id)[/dim]'}  [dim]{(r['title'] or '')[:40]}[/dim]  → {canon}"
+        )
     if orphans:
-        console.print(f"[yellow]{orphans} have no resolvable canonical — review before --execute.[/yellow]")
+        console.print(
+            f"[yellow]{orphans} have no resolvable canonical — review before --execute.[/yellow]"
+        )
 
     if not execute:
-        console.print(f"\n[yellow]DRY-RUN.[/yellow] Re-run with [cyan]--execute[/cyan] to delete these {len(rows)}.")
+        console.print(
+            f"\n[yellow]DRY-RUN.[/yellow] Re-run with [cyan]--execute[/cyan] to delete these {len(rows)}."
+        )
         return
 
     deleted = 0
     for r in rows:
         if store.delete_by_id(r["id"]):
             deleted += 1
-    console.print(f"[green]Deleted {deleted}/{len(rows)} '{status}' docs.[/green] Run [cyan]trovex stats[/cyan] to verify.")
+    console.print(
+        f"[green]Deleted {deleted}/{len(rows)} '{status}' docs.[/green] Run [cyan]trovex stats[/cyan] to verify."
+    )
 
 
 @app.command()
 def migrate(
-    source: str = typer.Option(None, "--source", help="Only this source id (else all file sources)."),
+    source: str = typer.Option(
+        None, "--source", help="Only this source id (else all file sources)."
+    ),
     execute: bool = typer.Option(False, "--execute", help="Write to the store (default: dry-run)."),
     chunk: int = typer.Option(100, help="Embedding batch size."),
 ) -> None:
@@ -425,14 +479,16 @@ def migrate(
         if not content.strip():
             skipped += 1
             continue
-        ext_id = "mig_" + hashlib.sha1(
-            f'{r["source_id"]}|{r["path"]}'.encode()
-        ).hexdigest()[:16]
+        ext_id = "mig_" + hashlib.sha1(f"{r['source_id']}|{r['path']}".encode()).hexdigest()[:16]
         kind = "note" if r["source_id"].startswith("vault") else "reference"
-        buf.append({
-            "content": content, "kind": kind, "ext_id": ext_id,
-            "title": _extract_title(content),
-        })
+        buf.append(
+            {
+                "content": content,
+                "kind": kind,
+                "ext_id": ext_id,
+                "title": _extract_title(content),
+            }
+        )
         by_src[r["source_id"]] = by_src.get(r["source_id"], 0) + 1
         migrated += 1
         if len(buf) >= chunk:
@@ -443,12 +499,12 @@ def migrate(
         console.print(f"  [cyan]{sid}[/cyan]: {n}")
     verb = "Wrote" if execute else "Would write"
     console.print(
-        f"[green]{verb} {migrated}[/green] docs to store · "
-        f"skipped(empty/unreadable)={skipped}"
+        f"[green]{verb} {migrated}[/green] docs to store · skipped(empty/unreadable)={skipped}"
     )
     if not execute:
-        console.print("[dim]Re-run with --execute to write, then drop the source(s) "
-                      "from sources.yaml.[/dim]")
+        console.print(
+            "[dim]Re-run with --execute to write, then drop the source(s) from sources.yaml.[/dim]"
+        )
 
 
 def _fmt_date(ts: float) -> str:
@@ -458,8 +514,10 @@ def _fmt_date(ts: float) -> str:
 def _scan_dir(settings, root: Path, label: str):
     """Gather + resolve every .md under root. Returns (paths, files, skipped)."""
     from . import onboarding
+
     paths = onboarding.gather(
-        root, set(settings.ignore_dirs), max_bytes=settings.max_file_size_bytes)
+        root, set(settings.ignore_dirs), max_bytes=settings.max_file_size_bytes
+    )
     files = []
     for p in paths:
         f = onboarding.build(p, root, label)
@@ -477,23 +535,32 @@ def _print_scan(files, skipped: int) -> None:
     console.print(
         f"[bold]{len(files)}[/bold] docs · dated "
         f"[cyan]{_fmt_date(dates[0])}[/cyan] → [cyan]{_fmt_date(dates[-1])}[/cyan]  "
-        f"[dim](skipped {skipped} empty/unreadable)[/dim]")
+        f"[dim](skipped {skipped} empty/unreadable)[/dim]"
+    )
     console.print(
-        "  dates from: " + "  ".join(
-            f"{src}={n}" for src, n in sorted(by_source.items(), key=lambda x: -x[1])))
+        "  dates from: "
+        + "  ".join(f"{src}={n}" for src, n in sorted(by_source.items(), key=lambda x: -x[1]))
+    )
 
 
 def _write_files(settings, files, kind: str, chunk: int) -> int:
     """Embed + write resolved files into the store in batches. Returns count written."""
     from .store import SqliteStore
+
     store = SqliteStore(settings)
     buf: list[dict] = []
     written = 0
     for f in files:
-        buf.append({
-            "content": f.content, "kind": kind or None, "ext_id": f.ext_id,
-            "title": f.title, "mtime": f.mtime, "tags": f.tags,
-        })
+        buf.append(
+            {
+                "content": f.content,
+                "kind": kind or None,
+                "ext_id": f.ext_id,
+                "title": f.title,
+                "mtime": f.mtime,
+                "tags": f.tags,
+            }
+        )
         if len(buf) >= chunk:
             store.put_batch(buf, embed_chunks=True)
             written += len(buf)
@@ -509,11 +576,14 @@ def _write_files(settings, files, kind: str, chunk: int) -> int:
 def import_(
     root: Path = typer.Argument(..., help="Directory to import all .md from."),
     source: str = typer.Option(
-        None, "--source", help="Source label / tag (default: the directory name)."),
+        None, "--source", help="Source label / tag (default: the directory name)."
+    ),
     kind: str = typer.Option(
-        "reference", "--kind", help="Lifecycle kind for imported docs ('' for living)."),
+        "reference", "--kind", help="Lifecycle kind for imported docs ('' for living)."
+    ),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Preview what would import (dates, counts) — write nothing."),
+        False, "--dry-run", help="Preview what would import (dates, counts) — write nothing."
+    ),
     chunk: int = typer.Option(100, help="Embedding batch size."),
 ) -> None:
     """Import every .md under ROOT into the trovex store, dated from its history.
@@ -532,7 +602,8 @@ def import_(
     settings = Settings()
     console.print(
         f"[bold]Import[/bold] {root}  →  store (source [cyan]{label}[/cyan])  "
-        f"{'[yellow]dry-run[/yellow]' if dry_run else ''}")
+        f"{'[yellow]dry-run[/yellow]' if dry_run else ''}"
+    )
     paths, files, skipped = _scan_dir(settings, root, label)
     console.print(f"[dim]Found {len(paths)} markdown files. Resolving dates…[/dim]")
 
@@ -545,17 +616,20 @@ def import_(
         console.print("\n[dim]Sample (newest first):[/dim]")
         for f in sorted(files, key=lambda x: -x.mtime)[:8]:
             console.print(
-                f"  [cyan]{_fmt_date(f.mtime)}[/cyan] [dim]{f.date_source:11}[/dim] {f.rel}")
+                f"  [cyan]{_fmt_date(f.mtime)}[/cyan] [dim]{f.date_source:11}[/dim] {f.rel}"
+            )
         console.print("\n[dim]Re-run without --dry-run to write to the store.[/dim]")
         return
 
     written = _write_files(settings, files, kind, chunk)
     console.print(
-        f"\n[green]Imported {written} docs[/green] into the store, dated + tagged + queryable.")
+        f"\n[green]Imported {written} docs[/green] into the store, dated + tagged + queryable."
+    )
     console.print(
-        '[bold]Next[/bold] — query them: '
+        "[bold]Next[/bold] — query them: "
         '[cyan]uv run trovex search "..."[/cyan]  '
-        "[dim]or browse at[/dim] [cyan]uv run trovex serve[/cyan] → http://localhost:8765")
+        "[dim]or browse at[/dim] [cyan]uv run trovex serve[/cyan] → http://localhost:8765"
+    )
 
 
 @app.command()
@@ -578,8 +652,9 @@ def onboard() -> None:
         console.print(f"[red]Not a directory:[/red] {root}")
 
     default_label = (root.name or "import").strip().strip("/").lower()
-    label = (typer.prompt("Source label (tag)", default=default_label)
-             ).strip().strip("/").lower() or default_label
+    label = (typer.prompt("Source label (tag)", default=default_label)).strip().strip(
+        "/"
+    ).lower() or default_label
 
     console.print(f"\n[dim]Scanning {root} …[/dim]")
     paths, files, skipped = _scan_dir(settings, root, label)
@@ -590,29 +665,30 @@ def onboard() -> None:
     _print_scan(files, skipped)
     console.print("\n[dim]Newest first:[/dim]")
     for f in sorted(files, key=lambda x: -x.mtime)[:8]:
-        console.print(
-            f"  [cyan]{_fmt_date(f.mtime)}[/cyan] [dim]{f.date_source:11}[/dim] {f.rel}")
+        console.print(f"  [cyan]{_fmt_date(f.mtime)}[/cyan] [dim]{f.date_source:11}[/dim] {f.rel}")
 
     if not typer.confirm(f"\nImport these {len(files)} docs into the store?", default=True):
         console.print("[dim]Aborted — nothing written.[/dim]")
         return
-    kind = (typer.prompt(
-        "Kind (lifecycle tag, blank for living docs)", default="reference")).strip()
+    kind = (
+        typer.prompt("Kind (lifecycle tag, blank for living docs)", default="reference")
+    ).strip()
 
     console.print()
     written = _write_files(settings, files, kind, 100)
     console.print(f"\n[green]Imported {written} docs[/green], dated + tagged + queryable.")
 
     if not typer.confirm("Start the server now?", default=True):
-        console.print(
-            "[dim]Later:[/dim] [cyan]uv run trovex serve[/cyan] → http://localhost:8765")
+        console.print("[dim]Later:[/dim] [cyan]uv run trovex serve[/cyan] → http://localhost:8765")
         return
     console.print(
         f"[dim]Serving at[/dim] [cyan]http://localhost:{settings.port}[/cyan] "
-        "[dim](Ctrl-C to stop)…[/dim]")
+        "[dim](Ctrl-C to stop)…[/dim]"
+    )
     import uvicorn
 
     from .server import build_app
+
     uvicorn.run(build_app(), host=settings.host, port=settings.port)
 
 
@@ -732,24 +808,62 @@ def enrich() -> None:
 
 
 _FACET_TYPE = {
-    "reports": "report", "report": "report", "audit": "audit", "audits": "audit",
-    "decision": "decision", "decisions": "decision", "adr": "decision",
-    "spec": "spec", "specs": "spec", "self-learning": "self-learning",
-    "learnings": "self-learning", "incident": "incident", "incidents": "incident",
-    "runbook": "runbook", "runbooks": "runbook", "plan": "plan", "plans": "plan",
-    "log": "log", "logs": "log", "guide": "guide", "guides": "guide",
+    "reports": "report",
+    "report": "report",
+    "audit": "audit",
+    "audits": "audit",
+    "decision": "decision",
+    "decisions": "decision",
+    "adr": "decision",
+    "spec": "spec",
+    "specs": "spec",
+    "self-learning": "self-learning",
+    "learnings": "self-learning",
+    "incident": "incident",
+    "incidents": "incident",
+    "runbook": "runbook",
+    "runbooks": "runbook",
+    "plan": "plan",
+    "plans": "plan",
+    "log": "log",
+    "logs": "log",
+    "guide": "guide",
+    "guides": "guide",
 }
 _FACET_DOMAIN = {
-    "accounting", "payroll", "auth", "infra", "iodd", "regulation", "kb", "zefix",
-    "ocr", "minio", "clients", "scripts", "banking", "debtors", "suppliers",
-    "outline", "freescout", "loki", "gitnexus", "supabase", "qdrant", "neo4j",
-    "security", "frontend", "backend", "data",
+    "accounting",
+    "payroll",
+    "auth",
+    "infra",
+    "iodd",
+    "regulation",
+    "kb",
+    "zefix",
+    "ocr",
+    "minio",
+    "clients",
+    "scripts",
+    "banking",
+    "debtors",
+    "suppliers",
+    "outline",
+    "freescout",
+    "loki",
+    "gitnexus",
+    "supabase",
+    "qdrant",
+    "neo4j",
+    "security",
+    "frontend",
+    "backend",
+    "data",
 }
 _FACET_OWNER = {"cto", "cos", "founder"}
 
 
 def _pick_query(content: str) -> str:
     import re
+
     text = re.sub(r"^---.*?---", "", content, flags=re.DOTALL)
     for line in text.splitlines():
         s = line.strip()
@@ -791,7 +905,7 @@ def eval(n: int = 40, k: int = 5) -> None:  # noqa: A001
         return
     console.print(
         f"[bold]Retrieval eval[/bold] (n={scored})  "
-        f"[green]recall@1 = {hit1/scored:.0%}[/green]  recall@{k} = {hitk/scored:.0%}"
+        f"[green]recall@1 = {hit1 / scored:.0%}[/green]  recall@{k} = {hitk / scored:.0%}"
     )
 
 
@@ -799,6 +913,7 @@ def eval(n: int = 40, k: int = 5) -> None:  # noqa: A001
 def backup() -> None:
     """Snapshot trovex.db into data_dir/backups/ (consistent online copy, keeps 14)."""
     from .backup import make_backup
+
     settings = Settings()
     dest = make_backup(settings.data_dir / "trovex.db", settings.data_dir)
     console.print(f"[green]Backed up[/green] -> {dest}")
@@ -815,14 +930,14 @@ def facet() -> None:
 
     settings = Settings()
     store = SqliteStore(settings)
-    rows = store.db.execute(
-        "SELECT id FROM docs WHERE source_id = 'trovex'"
-    ).fetchall()
+    rows = store.db.execute("SELECT id FROM docs WHERE source_id = 'trovex'").fetchall()
     added = 0
     for r in rows:
         doc_id = r["id"]
-        tags = [t["tag"] for t in store.db.execute(
-            "SELECT tag FROM doc_tags WHERE doc_id = ?", (doc_id,))]
+        tags = [
+            t["tag"]
+            for t in store.db.execute("SELECT tag FROM doc_tags WHERE doc_id = ?", (doc_id,))
+        ]
         facets: set[str] = set()
         for t in tags:
             if t in _FACET_TYPE:
@@ -843,6 +958,7 @@ def facet() -> None:
 
 def open_db_for_read(settings: Settings):
     from .db import open_db
+
     return open_db(settings.data_dir / "trovex.db", settings.embed_dim)
 
 

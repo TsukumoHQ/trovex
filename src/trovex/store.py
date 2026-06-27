@@ -53,9 +53,16 @@ class StoredDoc:
 class Store(Protocol):
     """Swappable system-of-record for trovex-owned docs (Pôle A sqlite ↔ B Supabase)."""
 
-    def put(self, content: str, *, kind: str | None = None,
-            ext_id: str | None = None, title: str | None = None,
-            author: str | None = None, tags: list[str] | None = None) -> str: ...
+    def put(
+        self,
+        content: str,
+        *,
+        kind: str | None = None,
+        ext_id: str | None = None,
+        title: str | None = None,
+        author: str | None = None,
+        tags: list[str] | None = None,
+    ) -> str: ...
 
     def get(self, ext_id: str) -> StoredDoc | None: ...
 
@@ -77,9 +84,16 @@ class SqliteStore:
         # worker threads, and put() is a multi-statement insert+embed+commit.
         self._lock = threading.Lock()
 
-    def put(self, content: str, *, kind: str | None = None,
-            ext_id: str | None = None, title: str | None = None,
-            author: str | None = None, tags: list[str] | None = None) -> str:
+    def put(
+        self,
+        content: str,
+        *,
+        kind: str | None = None,
+        ext_id: str | None = None,
+        title: str | None = None,
+        author: str | None = None,
+        tags: list[str] | None = None,
+    ) -> str:
         """Create or replace a trovex-owned doc; return its opaque ext_id."""
         ext_id = ext_id or uuid.uuid4().hex
         title = title or _extract_title(content)
@@ -88,9 +102,7 @@ class SqliteStore:
         size = len(content.encode("utf-8"))
 
         with self._lock:
-            existing = self.db.execute(
-                "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
-            ).fetchone()
+            existing = self.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()
 
             if existing:
                 doc_id = existing["id"]
@@ -116,8 +128,20 @@ class SqliteStore:
                             tokens_est, mtime, first_indexed, last_indexed, title,
                             author_agent, content, ext_id, kind)
                        VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (TROVEX_SOURCE_ID, ext_id, size, tokens_est,
-                     now, now, now, title, author, content, ext_id, kind),
+                    (
+                        TROVEX_SOURCE_ID,
+                        ext_id,
+                        size,
+                        tokens_est,
+                        now,
+                        now,
+                        now,
+                        title,
+                        author,
+                        content,
+                        ext_id,
+                        kind,
+                    ),
                 )
                 doc_id = cur.lastrowid
 
@@ -130,6 +154,7 @@ class SqliteStore:
             # docs land. Best-effort — never let it block a write.
             try:
                 from .status import detect_duplicate_for
+
                 detect_duplicate_for(self.db, self.settings, doc_id)
             except Exception:
                 pass
@@ -162,7 +187,11 @@ class SqliteStore:
                 similarity = 1.0 - nb["distance"] / 2
                 if similarity < threshold:
                     break  # neighbours sorted by distance asc → none closer remain
-                return {"ext_id": nb["ext_id"], "title": nb["title"], "similarity": round(similarity, 4)}
+                return {
+                    "ext_id": nb["ext_id"],
+                    "title": nb["title"],
+                    "similarity": round(similarity, 4),
+                }
         except Exception:
             return None  # a guard failure must never block a legit write
         return None
@@ -179,8 +208,32 @@ class SqliteStore:
             return None
         return _row_to_doc(row)
 
-    def list_docs(self, *, tag: str | None = None, kind: str | None = None,
-                  q: str | None = None, limit: int = 60, offset: int = 0) -> list[StoredDoc]:
+    def resolve_ext_id(self, ref: str) -> str | None:
+        """Resolve a full OR short/prefix ext_id to the unique full ext_id. Exact match
+        wins; otherwise a unique prefix match; None if absent OR ambiguous (>1 match).
+        Lets a caller pass a short id (e.g. `b8e05fa3`) instead of the full 32-char id
+        without silently getting `(not found)`."""
+        ref = (ref or "").strip()
+        if not ref:
+            return None
+        exact = self.db.execute("SELECT ext_id FROM docs WHERE ext_id = ?", (ref,)).fetchone()
+        if exact:
+            return exact["ext_id"]
+        rows = self.db.execute(
+            "SELECT ext_id FROM docs WHERE ext_id LIKE ? ESCAPE '\\' LIMIT 2",
+            (like_escape(ref) + "%",),
+        ).fetchall()
+        return rows[0]["ext_id"] if len(rows) == 1 else None
+
+    def list_docs(
+        self,
+        *,
+        tag: str | None = None,
+        kind: str | None = None,
+        q: str | None = None,
+        limit: int = 60,
+        offset: int = 0,
+    ) -> list[StoredDoc]:
         where = ["d.source_id = ?"]
         params: list = [TROVEX_SOURCE_ID]
         if tag:
@@ -206,8 +259,9 @@ class SqliteStore:
         ).fetchall()
         return [_row_to_doc(r) for r in rows if r["content"] is not None]
 
-    def count_docs(self, *, tag: str | None = None, kind: str | None = None,
-                   q: str | None = None) -> int:
+    def count_docs(
+        self, *, tag: str | None = None, kind: str | None = None, q: str | None = None
+    ) -> int:
         where = ["source_id = ?"]
         params: list = [TROVEX_SOURCE_ID]
         if tag:
@@ -227,9 +281,7 @@ class SqliteStore:
     def delete(self, ext_id: str) -> bool:
         """Remove a trovex-owned doc (row + its embedding) by ext_id. True if it existed."""
         with self._lock:
-            row = self.db.execute(
-                "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
-            ).fetchone()
+            row = self.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()
             if not row:
                 return False
             self._delete_cascade_locked(row["id"])
@@ -240,9 +292,7 @@ class SqliteStore:
         """Remove a doc by its internal id (handles rows with a NULL ext_id, e.g.
         agent/MCP-written docs). Same cascade as delete(). True if it existed."""
         with self._lock:
-            row = self.db.execute(
-                "SELECT id FROM docs WHERE id = ?", (doc_id,)
-            ).fetchone()
+            row = self.db.execute("SELECT id FROM docs WHERE id = ?", (doc_id,)).fetchone()
             if not row:
                 return False
             self._delete_cascade_locked(doc_id)
@@ -252,9 +302,7 @@ class SqliteStore:
     def _delete_cascade_locked(self, doc_id: int) -> None:
         """Proper cascade delete by internal id — no orphan vec rows. Caller holds _lock
         and commits. Removes chunks (+ vec_chunks/chunks_fts), doc_versions, vec_docs, docs."""
-        for c in self.db.execute(
-            "SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)
-        ).fetchall():
+        for c in self.db.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
             self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
             self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
         self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
@@ -307,8 +355,19 @@ class SqliteStore:
                                 size_bytes, tokens_est, mtime, first_indexed,
                                 last_indexed, title, content, ext_id, kind)
                            VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (TROVEX_SOURCE_ID, ext_id, size, tok, mtime, mtime, now,
-                         title, content, ext_id, kind),
+                        (
+                            TROVEX_SOURCE_ID,
+                            ext_id,
+                            size,
+                            tok,
+                            mtime,
+                            mtime,
+                            now,
+                            title,
+                            content,
+                            ext_id,
+                            kind,
+                        ),
                     )
                     doc_id = cur.lastrowid
                 ext_ids.append(ext_id)
@@ -337,9 +396,7 @@ class SqliteStore:
 
     def _insert_chunks(self, doc_id: int, content: str, title: str) -> list[tuple[int, str]]:
         """(Re)chunk a doc into the chunks table; return (chunk_id, embed_text)."""
-        for c in self.db.execute(
-            "SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)
-        ).fetchall():
+        for c in self.db.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
             self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
             self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
         self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
@@ -368,8 +425,15 @@ class SqliteStore:
                 (cid, sqlite_vec.serialize_float32(emb.tolist())),
             )
 
-    def search_chunks(self, query: str, limit: int = 5, *, kind: str | None = None,
-                      source: str | None = None, tags: list[str] | None = None) -> list[dict]:
+    def search_chunks(
+        self,
+        query: str,
+        limit: int = 5,
+        *,
+        kind: str | None = None,
+        source: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[dict]:
         """Hybrid chunk retrieval: vector + BM25 fused by reciprocal rank, then
         metadata-filtered. Vector finds semantic matches; BM25 catches exact terms
         (error codes, function names, ids) the embedding blurs."""
@@ -377,17 +441,25 @@ class SqliteStore:
             return []
         pool = max(limit * 6, 30)
         qemb = next(iter(self.embedder.embed([query])))
-        vec_ids = [r["rowid"] for r in self.db.execute(
-            "SELECT v.rowid FROM vec_chunks v WHERE v.embedding MATCH ? AND k = ? ORDER BY v.distance",
-            (sqlite_vec.serialize_float32(qemb.tolist()), pool))]
+        vec_ids = [
+            r["rowid"]
+            for r in self.db.execute(
+                "SELECT v.rowid FROM vec_chunks v WHERE v.embedding MATCH ? AND k = ? ORDER BY v.distance",
+                (sqlite_vec.serialize_float32(qemb.tolist()), pool),
+            )
+        ]
 
         terms = re.findall(r"[a-z0-9]{2,}", query.lower())[:24]
         bm_ids: list[int] = []
         if terms:
             try:
-                bm_ids = [r["chunk_id"] for r in self.db.execute(
-                    "SELECT chunk_id FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?",
-                    (" OR ".join(terms), pool))]
+                bm_ids = [
+                    r["chunk_id"]
+                    for r in self.db.execute(
+                        "SELECT chunk_id FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?",
+                        (" OR ".join(terms), pool),
+                    )
+                ]
             except sqlite3.OperationalError:
                 bm_ids = []
 
@@ -406,7 +478,8 @@ class SqliteStore:
                 """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
                           d.ext_id, d.title, d.kind, d.source_id, d.tokens_est AS doc_tokens
                    FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.id = ?""",
-                (cid,)).fetchone()
+                (cid,),
+            ).fetchone()
             if not r:
                 continue
             if kind and r["kind"] != kind:
@@ -414,8 +487,12 @@ class SqliteStore:
             if source and r["source_id"] != source:
                 continue
             if tagset:
-                dtags = {t["tag"] for t in self.db.execute(
-                    "SELECT tag FROM doc_tags WHERE doc_id = ?", (r["doc_id"],))}
+                dtags = {
+                    t["tag"]
+                    for t in self.db.execute(
+                        "SELECT tag FROM doc_tags WHERE doc_id = ?", (r["doc_id"],)
+                    )
+                }
                 if not (tagset & dtags):
                     continue
             hit = dict(r)
@@ -429,7 +506,9 @@ class SqliteStore:
         """Small-to-big: all chunks of a doc sharing a heading path = the section."""
         rows = self.db.execute(
             """SELECT content FROM chunks WHERE doc_id = ? AND heading_path = ?
-               ORDER BY chunk_index""", (doc_id, heading_path)).fetchall()
+               ORDER BY chunk_index""",
+            (doc_id, heading_path),
+        ).fetchall()
         return "\n\n".join(r["content"] for r in rows)
 
     def _set_tags(self, doc_id: int, tags: list[str]) -> None:
@@ -442,22 +521,21 @@ class SqliteStore:
                     (doc_id, tag),
                 )
 
-    def set_tags(self, ext_id: str, add: list[str] | None = None,
-                 remove: list[str] | None = None) -> list[str]:
+    def set_tags(
+        self, ext_id: str, add: list[str] | None = None, remove: list[str] | None = None
+    ) -> list[str]:
         """Add/remove tags on a doc (trovex_tag tool + reader UI). Returns new set."""
         with self._lock:
-            row = self.db.execute(
-                "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
-            ).fetchone()
+            row = self.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()
             if not row:
                 return []
             doc_id = row["id"]
-            for raw in (remove or []):
+            for raw in remove or []:
                 self.db.execute(
                     "DELETE FROM doc_tags WHERE doc_id = ? AND tag = ?",
                     (doc_id, raw.strip().strip("/").lower()),
                 )
-            for raw in (add or []):
+            for raw in add or []:
                 tag = raw.strip().strip("/").lower()
                 if tag:
                     self.db.execute(
@@ -465,16 +543,24 @@ class SqliteStore:
                         (doc_id, tag),
                     )
             self.db.commit()
-            return [r["tag"] for r in self.db.execute(
-                "SELECT tag FROM doc_tags WHERE doc_id = ? ORDER BY tag", (doc_id,))]
+            return [
+                r["tag"]
+                for r in self.db.execute(
+                    "SELECT tag FROM doc_tags WHERE doc_id = ? ORDER BY tag", (doc_id,)
+                )
+            ]
 
     def all_tags(self, limit: int = 40) -> list[tuple[str, int]]:
         """Top tags by doc count, for the filter sidebar (capped — can be many)."""
-        return [(r["tag"], r["c"]) for r in self.db.execute(
-            """SELECT t.tag, COUNT(*) AS c FROM doc_tags t
+        return [
+            (r["tag"], r["c"])
+            for r in self.db.execute(
+                """SELECT t.tag, COUNT(*) AS c FROM doc_tags t
                JOIN docs d ON d.id = t.doc_id WHERE d.source_id = ?
                GROUP BY t.tag ORDER BY c DESC, t.tag LIMIT ?""",
-            (TROVEX_SOURCE_ID, limit))]
+                (TROVEX_SOURCE_ID, limit),
+            )
+        ]
 
     def tags_by_facet(self, other_limit: int = 12) -> tuple[dict, list]:
         """Group tags for the sidebar: namespaced (facet/value) into facets,
@@ -482,7 +568,9 @@ class SqliteStore:
         rows = self.db.execute(
             """SELECT t.tag, COUNT(*) AS c FROM doc_tags t
                JOIN docs d ON d.id = t.doc_id WHERE d.source_id = ?
-               GROUP BY t.tag ORDER BY c DESC, t.tag""", (TROVEX_SOURCE_ID,)).fetchall()
+               GROUP BY t.tag ORDER BY c DESC, t.tag""",
+            (TROVEX_SOURCE_ID,),
+        ).fetchall()
         facets: dict[str, list] = {}
         other: list = []
         for r in rows:
@@ -507,8 +595,7 @@ class SqliteStore:
     def list_collections(self) -> list[dict]:
         return [
             {"name": r["name"], "filter": json.loads(r["filter_json"] or "{}")}
-            for r in self.db.execute(
-                "SELECT name, filter_json FROM collections ORDER BY name")
+            for r in self.db.execute("SELECT name, filter_json FROM collections ORDER BY name")
         ]
 
     def get_collection(self, name: str) -> dict | None:
@@ -524,16 +611,23 @@ class SqliteStore:
 
     def list_versions(self, ext_id: str) -> list[dict]:
         """Previous content snapshots of a doc (newest first)."""
-        return [dict(r) for r in self.db.execute(
-            """SELECT v.id, v.title, v.ts, LENGTH(v.content) AS size
+        return [
+            dict(r)
+            for r in self.db.execute(
+                """SELECT v.id, v.title, v.ts, LENGTH(v.content) AS size
                FROM doc_versions v JOIN docs d ON d.id = v.doc_id
-               WHERE d.ext_id = ? ORDER BY v.ts DESC""", (ext_id,))]
+               WHERE d.ext_id = ? ORDER BY v.ts DESC""",
+                (ext_id,),
+            )
+        ]
 
     def restore_version(self, ext_id: str, version_id: int) -> bool:
         """Restore a previous version — put() snapshots the current one first."""
         row = self.db.execute(
             """SELECT v.content FROM doc_versions v JOIN docs d ON d.id = v.doc_id
-               WHERE d.ext_id = ? AND v.id = ?""", (ext_id, version_id)).fetchone()
+               WHERE d.ext_id = ? AND v.id = ?""",
+            (ext_id, version_id),
+        ).fetchone()
         if not row:
             return False
         self.put(row["content"], ext_id=ext_id)
@@ -560,9 +654,15 @@ def _row_to_doc(row: sqlite3.Row) -> StoredDoc:
     except IndexError:
         origin = None
     return StoredDoc(
-        ext_id=row["ext_id"], title=row["title"] or "", content=row["content"],
-        kind=row["kind"], status=row["status"], tokens_est=row["tokens_est"],
-        mtime=row["mtime"], tags=tags, origin=origin,
+        ext_id=row["ext_id"],
+        title=row["title"] or "",
+        content=row["content"],
+        kind=row["kind"],
+        status=row["status"],
+        tokens_est=row["tokens_est"],
+        mtime=row["mtime"],
+        tags=tags,
+        origin=origin,
     )
 
 
@@ -617,3 +717,30 @@ def extract_section(content: str, heading: str) -> str | None:
             end = j
             break
     return "\n".join(lines[start:end]).strip()
+
+
+def replace_section(content: str, heading: str, new_text: str) -> str | None:
+    """Patch ONE section in place: replace the `heading` section (its heading line down
+    to just before the next same-or-higher heading) with `new_text`, returning the full
+    patched document. None if the heading isn't found — the caller MUST treat None as a
+    hard error and NEVER fall back to overwriting the whole doc (that's the section-write
+    data-loss this guards against). Symmetric with extract_section: read returns the
+    heading+body, so new_text is expected to include the (possibly edited) heading."""
+    target = heading.strip().lstrip("#").strip().lower()
+    lines = content.splitlines()
+    start = level = None
+    for i, ln in enumerate(lines):
+        m = HEADING_RE.match(ln)
+        if m and m.group(2).strip().lower() == target:
+            start, level = i, len(m.group(1))
+            break
+    if start is None:
+        return None
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        m = HEADING_RE.match(lines[j])
+        if m and len(m.group(1)) <= level:
+            end = j
+            break
+    patched = lines[:start] + new_text.strip("\n").splitlines() + lines[end:]
+    return "\n".join(patched).strip() + "\n"

@@ -11,13 +11,15 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .state import get_state
-from .store import TROVEX_SOURCE_ID, extract_section
+from .store import TROVEX_SOURCE_ID, extract_section, replace_section
 
 log = logging.getLogger("trovex.mcp")
 
 # Allow override via env so the same code runs locally and behind Traefik.
 EXTRA_HOSTS = [h for h in os.environ.get("TROVEX_MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
-EXTRA_ORIGINS = [o for o in os.environ.get("TROVEX_MCP_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+EXTRA_ORIGINS = [
+    o for o in os.environ.get("TROVEX_MCP_ALLOWED_ORIGINS", "").split(",") if o.strip()
+]
 
 mcp = FastMCP(
     "trovex",
@@ -30,17 +32,22 @@ mcp = FastMCP(
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
         allowed_hosts=[
-            "127.0.0.1:*", "localhost:*", "[::1]:*",
+            "127.0.0.1:*",
+            "localhost:*",
+            "[::1]:*",
             # Docker host alias — a containerized agent / dokan job reaches the MCP (the
             # only write path) at host.docker.internal:8765. Resolves to the host only
             # inside Docker, not internet-reachable, so the rebind risk is minimal.
-            "host.docker.internal", "host.docker.internal:*",
+            "host.docker.internal",
+            "host.docker.internal:*",
             # Extra hosts (e.g. a real deploy domain) come from TROVEX_MCP_ALLOWED_HOSTS —
             # never hardcode a deploy host in the public repo.
             *EXTRA_HOSTS,
         ],
         allowed_origins=[
-            "http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*",
+            "http://127.0.0.1:*",
+            "http://localhost:*",
+            "http://[::1]:*",
             "http://host.docker.internal:*",
             *EXTRA_ORIGINS,
         ],
@@ -80,8 +87,12 @@ def trovex(q: str, summary: bool = False) -> str:
     if cached is not None:
         try:
             log_query(
-                db, q, cached["n_results"], summary,
-                response_tokens_est=cached["resp_tokens"], elapsed_ms=0,
+                db,
+                q,
+                cached["n_results"],
+                summary,
+                response_tokens_est=cached["resp_tokens"],
+                elapsed_ms=0,
                 would_have_read_tokens=cached["whr"],
                 top_result_tokens=cached["top_tokens"],
             )
@@ -94,16 +105,23 @@ def trovex(q: str, summary: bool = False) -> str:
     pre_rerank_paths = [c.path for c in candidates]
     results, rerank_info = maybe_rerank(q, candidates, limit=5)
 
-    out = (state.searcher.format_with_summary(results) if summary
-           else state.searcher.format_minimal(results))
+    out = (
+        state.searcher.format_with_summary(results)
+        if summary
+        else state.searcher.format_minimal(results)
+    )
     elapsed_ms = int((_time.perf_counter() - t0) * 1000)
     would_have_read = sum(r.tokens_est for r in results[:3])
     top_tokens = results[0].tokens_est if results else 0
     resp_tokens = len(out) // 4
     try:
         log_query(
-            db, q, len(results), summary,
-            response_tokens_est=resp_tokens, elapsed_ms=elapsed_ms,
+            db,
+            q,
+            len(results),
+            summary,
+            response_tokens_est=resp_tokens,
+            elapsed_ms=elapsed_ms,
             would_have_read_tokens=would_have_read,
             top_result_tokens=top_tokens,
             results=results,
@@ -113,7 +131,9 @@ def trovex(q: str, summary: bool = False) -> str:
                     "tokens_in": rerank_info.tokens_in,
                     "tokens_out": rerank_info.tokens_out,
                     "elapsed_ms": rerank_info.elapsed_ms,
-                } if rerank_info else None
+                }
+                if rerank_info
+                else None
             ),
             # Only pass pre-rerank when actually reranking — otherwise it's
             # the same list and metrics would be meaningless.
@@ -122,8 +142,9 @@ def trovex(q: str, summary: bool = False) -> str:
     except Exception:  # noqa: BLE001 — logging must never break the tool
         log.debug("log_query failed", exc_info=True)
     try:
-        _qcache.put(db, q, summary, ver, out, len(results),
-                    would_have_read, top_tokens, resp_tokens)
+        _qcache.put(
+            db, q, summary, ver, out, len(results), would_have_read, top_tokens, resp_tokens
+        )
     except Exception:  # noqa: BLE001 — cache is best-effort, never block the tool
         log.debug("query-cache put failed", exc_info=True)
     return out
@@ -138,6 +159,7 @@ def _authorized() -> bool:
     TROVEX_ALLOW_UNAUTH_WRITES is set (opt-in open writes).
     Gates trovex_write / trovex_tag / trovex_delete."""
     from .usage import current_write_token
+
     tok = get_state().settings.write_token
     return (not tok) or (current_write_token.get() == tok)
 
@@ -158,8 +180,15 @@ def _as_taglist(v) -> list[str]:
 
 
 @mcp.tool()
-def trovex_write(content: str, kind: str = "", doc_id: str = "",
-              tags: list[str] | None = None, ticket: str = "", force: bool = False) -> str:
+def trovex_write(
+    content: str,
+    kind: str = "",
+    doc_id: str = "",
+    tags: list[str] | None = None,
+    ticket: str = "",
+    force: bool = False,
+    section: str = "",
+) -> str:
     """Store a doc INSIDE trovex so every agent of every dev can read it.
 
     For records / memory / coordination notes (incidents, decisions, plans) —
@@ -177,7 +206,12 @@ def trovex_write(content: str, kind: str = "", doc_id: str = "",
         content: The markdown body to store.
         kind: Lifecycle hint. "record" = event-anchored, never goes stale by
             age. Default "" = a normal living doc.
-        doc_id: Omit to create; pass an existing id to overwrite that doc.
+        doc_id: Omit to create; pass an existing id (full OR a unique short prefix)
+            to overwrite that doc. Without `section`, the WHOLE doc is replaced.
+        section: With doc_id, PATCH only this heading's section in place (read it back
+            first with trovex_read(doc_id, section=…); edit; write it back here). If the
+            heading isn't found this hard-errors and writes NOTHING — it never falls
+            through to a whole-doc overwrite.
         force: On create, override the near-duplicate block to store a new doc anyway.
         tags: List of tags (free or hierarchical "a/b/c"), e.g.
             ["type/report", "owner/cto", "domain/accounting"]. `kind/<kind>`
@@ -190,6 +224,34 @@ def trovex_write(content: str, kind: str = "", doc_id: str = "",
     if not _authorized():
         return _DENY
     state = get_state()
+    # Resolve a full OR short/prefix doc_id to the real id when the doc EXISTS; a
+    # non-resolving doc_id is kept as a client-chosen stable id for a fresh create.
+    resolved = state.store.resolve_ext_id(doc_id) if doc_id else None
+    if section:
+        # PATCH-in-place — never fall through to a whole-doc overwrite (the data-loss bug).
+        if not doc_id:
+            return "✗ section write needs doc_id — pass the doc to patch. (Nothing written.)"
+        doc = state.store.get(resolved) if resolved else None
+        if doc is None:
+            return (
+                f"✗ doc '{doc_id}' not found — cannot patch section '{section}'. (Nothing written.)"
+            )
+        patched = replace_section(doc.content, section, content)
+        if patched is None:
+            return (
+                f"✗ section '{section}' not found in doc {resolved} — NOTHING written "
+                f"(refused to overwrite the whole doc). Read its headings first: "
+                f'trovex_read(doc_id="{resolved}").'
+            )
+        content = patched
+        doc_id = resolved
+        # A patch must not silently drop the doc's kind/tags → reuse them when unspecified.
+        if not kind:
+            kind = doc.kind or ""
+        if not tags:
+            tags = [t for t in doc.tags if not t.startswith("kind/")]
+    elif resolved:
+        doc_id = resolved  # whole-doc update via a short id → resolve to the full id
     # Write-time dedup guard: on a CREATE (no doc_id) without force, block-and-point
     # if this near-duplicates an existing canonical — stops the 'one topic, N near-copies'
     # bloat at the source (the store was 43% dupes). Updates + force bypass it.
@@ -199,22 +261,23 @@ def trovex_write(content: str, kind: str = "", doc_id: str = "",
             pct = round(dup["similarity"] * 100)
             return (
                 f"⚠ Not stored — this looks like a duplicate of doc {dup['ext_id']} "
-                f"(\"{dup['title']}\", ~{pct}% similar). One canonical doc per topic: "
+                f'("{dup["title"]}", ~{pct}% similar). One canonical doc per topic: '
                 f"UPDATE that doc instead — call trovex_write again with "
-                f"doc_id=\"{dup['ext_id']}\". For a genuinely new doc, pass force=true."
+                f'doc_id="{dup["ext_id"]}". For a genuinely new doc, pass force=true.'
             )
     taglist = _as_taglist(tags)
     if ticket.strip():
         taglist.append(f"ticket/{ticket.strip()}")
     return state.store.put(
-        content, kind=kind or None, ext_id=doc_id or None,
+        content,
+        kind=kind or None,
+        ext_id=doc_id or None,
         tags=taglist or None,
     )
 
 
 @mcp.tool()
-def trovex_tag(doc_id: str, add: list[str] | None = None,
-            remove: list[str] | None = None) -> str:
+def trovex_tag(doc_id: str, add: list[str] | None = None, remove: list[str] | None = None) -> str:
     """Add/remove tags on a trovex-owned doc — returns the doc's new tag set.
 
     Args:
@@ -226,7 +289,9 @@ def trovex_tag(doc_id: str, add: list[str] | None = None,
         return _DENY
     state = get_state()
     tags = state.store.set_tags(
-        doc_id, add=_as_taglist(add), remove=_as_taglist(remove),
+        doc_id,
+        add=_as_taglist(add),
+        remove=_as_taglist(remove),
     )
     return ", ".join(tags) if tags else "(no tags)"
 
@@ -246,7 +311,9 @@ def trovex_read(query: str = "", doc_id: str = "", section: str = "", full: bool
     """
     state = get_state()
     if doc_id:
-        doc = state.store.get(doc_id)
+        # Accept a full OR short/prefix id (a bare short id used to return (not found)).
+        resolved = state.store.resolve_ext_id(doc_id)
+        doc = state.store.get(resolved) if resolved else None
         if doc is None:
             return "(not found)"
         if section:
@@ -273,8 +340,7 @@ def trovex_read(query: str = "", doc_id: str = "", section: str = "", full: bool
 
 
 @mcp.tool()
-def trovex_search(query: str, k: int = 5, kind: str = "",
-               tags: list[str] | None = None) -> str:
+def trovex_search(query: str, k: int = 5, kind: str = "", tags: list[str] | None = None) -> str:
     """Search the store — returns the top K relevant *passages* (not whole docs).
 
     The RAG entry point: chunk-level retrieval with metadata filters. Each result
@@ -289,7 +355,9 @@ def trovex_search(query: str, k: int = 5, kind: str = "",
     state = get_state()
     t0 = time.perf_counter()
     hits = state.store.search_chunks(
-        query, limit=k, kind=kind or None,
+        query,
+        limit=k,
+        kind=kind or None,
         tags=_as_taglist(tags) or None,
     )
     out = "\n\n———\n\n".join(_fmt_passage(h) for h in hits) if hits else "(no results)"
@@ -307,12 +375,17 @@ def _log_retrieval(state, query: str, hits: list, response: str, t0: float) -> N
     baseline = reading the whole parent doc(s); served = the passages."""
     try:
         from .usage import log_query
+
         would_have_read = sum({h["ext_id"]: h.get("doc_tokens", 0) for h in hits}.values())
         log_query(
-            state.searcher.db, query, len(hits), False,
+            state.searcher.db,
+            query,
+            len(hits),
+            False,
             response_tokens_est=len(response) // 4,
             elapsed_ms=int((time.perf_counter() - t0) * 1000),
-            would_have_read_tokens=would_have_read, top_result_tokens=0,
+            would_have_read_tokens=would_have_read,
+            top_result_tokens=0,
         )
     except Exception:  # noqa: BLE001 — logging must never break a tool
         log.debug("log_query (chunk path) failed", exc_info=True)

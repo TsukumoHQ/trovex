@@ -72,6 +72,21 @@ describe('hasInputs', () => {
   })
 })
 
+describe('OG card honesty gate (no-input default must not overstate)', () => {
+  // The savings-card handler builds: m = hasInputs(params) ? compute(readInputs(params)) : null.
+  // A bare og:image (the /savings or /audit card with no querystring) → m = null → the
+  // generic "~60%" claim, NOT the default scenario — which computes ~64%, above our
+  // conservative public floor. The real figure shows only when the link carries inputs.
+  it('a no-input card falls back to the generic claim, never the ~64% default scenario', () => {
+    expect(hasInputs(params(''))).toBe(false) // → card(null) → headline "~60%"
+    expect(pct(compute(readInputs(params(''))))).toBeGreaterThan(60) // why we must not render it bare
+  })
+  it("a shared link with the sharer's inputs shows their real, shareworthy number", () => {
+    expect(hasInputs(params('c=3&d=1200'))).toBe(true)
+    expect(isShareworthy(compute(readInputs(params('c=3&d=1200'))))).toBe(true)
+  })
+})
+
 describe('isShareworthy (honesty gate)', () => {
   it('blocks a receipt below the ratio floor', () => {
     const weak = compute({ ...DEFAULTS, candidates: 2, avgDocTokens: 100 })

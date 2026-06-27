@@ -6,6 +6,7 @@
  *   - command_copied  — the in-page install command was copied (install-intent signal)
  *   - github_clicked  — a click on any GitHub link (the conversion proxy on a vs page)
  *   - compare_clicked — a click to another /vs/ page (cross-comparison navigation)
+ *   - consult_clicked — a click on the soft tsukumo discovery-call band (funnel handoff)
  *
  * No cookies, no identifiers, no PII. A delegated listener so it survives any markup,
  * and a no-op if no analytics script is present. location = vs-<page-slug>.
@@ -47,6 +48,7 @@
       if (!a) return
       var href = a.getAttribute('href') || ''
       if (/github\.com/i.test(href)) track('github_clicked', { location: loc })
+      else if (/calendly\.com/i.test(href) || a.hasAttribute('data-consult')) track('consult_clicked', { location: loc })
       else if (href === '/vs/' || /^\/vs\//.test(href)) track('compare_clicked', { location: loc })
     },
     true,

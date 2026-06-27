@@ -105,6 +105,10 @@
     <p class="lead-answer">A <a href="/glossary/canonical-context-layer/">canonical context layer</a> is the part memory and RAG don't provide: one shared store that serves the single current, authoritative doc per topic — marked canonical, stale, or duplicate by a <a href="/glossary/freshness-marker/">freshness marker</a> — that every agent reads from and writes back to. It's not a smarter similarity search and it's not a bigger memory; it's the team's current truth, shared.</p>
     <p class="lead-answer"><a href="/">trovex</a> is that layer. It indexes your docs and returns the one current section that answers a query as a <code>path:line</code> pointer with a freshness marker, and lets agents write canonical <a href="/glossary/record/">records</a> back through one shared point. Serving the one current section instead of a similarity pile is about <strong>60% fewer tokens per lookup</strong>. It runs locally — SQLite + ONNX, no cloud, no keys — and sits alongside your agent's memory and any RAG stack, not in place of them.</p>
 
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Rolling agents out across a team? tsukumo, the studio behind trovex, consults on doing it well at scale. <a href="https://calendly.com/hello-tsukumo/tsukumo-1-hour-call-clone?utm_source=trovex&amp;utm_medium=oss-suite&amp;utm_campaign=consulting&amp;utm_content=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
     <div class="related">
       <div class="l">Related questions</div>
       <ul>

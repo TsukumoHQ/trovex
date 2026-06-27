@@ -1,9 +1,9 @@
 /**
- * trovex.dev/audit — "is your agent setup burning tokens?" self-audit.
+ * trovex.dev/audit: "is your agent setup burning tokens?" self-audit.
  *
  * Ungated lead magnet (content doc 4f28762f, voice-gated). A developer ticks a
  * 13-point checklist; the live score lands them in one of three bands. The value
- * is the audit itself — a low score honestly says "you don't need trovex yet,"
+ * is the audit itself: a low score honestly says "you don't need trovex yet,"
  * which is what makes the high-score readers trust the rest. Step 1 is "install
  * and measure" (activation); the 9+ band carries the single soft consulting
  * endplate to tsukumo.ch (convert layer, property-split canon v1.1).
@@ -15,9 +15,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { track, trackAuditView, trackTsukumoClick } from '../analytics'
 
-// The endplate is the highest-intent consult surface (dev just finished the self-audit) —
-// land them on the booking page, not the bare homepage they'd have to hunt the CTA on.
-const BOOK_URL = 'https://tsukumo.ch/assessment?utm_source=trovex&utm_medium=tool&utm_campaign=audit-consult'
+// The single soft consulting endplate (9+ band). LINKS canon: the canonical branded
+// short link, never a hand-rolled UTM. /go/consulting fires the Plausible Link Click
+// server-side then 308s to /consulting; ?s=magnet is the per-surface attribution.
+const BOOK_URL = 'https://tsukumo.ch/go/consulting?s=magnet'
 
 type Item = { id: string; text: string }
 type Group = { title: string; items: Item[] }
@@ -81,7 +82,7 @@ function bandFor(score: number): Band {
   }
 }
 
-/* Copyable command — one click to run, no hand-typing. Fires command_copied
+/* Copyable command: one click to run, no hand-typing. Fires command_copied
  * (closed-enum id, no PII) so install-intent from the audit is measurable. */
 function CopyCmd({ cmd, id }: { cmd: string; id: string }) {
   const [copied, setCopied] = useState(false)
@@ -173,7 +174,7 @@ export default function Audit() {
             </span>
             <span className="audit-note">
               (Or <code>uv tool install trovex</code> once, then <code>trovex index ...</code>.)
-              The Savings tab shows would-have-read versus actual tokens — that's your real
+              The Savings tab shows would-have-read versus actual tokens. That's your real
               number. Want it without installing?{' '}
               <a
                 className="audit-link"
@@ -203,7 +204,7 @@ export default function Audit() {
       <section className={`audit-endplate${band.key === 'compounding' ? ' is-live' : ''}`}>
         <p>
           {band.key === 'compounding'
-            ? "You scored 9+ and you're rolling agents out across a team — the by-hand version of the steps above is a real project."
+            ? "You scored 9+ and you're rolling agents out across a team. The by-hand version of the steps above is a real project."
             : 'Rolling agents out across a team and the by-hand version is getting heavy?'}{' '}
           That's the kind of thing we help teams do well.{' '}
           <a

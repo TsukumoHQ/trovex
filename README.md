@@ -139,10 +139,11 @@ token consumption before and after, from the hook's baseline log.
 
 - `trovex(q)` — route a question to the right on-disk `.md` and get back `path:line` pointers
   with freshness markers, not a pile of files to rank.
-- `trovex_write(content, kind?, doc_id?, tags?)` / `trovex_read(query | doc_id, section?)` —
+- `trovex_write(content, kind?, doc_id?, tags?, section?)` / `trovex_read(query | doc_id, section?)` —
   docs owned *inside* trovex. An agent stores a record (an incident, a decision, "what
   actually worked") once; every other agent and a second dev read it back as content
-  (optionally just one section) instead of re-deriving it. See [`REFONTE.md`](REFONTE.md).
+  (optionally just one section) instead of re-deriving it. Pass `section=` to `trovex_write`
+  to patch one heading's section in place instead of replacing the whole doc.
 - `trovex_search(query, k?, tags?)` — passage-level retrieval across the store with tag
   filters, for when you want the top matching chunks rather than one canonical doc.
 - `trovex_tag(...)` / `trovex_delete(...)` — tag or soft-delete a stored doc; delete is a
@@ -179,8 +180,7 @@ trovex is in public beta. Install it, run it on your repo, and if it saves you t
 PRs welcome.
 
 Questions, or comparing notes with other people running agents? Join the community on Discord:
-[tsukumo.ch/discord](https://tsukumo.ch/discord?utm_source=github&utm_medium=readme&utm_campaign=discord&utm_content=community)
-(also on [Slack](https://tsukumo.ch/slack)).
+[tsukumo.ch/discord](https://tsukumo.ch/discord?utm_source=github&utm_medium=readme&utm_campaign=discord&utm_content=community).
 
 ## Security
 

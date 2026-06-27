@@ -1,43 +1,114 @@
 name: Announce release to Discord
 
-# Posts a Discord embed to the #releases channel whenever a GitHub Release is
-# published. The webhook URL lives in the repo secret DISCORD_RELEASE_WEBHOOK
-# (Settings -> Secrets and variables -> Actions). Publishing a Release is the
-# announce signal; plain tag pushes (which drive publish-mcp.yml) stay silent.
+# On every version tag (v*), posts two designed embeds:
+#   - #release   (DISCORD_RELEASE_WEBHOOK)   -> concise card: highlight bullets + install
+#   - #changelog (DISCORD_CHANGELOG_WEBHOOK) -> full release notes
+# Tag push is the reliable signal (the same one publish-mcp.yml uses); GitHub
+# `release` events do NOT fire Actions for PAT-created releases on this repo.
+# workflow_dispatch allows a manual test run against an existing tag without
+# cutting a new version. Each webhook is independent — an unset one is skipped.
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to announce (e.g. v0.11.7)"
+        required: true
 
 permissions:
   contents: read
 
+env:
+  # trovex brand: emerald accent (ties to the token-savings story) + PNG logo.
+  # LOGO = the current brand-kit avatar in Supabase (the kit rolled out 2026-06-26);
+  # Discord embeds don't render SVG for icon/thumbnail, so use the 400px PNG.
+  COLOR: "1098629"            # 0x10C685 emerald
+  LOGO: "https://bxdpevnqdnjcehewbiyg.supabase.co/storage/v1/object/public/media/assets/brand-kit/trovex/social-avatar/avatar-400.png"
+  SITE: "https://trovex.dev"
+
 jobs:
   announce:
     runs-on: ubuntu-latest
-    if: ${{ !github.event.release.prerelease }}
     steps:
-      - name: Post release to Discord
+      - name: Post to Discord
         env:
-          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
-          TAG: ${{ github.event.release.tag_name }}
-          NAME: ${{ github.event.release.name }}
-          URL: ${{ github.event.release.html_url }}
-          BODY: ${{ github.event.release.body }}
+          RELEASE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          CHANGELOG_WEBHOOK: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          if [ -z "${WEBHOOK:-}" ]; then
-            echo "DISCORD_RELEASE_WEBHOOK not set — skipping." >&2
+          if [ -z "${RELEASE_WEBHOOK:-}" ] && [ -z "${CHANGELOG_WEBHOOK:-}" ]; then
+            echo "No Discord webhooks configured — skipping." >&2
             exit 0
           fi
-          title="${NAME:-$TAG}"
-          # Discord embed descriptions cap at 4096; trim release notes well under it.
-          desc=$(printf '%s' "$BODY" | head -c 1500)
-          payload=$(jq -n \
-            --arg title "🚀 ${REPO}  ${title}" \
-            --arg url "$URL" \
-            --arg desc "$desc" \
-            '{username: "trovex releases",
-              embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')
-          curl -fsS -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"
+
+          url="https://github.com/${REPO}/releases/tag/${TAG}"
+          ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          body=$(gh api "repos/${REPO}/releases/tags/${TAG}" --jq '.body' 2>/dev/null || true)
+          [ -z "$body" ] && body="New release: ${TAG}"
+
+          post() { # $1=webhook  $2=payload
+            [ -z "${1:-}" ] && return 0
+            curl -fsS -H "Content-Type: application/json" -d "$2" "$1" >/dev/null
+          }
+
+          # --- highlights for the #release card -------------------------------
+          # Prefer markdown bullet lines; fall back to the first prose lines.
+          highlights=$(printf '%s\n' "$body" | grep -E '^[[:space:]]*[-*][[:space:]]' | head -6 || true)
+          if [ -z "$highlights" ]; then
+            highlights=$(printf '%s\n' "$body" | grep -vE '^[[:space:]]*(#|$)' | head -4 | sed 's/^/- /')
+          fi
+          # normalize "* " / "- " to a single bullet glyph, trim well under limits
+          highlights=$(printf '%s\n' "$highlights" | sed -E 's/^[[:space:]]*[-*][[:space:]]+/• /')
+          highlights=$(printf '%s' "$highlights" | head -c 1200)
+          [ -z "$highlights" ] && highlights="New release is out."
+
+          install=$(printf '```\nuv tool upgrade trovex\n```')
+
+          # --- #release: designed announce card -------------------------------
+          announce=$(jq -n \
+            --arg tag "$TAG" --arg url "$url" --arg desc "$highlights" \
+            --arg install "$install" --arg ts "$ts" \
+            --arg logo "$LOGO" --arg site "$SITE" --arg repo "$REPO" \
+            --argjson color "$COLOR" \
+            '{username: "trovex",
+              avatar_url: $logo,
+              embeds: [{
+                author: {name: "trovex", url: $site, icon_url: $logo},
+                title: ("🚀  " + $tag + " released"),
+                url: $url,
+                description: $desc,
+                color: $color,
+                thumbnail: {url: $logo},
+                fields: [
+                  {name: "Update", value: $install, inline: false},
+                  {name: "Links", value: ("[Release notes](" + $url + ")  ·  [trovex.dev](" + $site + ")  ·  full log in #changelog"), inline: false}
+                ],
+                footer: {text: $repo, icon_url: $logo},
+                timestamp: $ts
+              }]}')
+          post "$RELEASE_WEBHOOK" "$announce"
+
+          # --- #changelog: full notes ----------------------------------------
+          desc=$(printf '%s' "$body" | head -c 4000)
+          changelog=$(jq -n \
+            --arg tag "$TAG" --arg url "$url" --arg desc "$desc" --arg ts "$ts" \
+            --arg logo "$LOGO" --arg site "$SITE" --arg repo "$REPO" \
+            --argjson color "$COLOR" \
+            '{username: "trovex",
+              avatar_url: $logo,
+              embeds: [{
+                author: {name: "trovex · changelog", url: $site, icon_url: $logo},
+                title: ("📝  Changelog — " + $tag),
+                url: $url,
+                description: $desc,
+                color: $color,
+                footer: {text: ($repo + " · full diff on GitHub"), icon_url: $logo},
+                timestamp: $ts
+              }]}')
+          post "$CHANGELOG_WEBHOOK" "$changelog"

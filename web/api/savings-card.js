@@ -25,7 +25,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { compute, humanTokens, isShareworthy, money, pct, readInputs } from './_savings.js'
+import { compute, hasInputs, humanTokens, isShareworthy, money, pct, readInputs } from './_savings.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FONT = (f) => readFileSync(join(HERE, '_fonts', f))
@@ -171,7 +171,11 @@ export default async function handler(req, res) {
     params = new URLSearchParams()
   }
 
-  const m = compute(readInputs(params))
+  // No querystring inputs (the bare /savings or /audit og:image) → render the GENERIC
+  // brand card (the conservative ~60% claim), NOT the default scenario, which computes
+  // ~64% and would overstate our public floor. The real number shows only when the link
+  // carries the sharer's own inputs. (Matches the honesty note in the header docblock.)
+  const m = hasInputs(params) ? compute(readInputs(params)) : null
 
   // Cache hard at the CDN — the card is a pure function of the querystring.
   res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400')

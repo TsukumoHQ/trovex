@@ -18,10 +18,17 @@ Exit 1 + `path:line — RULE n — <snippet>` per hit; exit 0 when clean.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# Owner-ruled PRIVATE paths — must NEVER be tracked in this PUBLIC repo. growth/ (the
+# marketing playbook) was purged from history twice; a stale-clone merge re-injected it
+# via history (#637), which .gitignore cannot stop. This gate catches a tracked re-add
+# regardless of .gitignore, so the regression is impossible to merge.
+PRIVATE_PREFIXES = ("growth/",)
 
 # Public product surfaces (relative to repo root).
 SCOPE = ["README.md", "web/public", "web/src", "web/index.html", "src/trovex/templates"]
@@ -121,7 +128,30 @@ def scan(roots: list[str] | None = None) -> list[str]:
     return offenders
 
 
+def tracked_private_paths() -> list[str]:
+    """Tracked files under any PRIVATE_PREFIXES (owner-ruled private, must not be public)."""
+    try:
+        out = subprocess.run(
+            ["git", "ls-files", "-z", "--", *PRIVATE_PREFIXES],
+            cwd=ROOT, capture_output=True, text=True, check=False,
+        ).stdout
+    except OSError:
+        return []
+    return [p for p in out.split("\0") if p]
+
+
 def main() -> int:
+    private = tracked_private_paths()
+    if private:
+        print("✗ Brand guard FAILED — PRIVATE paths tracked in the PUBLIC repo:")
+        print("  growth/ is owner-ruled PRIVÉ (purged from history). Never commit it to trovex.")
+        print("  If your branch carries it, you have a stale clone — re-clone off current main.\n")
+        for p in private[:20]:
+            print("  " + p)
+        if len(private) > 20:
+            print(f"  … +{len(private) - 20} more")
+        print("")
+
     offenders = scan()
     if offenders:
         print("✗ Brand guard FAILED — brand-rule violations on public surfaces:")
@@ -129,8 +159,10 @@ def main() -> int:
         for o in offenders:
             print("  " + o)
         print("")
+
+    if private or offenders:
         return 1
-    print("✓ Brand guard: no brand-rule violations on public surfaces.")
+    print("✓ Brand guard: no private paths tracked, no brand-rule violations on public surfaces.")
     return 0
 
 

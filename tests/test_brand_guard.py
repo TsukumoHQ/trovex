@@ -57,3 +57,14 @@ def test_rule5_dokan_overpromise():
 def test_live_repo_scans_clean():
     """The guard must pass on the current public surfaces — zero false positives."""
     assert bg.scan() == []
+
+
+def test_growth_is_a_private_prefix():
+    # growth/ (marketing playbook) must be gated as private — a stale-clone merge
+    # re-injected it via history once (#637); this keeps it out for good.
+    assert "growth/" in bg.PRIVATE_PREFIXES
+
+
+def test_no_private_paths_tracked():
+    """growth/ must not be tracked in the public repo — the durable anti-regression gate."""
+    assert bg.tracked_private_paths() == []

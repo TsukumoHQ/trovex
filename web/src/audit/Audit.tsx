@@ -206,7 +206,7 @@ export default function Audit() {
           {band.key === 'compounding'
             ? "You scored 9+ and you're rolling agents out across a team. The by-hand version of the steps above is a real project."
             : 'Rolling agents out across a team and the by-hand version is getting heavy?'}{' '}
-          That's the kind of thing we help teams do well.{' '}
+          tsukumo, the studio behind trovex, sets this up with teams.{' '}
           <a
             className="audit-consult"
             href={BOOK_URL}
@@ -214,7 +214,7 @@ export default function Audit() {
             rel="noopener noreferrer"
             onClick={() => trackTsukumoClick('audit_endplate')}
           >
-            Working with a team? Let's talk →
+            Working with a team? →
           </a>
         </p>
       </section>

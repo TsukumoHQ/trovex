@@ -58,8 +58,17 @@ def get(db: sqlite3.Connection, q: str, summary: bool, version: str) -> dict | N
     return dict(row) if row else None
 
 
-def put(db: sqlite3.Connection, q: str, summary: bool, version: str, output: str,
-        n_results: int, whr: int, top_tokens: int, resp_tokens: int) -> None:
+def put(
+    db: sqlite3.Connection,
+    q: str,
+    summary: bool,
+    version: str,
+    output: str,
+    n_results: int,
+    whr: int,
+    top_tokens: int,
+    resp_tokens: int,
+) -> None:
     _ensure(db)
     db.execute(
         """INSERT INTO query_cache

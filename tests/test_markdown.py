@@ -28,8 +28,8 @@ def test_duplicate_headings_get_unique_slugs():
 
 def test_fenced_code_block_is_escaped_with_lang():
     html, _ = render_markdown("```python\nx = 1 < 2\n```")
-    assert 'class="highlight"' in html   # pygments-highlighted block
-    assert "&lt;" in html                 # the < is escaped, never raw markup
+    assert 'class="highlight"' in html  # pygments-highlighted block
+    assert "&lt;" in html  # the < is escaped, never raw markup
     assert "<script" not in html
 
 
@@ -45,9 +45,9 @@ def test_safe_links_kept_unsafe_dropped():
     assert '<a href="https://example.com/x" rel="noopener noreferrer">docs</a>' in ok
 
     bad, _ = render_markdown("click [here](javascript:alert(1))")
-    assert "javascript:" not in bad        # no script-execution path
-    assert 'href="javascript' not in bad   # protocol neutralised
-    assert "here" in bad                    # link text preserved
+    assert "javascript:" not in bad  # no script-execution path
+    assert 'href="javascript' not in bad  # protocol neutralised
+    assert "here" in bad  # link text preserved
 
 
 def test_lists_render():

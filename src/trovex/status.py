@@ -64,8 +64,7 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
 
         # Stale: age (only if not already plan). Records are event-anchored —
         # a 2-year-old incident report is still true, so never age-stale them.
-        if (new_status is None and row["kind"] != "record"
-                and row["mtime"] < stale_cutoff):
+        if new_status is None and row["kind"] != "record" and row["mtime"] < stale_cutoff:
             new_status = "stale"
 
         if new_status is not None and new_status != "canonical":
@@ -161,9 +160,7 @@ def detect_duplicate_for(db: sqlite3.Connection, settings: Settings, doc_id: int
     nearest non-record neighbour is within the cosine threshold, the OLDER of the
     two becomes a duplicate of the newer. Returns the id marked duplicate, or None.
     """
-    row = db.execute(
-        "SELECT id, mtime, kind, status FROM docs WHERE id = ?", (doc_id,)
-    ).fetchone()
+    row = db.execute("SELECT id, mtime, kind, status FROM docs WHERE id = ?", (doc_id,)).fetchone()
     if not row or row["kind"] == "record" or row["status"] not in ("canonical", "plan"):
         return None
     emb = db.execute("SELECT embedding FROM vec_docs WHERE rowid = ?", (doc_id,)).fetchone()
@@ -184,8 +181,7 @@ def detect_duplicate_for(db: sqlite3.Connection, settings: Settings, doc_id: int
         if 1.0 - nb["distance"] / 2 < threshold:
             break  # neighbours sorted by distance asc → none closer remain
         older_id, newer_id = (
-            (nb["rowid"], doc_id) if row["mtime"] >= nb["mtime"]
-            else (doc_id, nb["rowid"])
+            (nb["rowid"], doc_id) if row["mtime"] >= nb["mtime"] else (doc_id, nb["rowid"])
         )
         db.execute(
             "UPDATE docs SET status = 'duplicate', dup_of_id = ? WHERE id = ?",
@@ -204,10 +200,7 @@ def _read_head(path: str, n: int) -> str:
 def _looks_like_plan(head: str) -> bool:
     stripped = FRONTMATTER_RE.sub("", head)
     lines = [ln.strip() for ln in stripped.splitlines() if ln.strip()][:5]
-    return any(
-        ln.startswith("#") and PLAN_TITLE_RE.search(ln.lstrip("#").strip())
-        for ln in lines
-    )
+    return any(ln.startswith("#") and PLAN_TITLE_RE.search(ln.lstrip("#").strip()) for ln in lines)
 
 
 def _frontmatter_status(head: str) -> str | None:

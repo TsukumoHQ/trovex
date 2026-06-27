@@ -16,12 +16,12 @@ import numpy as np
 # Model registry: name → (dim, provider)
 MODEL_REGISTRY = {
     # OpenAI
-    "text-embedding-3-large":  (3072, "openai"),
-    "text-embedding-3-small":  (1536, "openai"),
-    "text-embedding-ada-002":  (1536, "openai"),
+    "text-embedding-3-large": (3072, "openai"),
+    "text-embedding-3-small": (1536, "openai"),
+    "text-embedding-ada-002": (1536, "openai"),
     # fastembed (local ONNX)
     "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": (384, "fastembed"),
-    "BAAI/bge-small-en-v1.5":                                     (384, "fastembed"),
+    "BAAI/bge-small-en-v1.5": (384, "fastembed"),
 }
 
 
@@ -36,12 +36,14 @@ def model_provider(model_name: str) -> str:
 class Embedder(Protocol):
     dim: int
     name: str
+
     def embed(self, texts: Iterable[str]) -> Iterable[np.ndarray]: ...
 
 
 class FastEmbedEmbedder:
     def __init__(self, model_name: str):
         import fastembed
+
         self.name = model_name
         self.dim = model_dim(model_name)
         self._client = fastembed.TextEmbedding(model_name=model_name)
@@ -63,6 +65,7 @@ class OpenAIEmbedder:
 
     def __init__(self, model_name: str, api_key: str | None = None):
         from openai import OpenAI
+
         self.name = model_name
         self.dim = model_dim(model_name)
         key = api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("TROVEX_OPENAI_KEY")
@@ -94,7 +97,7 @@ class OpenAIEmbedder:
                 return [np.array(d.embedding, dtype=np.float32) for d in resp.data]
             except Exception as e:  # noqa: BLE001 — retry on any transient
                 last_err = e
-                time.sleep(0.5 * (2 ** attempt))
+                time.sleep(0.5 * (2**attempt))
         raise RuntimeError(f"OpenAI embed failed after retries: {last_err}")
 
 

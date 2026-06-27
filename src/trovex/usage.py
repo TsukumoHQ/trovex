@@ -18,11 +18,11 @@ from starlette.requests import Request
 # (finding 5). Each is anchored to a recognisable shape so ordinary queries
 # aren't mangled — we'd rather miss an exotic secret than redact real words.
 _SECRET_PATTERNS = [
-    re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"),                 # email
-    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),                    # OpenAI-style key
+    re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"),  # email
+    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),  # OpenAI-style key
     re.compile(r"\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{16,}\b"),  # GitHub token
-    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),            # Slack token
-    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),                        # AWS access key id
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),  # Slack token
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),  # AWS access key id
     # key=value secrets, e.g. api_key=..., token: ..., password=...
     re.compile(
         r"(?i)\b(api[_-]?key|secret|token|password|passwd|authorization|bearer)"
@@ -50,6 +50,7 @@ def purge_old_queries(db, retention_days: int) -> int:
     cur = db.execute("DELETE FROM mcp_queries WHERE ts < ?", (cutoff,))
     db.commit()
     return cur.rowcount or 0
+
 
 current_user: contextvars.ContextVar[str] = contextvars.ContextVar(
     "trovex_current_user", default="unknown"
@@ -96,13 +97,19 @@ class UserHeaderMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def log_query(db, query: str, n_results: int, summary: bool,
-              response_tokens_est: int, elapsed_ms: int,
-              would_have_read_tokens: int = 0,
-              top_result_tokens: int = 0,
-              results: list | None = None,
-              rerank_info: dict | None = None,
-              pre_rerank_paths: list[str] | None = None) -> None:
+def log_query(
+    db,
+    query: str,
+    n_results: int,
+    summary: bool,
+    response_tokens_est: int,
+    elapsed_ms: int,
+    would_have_read_tokens: int = 0,
+    top_result_tokens: int = 0,
+    results: list | None = None,
+    rerank_info: dict | None = None,
+    pre_rerank_paths: list[str] | None = None,
+) -> None:
     # Divergence metrics: if pre-rerank paths supplied, compare with post-rerank.
     pre_top1: str | None = None
     top1_changed = 0
@@ -130,22 +137,32 @@ def log_query(db, query: str, n_results: int, summary: bool,
             reranked, llm_model, llm_tokens_in, llm_tokens_out, llm_elapsed_ms,
             pre_top1_path, top1_changed, top1_lift, top5_overlap)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (time.time(), current_user.get(), redact_secrets(query)[:500],
-         n_results, int(summary), response_tokens_est, elapsed_ms,
-         would_have_read_tokens, top_result_tokens,
-         1 if rerank_info else 0,
-         (rerank_info or {}).get("model"),
-         (rerank_info or {}).get("tokens_in", 0),
-         (rerank_info or {}).get("tokens_out", 0),
-         (rerank_info or {}).get("elapsed_ms", 0),
-         pre_top1, top1_changed, top1_lift, top5_overlap),
+        (
+            time.time(),
+            current_user.get(),
+            redact_secrets(query)[:500],
+            n_results,
+            int(summary),
+            response_tokens_est,
+            elapsed_ms,
+            would_have_read_tokens,
+            top_result_tokens,
+            1 if rerank_info else 0,
+            (rerank_info or {}).get("model"),
+            (rerank_info or {}).get("tokens_in", 0),
+            (rerank_info or {}).get("tokens_out", 0),
+            (rerank_info or {}).get("elapsed_ms", 0),
+            pre_top1,
+            top1_changed,
+            top1_lift,
+            top5_overlap,
+        ),
     )
     query_id = cur.lastrowid
     if results and query_id is not None:
         db.executemany(
             """INSERT INTO mcp_query_results (query_id, rank, path, status, tokens_est, score)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            [(query_id, i, r.path, r.status, r.tokens_est, r.score)
-             for i, r in enumerate(results)],
+            [(query_id, i, r.path, r.status, r.tokens_est, r.score) for i, r in enumerate(results)],
         )
     db.commit()

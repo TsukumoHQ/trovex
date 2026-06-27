@@ -61,13 +61,17 @@ def _inject_state(settings):
     searcher = Searcher(settings, embedder=embedder)
     indexer = Indexer(settings, embedder=embedder)
     state_mod._state = AppState(
-        settings=settings, embedder=embedder,
-        searcher=searcher, indexer=indexer, store=store,
+        settings=settings,
+        embedder=embedder,
+        searcher=searcher,
+        indexer=indexer,
+        store=store,
     )
     return store
 
 
 # ── Finding 3: LIKE injection / escaping ─────────────────────────────
+
 
 def test_like_escape_escapes_specials():
     assert like_escape("a%b") == r"a\%b"
@@ -98,6 +102,7 @@ def test_store_browse_filter_treats_percent_literally(tmp_path):
 
 # ── Finding 2: /api/reindex auth ─────────────────────────────────────
 
+
 def test_reindex_requires_write_token(tmp_path):
     (tmp_path / "project").mkdir()
     settings = _make_settings(tmp_path, write_token="s3cret")
@@ -115,6 +120,7 @@ def test_reindex_requires_write_token(tmp_path):
 
 
 # ── Finding 5: symlink / path-traversal in the indexer ───────────────
+
 
 def test_indexer_skips_symlink_escaping_root(tmp_path):
     root = tmp_path / "project"
@@ -155,6 +161,7 @@ def test_indexer_honors_trovexignore(tmp_path):
 
 # ── Finding 4: rate limiting ─────────────────────────────────────────
 
+
 def test_search_rate_limit_returns_429(tmp_path):
     settings = _make_settings(tmp_path, rate_limit_search="2/minute")
     _inject_state(settings)
@@ -187,6 +194,7 @@ def test_write_rate_limit_returns_429(tmp_path):
 
 # ── Finding 6: input validation on kind / tags ───────────────────────
 
+
 def test_api_search_rejects_malformed_kind_and_tags(tmp_path):
     _inject_state(_make_settings(tmp_path))
     try:
@@ -194,7 +202,9 @@ def test_api_search_rejects_malformed_kind_and_tags(tmp_path):
         # kind with an illegal char → 422 (Query pattern).
         assert client.get("/api/search", params={"q": "x", "kind": "a;b"}).status_code == 422
         # a malformed tag → 422.
-        assert client.get("/api/search", params={"q": "x", "tags": "ok,bad tag!"}).status_code == 422
+        assert (
+            client.get("/api/search", params={"q": "x", "tags": "ok,bad tag!"}).status_code == 422
+        )
         # too many tags → 422.
         toomany = ",".join(f"t{i}" for i in range(11))
         assert client.get("/api/search", params={"q": "x", "tags": toomany}).status_code == 422
@@ -205,6 +215,7 @@ def test_api_search_rejects_malformed_kind_and_tags(tmp_path):
 
 
 # ── Finding 7: malformed JSON body → 400, not 500 ────────────────────
+
 
 def test_malformed_json_body_is_400(tmp_path):
     _inject_state(_make_settings(tmp_path))
@@ -223,13 +234,14 @@ def test_malformed_json_body_is_400(tmp_path):
 
 # ── Round 2 · Finding 1: write-auth is fail-closed by default ────────
 
+
 def test_write_token_auto_generated_and_persisted(tmp_path):
     """With no env token and no opt-in, resolve_write_token() mints a persisted
     per-instance token (fail-closed), not the open-writes default."""
     settings = _make_settings(tmp_path)
-    assert settings.write_token == ""           # nothing configured
+    assert settings.write_token == ""  # nothing configured
     tok = settings.resolve_write_token()
-    assert tok                                   # a real token was produced
+    assert tok  # a real token was produced
     token_file = tmp_path / ".write_token"
     assert token_file.exists()
     assert token_file.read_text().strip() == tok
@@ -238,6 +250,7 @@ def test_write_token_auto_generated_and_persisted(tmp_path):
     # 0600 perms (owner-only) where the platform supports it.
     import os
     import stat
+
     mode = stat.S_IMODE(os.stat(token_file).st_mode)
     if os.name == "posix":
         assert mode == 0o600
@@ -295,6 +308,7 @@ def test_write_token_endpoint_refuses_non_loopback(tmp_path):
 
 # ── Round 2 · Finding 2: hook download — traversal + configurable dir ──
 
+
 def test_hook_download_rejects_traversal(tmp_path):
     _inject_state(_make_settings(tmp_path))
     try:
@@ -323,6 +337,7 @@ def test_hook_dir_is_configurable(tmp_path):
 
 # ── Round 2 · Finding 3: qpath validation ────────────────────────────
 
+
 def test_docs_partial_rejects_malformed_qpath(tmp_path):
     _inject_state(_make_settings(tmp_path))
     try:
@@ -338,6 +353,7 @@ def test_docs_partial_rejects_malformed_qpath(tmp_path):
 
 
 # ── Round 2 · Finding 4: numeric-cast safety ─────────────────────────
+
 
 def test_restore_rejects_non_integer_version(tmp_path):
     settings = _make_settings(tmp_path)
@@ -358,8 +374,10 @@ def test_restore_rejects_non_integer_version(tmp_path):
 
 # ── Round 2 · Finding 5: query-log retention + secret redaction ──────
 
+
 def test_purge_old_queries_drops_aged_rows(tmp_path):
     from trovex.usage import log_query, purge_old_queries
+
     store = _inject_state(_make_settings(tmp_path))
     try:
         db = store.db
@@ -382,8 +400,8 @@ def test_purge_old_queries_drops_aged_rows(tmp_path):
 
 def test_query_secret_redaction():
     from trovex.usage import redact_secrets
-    assert redact_secrets("email me at alice@example.com please") == \
-        "email me at [redacted] please"
+
+    assert redact_secrets("email me at alice@example.com please") == "email me at [redacted] please"
     assert "[redacted]" in redact_secrets("use sk-abcdefghijklmnopqrstuvwx for the call")
     assert "[redacted]" in redact_secrets("api_key=supersecretvalue123")
     # An ordinary query is left intact.

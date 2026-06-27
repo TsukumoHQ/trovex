@@ -94,10 +94,15 @@ class Searcher:
             score = similarity * freshness * status_w
             results.append(
                 SearchResult(
-                    path=r["path"], title=r["title"] or r["path"],
-                    distance=r["distance"], score=score, age_days=age_days,
-                    status=r["status"], size_bytes=r["size_bytes"],
-                    tokens_est=r["tokens_est"], absolute_path=r["absolute_path"],
+                    path=r["path"],
+                    title=r["title"] or r["path"],
+                    distance=r["distance"],
+                    score=score,
+                    age_days=age_days,
+                    status=r["status"],
+                    size_bytes=r["size_bytes"],
+                    tokens_est=r["tokens_est"],
+                    absolute_path=r["absolute_path"],
                     source_id=r["source_id"] or "code",
                 )
             )

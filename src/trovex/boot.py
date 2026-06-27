@@ -37,10 +37,7 @@ def boot_pointers(
     if not results:
         return {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
 
-    pointers = [
-        {"id": r.path, "title": r.title, "score": round(r.score, 3)}
-        for r in results
-    ]
+    pointers = [{"id": r.path, "title": r.title, "score": round(r.score, 3)} for r in results]
     lines = [f"## Resume — {agent} (trovex active memory)"]
     lines += [f"- {p['title']}  (trovex:{p['id']})" for p in pointers]
     lines.append("Pull any with trovex_read(doc_id) for the full record.")

@@ -167,7 +167,9 @@ def format_eval_report(r: EvalReport, *, query_source: str = "") -> str:
         )
     if r.n_trovex_loss:
         lines.append("")
-        lines.append(f"⚠ {r.n_trovex_loss} quality-loss(es) — report these; they cap the honest claim.")
+        lines.append(
+            f"⚠ {r.n_trovex_loss} quality-loss(es) — report these; they cap the honest claim."
+        )
     return "\n".join(lines)
 
 

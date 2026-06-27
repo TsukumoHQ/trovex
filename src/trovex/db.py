@@ -63,6 +63,7 @@ def _migrate_embed_dim(conn: sqlite3.Connection, embed_dim: int) -> None:
     ddl = row["sql"] or ""
     # Parse the float[N] dim out of the DDL.
     import re
+
     m = re.search(r"float\[(\d+)\]", ddl)
     if not m:
         return
@@ -153,7 +154,9 @@ def _migrate_add_trovex_store_columns(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
     for col in ("content", "ext_id", "kind", "origin"):
         if col not in cols:
-            conn.execute(f"ALTER TABLE docs ADD COLUMN {col} TEXT")  # sql-safe: col from fixed literal tuple above, never user input
+            conn.execute(
+                f"ALTER TABLE docs ADD COLUMN {col} TEXT"
+            )  # sql-safe: col from fixed literal tuple above, never user input
     conn.commit()
 
 

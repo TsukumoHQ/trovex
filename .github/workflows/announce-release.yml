@@ -22,10 +22,11 @@ permissions:
   contents: read
 
 env:
-  # trovex brand: emerald accent (ties to the token-savings story) + PNG logo
-  # (Discord embeds don't render SVG for icon/thumbnail).
+  # trovex brand: emerald accent (ties to the token-savings story) + PNG logo.
+  # LOGO = the current brand-kit avatar in Supabase (the kit rolled out 2026-06-26);
+  # Discord embeds don't render SVG for icon/thumbnail, so use the 400px PNG.
   COLOR: "1098629"            # 0x10C685 emerald
-  LOGO: "https://trovex.dev/apple-touch-icon.png"
+  LOGO: "https://bxdpevnqdnjcehewbiyg.supabase.co/storage/v1/object/public/media/assets/brand-kit/trovex/social-avatar/avatar-400.png"
   SITE: "https://trovex.dev"
 
 jobs:

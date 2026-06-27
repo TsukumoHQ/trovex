@@ -3,7 +3,7 @@
   "name": "io.github.TsukumoHQ/trovex",
   "title": "trovex",
   "description": "Serves coding agents one canonical doc per query instead of rereading the repo — ~60% fewer tokens.",
-  "version": "0.11.3",
+  "version": "0.11.9",
   "websiteUrl": "https://trovex.dev",
   "repository": {
     "url": "https://github.com/TsukumoHQ/trovex",
@@ -14,7 +14,24 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "trovex",
-      "version": "0.11.3",
+      "version": "0.11.9",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "description": "Serve the trovex MCP server over stdio — the transport MCP registries and .mcpb bundles launch directly. No port, no HTTP server; the client speaks JSON-RPC over stdin/stdout."
+        }
+      ]
+    },
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "trovex",
+      "version": "0.11.9",
       "runtimeHint": "uvx",
       "transport": {
         "type": "streamable-http",

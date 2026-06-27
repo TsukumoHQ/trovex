@@ -1,0 +1,42 @@
+{
+  "manifest_version": "0.4",
+  "name": "trovex",
+  "display_name": "trovex",
+  "version": "0.11.9",
+  "description": "Serves coding agents one canonical doc per query instead of rereading the repo — ~60% fewer tokens.",
+  "long_description": "trovex indexes your repo's markdown and exposes one MCP tool. Your agent asks a question; trovex returns the single current doc that answers it (path:line + freshness marker) and serves just the section that answers — not the whole file, not a pile of candidates. Runs locally: vectors in SQLite, embeddings via ONNX, no cloud or API keys.",
+  "author": {
+    "name": "Tsukumo",
+    "url": "https://tsukumo.ch"
+  },
+  "homepage": "https://trovex.dev",
+  "documentation": "https://github.com/TsukumoHQ/trovex",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TsukumoHQ/trovex"
+  },
+  "license": "AGPL-3.0-or-later",
+  "keywords": ["mcp", "rag", "documentation", "context", "coding-agents", "token-efficiency"],
+  "server": {
+    "type": "uv",
+    "entry_point": "trovex",
+    "mcp_config": {
+      "command": "uvx",
+      "args": ["trovex", "mcp"]
+    }
+  },
+  "tools": [
+    { "name": "trovex", "description": "Route a query to the one canonical .md doc (path:line pointers + freshness)." },
+    { "name": "trovex_read", "description": "Read a trovex-owned doc by query or id; optionally just one section." },
+    { "name": "trovex_search", "description": "Passage-level retrieval across the store with tag/kind filters." },
+    { "name": "trovex_write", "description": "Store a doc inside trovex; patch one section in place with section=." },
+    { "name": "trovex_tag", "description": "Add or remove tags on a stored doc." },
+    { "name": "trovex_delete", "description": "Soft-delete (recoverable archive) a stored doc." }
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "linux", "win32"],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  }
+}

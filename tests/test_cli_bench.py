@@ -16,6 +16,18 @@ def test_load_queries_default():
     assert len(_DEFAULT_QUERIES) >= 5
 
 
+def test_mcp_stdio_command_registered():
+    """`trovex mcp` (the stdio transport .mcpb registry bundles launch) is wired. The
+    transport itself is verified manually via an initialize handshake (FastMCP runs the
+    real server); here we just guard the command + its help against regression."""
+    top = runner.invoke(app, ["--help"])
+    assert top.exit_code == 0
+    assert "mcp" in top.output
+    sub = runner.invoke(app, ["mcp", "--help"])
+    assert sub.exit_code == 0
+    assert "stdio" in sub.output.lower()
+
+
 def test_load_queries_from_file(tmp_path):
     f = tmp_path / "q.txt"
     f.write_text("how do I install\n\n  what tests  \nhow to deploy\n", encoding="utf-8")
@@ -42,14 +54,25 @@ def test_bench_json_serializes_both_report_types():
     from trovex.eval_bench import CategoryStats, EvalReport
 
     br = BenchResult(
-        n_queries=2, n_scored=2, median_ratio=0.6, p25_ratio=0.4, p75_ratio=0.8,
-        total_saved=100, total_would_have_read=160, per_query=[{"query": "q", "ratio": 0.6}],
+        n_queries=2,
+        n_scored=2,
+        median_ratio=0.6,
+        p25_ratio=0.4,
+        p75_ratio=0.8,
+        total_saved=100,
+        total_would_have_read=160,
+        per_query=[{"query": "q", "ratio": 0.6}],
     )
     d = json.loads(_bench_json(br))
     assert d["median_ratio"] == 0.6 and d["per_query"][0]["query"] == "q"
 
     er = EvalReport(
-        n_queries=1, n_equal_success=1, n_trovex_loss=0, median_saving=0.7, p25=0.7, p75=0.7,
+        n_queries=1,
+        n_equal_success=1,
+        n_trovex_loss=0,
+        median_saving=0.7,
+        p25=0.7,
+        p75=0.7,
         per_category=[CategoryStats("C1", 1, 1, 0, 0, 0.7, 0.7, 0.7)],
     )
     d2 = json.loads(_bench_json(er))

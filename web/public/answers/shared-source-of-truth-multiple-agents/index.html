@@ -54,6 +54,14 @@
             "text": "Give every agent one shared point to both read and write, instead of separate copies each maintains. When one agent records what it learns, every other agent and teammate reads that record back instead of re-deriving it. With one point of passage there are no copies to drift and nothing to sync: a single source of truth by construction."
           }
         }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How do agents avoid drifting apart?", "acceptedAnswer": { "@type": "Answer", "text": "They read and write through one shared store. Instead of each agent keeping a private, divergent copy of what it learned, trovex gives the fleet one canonical source of truth: an agent saves an insight once, the rest read it." } },
+          { "@type": "Question", "name": "What does the write-back actually do?", "acceptedAnswer": { "@type": "Answer", "text": "When an agent works something out, it stores the result in trovex so the next agent reads it rather than re-deriving it. Over time the store accumulates the fleet's knowledge instead of throwing it away each session." } },
+          { "@type": "Question", "name": "Does this work across more than one repo?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. trovex indexes the markdown you point it at across repos and serves one canonical answer over MCP, so agents in different repositories still read from the same source of truth." } }
+        ]
       }
     ]
   }
@@ -111,6 +119,22 @@
         <li><a href="https://tsukumo.ch/blog/ai-agents-in-production-the-four-operating-problems" target="_blank" rel="noopener noreferrer">Long-form: the four operating problems of running AI agents in production</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How do agents avoid drifting apart?</p>
+        <p class="faq-a">They read and write through one shared store. Instead of each agent keeping a private, divergent copy of what it learned, trovex gives the fleet one canonical source of truth: an agent saves an insight once, the rest read it.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What does the write-back actually do?</p>
+        <p class="faq-a">When an agent works something out, it stores the result in trovex so the next agent reads it rather than re-deriving it. Over time the store accumulates the fleet's knowledge instead of throwing it away each session.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does this work across more than one repo?</p>
+        <p class="faq-a">Yes. trovex indexes the markdown you point it at across repos and serves one canonical answer over MCP, so agents in different repositories still read from the same source of truth.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>One source of truth for your whole fleet.</h2>

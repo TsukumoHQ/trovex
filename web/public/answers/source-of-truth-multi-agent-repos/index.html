@@ -51,6 +51,14 @@
             "text": "One store that every agent both reads from and writes to, so the repo's documents, not each agent's private context, are authoritative. With one point of passage there are no copies to drift and nothing to sync, and a query returns the one canonical doc with a freshness marker, not whatever an agent cached. It stops fleet cost from compounding."
           }
         }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "One index per repo, or one shared one?", "acceptedAnswer": { "@type": "Answer", "text": "Either, depending on how your teams work. trovex can index multiple repos' markdown and serve a single canonical answer over MCP, so agents working across services read from one source of truth instead of each repo's local, possibly stale, copy." } },
+          { "@type": "Question", "name": "How does it know which repo's doc is current?", "acceptedAnswer": { "@type": "Answer", "text": "The same freshness mechanism applies across repos: each doc is marked canonical, stale, or duplicate, so the agent gets the current one regardless of which repo it lives in." } },
+          { "@type": "Question", "name": "Does pointing it at many repos slow it down?", "acceptedAnswer": { "@type": "Answer", "text": "No meaningfully. It runs locally with vectors in SQLite and an on-device embedder; lookups stay fast because it returns one canonical doc per query, not a scan of every repo." } }
+        ]
       }
     ]
   }
@@ -112,6 +120,22 @@
         <li><a href="https://tsukumo.ch/blog/ai-agents-in-production-the-four-operating-problems" target="_blank" rel="noopener noreferrer">Long-form: the four operating problems of running AI agents in production</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">One index per repo, or one shared one?</p>
+        <p class="faq-a">Either, depending on how your teams work. trovex can index multiple repos' markdown and serve a single canonical answer over MCP, so agents working across services read from one source of truth instead of each repo's local, possibly stale, copy.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How does it know which repo's doc is current?</p>
+        <p class="faq-a">The same freshness mechanism applies across repos: each doc is marked canonical, stale, or duplicate, so the agent gets the current one regardless of which repo it lives in.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does pointing it at many repos slow it down?</p>
+        <p class="faq-a">No meaningfully. It runs locally with vectors in SQLite and an on-device embedder; lookups stay fast because it returns one canonical doc per query, not a scan of every repo.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>One source of truth for the whole fleet.</h2>

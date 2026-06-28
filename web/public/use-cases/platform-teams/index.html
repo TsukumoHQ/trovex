@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/use-cases/platform-teams/" />
+  <title>trovex for platform and DevEx teams: standardize agent context</title>
+  <meta name="description" content="When a platform or DevEx team rolls AI agents out to other teams, the hard part is consistency. trovex gives the org one canonical source of truth its agents read, run locally, no central service. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/use-cases/platform-teams/" />
+  <meta property="og:title" content="trovex for platform and DevEx teams: standardize agent context" />
+  <meta property="og:description" content="Standardize agent context across teams with one canonical source of truth, run locally, no central service for the platform team to operate." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for platform and DevEx teams" />
+  <meta name="twitter:description" content="One canonical source of truth across teams, run locally, no central service. By tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Use cases", "item": "https://trovex.dev/use-cases/" },
+          { "@type": "ListItem", "position": 3, "name": "Platform teams", "item": "https://trovex.dev/use-cases/platform-teams/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How do we standardize agent context across teams?", "acceptedAnswer": { "@type": "Answer", "text": "Point every team's agents at one canonical store. trovex serves the same current doc per query to any MCP client, so behavior is consistent across teams without each maintaining its own copy." } },
+          { "@type": "Question", "name": "Does this add a service for the platform team to run?", "acceptedAnswer": { "@type": "Answer", "text": "No. trovex is local-first; each developer runs it against the repo. There is no central server to operate or scale, so you ship a standard, not an SRE burden." } },
+          { "@type": "Question", "name": "How does it fit our existing dev setup?", "acceptedAnswer": { "@type": "Answer", "text": "It is an MCP server any client connects to (Claude Code, Cursor, Windsurf, Cline), configured per the /for setup pages. One install, no account, no data leaving your machines." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-28", "dateModified": "2026-06-28",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How does a platform team standardize AI agent context across the org?",
+          "text": "We're a platform team rolling AI agents out to other teams, and every team's agents read different docs and answer differently. How do we standardize the context?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/use-cases/platform-teams/",
+            "text": "When a platform or developer-experience team rolls AI agents out to other teams, the hard part is consistency: every team's agents read a different slice of the docs and answer differently. trovex gives the org one canonical source of truth its agents read and write back to, served locally over MCP, so context is standard without a central service to operate. About 60% fewer tokens per lookup."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/use-cases/">Use cases</a> / Platform teams
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-28">28 June 2026</time></p>
+    <h1>trovex for platform and DevEx <span class="ac">teams</span></h1>
+
+    <div class="verdict">
+      <div class="l">The short version</div>
+      <p>When a platform or developer-experience team rolls AI agents out to other teams, the hard part is consistency: every team's agents read a different slice of the docs and answer differently. trovex gives the org one <a href="/glossary/ssot-for-agents/">canonical source of truth</a> its agents read and write back to, served locally over MCP, so context is standard without a central service to operate. About <strong>60% fewer tokens</strong> per lookup.</p>
+    </div>
+
+    <h2>The problem a platform team owns</h2>
+    <p class="lead-answer">Your job is to make agents work the same way for every team, but each team points its agents at different docs and gets different answers. There is no shared notion of which doc is current, so behavior drifts team by team and you field the same questions about where the real source of truth lives.</p>
+
+    <h2>One standard context layer, run locally</h2>
+    <p class="lead-answer">trovex serves the one current doc per query with a <a href="/glossary/freshness-marker/">freshness marker</a>, and each developer runs it against the repo locally. There is no central service for the platform team to operate and scale. The standard you ship is the index plus the freshness discipline, not a server you have to babysit, and any MCP client reads the same canonical answer.</p>
+
+    <h2>How it rolls out</h2>
+    <p class="lead-answer">Make it the recommended setup in your developer environment: a one-line install, per-client config already documented under <a href="/for/">Setup</a>. Adoption is bottom-up and standardized at the same time, with no procurement and no data leaving your machines.</p>
+
+    <h2>When the rollout is the product</h2>
+    <p class="lead-answer">Standardizing agent context is the easy half. Making agents reliable across many teams, with scoped permissions, review gates, and context that stays current, is the operating problem platform teams own. trovex fixes the retrieval; <a href="https://tsukumo.ch/" target="_blank" rel="noopener noreferrer">tsukumo consults on the operating model</a>, and trovex is the proof of how it is done.</p>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/answers/roll-out-ai-agents-engineering-team/">How do I roll out AI coding agents across my team?</a></li>
+        <li><a href="/use-cases/multi-agent-fleets/">trovex for multi-agent fleets</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/for/">Setup for your agent</a></li>
+        <li><a href="/glossary/ssot-for-agents/">SSOT for agents</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How do we standardize agent context across teams?</p>
+        <p class="faq-a">Point every team's agents at one canonical store. trovex serves the same current doc per query to any MCP client, so behavior is consistent across teams without each maintaining its own copy.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does this add a service for the platform team to run?</p>
+        <p class="faq-a">No. trovex is local-first; each developer runs it against the repo. There is no central server to operate or scale, so you ship a standard, not an SRE burden.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How does it fit our existing dev setup?</p>
+        <p class="faq-a">It is an MCP server any client connects to (Claude Code, Cursor, Windsurf, Cline), configured per the /for setup pages. One install, no account, no data leaving your machines.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Ship one standard for agent context.</h2>
+      <p>One canonical source of truth, run locally by each dev. No central service. About a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/measure">see the measured numbers →</a>
+        <a class="btn btn-ghost" href="/for/">Setup for your agent</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/use-cases/">Use cases</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

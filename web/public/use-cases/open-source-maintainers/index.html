@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/use-cases/open-source-maintainers/" />
+  <title>trovex for open-source maintainers: keep contributors' agents current</title>
+  <meta name="description" content="Contributors' coding agents read your CONTRIBUTING and architecture docs, often a stale copy. trovex serves the one current doc per query with a freshness marker. Local, open source. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/use-cases/open-source-maintainers/" />
+  <meta property="og:title" content="trovex for open-source maintainers: keep contributors' agents current" />
+  <meta property="og:description" content="Contributors' agents often read stale docs. trovex serves the one current doc per query with a freshness marker. Local, open source." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for open-source maintainers" />
+  <meta name="twitter:description" content="Keep contributors' agents on your current docs, not last year's wiki. Local, open source. By tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Use cases", "item": "https://trovex.dev/use-cases/" },
+          { "@type": "ListItem", "position": 3, "name": "Open-source maintainers", "item": "https://trovex.dev/use-cases/open-source-maintainers/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How does this help contributors?", "acceptedAnswer": { "@type": "Answer", "text": "Their agent reads the one current doc for a question with a freshness marker, instead of guessing among stale copies, so changes start from your actual conventions and you field fewer repeat questions." } },
+          { "@type": "Question", "name": "Does a contributor need an account?", "acceptedAnswer": { "@type": "Answer", "text": "No. trovex is a local-first MCP server with a one-line install; no SaaS, no sign-up, and the repo's docs stay on the contributor's machine." } },
+          { "@type": "Question", "name": "Will it send my repo to a cloud?", "acceptedAnswer": { "@type": "Answer", "text": "No. Indexing and embeddings run locally, vectors in SQLite, no cloud or API keys, so nothing leaves the machine it runs on." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-28", "dateModified": "2026-06-28",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I keep open-source contributors' AI agents reading current docs?",
+          "text": "Contributors point coding agents at my repo and the agents read stale CONTRIBUTING and architecture docs. How do I keep them on the current ones?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/use-cases/open-source-maintainers/",
+            "text": "Contributors' coding agents read your CONTRIBUTING, architecture, and setup docs to make a change, and they often read a stale copy. trovex serves the one current doc per query with a freshness marker, so a contributor's agent works from the canonical answer instead of last year's wiki. Local-first, open source, about 60% fewer tokens per lookup."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/use-cases/">Use cases</a> / Open-source maintainers
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-28">28 June 2026</time></p>
+    <h1>trovex for open-source <span class="ac">maintainers</span></h1>
+
+    <div class="verdict">
+      <div class="l">The short version</div>
+      <p>Contributors' coding agents read your CONTRIBUTING, architecture, and setup docs to make a change, and they often read a stale copy. trovex serves the one current doc per query with a <a href="/glossary/freshness-marker/">freshness marker</a>, so a contributor's agent works from the canonical answer instead of last year's wiki. Local-first, open source, about <strong>60% fewer tokens</strong> per lookup.</p>
+    </div>
+
+    <h2>The problem for a maintainer</h2>
+    <p class="lead-answer">A drive-by contributor points an agent at your repo, and the agent reads whichever doc looks relevant, often an outdated one. You get PRs built on stale conventions, and you answer the same setup questions over and over because the agent could not tell which doc was current.</p>
+
+    <h2>One current answer per query</h2>
+    <p class="lead-answer">trovex indexes your markdown and returns the one <a href="/answers/canonical-context-for-agents/">canonical doc</a> for a question, marking stale and duplicate copies so they are skipped. A contributor points an agent at it and the agent reads the current CONTRIBUTING and architecture notes, not a fork of them. It runs locally with an on-device embedder, so nothing leaves the contributor's machine.</p>
+
+    <h2>How it rolls out</h2>
+    <p class="lead-answer">Recommend it in your CONTRIBUTING as the setup step: a one-line install, no account, works with any MCP client. Contributors opt in locally, and their agents start from your current docs.</p>
+
+    <h2>When docs hygiene is the real bottleneck</h2>
+    <p class="lead-answer">trovex makes the current doc easy to find; keeping a large project's docs and agent workflows healthy is a bigger job. The tool is open source you can adopt today; if making agents reliable across a project is the hard part, <a href="https://tsukumo.ch/" target="_blank" rel="noopener noreferrer">tsukumo consults</a>, and trovex is the proof.</p>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/why-agents-pick-stale-docs/">Why do agents pick stale or outdated docs?</a></li>
+        <li><a href="/answers/mcp-server-for-repo-docs/">Is there an MCP server that serves a repo's docs?</a></li>
+        <li><a href="/answers/local-first-context-for-agents/">Can I give agents context without sending code to a cloud?</a></li>
+        <li><a href="/glossary/freshness-marker/">Freshness marker</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How does this help contributors?</p>
+        <p class="faq-a">Their agent reads the one current doc for a question with a freshness marker, instead of guessing among stale copies, so changes start from your actual conventions and you field fewer repeat questions.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does a contributor need an account?</p>
+        <p class="faq-a">No. trovex is a local-first MCP server with a one-line install; no SaaS, no sign-up, and the repo's docs stay on the contributor's machine.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Will it send my repo to a cloud?</p>
+        <p class="faq-a">No. Indexing and embeddings run locally, vectors in SQLite, no cloud or API keys, so nothing leaves the machine it runs on.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Keep contributors' agents on your current docs.</h2>
+      <p>Recommend it in CONTRIBUTING. One-line install, no account, local-first. About a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/measure">see the measured numbers →</a>
+        <a class="btn btn-ghost" href="/for/">Setup for your agent</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/use-cases/">Use cases</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

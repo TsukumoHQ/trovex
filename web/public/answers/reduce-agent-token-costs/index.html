@@ -54,6 +54,14 @@
             "text": "Cut the repeated retrieval, not the one-time prompt. Most of a coding agent's context cost is paying repeatedly to reread the same docs to find which is current. Route each query to the single canonical doc that answers it, read at the section level, and skip stale and duplicate copies. Together that's about 60% fewer tokens per doc lookup."
           }
         }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How much of the token bill is rereading versus real work?", "acceptedAnswer": { "@type": "Answer", "text": "Most of it. The expensive part of a doc lookup is the agent reopening several candidate files to work out which is current, then discarding them; the answer it keeps is a fraction of what it read. Cut the rereading and you cut the bill, without touching the model." } },
+          { "@type": "Question", "name": "Does switching to a cheaper model cut the cost more?", "acceptedAnswer": { "@type": "Answer", "text": "Only at the margin, usually at the cost of quality. The spend is driven by how many tokens the agent reads to find one answer, not by the per-token price. Serving one canonical doc per query cuts the tokens read, which a cheaper model alone does not." } },
+          { "@type": "Question", "name": "How do I measure my own savings?", "acceptedAnswer": { "@type": "Answer", "text": "trovex ships the benchmark as a command. On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 queries, range 41 to 81%; we headline a conservative about 60%. Run uvx trovex bench on your repo for your number, or see the method at trovex.dev/measure." } }
+        ]
       }
     ]
   }
@@ -120,6 +128,22 @@
         <li><a href="https://tsukumo.ch/blog/ai-agents-in-production-the-four-operating-problems" target="_blank" rel="noopener noreferrer">Long-form: the four operating problems of running AI agents in production</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How much of the token bill is rereading versus real work?</p>
+        <p class="faq-a">Most of it. The expensive part of a doc lookup is the agent reopening several candidate files to work out which is current, then discarding them; the answer it keeps is a fraction of what it read. Cut the rereading and you cut the bill, without touching the model.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does switching to a cheaper model cut the cost more?</p>
+        <p class="faq-a">Only at the margin, usually at the cost of quality. The spend is driven by how many tokens the agent reads to find one answer, not by the per-token price. Serving one canonical doc per query cuts the tokens read, which a cheaper model alone does not.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How do I measure my own savings?</p>
+        <p class="faq-a">trovex ships the benchmark as a command. On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 queries, range 41 to 81%; we headline a conservative about 60%. Run <code>uvx trovex bench</code> on your repo for your number, or see the method at trovex.dev/measure.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>See the tokens you'd stop spending.</h2>

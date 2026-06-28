@@ -51,6 +51,14 @@
             "text": "Yes, trovex is an MCP server built for this. It indexes a repo's markdown and returns the single current doc for a query, a path:line pointer with a freshness marker, instead of letting the agent reread or sift chunks. It serves the answering section for about 60% fewer tokens per lookup, runs locally, and works with any MCP client."
           }
         }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Which MCP clients can use it?", "acceptedAnswer": { "@type": "Answer", "text": "Any. trovex serves docs over the Model Context Protocol, so Claude Code, Cursor, Windsurf, Cline, and Zed all read the same canonical answer. Point the client at the local trovex server once and every agent in it can query your docs." } },
+          { "@type": "Question", "name": "What exactly does it index?", "acceptedAnswer": { "@type": "Answer", "text": "The markdown you point it at: a repo's docs, runbooks, ADRs, design notes. It builds a local index and, for a query, returns the one current doc that answers it with a path:line pointer and a freshness marker, rather than the whole folder." } },
+          { "@type": "Question", "name": "Does it send my docs to a cloud?", "acceptedAnswer": { "@type": "Answer", "text": "No. trovex runs locally with vectors in SQLite and an on-device embedder, no cloud and no API keys, so your docs and code never leave your machine." } }
+        ]
       }
     ]
   }
@@ -103,6 +111,22 @@
         <li><a href="/vs/">All comparisons</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Which MCP clients can use it?</p>
+        <p class="faq-a">Any. trovex serves docs over the Model Context Protocol, so Claude Code, Cursor, Windsurf, Cline, and Zed all read the same canonical answer. Point the client at the local trovex server once and every agent in it can query your docs.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What exactly does it index?</p>
+        <p class="faq-a">The markdown you point it at: a repo's docs, runbooks, ADRs, design notes. It builds a local index and, for a query, returns the one current doc that answers it with a path:line pointer and a freshness marker, rather than the whole folder.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does it send my docs to a cloud?</p>
+        <p class="faq-a">No. trovex runs locally with vectors in SQLite and an on-device embedder, no cloud and no API keys, so your docs and code never leave your machine.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>An MCP server for your repo's docs.</h2>

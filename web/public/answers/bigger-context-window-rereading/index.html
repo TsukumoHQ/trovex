@@ -54,6 +54,14 @@
             "text": "No. A bigger context window raises how much you can load, not how efficiently. You still pay for every token, every session, every agent, so rereading docs is as expensive per token, you just do more of it. A bigger window isn't a more current one either. Serving one canonical answer per query is about 60% fewer tokens per lookup."
           }
         }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "If the window is huge, why does cost still climb?", "acceptedAnswer": { "@type": "Answer", "text": "Because a bigger window changes how much the agent can hold, not how much it needs to read. It still reopens candidate docs each session to find the current one and still pays for every token it reads. Capacity is not the bottleneck; knowing which doc is current is." } },
+          { "@type": "Question", "name": "Can I just paste all the docs into the window?", "acceptedAnswer": { "@type": "Answer", "text": "You can, and you pay for all of them on every turn, plus the model has to find the answer inside the pile. Serving the one canonical doc per query is cheaper and sharper than dumping everything into a large window." } },
+          { "@type": "Question", "name": "What actually reduces the rereading?", "acceptedAnswer": { "@type": "Answer", "text": "A freshness signal and routing, not size. trovex marks each doc canonical, stale, or duplicate and returns only the current one for a query, so the agent reads one section instead of re-scanning candidates. About 60% fewer tokens per lookup on our own repo." } }
+        ]
       }
     ]
   }
@@ -106,6 +114,22 @@
         <li><a href="/vs/repomix/">trovex vs repomix / files-to-prompt</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">If the window is huge, why does cost still climb?</p>
+        <p class="faq-a">Because a bigger window changes how much the agent can hold, not how much it needs to read. It still reopens candidate docs each session to find the current one and still pays for every token it reads. Capacity is not the bottleneck; knowing which doc is current is.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Can I just paste all the docs into the window?</p>
+        <p class="faq-a">You can, and you pay for all of them on every turn, plus the model has to find the answer inside the pile. Serving the one canonical doc per query is cheaper and sharper than dumping everything into a large window.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What actually reduces the rereading?</p>
+        <p class="faq-a">A freshness signal and routing, not size. trovex marks each doc canonical, stale, or duplicate and returns only the current one for a query, so the agent reads one section instead of re-scanning candidates. About 60% fewer tokens per lookup on our own repo.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>Load less, the right thing.</h2>

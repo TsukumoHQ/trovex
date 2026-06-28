@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/cut-team-agent-token-costs/" />
+  <title>Cut your team's AI agent token bill at scale</title>
+  <meta name="description" content="How to cut your engineering team's AI agent token bill: the spend is mostly agents rereading candidate docs to re-find one answer. Serve one canonical doc per query instead. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/cut-team-agent-token-costs/" />
+  <meta property="og:title" content="Cut your team's AI agent token bill at scale" />
+  <meta property="og:description" content="The team token bill is the same rereading waste multiplied. Cut it once, centrally: one canonical doc per query. By tsukumo." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Cut your team's AI agent token bill at scale" />
+  <meta name="twitter:description" content="Cut the rereading once, centrally, and the savings scale with team size. By tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Cut your team's AI agent token bill at scale", "item": "https://trovex.dev/answers/cut-team-agent-token-costs/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Where does a team's agent token spend actually go?", "acceptedAnswer": { "@type": "Answer", "text": "Mostly to rereading. Every agent, on every session, reopens the top candidate docs to work out which one is current, then throws most of them away. Multiply that across a team and the bill is dominated by re-finding answers the fleet already had, not by generating new work." } },
+          { "@type": "Question", "name": "Is this a per-seat fix or a central one?", "acceptedAnswer": { "@type": "Answer", "text": "Central. Buying more seats multiplies the same waste. The lever is to serve one canonical doc per query from a shared store every agent reads, so the rereading is cut once for the whole team instead of paid per developer." } },
+          { "@type": "Question", "name": "How much does it save, and how do we measure it on our repos?", "acceptedAnswer": { "@type": "Answer", "text": "On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 pre-registered queries, range 41 to 81%; we headline a conservative about 60%. Run the benchmark on your repo at trovex.dev/measure for your own number." } },
+          { "@type": "Question", "name": "Won't a bigger context window cut the cost instead?", "acceptedAnswer": { "@type": "Answer", "text": "No. A bigger window lets each agent hold more, but it still rereads candidates to find the current doc and still pays for them. What cuts the cost is serving one canonical doc per query, not buying more context to sift." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-28", "dateModified": "2026-06-28",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "about": { "@type": "SoftwareApplication", "@id": "https://trovex.dev/#software" },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I cut my team's AI agent token bill at scale?",
+          "text": "Our whole team runs coding agents and the token bill is climbing. How do we cut it at scale?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/cut-team-agent-token-costs/",
+            "text": "At team scale the bill is mostly the same waste multiplied: every agent, on every session, rereads candidate docs to re-find one answer. Cut the rereading once, centrally, by serving the single canonical doc per query instead of the pile. trovex models about 60% fewer tokens per doc lookup (measured at equal task-success, median 69% across 26 queries; trovex.dev/measure), and the win scales with team size."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Cut your team's AI agent token bill at scale
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-28">28 June 2026</time></p>
+    <h1>Cut your team's AI agent token bill at <span class="ac">scale</span></h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>At team scale the bill is mostly the same waste multiplied: every agent, on every session, rereads candidate docs to re-find one answer. Cut the rereading once, centrally, by serving the single canonical doc per query instead of the pile. trovex models about <strong>60% fewer tokens</strong> per doc lookup (measured at equal task-success, median 69% across 26 queries), and the win scales with team size.</p>
+    </div>
+
+    <h2>The bill is rereading, multiplied by your headcount</h2>
+    <p class="lead-answer">One developer's agent rereading the same docs is a rounding error. A whole team doing it, every session, is the bill. The tokens go to re-finding which of several near-duplicate docs is current, not to the actual work. Adding seats scales the waste linearly. The fix is to cut the rereading at the source, once, for everyone: resolve a question to one canonical doc with a freshness marker instead of dumping the top candidates into every agent's context.</p>
+
+    <h2>Cut it once, centrally, not per seat</h2>
+    <p class="lead-answer">trovex indexes your markdown and serves the one doc that answers a query, locally, over MCP, so every client on the team (Claude Code, Cursor, Windsurf, Cline) reads the same canonical answer instead of each rebuilding it. On our own repo that measured a median of <strong>69%</strong> fewer tokens per lookup at equal task-success across 26 queries, range 41 to 81%; we publish about <strong>60%</strong> as the conservative floor. Run <code>uvx trovex bench</code> to get your team's own number.</p>
+
+    <h2>Where trovex fits, and where the consulting does</h2>
+    <p class="lead-answer">trovex is the shared-context layer and you can install it today. If the token bill is a symptom of a deeper operating problem, how the team runs agents in production, that is what tsukumo consults on. trovex is the tool; the operating model is the engagement. Here is what <a href="https://tsukumo.ch/answers/how-to-get-help-running-ai-agent-fleets">getting help running agent fleets in production</a> looks like.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Rolling agents out across a team? tsukumo, the studio behind trovex, consults on doing it well at scale. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/reduce-agent-token-costs/">How do I reduce a coding agent's token cost?</a></li>
+        <li><a href="/answers/token-cost-of-agent-context/">What does context actually cost a coding agent?</a></li>
+        <li><a href="/answers/roll-out-ai-agents-engineering-team/">How do I roll out AI coding agents across my team?</a></li>
+        <li><a href="/answers/why-team-agents-give-inconsistent-answers/">Why do my team's agents give inconsistent answers?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Where does a team's agent token spend actually go?</p>
+        <p class="faq-a">Mostly to rereading. Every agent, on every session, reopens the top candidate docs to work out which one is current, then throws most of them away. Multiply that across a team and the bill is dominated by re-finding answers the fleet already had, not by generating new work.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Is this a per-seat fix or a central one?</p>
+        <p class="faq-a">Central. Buying more seats multiplies the same waste. The lever is to serve one canonical doc per query from a shared store every agent reads, so the rereading is cut once for the whole team instead of paid per developer.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How much does it save, and how do we measure it on our repos?</p>
+        <p class="faq-a">On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 pre-registered queries, range 41 to 81%. We headline a conservative about 60%. Run the benchmark on your repo at trovex.dev/measure for your own number.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Won't a bigger context window cut the cost instead?</p>
+        <p class="faq-a">No. A bigger window lets each agent hold more, but it still rereads candidates to find the current doc and still pays for them. What cuts the cost is serving one canonical doc per query, not buying more context to sift.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Measure it on your own repo.</h2>
+      <p>Index a folder of markdown, serve your agents one current answer per query, and see the tokens saved.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/measure">see the measured numbers →</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

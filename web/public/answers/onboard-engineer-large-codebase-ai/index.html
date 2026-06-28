@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/onboard-engineer-large-codebase-ai/" />
+  <title>Onboard an engineer to a large codebase with AI</title>
+  <meta name="description" content="How to onboard a new engineer to a large codebase faster with AI agents: point their agent at one canonical store that returns the current doc, not the whole repo to sift. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/onboard-engineer-large-codebase-ai/" />
+  <meta property="og:title" content="Onboard an engineer to a large codebase with AI" />
+  <meta property="og:description" content="The slow part of onboarding is finding which doc is current, not reading code. Serve the new hire's agent one canonical answer. By tsukumo." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Onboard an engineer to a large codebase with AI" />
+  <meta name="twitter:description" content="A new hire's agent should read the one current doc, not sift the whole repo. Productive on day one. By tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Onboard an engineer to a large codebase with AI", "item": "https://trovex.dev/answers/onboard-engineer-large-codebase-ai/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "What should I index first to speed up onboarding?", "acceptedAnswer": { "@type": "Answer", "text": "Start with the docs a new hire actually asks about: the architecture overview, the runbooks, the setup and deploy guides, and the conventions. Index those markdown files so the new engineer's agent can answer where does X live and how do we do Y from the current doc, instead of grepping the whole repo." } },
+          { "@type": "Question", "name": "Is this for onboarding the human or the agent?", "acceptedAnswer": { "@type": "Answer", "text": "Both, through the same store. The agent gets a fast, current answer to read, and the human gets a teammate that points to the right doc instead of a stale one. The slow part of onboarding is finding which doc is authoritative; serving one canonical answer removes that for both." } },
+          { "@type": "Question", "name": "How do we keep the onboarding docs from going stale?", "acceptedAnswer": { "@type": "Answer", "text": "trovex marks each doc canonical, stale, or duplicate, so a new hire's agent reads the current one and not last year's. As docs change, the freshness marker moves, and agents can write back what they learn so the store stays current instead of drifting." } },
+          { "@type": "Question", "name": "Does our code leave the machine?", "acceptedAnswer": { "@type": "Answer", "text": "No. trovex runs locally with vectors in SQLite and an on-device embedder, no cloud and no API keys, so the docs and code a new engineer's agent reads never leave your machine. That matters when onboarding onto a private or regulated codebase." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-28", "dateModified": "2026-06-28",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "about": { "@type": "SoftwareApplication", "@id": "https://trovex.dev/#software" },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I onboard a new engineer to a large codebase faster with AI agents?",
+          "text": "A new engineer is joining a big codebase. How do we use AI agents to get them productive faster?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/onboard-engineer-large-codebase-ai/",
+            "text": "The slow part of onboarding is finding which doc is current, not reading code. Point the new hire's agent at one canonical store that answers a question with the single current doc plus a path:line pointer, instead of making it sift the repo. trovex indexes your markdown and serves that one answer locally, so a new engineer's agent is productive on day one, not week three."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Onboard an engineer to a large codebase with AI
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-28">28 June 2026</time></p>
+    <h1>Onboard an engineer to a large codebase with <span class="ac">AI</span></h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>The slow part of onboarding is finding which doc is current, not reading code. Point the new hire's agent at one canonical store that answers a question with the single current doc plus a path:line pointer, instead of making it sift the repo. trovex indexes your markdown and serves that one answer locally, so a new engineer's agent is productive on day one, not week three.</p>
+    </div>
+
+    <h2>Onboarding is a search problem, not a reading problem</h2>
+    <p class="lead-answer">A new engineer on a large codebase does not struggle to read code; they struggle to find which doc is authoritative among many near-duplicates. Their agent has the same problem, and worse: it rereads candidate files every session to guess which runbook or setup guide is current. Give it one canonical answer per question instead, with a path:line pointer, and the new hire stops losing days to which doc do I trust.</p>
+
+    <h2>Point the agent at one canonical store</h2>
+    <p class="lead-answer">trovex indexes your markdown and returns the single doc that answers a query, down to the section, with a freshness marker, served locally over MCP to whatever client the new hire uses (Claude Code, Cursor, Windsurf, Cline). It runs on their machine with a local embedder and no API key, so a private codebase stays private. An agent can also write back what it learns, so each onboarding question answered makes the next one faster.</p>
+
+    <h2>Where trovex fits, and where the consulting does</h2>
+    <p class="lead-answer">trovex makes a new engineer's agent productive fast, and you can install it today. If onboarding is one symptom of a wider operating problem, how the team runs agents in production, that is what tsukumo consults on. Here is what <a href="https://tsukumo.ch/answers/how-to-get-help-running-ai-agent-fleets">getting help running agent fleets in production</a> looks like.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Rolling agents out across a team? tsukumo, the studio behind trovex, consults on doing it well at scale. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/mcp-server-for-repo-docs/">Is there an MCP server that serves a repo's docs?</a></li>
+        <li><a href="/answers/roll-out-ai-agents-engineering-team/">How do I roll out AI coding agents across my team?</a></li>
+        <li><a href="/answers/local-first-context-for-agents/">Can I give agents context without sending code to a cloud?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">What should I index first to speed up onboarding?</p>
+        <p class="faq-a">Start with the docs a new hire actually asks about: the architecture overview, the runbooks, the setup and deploy guides, and the conventions. Index those markdown files so the new engineer's agent can answer where does X live and how do we do Y from the current doc, instead of grepping the whole repo.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Is this for onboarding the human or the agent?</p>
+        <p class="faq-a">Both, through the same store. The agent gets a fast, current answer to read, and the human gets a teammate that points to the right doc instead of a stale one. The slow part of onboarding is finding which doc is authoritative; serving one canonical answer removes that for both.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How do we keep the onboarding docs from going stale?</p>
+        <p class="faq-a">trovex marks each doc canonical, stale, or duplicate, so a new hire's agent reads the current one and not last year's. As docs change, the freshness marker moves, and agents can write back what they learn so the store stays current instead of drifting.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does our code leave the machine?</p>
+        <p class="faq-a">No. trovex runs locally with vectors in SQLite and an on-device embedder, no cloud and no API keys, so the docs and code a new engineer's agent reads never leave your machine. That matters when onboarding onto a private or regulated codebase.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Get a new hire's agent productive on day one.</h2>
+      <p>Index your docs and serve the new engineer's agent one current answer per query, in about a minute.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/measure">see the measured numbers →</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

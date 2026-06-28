@@ -449,7 +449,7 @@ export default function App() {
           <div className="wrap trust-grid">
             <div className="trust-card">
               <div className="trust-h">Runs on your machine</div>
-              <p>Indexing and embeddings run locally in SQLite and ONNX. No cloud, no API keys — your code and docs never leave your machine.</p>
+              <p>Indexing and embeddings run locally in SQLite and ONNX. No cloud, no API keys; your code and docs never leave your machine.</p>
             </div>
             <div className="trust-card">
               <div className="trust-h">Open source, AGPL-3.0</div>

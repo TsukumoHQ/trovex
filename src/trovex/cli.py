@@ -290,17 +290,26 @@ def bench(
         "--eval",
         help="Full answer+judge A/B (needs OPENAI_API_KEY); default is the cheap token-model.",
     ),
+    latency: bool = typer.Option(
+        False,
+        "--latency",
+        help="Measure query LATENCY (embed+knn+score) over the queries instead of token savings.",
+    ),
+    repeats: int = typer.Option(
+        20, "--repeats", help="Repeats per query for --latency (more = steadier percentiles)."
+    ),
     k: int = typer.Option(3, "--k", help="Baseline candidate count (top-k read)."),
     model: str = typer.Option("gpt-5.4-mini", help="LLM for --eval (answers + judges)."),
     json_out: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON (median, spread, per-query/category)."
     ),
 ) -> None:
-    """Benchmark trovex's token savings on YOUR repo — the method is the claim, run it yourself.
+    """Benchmark trovex on YOUR repo — the method is the claim, run it yourself.
 
     Default = the token-accounting MODEL (no LLM, instant): the cost of reading the 1 routed
     canonical doc vs the top-k candidates. --eval = the full answer+judge A/B counted at EQUAL
-    task-success (needs a key). Reports the distribution (median + spread), not a max.
+    task-success (needs a key). --latency = the sqlite-vec query speed (p50/p95/max ms), no LLM.
+    Reports the distribution (median + spread), not a max.
     """
     import os
     import tempfile
@@ -308,8 +317,9 @@ def bench(
     from .embedder import build_embedder
 
     # Check the key BEFORE the (slow) index, so --eval without a key fails fast.
-    key = os.environ.get("OPENAI_API_KEY") if eval_mode else None
-    if eval_mode and not key:
+    # --latency never needs a key (no LLM), so don't gate it.
+    key = os.environ.get("OPENAI_API_KEY") if (eval_mode and not latency) else None
+    if eval_mode and not latency and not key:
         console.print("[red]--eval needs OPENAI_API_KEY in your environment.[/red]")
         raise typer.Exit(1)
 
@@ -327,7 +337,18 @@ def bench(
             raise typer.Exit(1)
         searcher = Searcher(settings, embedder=emb)
 
-        if eval_mode:
+        if latency:
+            from .query_latency import format_latency_stats, measure_query_latency
+
+            stats = measure_query_latency(searcher, qs, repeats=repeats)
+            if json_out:
+                print(_bench_json(stats))
+            else:
+                console.print(
+                    f"[bold]query-latency[/bold] · {len(qs)} queries × {repeats} on "
+                    f"{repo.name} ({stats.n} samples)\n{format_latency_stats(stats)}"
+                )
+        elif eval_mode:
             from openai import OpenAI
 
             from .eval_bench import EvalQuery, format_eval_report, run_eval

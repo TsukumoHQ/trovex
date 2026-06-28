@@ -46,6 +46,26 @@ def test_bench_eval_requires_key(monkeypatch, tmp_path):
     assert "OPENAI_API_KEY" in res.output
 
 
+def test_bench_latency_flags_registered():
+    """The --latency / --repeats mode is wired (the index path needs the real model, so
+    only the flag surface is guarded here — the math is covered by test_query_latency)."""
+    res = runner.invoke(app, ["bench", "--help"])
+    assert res.exit_code == 0
+    assert "--latency" in res.output
+    assert "--repeats" in res.output
+
+
+def test_bench_json_serializes_latency_stats():
+    import json
+
+    from trovex.cli import _bench_json
+    from trovex.query_latency import LatencyStats
+
+    s = LatencyStats(n=4, mean_ms=1.5, p50_ms=1.0, p95_ms=2.0, max_ms=2.5)
+    d = json.loads(_bench_json(s))
+    assert d["n"] == 4 and d["p95_ms"] == 2.0
+
+
 def test_bench_json_serializes_both_report_types():
     import json
 

@@ -320,7 +320,7 @@ function NewsletterBand() {
           <p className="news-deck">When we ship or learn something real about running AI coding agents in production. No filler, no fixed schedule.</p>
         </div>
         {state === 'ok' ? (
-          <p className="news-status" role="status">Check your inbox — confirm the link to finish subscribing.</p>
+          <p className="news-status" role="status">Check your inbox. Confirm the link to finish subscribing.</p>
         ) : state === 'already' ? (
           <p className="news-status" role="status">You&apos;re already on the list.</p>
         ) : (
@@ -402,7 +402,7 @@ export default function App() {
             {/* Above-fold proof of the aha (the savings number). The dashboard below is the
                 visual proof, but it sits below the fold — this carries the ~60% up top. */}
             <p className="hero-proof">
-              <b>~60% fewer tokens</b> per .md lookup — measured at equal task-success (median 69%, range 41–81%, n=26 on our repo, LLM-judged) ·{' '}
+              <b>~60% fewer tokens</b> per .md lookup, measured at equal task-success (median 69%, range 41–81%, n=26 on our repo, LLM-judged) ·{' '}
               <a className="hero-proof-link" href="/measure/" onClick={() => track('cta_clicked', { cta_id: 'methodology', location: 'hero' })}>how we measure →</a>{' · '}
               <a className="hero-proof-link" href="/savings" onClick={() => track('cta_clicked', { cta_id: 'estimate-savings', location: 'hero' })}>estimate it on your numbers →</a>
             </p>
@@ -457,7 +457,7 @@ export default function App() {
             </div>
             <div className="trust-card">
               <div className="trust-h">~60% fewer tokens, measured</div>
-              <p>Measured at equal task-success on our own repo — median 69%, n=26 queries, LLM-judged — and modeled to about the same ~60% from the reads trovex avoids. The savings view shows the difference on your own repo. <a className="hero-proof-link" href="/measure/">see how we measure →</a></p>
+              <p>Measured at equal task-success on our own repo: median 69%, n=26 queries, LLM-judged. Modeled to about the same ~60% from the reads trovex avoids. The savings view shows the difference on your own repo. <a className="hero-proof-link" href="/measure/">see how we measure →</a></p>
             </div>
           </div>
         </section>
@@ -519,7 +519,7 @@ export default function App() {
               </ol>
               {/* The zero-install escape hatch (README): one command, nothing installed,
                   still prints the savings number. Lowest-commitment path to the aha. */}
-              <p className="start-try">Not ready to install? Run one command, nothing installed — it still prints the tokens saved:</p>
+              <p className="start-try">Not ready to install? Run one command, nothing installed, and it still prints the tokens saved:</p>
               <div className="start-try-cmd"><CopyCmd cmd={'uvx trovex search "how do we roll back a deploy?"'} id="uvx-try" /></div>
               <p className="start-setup">
                 Then point your agent at it:{' '}

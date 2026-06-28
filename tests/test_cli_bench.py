@@ -48,11 +48,14 @@ def test_bench_eval_requires_key(monkeypatch, tmp_path):
 
 def test_bench_latency_flags_registered():
     """The --latency / --repeats mode is wired (the index path needs the real model, so
-    only the flag surface is guarded here — the math is covered by test_query_latency)."""
-    res = runner.invoke(app, ["bench", "--help"])
-    assert res.exit_code == 0
-    assert "--latency" in res.output
-    assert "--repeats" in res.output
+    only the flag surface is guarded here — the math is covered by test_query_latency).
+    Introspect the click params rather than the rendered --help, which Rich line-wraps
+    differently under a narrow/no-tty CI terminal."""
+    from typer.main import get_command
+
+    bench_cmd = get_command(app).commands["bench"]
+    opt_names = {p.name for p in bench_cmd.params}
+    assert {"latency", "repeats"} <= opt_names
 
 
 def test_bench_json_serializes_latency_stats():

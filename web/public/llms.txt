@@ -45,6 +45,7 @@
 - [What does context cost your coding agents?](https://trovex.dev/answers/token-cost-of-agent-context/): the per-lookup token math, and how serving one canonical doc cuts it.
 - [What is local-first context for coding agents?](https://trovex.dev/answers/local-first-context-for-agents/): index and serve your repo's canonical docs on your own machine over MCP, no cloud or API keys.
 - [Why don't context files (CLAUDE.md / AGENTS.md) scale?](https://trovex.dev/answers/why-context-files-dont-scale/): one static file goes stale and can't route a query to the right doc; serve the current one per query instead.
+- [Can AI agents correct their own mistakes?](https://trovex.dev/answers/can-ai-agents-correct-their-own-mistakes/): not reliably alone; a 2026 study (arXiv:2606.05976) found correction rose 23 to 93 points by relabeling the same claim as external, so the fix is a second role in the loop.
 - [All answers](https://trovex.dev/answers/)
 
 ## Setup (per MCP client)

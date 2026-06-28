@@ -199,6 +199,18 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://trovex.dev/use-cases/platform-teams/</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://trovex.dev/use-cases/open-source-maintainers/</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://trovex.dev/for/claude-code/</loc>
     <lastmod>2026-06-22</lastmod>
     <changefreq>monthly</changefreq>

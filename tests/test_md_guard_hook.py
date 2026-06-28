@@ -104,3 +104,25 @@ def test_write_guard_honors_trovexignore_keeplist(trovex_up):
     # README.md is on the keep-list → allowed even inside the trovex repo.
     target = str(_REPO / "README.md")
     assert not _is_deny(_run(_WRITE_GUARD, "Write", target, trovex_up))
+
+
+def test_write_guard_allows_repo_without_trovexignore(tmp_path, trovex_up):
+    # A git repo that hasn't opted into the doc-regime (no .trovexignore) → allow.
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    doc = tmp_path / "notes.md"
+    doc.write_text("# not a trovex repo\n")
+    assert not _is_deny(_run(_WRITE_GUARD, "Write", str(doc), trovex_up))
+
+
+def test_write_guard_install_location_independent(tmp_path, trovex_up):
+    # Regression (cto 2026-06-28): when the hook is INSTALLED to ~/.claude/hooks (not a
+    # git repo), the old script-location probe returned empty and over-denied scratchpad
+    # + foreign .md. Run a copy of the hook from a non-repo dir against a non-git .md →
+    # must still ALLOW. The scope is keyed on the edited file's repo, not the script's.
+    installed = tmp_path / "hooks" / "trovex-md-guard.sh"
+    installed.parent.mkdir()
+    shutil.copy(_WRITE_GUARD, installed)
+    scratch = tmp_path / "scratchpad" / "probe.md"
+    scratch.parent.mkdir()
+    scratch.write_text("# scratch\n")
+    assert not _is_deny(_run(installed, "Write", str(scratch), trovex_up))

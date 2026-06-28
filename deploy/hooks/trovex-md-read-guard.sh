@@ -27,23 +27,17 @@ file="$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')"
 [ -n "$file" ] || allow
 case "$file" in *.md | *.mdx | *.markdown) ;; *) allow ;; esac
 
-# Scope: this guard owns ONLY the trovex repo's SSOT .md (see trovex-md-guard.sh).
-# A SKILL.md or any .md in a foreign repo is not trovex SSOT — never proxy it (TSU-79).
+# Scope: guard only repos under the trovex doc-regime, identified by a .trovexignore
+# at the EDITED FILE's git root — keyed on the file, NOT this script's location, so it
+# works wherever the hook is INSTALLED (see trovex-md-guard.sh; cto 2026-06-28).
+# SKILL.md is a disk persona, never SSOT.
 case "$(basename "$file")" in SKILL.md) allow ;; esac
-self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P || true)"
-trovex_root="$(git -C "$self_dir" rev-parse --show-toplevel 2>/dev/null || true)"
-if [ -n "$trovex_root" ]; then
-  trovex_root="$(cd "$trovex_root" 2>/dev/null && pwd -P || printf '%s' "$trovex_root")"
-  file_real="$(cd "$(dirname "$file")" 2>/dev/null && pwd -P || true)/$(basename "$file")"
-  case "$file_real" in
-    "$trovex_root"/*) ;;   # inside the trovex repo (incl. its worktrees) → keep guarding
-    *) allow ;;            # outside trovex → not our SSOT, let it read
-  esac
-fi
+root="$(git -C "$(dirname "$file")" rev-parse --show-toplevel 2>/dev/null || true)"
+ignore="${root:+$root/.trovexignore}"
+# No git repo (e.g. scratchpad), or a repo not opted into the regime → not our SSOT.
+[ -n "$ignore" ] && [ -f "$ignore" ] || allow
 
 # .trovexignore — files exempt from the proxy (read raw off disk).
-root="$(git -C "$(dirname "$file")" rev-parse --show-toplevel 2>/dev/null || pwd)"
-ignore="$root/.trovexignore"
 if [ -f "$ignore" ]; then
   rel="${file#"$root"/}"
   while IFS= read -r pat || [ -n "$pat" ]; do

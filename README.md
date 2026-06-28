@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/TsukumoHQ/trovex/main/.github/assets/readme-hero.png" alt="trovex — one canonical doc for your coding agents, ~60% fewer tokens." width="100%">
+  <img src="https://raw.githubusercontent.com/TsukumoHQ/trovex/main/.github/assets/readme-hero.png" alt="trovex: one canonical doc for your coding agents, ~60% fewer tokens." width="100%">
 </p>
 
 <!-- mcp-name: io.github.TsukumoHQ/trovex -->
 
 # trovex
 
-**trovex — one canonical doc for your coding agents, ~60% fewer tokens.**
+**trovex: one canonical doc for your coding agents, ~60% fewer tokens.**
 
 <p align="center">
   <a href="https://tsukumo.ch/discord?utm_source=github&utm_medium=readme&utm_campaign=discord&utm_content=trovex"><img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white" alt="Join the tsukumo community on Discord"></a>
@@ -203,10 +203,10 @@ requires you to share your changes.
 
 trovex is the **context** layer of a four-part open-source suite for running AI coding agents in production, built by [tsukumo](https://tsukumo.ch):
 
-- **trovex** — context: serve agents the one canonical doc per query instead of rereading the repo (~60% fewer tokens per lookup; method at [trovex.dev/measure](https://trovex.dev/measure)).
-- **[wrai.th](https://github.com/TsukumoHQ/WRAI.TH)** — orchestration: run and coordinate a fleet of agents.
-- **[yoru](https://yoru.sh)** — observability: session receipts of what each agent actually did.
-- **[dokan](https://github.com/TsukumoHQ/dokan)** — deterministic execution: run the agent's settled, repeatable work as scripts in clean containers, no model in the loop.
+- **trovex**, context: serve agents the one canonical doc per query instead of rereading the repo (~60% fewer tokens per lookup; method at [trovex.dev/measure](https://trovex.dev/measure)).
+- **[wrai.th](https://github.com/TsukumoHQ/WRAI.TH)**, orchestration: run and coordinate a fleet of agents.
+- **[yoru](https://yoru.sh)**, observability: session receipts of what each agent actually did.
+- **[dokan](https://github.com/TsukumoHQ/dokan)**, deterministic execution: run the agent's settled, repeatable work as scripts in clean containers, no model in the loop.
 
 ## Working with a team?
 

@@ -36,14 +36,14 @@ A 30-second trust check, since the decision happens on the README, not the direc
 
 ## Quick start
 
-trovex is in public beta, on PyPI. No clone needed — `uv tool install` puts `trovex`
+trovex is in public beta, on PyPI. No clone needed; `uv tool install` puts `trovex`
 on your PATH:
 
 ```bash
 uv tool install trovex   # one-time, no clone
 
 trovex index /path/to/your/repo        # index your markdown (~1 min)
-trovex search "how do we roll back a deploy?"   # ask — prints the tokens it saved
+trovex search "how do we roll back a deploy?"   # ask, prints the tokens it saved
 trovex serve                           # wire into your agent: MCP at /mcp, dashboard at /savings
 ```
 
@@ -56,7 +56,7 @@ wired into your agent over MCP, the same numbers accumulate on the savings dashb
 `http://localhost:8765/savings`.
 
 > Prefer not to install anything yet? `uvx trovex search "..."` runs a single command in a
-> throwaway environment — no install.
+> throwaway environment, no install.
 
 ## Wire it into your agent
 
@@ -74,7 +74,7 @@ For **Cursor**, one click (after `trovex serve`):
 ## How it works
 
 trovex turns your repo's markdown into one queryable, canonical store, then serves each
-agent the single current doc that answers a question — not a pile of candidates to rank.
+agent the single current doc that answers a question, not a pile of candidates to rank.
 
 ```mermaid
 flowchart LR
@@ -91,10 +91,10 @@ Four ideas do the work:
 
 - **Canonical, not complete.** For each question there should be one doc that answers it.
   trovex marks every doc canonical / stale / duplicate, so retrieval can prefer the one
-  that's still true — a stale doc is exactly as similar to a query as the current one, so
+  that's still true: a stale doc is exactly as similar to a query as the current one, so
   similarity alone can't tell them apart.
 - **Route, then serve the section.** A query returns a `path:line` pointer to the one doc
-  and just the section that answers — not the whole file, and not the top-k pile your agent
+  and just the section that answers, not the whole file, and not the top-k pile your agent
   would otherwise read and rank itself. Closing that gap is where the tokens are saved.
 - **Local by default.** Indexing, embeddings (ONNX, `bge-small-en-v1.5`) and vector search
   (sqlite-vec) all run on your machine. No cloud, no API key, no network call to answer a query.
@@ -123,13 +123,13 @@ sequenceDiagram
 The ~60% is a claim you can run, not a number to take on faith. Two commands:
 
 ```bash
-trovex bench /path/to/your/repo          # token-accounting model — instant, no LLM, no key
+trovex bench /path/to/your/repo          # token-accounting model, instant, no LLM, no key
 trovex bench /path/to/your/repo --eval   # full answer+judge A/B at equal task-success (needs OPENAI_API_KEY)
 ```
 
 `bench` reports the distribution (median + spread), not a best case: the cost of reading the
 one routed canonical doc versus the top-k candidates an unaided agent would read. `--eval`
-goes further — both arms answer, an LLM judges, and a saving counts only when both answer
+goes further: both arms answer, an LLM judges, and a saving counts only when both answer
 correctly. Full method and our own numbers are at [trovex.dev/measure](https://trovex.dev/measure).
 
 Already running trovex through the md-guard hook? `trovex measure` compares your real `.md`
@@ -137,16 +137,16 @@ token consumption before and after, from the hook's baseline log.
 
 ## MCP tools
 
-- `trovex(q)` — route a question to the right on-disk `.md` and get back `path:line` pointers
+- `trovex(q)`: route a question to the right on-disk `.md` and get back `path:line` pointers
   with freshness markers, not a pile of files to rank.
-- `trovex_write(content, kind?, doc_id?, tags?, section?)` / `trovex_read(query | doc_id, section?)` —
+- `trovex_write(content, kind?, doc_id?, tags?, section?)` / `trovex_read(query | doc_id, section?)`:
   docs owned *inside* trovex. An agent stores a record (an incident, a decision, "what
   actually worked") once; every other agent and a second dev read it back as content
   (optionally just one section) instead of re-deriving it. Pass `section=` to `trovex_write`
   to patch one heading's section in place instead of replacing the whole doc.
-- `trovex_search(query, k?, tags?)` — passage-level retrieval across the store with tag
+- `trovex_search(query, k?, tags?)`: passage-level retrieval across the store with tag
   filters, for when you want the top matching chunks rather than one canonical doc.
-- `trovex_tag(...)` / `trovex_delete(...)` — tag or soft-delete a stored doc; delete is a
+- `trovex_tag(...)` / `trovex_delete(...)`: tag or soft-delete a stored doc; delete is a
   recoverable archive, not a hard wipe. Both touch only the trovex store, never your files.
 
 Humans read trovex-owned docs at `/doc/{id}` in the rendered reader. To make agents route
@@ -185,7 +185,7 @@ Questions, or comparing notes with other people running agents? Join the communi
 ## Security
 
 trovex is **local-first and single-tenant**: it runs on your machine, indexes your docs, and
-serves your agents. Mutations are gated behind the `X-TROVEX-Write-Token` header — and the
+serves your agents. Mutations are gated behind the `X-TROVEX-Write-Token` header, and the
 default is **fail-closed**: with no token configured, trovex auto-generates a per-instance
 token on first run and persists it to `<data_dir>/.write_token` (chmod 600), so a
 network-exposed instance does not accept anonymous writes. Set `TROVEX_WRITE_TOKEN` to share

@@ -98,6 +98,24 @@
   {% include "_results.html" %}
 </div>
 
+{# Error state: htmx leaves the stale results in place on a non-2xx / network drop,
+   so a failed search silently looks frozen. This template is swapped into #results by
+   the handler below when /search/partial fails — an honest message + a retry, instead
+   of a frozen or blank list. #}
+<template id="search-error-tpl">
+  <div class="empty" role="alert">
+    <svg class="icon icon-lg" aria-hidden="true" style="color: var(--stale);"><use href="#i-search"></use></svg>
+    <div class="empty-title mono" style="margin-top: var(--s-3);">search hit a snag</div>
+    <div class="subtle mono" style="font-size: var(--t-12);">
+      the server couldn’t finish that query — it may be reindexing or warming up
+    </div>
+    <div class="empty-hint">
+      <button type="button" class="empty-action"
+              onclick="htmx.trigger('#search-form', 'submit')">↻ retry</button>
+    </div>
+  </div>
+</template>
+
 <style>
   .suggest {
     position: absolute;
@@ -468,6 +486,28 @@
     document.body.addEventListener('htmx:afterSwap', function (e) {
       if (e.target && e.target.id === 'results') idx = -1;  // reset on new results
     });
+  })();
+</script>
+<script>
+  // Error state. htmx only swaps a 2xx response, so a 5xx (store/embedder hiccup,
+  // reindex) or a dropped connection leaves the previous results frozen with no
+  // feedback. Swap in the error template + a retry instead, and drop the skeleton.
+  (function () {
+    const results = document.getElementById('results');
+    const tpl = document.getElementById('search-error-tpl');
+    if (!results || !tpl) return;
+    function showError() {
+      // Clear the in-flight state so the skeleton/dimming doesn't linger over the error.
+      const form = document.getElementById('search-form');
+      if (form) form.classList.remove('htmx-request');
+      results.setAttribute('aria-busy', 'false');
+      results.replaceChildren(tpl.content.cloneNode(true));
+    }
+    // Both fire on the request's source element (the form); the search page has a
+    // single htmx flow, so handle them page-wide.
+    document.body.addEventListener('htmx:responseError', showError);
+    document.body.addEventListener('htmx:sendError', showError);
+    document.body.addEventListener('htmx:timeout', showError);
   })();
 </script>
 {% endblock %}

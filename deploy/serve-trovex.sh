@@ -37,6 +37,13 @@ set -euo pipefail
 
 WORKTREE="${TROVEX_SERVE_WORKTREE:-$HOME/.config/trovex-growth/deploy-wt/trovex}"
 PORT="${TROVEX_PORT:-8765}"
+# `trovex serve` takes host/port as CLI OPTIONS whose defaults (127.0.0.1 / 8765)
+# are the SAFE end-user defaults and deliberately do NOT read TROVEX_HOST/TROVEX_PORT
+# — so this fleet launcher must pass them as explicit FLAGS, not env vars, to bind
+# the LAN interface dokan containers need (host.docker.internal can't reach a
+# 127.0.0.1 bind). Keep the env vars unset on a normal end-user box → BIND_HOST 0.0.0.0
+# is the FLEET-HOST choice, safe only because the MCP transport is host-gated.
+BIND_HOST="${TROVEX_HOST:-0.0.0.0}"
 LOG="$HOME/.trovex-data/serve.log"
 ENV_FILE="${TROVEX_ENV_FILE:-$HOME/.config/trovex-growth/openai.env}"
 LABEL="com.tsukumo.trovex-serve"
@@ -138,7 +145,7 @@ fi
 
 # Stop whatever currently holds the port (the previous serve), if anything — UNLESS
 # the launchd agent owns it and we're about to kickstart (launchctl handles the swap).
-serve_env() { echo TROVEX_ALLOW_UNAUTH_WRITES=1 TROVEX_HOST=0.0.0.0 TROVEX_PORT="$PORT"; }
+serve_env() { echo TROVEX_ALLOW_UNAUTH_WRITES=1; }
 agent_loaded() { launchctl print "$GUI/$LABEL" >/dev/null 2>&1; }
 
 stop_port_listener() {
@@ -161,17 +168,17 @@ stop_port_listener() {
 # server (KeepAlive watches THIS pid). No nohup, no healthcheck — launchd owns both.
 if [ "$exec_mode" = 1 ]; then
   stop_port_listener
-  echo "→ exec trovex serve (host 0.0.0.0, unauth-writes, port $PORT) under launchd"
-  exec env TROVEX_ALLOW_UNAUTH_WRITES=1 TROVEX_HOST=0.0.0.0 TROVEX_PORT="$PORT" \
-    .venv/bin/trovex serve
+  echo "→ exec trovex serve --host $BIND_HOST --port $PORT (unauth-writes) under launchd"
+  exec env TROVEX_ALLOW_UNAUTH_WRITES=1 \
+    .venv/bin/trovex serve --host "$BIND_HOST" --port "$PORT"
 fi
 
-echo "→ launching trovex serve (host 0.0.0.0, unauth-writes, port $PORT)"
+echo "→ launching trovex serve --host $BIND_HOST --port $PORT (unauth-writes)"
 if [ "$dry" = 1 ]; then
   if agent_loaded; then
     echo "DRY: launchctl kickstart -k $GUI/$LABEL  (agent supervises the swap)"
   else
-    echo "DRY: $(serve_env) nohup .venv/bin/trovex serve >> $LOG 2>&1 &"
+    echo "DRY: $(serve_env) nohup .venv/bin/trovex serve --host $BIND_HOST --port $PORT >> $LOG 2>&1 &"
   fi
 elif agent_loaded; then
   # The LaunchAgent owns the process — restart it onto the fresh checkout instead of
@@ -187,8 +194,8 @@ elif agent_loaded; then
   fi
 else
   stop_port_listener
-  TROVEX_ALLOW_UNAUTH_WRITES=1 TROVEX_HOST=0.0.0.0 TROVEX_PORT="$PORT" \
-    nohup .venv/bin/trovex serve >>"$LOG" 2>&1 &
+  TROVEX_ALLOW_UNAUTH_WRITES=1 \
+    nohup .venv/bin/trovex serve --host "$BIND_HOST" --port "$PORT" >>"$LOG" 2>&1 &
   disown
   new_pid=$!
   # Wait for /healthz, bounded — embedder warm-up can take a few seconds.

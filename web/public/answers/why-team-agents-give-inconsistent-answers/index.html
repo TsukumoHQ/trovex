@@ -1,0 +1,170 @@
+<!doctype html>
+<!-- TSU-112 SCAFFOLD. DRAFT COPY (geo placeholder from spec 6f061383). WIRE HELD: swap in tech-copywriter's prose-gated copy before merge. Structure + JSON-LD are final. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/why-team-agents-give-inconsistent-answers/" />
+  <title>Why do my team's AI agents give inconsistent answers?</title>
+  <meta name="description" content="Why a team's coding agents give inconsistent or conflicting answers: each retrieves a different, often stale slice of the repo. The fix is one shared canonical source of truth with freshness. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/why-team-agents-give-inconsistent-answers/" />
+  <meta property="og:title" content="Why do my team's AI agents give inconsistent answers?" />
+  <meta property="og:description" content="Each agent retrieves a different, often stale slice of the repo. A shared canonical source of truth with freshness is the fix. By tsukumo." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Why do my team's AI agents give inconsistent answers?" />
+  <meta name="twitter:description" content="Different agents read different stale docs and confidently disagree. One canonical source of truth converges them. By tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Why do my team's AI agents give inconsistent answers?", "item": "https://trovex.dev/answers/why-team-agents-give-inconsistent-answers/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "What is the root cause of inconsistent agent answers?", "acceptedAnswer": { "@type": "Answer", "text": "Each agent retrieves from a different slice of the repo, and similarity search ranks text by relevance, not by which copy is current. So one agent reads an old runbook and another reads the new one, and both answer confidently. Without a freshness signal, the fleet has no shared notion of which doc is the source of truth." } },
+          { "@type": "Question", "name": "Will a bigger or better model fix the inconsistency?", "acceptedAnswer": { "@type": "Answer", "text": "No. The model is not the problem; the inputs are. If two agents read two different stale docs, a smarter model just reasons more confidently over the wrong one. The fix is upstream: serve every agent the same current doc, not a better guesser." } },
+          { "@type": "Question", "name": "How does a freshness marker keep agents consistent?", "acceptedAnswer": { "@type": "Answer", "text": "trovex marks each doc canonical, stale, or duplicate and serves only the current one for a query. Every agent on the team gets the same answer for the same question, so they converge instead of each reasoning over a different copy. When a doc changes, the marker moves with it." } },
+          { "@type": "Question", "name": "Does this work when our docs span multiple repos?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. trovex indexes the markdown you point it at across repos and serves the one canonical answer over MCP, so agents working in different repositories still read from one shared source of truth rather than each repo's local, possibly stale, copy." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-28", "dateModified": "2026-06-28",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "about": { "@type": "SoftwareApplication", "@id": "https://trovex.dev/#software" },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "Why do my team's AI coding agents give inconsistent answers?",
+          "text": "Different developers' agents give us conflicting answers about the same codebase. Why, and how do we fix it?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/why-team-agents-give-inconsistent-answers/",
+            "text": "Because each agent retrieves from a different slice of the repo, and similarity search ranks text by relevance, not by which copy is current, so two agents can confidently cite two stale docs. The fix is a shared source of truth with a freshness signal: one canonical doc per question, marked current. trovex serves that to every agent over MCP, so the team converges instead of drifting."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Why do my team's AI agents give inconsistent answers?
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-28">28 June 2026</time></p>
+    <h1>Why do my team's AI agents give <span class="ac">inconsistent</span> answers?</h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Because each agent retrieves from a different slice of the repo, and similarity search ranks text by relevance, not by which copy is current, so two agents can confidently cite two stale docs. The fix is a shared source of truth with a freshness signal: one canonical doc per question, marked current. trovex serves that to every agent over MCP, so the team converges instead of drifting.</p>
+    </div>
+
+    <h2>Same question, different stale doc</h2>
+    <p class="lead-answer">When several markdown files touch the same topic, a runbook, an old ADR, a wiki page, each agent retrieves whichever scores highest for its query. Similarity ranks the closest-looking text, not the current one, so one agent reads last year's doc and another reads this week's, and both sound certain. Across a team that reads as the agents disagreeing, when really they are each reasoning over a different copy of the truth.</p>
+
+    <h2>The fix is a shared source of truth, not a better model</h2>
+    <p class="lead-answer">trovex indexes your docs and serves the single canonical doc for a question, marked current, with stale and duplicate copies flagged so they never reach the agent. Every client on the team (Claude Code, Cursor, Windsurf, Cline) reads the same answer over MCP, so the fleet converges. It runs locally with a local embedder and no API key, and an agent can write back what it learns so the next one reads it instead of re-deriving a different version.</p>
+
+    <h2>Where trovex fits, and where the consulting does</h2>
+    <p class="lead-answer">trovex gives the team one consistent source of truth, and you can install it today. If the inconsistency is part of a wider operating problem, how the team runs agents in production, that is what tsukumo consults on. Here is what <a href="https://tsukumo.ch/answers/how-to-get-help-running-ai-agent-fleets">getting help running agent fleets in production</a> looks like.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Rolling agents out across a team? tsukumo, the studio behind trovex, consults on doing it well at scale. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/why-agents-pick-stale-docs/">Why do agents pick stale or outdated docs?</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/roll-out-ai-agents-engineering-team/">How do I roll out AI coding agents across my team?</a></li>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">What is the root cause of inconsistent agent answers?</p>
+        <p class="faq-a">Each agent retrieves from a different slice of the repo, and similarity search ranks text by relevance, not by which copy is current. So one agent reads an old runbook and another reads the new one, and both answer confidently. Without a freshness signal, the fleet has no shared notion of which doc is the source of truth.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Will a bigger or better model fix the inconsistency?</p>
+        <p class="faq-a">No. The model is not the problem; the inputs are. If two agents read two different stale docs, a smarter model just reasons more confidently over the wrong one. The fix is upstream: serve every agent the same current doc, not a better guesser.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How does a freshness marker keep agents consistent?</p>
+        <p class="faq-a">trovex marks each doc canonical, stale, or duplicate and serves only the current one for a query. Every agent on the team gets the same answer for the same question, so they converge instead of each reasoning over a different copy. When a doc changes, the marker moves with it.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does this work when our docs span multiple repos?</p>
+        <p class="faq-a">Yes. trovex indexes the markdown you point it at across repos and serves the one canonical answer over MCP, so agents working in different repositories still read from one shared source of truth rather than each repo's local, possibly stale, copy.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Give every agent the same current answer.</h2>
+      <p>Index your markdown and serve the whole team one canonical doc per query, in about a minute.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/measure">see the measured numbers →</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

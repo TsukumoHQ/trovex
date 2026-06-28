@@ -58,7 +58,10 @@
           { "@type": "ListItem", "position": 14, "name": "What's the difference between agent memory and retrieval (RAG)?", "url": "https://trovex.dev/answers/agent-memory-vs-rag/" },
           { "@type": "ListItem", "position": 15, "name": "What's the missing layer in agent memory?", "url": "https://trovex.dev/answers/missing-layer-agent-memory/" },
           { "@type": "ListItem", "position": 16, "name": "What is trovex?", "url": "https://trovex.dev/answers/what-is-trovex/" },
-          { "@type": "ListItem", "position": 17, "name": "How do I roll out AI coding agents across my engineering team?", "url": "https://trovex.dev/answers/roll-out-ai-agents-engineering-team/" }
+          { "@type": "ListItem", "position": 17, "name": "How do I roll out AI coding agents across my engineering team?", "url": "https://trovex.dev/answers/roll-out-ai-agents-engineering-team/" },
+          { "@type": "ListItem", "position": 18, "name": "How do I cut my team's AI agent token bill at scale?", "url": "https://trovex.dev/answers/cut-team-agent-token-costs/" },
+          { "@type": "ListItem", "position": 19, "name": "Why do my team's AI agents give inconsistent answers?", "url": "https://trovex.dev/answers/why-team-agents-give-inconsistent-answers/" },
+          { "@type": "ListItem", "position": 20, "name": "How do I onboard a new engineer to a large codebase with AI?", "url": "https://trovex.dev/answers/onboard-engineer-large-codebase-ai/" }
         ]
       }
     ]
@@ -101,6 +104,9 @@
         <li><a href="/answers/missing-layer-agent-memory/"><strong>What's the missing layer in agent memory?</strong></a> — the 7 memory types are per-agent recall; the missing layer is one current source of truth the whole fleet writes back to.</li>
         <li><a href="/answers/what-is-trovex/"><strong>What is trovex?</strong></a> — the open-source canonical doc store and context layer for AI coding agents, by tsukumo.</li>
         <li><a href="/answers/roll-out-ai-agents-engineering-team/"><strong>How do I roll out AI coding agents across my engineering team?</strong></a>: start with the operating problem, give agents one shared canonical source of truth, then add guardrails and trained operators.</li>
+        <li><a href="/answers/cut-team-agent-token-costs/"><strong>How do I cut my team's AI agent token bill at scale?</strong></a>: the spend is rereading multiplied by headcount; cut it once, centrally, with one canonical doc per query.</li>
+        <li><a href="/answers/why-team-agents-give-inconsistent-answers/"><strong>Why do my team's AI agents give inconsistent answers?</strong></a>: each reads a different stale slice of the repo; a shared canonical source of truth with freshness converges them.</li>
+        <li><a href="/answers/onboard-engineer-large-codebase-ai/"><strong>How do I onboard a new engineer to a large codebase with AI?</strong></a>: point their agent at one canonical store that returns the current doc, not the whole repo to sift.</li>
         <li><a href="/answers/bigger-context-window-rereading/"><strong>Does a bigger context window make rereading docs cheaper?</strong></a> — no; it raises the ceiling, not the efficiency.</li>
         <li><a href="/answers/shared-source-of-truth-multiple-agents/"><strong>How do I keep multiple AI agents working from the same docs?</strong></a> — one shared read-and-write point, no drift.</li>
         <li><a href="/answers/why-agents-pick-stale-docs/"><strong>Why do AI coding agents pick stale or outdated docs?</strong></a> — similarity ranks the closest text, not the current one; a freshness marker fixes it.</li>

@@ -121,6 +121,24 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://trovex.dev/answers/cut-team-agent-token-costs/</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://trovex.dev/answers/why-team-agents-give-inconsistent-answers/</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://trovex.dev/answers/onboard-engineer-large-codebase-ai/</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://trovex.dev/answers/agent-memory-vs-rag/</loc>
     <lastmod>2026-06-23</lastmod>
     <changefreq>monthly</changefreq>

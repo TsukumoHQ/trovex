@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/use-cases/large-monorepo/" />
+  <title>trovex for large monorepos: serve agents the one current doc</title>
+  <meta name="description" content="In a large monorepo, an agent's problem is finding which of many overlapping docs is current, not reading code. trovex returns the single canonical doc per query instead of the whole tree. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/use-cases/large-monorepo/" />
+  <meta property="og:title" content="trovex for large monorepos: serve agents the one current doc" />
+  <meta property="og:description" content="In a big monorepo the bottleneck is finding the current doc among many overlapping ones. trovex returns the single canonical doc per query." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for large monorepos" />
+  <meta name="twitter:description" content="The bottleneck is finding the current doc among many. trovex returns the one canonical doc per query. By tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Use cases", "item": "https://trovex.dev/use-cases/" },
+          { "@type": "ListItem", "position": 3, "name": "Large monorepo", "item": "https://trovex.dev/use-cases/large-monorepo/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Does indexing a huge repo make lookups slow?", "acceptedAnswer": { "@type": "Answer", "text": "No meaningfully. trovex returns one canonical doc per query rather than scanning every package, and the index runs locally in SQLite, so lookups stay fast as the repo grows." } },
+          { "@type": "Question", "name": "What does it index in a monorepo?", "acceptedAnswer": { "@type": "Answer", "text": "The markdown you point it at across the tree: docs, runbooks, ADRs, design notes. It returns the one current doc for a query with a path:line pointer and a freshness marker." } },
+          { "@type": "Question", "name": "How much does it save on a big repo?", "acceptedAnswer": { "@type": "Answer", "text": "On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 queries, range 41 to 81%; we headline a conservative about 60%. More overlapping docs means more rereading removed. See trovex.dev/measure." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-28", "dateModified": "2026-06-28",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I give coding agents context in a large monorepo without burning tokens?",
+          "text": "Our monorepo is huge and the docs overlap. Agents reread a pile of files every session to find the current one. How do we fix that?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/use-cases/large-monorepo/",
+            "text": "In a large monorepo the agent's bottleneck is finding which of many overlapping docs is current, not reading code. trovex indexes the markdown and returns the single canonical doc per query with a path:line pointer and a freshness marker, instead of letting the agent sift hundreds of files. About 60% fewer tokens per lookup, and the bigger the repo, the more it matters."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/use-cases/">Use cases</a> / Large monorepo
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-28">28 June 2026</time></p>
+    <h1>trovex for large <span class="ac">monorepos</span></h1>
+
+    <div class="verdict">
+      <div class="l">The short version</div>
+      <p>In a large monorepo the agent's bottleneck is finding which of many overlapping docs is current, not reading code. trovex indexes the markdown and returns the single <a href="/glossary/canonical-context-layer/">canonical doc</a> per query with a path:line pointer and a <a href="/glossary/freshness-marker/">freshness marker</a>, instead of letting the agent sift hundreds of files. About <strong>60% fewer tokens</strong> per lookup, and the bigger the repo, the more it matters.</p>
+    </div>
+
+    <h2>The problem at monorepo scale</h2>
+    <p class="lead-answer">A big repo has many docs that say overlapping things: an old runbook, a current one, a design note, a wiki export. Similarity search ranks the closest-looking text, not the current one, so the agent opens several and reasons over the pile, every session. The more docs there are, the worse the rereading and the higher the chance it picks a stale one.</p>
+
+    <h2>One canonical doc, not the whole tree</h2>
+    <p class="lead-answer">trovex returns the one doc that answers a query, down to the section, and marks stale and duplicate copies so they are skipped. The agent reads one current answer with a path:line pointer instead of scanning the tree. Lookups stay fast because it returns one doc per query, not a scan of every package. That is what <a href="/answers/why-agents-pick-stale-docs/">stopping agents picking stale docs</a> takes at scale.</p>
+
+    <h2>How it rolls out</h2>
+    <p class="lead-answer">Point trovex at the markdown across the monorepo and it builds a local index: vectors in SQLite, an on-device embedder, no cloud or keys. Each developer's agent queries it over MCP. Index once, serve every query.</p>
+
+    <h2>When the docs problem is really an operating problem</h2>
+    <p class="lead-answer">A large repo with drifting docs is often a symptom of how the team runs agents, not just a search problem. trovex fixes the retrieval; if making agents reliable across a large codebase is the hard part, <a href="https://tsukumo.ch/" target="_blank" rel="noopener noreferrer">tsukumo consults on the operating model</a>, and trovex is the proof.</p>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/why-agents-pick-stale-docs/">Why do agents pick stale or outdated docs?</a></li>
+        <li><a href="/answers/source-of-truth-multi-agent-repos/">What's the source of truth for agents across repos?</a></li>
+        <li><a href="/use-cases/multi-agent-fleets/">trovex for multi-agent fleets</a></li>
+        <li><a href="/glossary/freshness-marker/">Freshness marker</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Does indexing a huge repo make lookups slow?</p>
+        <p class="faq-a">No meaningfully. trovex returns one canonical doc per query rather than scanning every package, and the index runs locally in SQLite, so lookups stay fast as the repo grows.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What does it index in a monorepo?</p>
+        <p class="faq-a">The markdown you point it at across the tree: docs, runbooks, ADRs, design notes. It returns the one current doc for a query with a path:line pointer and a freshness marker.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How much does it save on a big repo?</p>
+        <p class="faq-a">On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 queries, range 41 to 81%; we headline a conservative about 60%. More overlapping docs means more rereading removed. See trovex.dev/measure.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Serve your monorepo's agents the one current doc.</h2>
+      <p>Index the whole tree once; every query returns one canonical answer. About a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/measure">see the measured numbers →</a>
+        <a class="btn btn-ghost" href="/for/">Setup for your agent</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/use-cases/">Use cases</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

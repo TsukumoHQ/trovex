@@ -43,7 +43,9 @@
         "name": "trovex use cases",
         "itemListElement": [
           { "@type": "ListItem", "position": 1, "name": "trovex for solo developers", "url": "https://trovex.dev/use-cases/solo-developer/" },
-          { "@type": "ListItem", "position": 2, "name": "trovex for small teams", "url": "https://trovex.dev/use-cases/small-team/" }
+          { "@type": "ListItem", "position": 2, "name": "trovex for small teams", "url": "https://trovex.dev/use-cases/small-team/" },
+          { "@type": "ListItem", "position": 3, "name": "trovex for multi-agent fleets", "url": "https://trovex.dev/use-cases/multi-agent-fleets/" },
+          { "@type": "ListItem", "position": 4, "name": "trovex for large monorepos", "url": "https://trovex.dev/use-cases/large-monorepo/" }
         ]
       }
     ]
@@ -78,6 +80,8 @@
       <ul>
         <li><a href="/use-cases/solo-developer/"><strong>Solo developer</strong></a> — your agent rereads the repo every session to guess which doc is current; trovex serves the one canonical answer for about 60% fewer tokens per lookup. Local, no cloud.</li>
         <li><a href="/use-cases/small-team/"><strong>Small team</strong></a> — every dev's agent re-derives the same things and your docs drift; trovex gives the team's agents one shared point to read and write, a single source of truth with nothing to sync.</li>
+        <li><a href="/use-cases/multi-agent-fleets/"><strong>Multi-agent fleets</strong></a>: running many agents in production, each rebuilds context from a different stale slice and they drift; trovex gives the whole fleet one canonical source of truth, and the savings scale with the number of agents.</li>
+        <li><a href="/use-cases/large-monorepo/"><strong>Large monorepo</strong></a>: in a big tree the bottleneck is finding which of many overlapping docs is current; trovex returns the one canonical doc per query with a path:line pointer, not the whole tree to sift.</li>
       </ul>
     </div>
 

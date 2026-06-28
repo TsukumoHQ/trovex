@@ -116,7 +116,14 @@ if [ "$install" = 1 ]; then
 </plist>
 PLIST_EOF
   echo "→ installed LaunchAgent → $PLIST"
+  # bootout is ASYNC — on a RE-install the label can still be loaded when bootstrap
+  # runs, which fails with "Bootstrap failed: 5: Input/output error" and leaves NO
+  # service (the bootout already tore down the old one). Wait until it's gone first.
   launchctl bootout "$GUI/$LABEL" 2>/dev/null || true
+  for _ in $(seq 1 30); do
+    launchctl print "$GUI/$LABEL" >/dev/null 2>&1 || break
+    sleep 0.3
+  done
   launchctl bootstrap "$GUI" "$PLIST"
   launchctl kickstart -k "$GUI/$LABEL"
   if curl -fsS --retry 25 --retry-delay 1 --retry-all-errors -m 5 \

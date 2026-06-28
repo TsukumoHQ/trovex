@@ -1,0 +1,170 @@
+<!doctype html>
+<!-- TSU-112 SCAFFOLD. DRAFT COPY (geo placeholder from spec 6f061383). WIRE HELD: swap in tech-copywriter's prose-gated copy before merge. Structure + JSON-LD are final. TODO: when sibling pages land, re-point related/FAQ links to why-team-agents-give-inconsistent-answers + cut-team-agent-token-costs. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/roll-out-ai-agents-engineering-team/" />
+  <title>Roll out AI coding agents across your team</title>
+  <meta name="description" content="How to roll out AI coding agents across an engineering team: start with the operating problem, give agents one shared canonical source of truth, add guardrails, train operators. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/roll-out-ai-agents-engineering-team/" />
+  <meta property="og:title" content="Roll out AI coding agents across your team" />
+  <meta property="og:description" content="Start with the operating problem, not seat licenses: one shared canonical source of truth, guardrails, and trained operators. By tsukumo." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Roll out AI coding agents across your team" />
+  <meta name="twitter:description" content="The operating model for running coding agents across an engineering team. By tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Roll out AI coding agents across your team", "item": "https://trovex.dev/answers/roll-out-ai-agents-engineering-team/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Where should a team start rolling out AI coding agents?", "acceptedAnswer": { "@type": "Answer", "text": "Start with the operating problem, not seat licenses. Pick one painful workflow, give the team a shared canonical source of truth its agents read, put guardrails around what agents can touch, and train a few developers as operators. Tools come last. trovex is the shared-context layer; the rollout is context plus guardrails plus operators." } },
+          { "@type": "Question", "name": "What breaks first when agents scale across a team?", "acceptedAnswer": { "@type": "Answer", "text": "Context drift. Each developer's agent rebuilds understanding from a different, often stale slice of the repo, so they give inconsistent answers and burn tokens re-deriving what another agent already knew. A shared canonical store with freshness markers is what keeps the fleet converged." } },
+          { "@type": "Question", "name": "Should we build this ourselves or hire help?", "acceptedAnswer": { "@type": "Answer", "text": "The plumbing is open source, so the build is not the hard part; the operating model is. If your team wants to run agents in production well without months of trial and error, that is where tsukumo consults. trovex you can install today; the rollout is what the consulting covers." } },
+          { "@type": "Question", "name": "How do we measure whether it is working?", "acceptedAnswer": { "@type": "Answer", "text": "Measure tokens per task and task success, not lines of code. On our own repo, serving one canonical doc instead of rereading candidates cut a median of 69% of tokens per lookup at equal task-success across 26 queries, range 41 to 81%. We headline a conservative about 60%. Run it on your repo at trovex.dev/measure." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-28", "dateModified": "2026-06-28",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "about": { "@type": "SoftwareApplication", "@id": "https://trovex.dev/#software" },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I roll out AI coding agents across my engineering team?",
+          "text": "We want our whole engineering team using AI coding agents in production. How do we actually roll that out?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/roll-out-ai-agents-engineering-team/",
+            "text": "Start with the operating problem, not the tool. The blocker at team scale is that each agent and each developer rebuilds context from a different, often stale slice of the repo. Give the team one canonical source of truth its agents read and write back to, so knowledge compounds instead of drifting. trovex is that layer, open source and local; the rollout is context plus guardrails plus a few trained operators."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Roll out AI coding agents across your team
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-28">28 June 2026</time></p>
+    <h1>Roll out AI coding agents across your <span class="ac">team</span></h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Start with the operating problem, not the tool. The blocker at team scale is that each agent and each developer rebuilds context from a different, often stale slice of the repo. Give the team one canonical source of truth its agents read and write back to, so knowledge compounds instead of drifting. trovex is that layer, open source and local. The rollout is context plus guardrails plus a few trained operators.</p>
+    </div>
+
+    <h2>The blocker is context drift, not the model</h2>
+    <p class="lead-answer">A team that adds seats gets a copilot per developer, but every agent still rebuilds its understanding from scratch, from whichever files it happened to read. Two agents answer the same question differently because they read different, often stale docs. The fleet drifts. The fix is a shared source of truth: one canonical doc per question, marked current, that every agent on the team reads and writes back to, so what one agent learns the next one reuses instead of re-deriving.</p>
+
+    <h2>The rollout: context, guardrails, operators</h2>
+    <p class="lead-answer">Pick one painful workflow and give its agents a shared canonical context layer first. Put guardrails around what agents can touch, the same review and tests a human contributor gets, with a person at anything irreversible. Then train a few developers as operators who run the fleet rather than babysit it. Tools come last, and most are open source. trovex serves the shared context locally over MCP, so every client (Claude Code, Cursor, Windsurf, Cline) reads the same answer.</p>
+
+    <h2>Where trovex fits, and where the consulting does</h2>
+    <p class="lead-answer">trovex is the shared-context layer, and you can install it today. The hard part of a rollout is the operating model, not the plumbing. tsukumo, the studio behind trovex, runs AI agents in production and consults on getting a team there without months of trial and error. If that is what you need, here is what <a href="https://tsukumo.ch/answers/how-to-get-help-running-ai-agent-fleets">getting help running agent fleets in production</a> looks like.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Rolling agents out across a team? tsukumo, the studio behind trovex, consults on doing it well at scale. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">Related questions</div>
+      <ul>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/source-of-truth-multi-agent-repos/">What's the source of truth for agents across repos?</a></li>
+        <li><a href="/answers/canonical-context-for-agents/">What is canonical context for coding agents?</a></li>
+        <li><a href="/answers/reduce-agent-token-costs/">How do I cut my coding agent's token bill?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Where should a team start rolling out AI coding agents?</p>
+        <p class="faq-a">Start with the operating problem, not seat licenses. Pick one painful workflow, give the team a shared canonical source of truth its agents read, put guardrails around what agents can touch, and train a few developers as operators. Tools come last. trovex is the shared-context layer; the rollout is context plus guardrails plus operators.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What breaks first when agents scale across a team?</p>
+        <p class="faq-a">Context drift. Each developer's agent rebuilds understanding from a different, often stale slice of the repo, so they give inconsistent answers and burn tokens re-deriving what another agent already knew. A shared canonical store with freshness markers is what keeps the fleet converged.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Should we build this ourselves or hire help?</p>
+        <p class="faq-a">The plumbing is open source, so the build is not the hard part; the operating model is. If your team wants to run agents in production well without months of trial and error, that is where tsukumo consults. trovex you can install today; the rollout is what the consulting covers.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How do we measure whether it is working?</p>
+        <p class="faq-a">Measure tokens per task and task success, not lines of code. On our own repo, serving one canonical doc instead of rereading candidates cut a median of 69% of tokens per lookup at equal task-success across 26 queries, range 41 to 81%. We headline a conservative about 60%. Run it on your repo at trovex.dev/measure.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Give your team one source of truth.</h2>
+      <p>Index a folder of markdown and serve every agent on the team one current answer per query, in about a minute.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/measure">see the measured numbers →</a>
+        <a class="btn btn-ghost" href="/">See how it works</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>© 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

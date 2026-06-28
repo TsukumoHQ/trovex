@@ -1,0 +1,44 @@
+name: dep-audit
+
+# Scheduled supply-chain CVE scan. The per-PR audits (core.yml pip-audit, web.yml
+# npm audit) only fire on a pull_request — so a CVE disclosed against the CURRENT
+# pinned lock, with no new PR open, goes unnoticed until the next unrelated PR. This
+# closes that blind spot: it re-runs the SAME gates on a daily cron (and on manual
+# dispatch), so a post-merge disclosure is caught without anyone opening a PR.
+#
+# Not a required check and never runs on pull_request, so it can't block a merge or
+# turn the trunk red — a finding surfaces as a failed scheduled run (→ a fix PR).
+on:
+  schedule:
+    - cron: '17 7 * * *'   # daily 07:17 UTC, off the top-of-hour load
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # hatch-vcs derives the version from git tags
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: pip-audit (fail on any known vuln in the dep graph)
+        run: uv run --with pip-audit pip-audit --skip-editable
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: npm audit (fail on high+ severity)
+        run: npm audit --audit-level=high

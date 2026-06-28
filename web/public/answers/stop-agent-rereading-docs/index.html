@@ -54,6 +54,14 @@
             "text": "Give the agent a single canonical answer per query instead of raw files to sift. Index your repo's markdown once, then serve the one current doc that answers a question, a path:line pointer with a freshness marker, rather than letting it reread files to guess which is canonical. That cuts the cost to about 60% fewer tokens per lookup."
           }
         }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Won't a bigger context window stop the rereading?", "acceptedAnswer": { "@type": "Answer", "text": "No. A bigger window only lets the agent hold more at once; it still has no signal for which doc is current, so it keeps reopening candidate files and paying for them. What stops the rereading is serving one canonical doc per query with a freshness marker, not more context to sift." } },
+          { "@type": "Question", "name": "Does this work across my whole team's agents?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. trovex serves the same canonical answer to any MCP client (Claude Code, Cursor, Windsurf, Cline), so every developer's agent reads one shared source of truth instead of each rebuilding context from a different slice of the repo. The savings compound with team size." } },
+          { "@type": "Question", "name": "How much does it actually save?", "acceptedAnswer": { "@type": "Answer", "text": "On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 pre-registered queries (range 41 to 81%, LLM-judged); we publish a conservative about 60% as the headline. Run it on your repo for your own number; the full method is at trovex.dev/measure." } }
+        ]
       }
     ]
   }
@@ -113,6 +121,22 @@
         <li><a href="/vs/claude-md/">trovex vs CLAUDE.md / AGENTS.md</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Won't a bigger context window stop the rereading?</p>
+        <p class="faq-a">No. A bigger window only lets the agent hold more at once; it still has no signal for which doc is current, so it keeps reopening candidate files and paying for them. What stops the rereading is serving one canonical doc per query with a freshness marker, not more context to sift.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does this work across my whole team's agents?</p>
+        <p class="faq-a">Yes. trovex serves the same canonical answer to any MCP client (Claude Code, Cursor, Windsurf, Cline), so every developer's agent reads one shared source of truth instead of each rebuilding context from a different slice of the repo. The savings compound with team size.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How much does it actually save?</p>
+        <p class="faq-a">On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 pre-registered queries (range 41 to 81%, LLM-judged); we publish a conservative about 60% as the headline. Run it on your repo for your own number; the full method is at trovex.dev/measure.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>Stop paying to reread the repo.</h2>

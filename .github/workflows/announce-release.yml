@@ -49,24 +49,51 @@ jobs:
 
           url="https://github.com/${REPO}/releases/tag/${TAG}"
           ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          body=$(gh api "repos/${REPO}/releases/tags/${TAG}" --jq '.body' 2>/dev/null || true)
-          [ -z "$body" ] && body="New release: ${TAG}"
+          # PUBLISH-GATE: only announce a real, PUBLISHED (non-draft) GitHub release. A bare
+          # tag with no release, or a draft, → skip — never post a contentless "New release" embed.
+          rel=$(gh api "repos/${REPO}/releases/tags/${TAG}" 2>/dev/null || true)
+          if [ -z "$rel" ] || [ "$(printf '%s' "$rel" | jq -r '.draft // false')" = "true" ]; then
+            echo "No published (non-draft) release for ${TAG} — skipping." >&2
+            exit 0
+          fi
+          body=$(printf '%s' "$rel" | jq -r '.body // ""')
+          [ -z "$body" ] && body="Release ${TAG}"
 
           post() { # $1=webhook  $2=payload
             [ -z "${1:-}" ] && return 0
             curl -fsS -H "Content-Type: application/json" -d "$2" "$1" >/dev/null
           }
 
-          # --- highlights for the #release card -------------------------------
-          # Prefer markdown bullet lines; fall back to the first prose lines.
-          highlights=$(printf '%s\n' "$body" | grep -E '^[[:space:]]*[-*][[:space:]]' | head -6 || true)
-          if [ -z "$highlights" ]; then
-            highlights=$(printf '%s\n' "$body" | grep -vE '^[[:space:]]*(#|$)' | head -4 | sed 's/^/- /')
+          # --- #release TEASER: curated ≤3 user-facing highlights (copy rule trovex 1888262f) -
+          # The card is a TEASER, distinct from #changelog (full body) — was top-6 raw bullets,
+          # which read near-identical to the changelog (owner: "très similaires"). Now:
+          #  Path A: an authored "## Highlights" block wins (verbatim bullets, the voice path).
+          hl=$(printf '%s\n' "$body" | awk '
+            tolower($0) ~ /^#{1,6}[[:space:]]*highlights\b/ {grab=1; next}
+            /^#{1,6}[[:space:]]/ {grab=0}
+            grab && /^[[:space:]]*[-*][[:space:]]/ {print}')
+          #  Path B: else keep ONLY feat/perf/fix bullets (drop chore/ci/docs/test/build/refactor/
+          #  style/revert/deps + internal scopes), ordered perf → feat → fix (perf = the angle).
+          if [ -z "$hl" ]; then
+            base=$(printf '%s\n' "$body" | grep -ivE '\((ci|deps|release|build|repo|infra)\)')
+            hl=$(
+              printf '%s\n' "$base" | grep -iE '^[[:space:]]*[-*][[:space:]]+(\*\*)?perf(\([^)]*\))?:' || true
+              printf '%s\n' "$base" | grep -iE '^[[:space:]]*[-*][[:space:]]+(\*\*)?feat(\([^)]*\))?:' || true
+              printf '%s\n' "$base" | grep -iE '^[[:space:]]*[-*][[:space:]]+(\*\*)?fix(\([^)]*\))?:'  || true
+            )
           fi
-          # normalize "* " / "- " to a single bullet glyph, trim well under limits
-          highlights=$(printf '%s\n' "$highlights" | sed -E 's/^[[:space:]]*[-*][[:space:]]+/• /')
-          highlights=$(printf '%s' "$highlights" | head -c 1200)
-          [ -z "$highlights" ] && highlights="New release is out."
+          # Clean each kept line: strip bullet marker + bold + type(scope): prefix, neutralize
+          # em-dash (voice hardFail), uppercase the first letter, truncate ~100ch at a word
+          # boundary, re-bullet. Cap 3.
+          highlights=$(printf '%s\n' "$hl" \
+            | sed -E 's/^[[:space:]]*[-*][[:space:]]+//; s/\*\*//g; s/^(feat|perf|fix)(\([^)]*\))?:[[:space:]]*//I; s/ — /: /g; s/—/, /g' \
+            | awk 'NF' \
+            | awk '{ $0=toupper(substr($0,1,1)) substr($0,2);
+                     if (length($0)>100){ s=substr($0,1,97); sub(/[[:space:]][^[:space:]]*$/,"",s); $0=s "…" }
+                     print "• " $0 }' \
+            | head -3)
+          # FALLBACK: pure chore/ci/docs release → one honest line, never dumped bullets.
+          [ -z "$highlights" ] && highlights="Maintenance release under the hood. Full log → #changelog."
 
           install=$(printf '```\nuv tool upgrade trovex\n```')
 

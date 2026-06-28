@@ -139,3 +139,31 @@ def test_api_boot_owner_scope_excludes_other_owners(client):
     out = client.get("/api/boot", params={"agent": "alpha", "floor": 0.0}).json()
     titles = {p["title"] for p in out["pointers"]}
     assert titles == {"Auth incident"}
+
+
+def test_search_page_renders_states(client):
+    """The /search surface ships all four UX states. Empty (no query) prompts; a real
+    query renders the result list; and the page wires the error-state template + the
+    htmx error handlers so a failed /search/partial isn't a silent freeze."""
+    empty = client.get("/search")
+    assert empty.status_code == 200
+    assert "type a query to search" in empty.text  # empty/no-query state
+
+    hit = client.get("/search", params={"q": "current state work in flight"})
+    assert hit.status_code == 200
+    assert "result-list" in hit.text and "Auth incident" in hit.text  # results state
+
+    # Error state: the template + the three htmx error hooks must be present so a
+    # non-2xx / dropped /search/partial swaps in a retry instead of freezing.
+    assert 'id="search-error-tpl"' in empty.text
+    assert "htmx:responseError" in empty.text
+    assert "htmx:sendError" in empty.text
+
+
+def test_search_partial_renders_no_results_state(client):
+    """A scope that excludes every doc renders the no-results empty state (not a 500).
+    (knn has no score floor, so a gibberish query still returns top-k — emptiness comes
+    from a filter that matches nothing, here kind=note with no note docs indexed.)"""
+    res = client.get("/search/partial", params={"q": "current state", "kind": "note"})
+    assert res.status_code == 200
+    assert "no results" in res.text

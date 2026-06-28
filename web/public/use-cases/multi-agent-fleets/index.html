@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/use-cases/multi-agent-fleets/" />
+  <title>trovex for multi-agent fleets: one source of truth across every agent</title>
+  <meta name="description" content="Running many AI agents in production? Each rebuilds context from a different, often stale slice of the repo. trovex gives the whole fleet one canonical source of truth, served locally over MCP. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/use-cases/multi-agent-fleets/" />
+  <meta property="og:title" content="trovex for multi-agent fleets: one source of truth across every agent" />
+  <meta property="og:description" content="Many agents in production drift, each from a different stale slice of the repo. trovex gives the fleet one canonical source of truth over MCP." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="trovex for multi-agent fleets" />
+  <meta name="twitter:description" content="Many agents in production drift. trovex gives the fleet one canonical source of truth over MCP. By tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Use cases", "item": "https://trovex.dev/use-cases/" },
+          { "@type": "ListItem", "position": 3, "name": "Multi-agent fleets", "item": "https://trovex.dev/use-cases/multi-agent-fleets/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How do agents stay consistent across a fleet?", "acceptedAnswer": { "@type": "Answer", "text": "They read and write through one shared store instead of each keeping a private copy. trovex serves the same canonical doc for the same query to every agent and lets them write learnings back, so the fleet converges rather than drifts." } },
+          { "@type": "Question", "name": "Does a fleet need a server or cloud account?", "acceptedAnswer": { "@type": "Answer", "text": "No hosted account. trovex is a local-first MCP server each agent runs against your repo; no SaaS, no procurement, and the docs never leave your machines." } },
+          { "@type": "Question", "name": "How much does it save at fleet scale?", "acceptedAnswer": { "@type": "Answer", "text": "On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 queries, range 41 to 81%; we headline a conservative about 60%. The waste it removes is per-agent, so the saving grows with the fleet. See trovex.dev/measure." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-28", "dateModified": "2026-06-28",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I keep a fleet of AI agents working from one source of truth?",
+          "text": "We run many coding agents in production and they drift apart and re-derive each other's work. How do we put the whole fleet on one current source of truth?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/use-cases/multi-agent-fleets/",
+            "text": "Running many agents in production, each one rebuilds context from a different, often stale slice of the repo, so they drift and re-derive what another already worked out. trovex gives the whole fleet one canonical source of truth it reads and writes back to, served locally over MCP, so knowledge compounds instead of resetting each session. About 60% fewer tokens per lookup, and the savings scale with the number of agents."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/glossary/">Glossary</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/use-cases/">Use cases</a> / Multi-agent fleets
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-28">28 June 2026</time></p>
+    <h1>trovex for multi-agent <span class="ac">fleets</span></h1>
+
+    <div class="verdict">
+      <div class="l">The short version</div>
+      <p>Running many agents in production, each one rebuilds context from a different, often stale slice of the repo, so they drift and re-derive what another already worked out. trovex gives the whole fleet one <a href="/glossary/ssot-for-agents/">canonical source of truth</a> it reads and writes back to, served locally over MCP, so knowledge compounds instead of resetting each session. About <strong>60% fewer tokens</strong> per lookup, and the savings scale with the number of agents.</p>
+    </div>
+
+    <h2>The problem at fleet scale</h2>
+    <p class="lead-answer">A single agent rereading docs is cheap. A fleet doing it, every session, across every overlapping runbook and ADR, is a recurring bill paid in tokens and in inconsistency. Each agent retrieves whichever doc scores highest for its query and saves what it learns into private context no other agent sees, so the fleet drifts: same question, different stale answer.</p>
+
+    <h2>One shared store the fleet reads and writes</h2>
+    <p class="lead-answer">trovex indexes the docs and serves the one current doc per query with a <a href="/glossary/freshness-marker/">freshness marker</a>, and every agent writes what it learns back through a single shared point. A fix one agent finds is readable by the rest next session. No private copies to drift, nothing to sync. It runs locally over MCP, so any client (Claude Code, Cursor, Windsurf, Cline) reads the same answer. That is what <a href="/answers/why-team-agents-give-inconsistent-answers/">stopping agents giving inconsistent answers</a> actually requires.</p>
+
+    <h2>How it rolls out</h2>
+    <p class="lead-answer">Bottom-up, no procurement. Each agent runs against a local trovex server; there is no SaaS to buy and no data leaving your machines. Point the fleet at one index and the shared context is live.</p>
+
+    <h2>When running the fleet well is the hard part</h2>
+    <p class="lead-answer">Installing the tool is a one-minute step. Making a fleet reliable and consistent in production, with scoped permissions, review gates, and context that stays current, is the harder problem. trovex is open source you can run yourself; if you want hands-on help getting there, <a href="https://tsukumo.ch/" target="_blank" rel="noopener noreferrer">tsukumo consults on exactly this</a>, and trovex is the proof of how it is done. See also <a href="/answers/roll-out-ai-agents-engineering-team/">rolling agents out across a team</a>.</p>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/use-cases/small-team/">trovex for small teams</a></li>
+        <li><a href="/answers/shared-source-of-truth-multiple-agents/">How do I keep multiple agents working from the same docs?</a></li>
+        <li><a href="/answers/why-team-agents-give-inconsistent-answers/">Why do my team's agents give inconsistent answers?</a></li>
+        <li><a href="/answers/roll-out-ai-agents-engineering-team/">How do I roll out AI coding agents across my team?</a></li>
+        <li><a href="/glossary/ssot-for-agents/">SSOT for agents</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How do agents stay consistent across a fleet?</p>
+        <p class="faq-a">They read and write through one shared store instead of each keeping a private copy. trovex serves the same canonical doc for the same query to every agent and lets them write learnings back, so the fleet converges rather than drifts.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does a fleet need a server or cloud account?</p>
+        <p class="faq-a">No hosted account. trovex is a local-first MCP server each agent runs against your repo; no SaaS, no procurement, and the docs never leave your machines.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How much does it save at fleet scale?</p>
+        <p class="faq-a">On our own repo it measured a median of 69% fewer tokens per lookup at equal task-success across 26 queries, range 41 to 81%; we headline a conservative about 60%. The waste it removes is per-agent, so the saving grows with the fleet. See trovex.dev/measure.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Put your whole fleet on one source of truth.</h2>
+      <p>One shared read-and-write point for every agent. No copies to sync. About a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/measure">see the measured numbers →</a>
+        <a class="btn btn-ghost" href="/for/">Setup for your agent</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/use-cases/">Use cases</a>
+      <a href="/glossary/">Glossary</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

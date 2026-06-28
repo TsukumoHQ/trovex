@@ -51,6 +51,14 @@
             "text": "There's no single honest dollar figure: it depends on your repo size, how often agents run, and your model's pricing. But the waste is structural, the same docs reread every session, for every agent, for every teammate. The measurable part is per-lookup: serving the one canonical section is about 60% fewer tokens than reading the top stale candidates."
           }
         }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How much does the rereading actually cost?", "acceptedAnswer": { "@type": "Answer", "text": "It depends on your repo, but the pattern is the same: the agent reads several candidate files every session to find the one current answer, and most of those tokens are discarded. On our own repo, serving one canonical doc instead cut a median of 69% of tokens per lookup at equal task-success, range 41 to 81%; we headline about 60%." } },
+          { "@type": "Question", "name": "Is it cheaper to just let it reread?", "acceptedAnswer": { "@type": "Answer", "text": "Only until the bill arrives. Rereading is paid on every session, by every agent, for the same answer. Index once and serve the current doc per query, and a recurring cost becomes a one-time one." } },
+          { "@type": "Question", "name": "Does this need a cloud service?", "acceptedAnswer": { "@type": "Answer", "text": "No. trovex runs locally with vectors in SQLite and an on-device embedder, no cloud or API keys, so your files never leave your machine." } }
+        ]
       }
     ]
   }
@@ -107,6 +115,22 @@
         <li><a href="https://tsukumo.ch/proof" target="_blank" rel="noopener noreferrer">Reproducible benchmarks — the ~60% number, measured and open to re-run</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How much does the rereading actually cost?</p>
+        <p class="faq-a">It depends on your repo, but the pattern is the same: the agent reads several candidate files every session to find the one current answer, and most of those tokens are discarded. On our own repo, serving one canonical doc instead cut a median of 69% of tokens per lookup at equal task-success, range 41 to 81%; we headline about 60%.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Is it cheaper to just let it reread?</p>
+        <p class="faq-a">Only until the bill arrives. Rereading is paid on every session, by every agent, for the same answer. Index once and serve the current doc per query, and a recurring cost becomes a one-time one.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does this need a cloud service?</p>
+        <p class="faq-a">No. trovex runs locally with vectors in SQLite and an on-device embedder, no cloud or API keys, so your files never leave your machine.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>Measure what you'd stop spending.</h2>

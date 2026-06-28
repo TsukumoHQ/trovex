@@ -54,6 +54,14 @@
             "text": "Managing context for coding agents is controlling what they read — not hoping a bigger window saves you. Give each query one canonical doc with a freshness marker, read at the section level, and let every agent share one write-back path so stale and duplicate copies stop being re-read. About 60% fewer tokens per lookup."
           }
         }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Is this the same as RAG?", "acceptedAnswer": { "@type": "Answer", "text": "Related, not the same. Generic RAG retrieves the most similar chunks; it does not know which doc is current. trovex adds a freshness layer on top: it marks docs canonical, stale, or duplicate and serves the one current answer, so the agent does not reason over an outdated chunk that happened to score well." } },
+          { "@type": "Question", "name": "How do I stop the context going stale?", "acceptedAnswer": { "@type": "Answer", "text": "Let a freshness signal do it. trovex flags each doc canonical, stale, or duplicate, so the agent reads the current one; when a doc changes, the marker moves with it. You manage the docs, not the agent's memory of them." } },
+          { "@type": "Question", "name": "Can agents save what they learn back?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. trovex has a write path, so an agent records what it learned once and the next agent reads it instead of re-deriving it. The shared context grows instead of resetting each session." } }
+        ]
       }
     ]
   }
@@ -124,6 +132,22 @@
         <li><a href="https://tsukumo.ch/blog/ai-agents-in-production-the-four-operating-problems" target="_blank" rel="noopener noreferrer">Long-form: the four operating problems of running AI agents in production</a></li>
       </ul>
     </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Is this the same as RAG?</p>
+        <p class="faq-a">Related, not the same. Generic RAG retrieves the most similar chunks; it does not know which doc is current. trovex adds a freshness layer on top: it marks docs canonical, stale, or duplicate and serves the one current answer, so the agent does not reason over an outdated chunk that happened to score well.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How do I stop the context going stale?</p>
+        <p class="faq-a">Let a freshness signal do it. trovex flags each doc canonical, stale, or duplicate, so the agent reads the current one; when a doc changes, the marker moves with it. You manage the docs, not the agent's memory of them.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Can agents save what they learn back?</p>
+        <p class="faq-a">Yes. trovex has a write path, so an agent records what it learned once and the next agent reads it instead of re-deriving it. The shared context grows instead of resetting each session.</p>
+      </div>
+    </section>
 
     <div class="cta">
       <h2>Manage the read, not the window.</h2>

@@ -31,6 +31,9 @@ def test_serve_command_default_host_is_loopback():
 def test_run_server_warns_on_all_interfaces(monkeypatch, host):
     import uvicorn
 
+    # Stub build_app + uvicorn so the test never builds the real OpenAI embedder
+    # (no OPENAI_API_KEY in CI) — we only assert the bind warning, not a live app.
+    monkeypatch.setattr("trovex.server.build_app", lambda: object())
     monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
     printed: list[str] = []
     monkeypatch.setattr(cli.console, "print", lambda msg="", *a, **k: printed.append(str(msg)))
@@ -42,6 +45,7 @@ def test_run_server_warns_on_all_interfaces(monkeypatch, host):
 def test_run_server_quiet_on_loopback(monkeypatch):
     import uvicorn
 
+    monkeypatch.setattr("trovex.server.build_app", lambda: object())
     monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
     printed: list[str] = []
     monkeypatch.setattr(cli.console, "print", lambda msg="", *a, **k: printed.append(str(msg)))

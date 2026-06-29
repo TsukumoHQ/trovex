@@ -16,6 +16,19 @@ def test_load_queries_default():
     assert len(_DEFAULT_QUERIES) >= 5
 
 
+def test_version_flag():
+    """`trovex --version` / `-V` print the version and exit 0 — the first thing anyone
+    runs to verify an install. (Regression: it used to error 'No such option'.)"""
+    import re
+
+    res = runner.invoke(app, ["--version"])
+    assert res.exit_code == 0
+    assert re.match(r"^\d+\.\d+", res.output.strip()), res.output  # looks like a version
+    assert runner.invoke(app, ["-V"]).exit_code == 0
+    # no args still routes to help (no_args_is_help), not a traceback.
+    assert "Usage" in runner.invoke(app, []).output
+
+
 def test_mcp_stdio_command_registered():
     """`trovex mcp` (the stdio transport .mcpb registry bundles launch) is wired. The
     transport itself is verified manually via an initialize handshake (FastMCP runs the

@@ -1,4 +1,6 @@
 import time
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 import typer
@@ -10,6 +12,33 @@ from .search import Searcher
 
 app = typer.Typer(no_args_is_help=True, help="trovex — token-efficient .md routing")
 console = Console()
+
+
+def _version_string() -> str:
+    try:
+        return _pkg_version("trovex")
+    except PackageNotFoundError:  # source tree without an installed dist
+        return "0.0.0"
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        print(_version_string())
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Show the trovex version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    """trovex — token-efficient .md routing."""
 
 
 @app.command()

@@ -71,6 +71,48 @@ def test_bench_latency_flags_registered():
     assert {"latency", "repeats"} <= opt_names
 
 
+def test_load_labels_parses_separators_and_skips(tmp_path):
+    from trovex.cli import _load_labels
+
+    f = tmp_path / "labels.tsv"
+    f.write_text(
+        "# a comment\n"
+        "how do I install\tREADME.md\n"
+        "what is the architecture\tdocs/arch.md, ARCHITECTURE.md\n"
+        "pipe sep query|docs/p.md\n"
+        "noseparatorline\n"
+        "\n",
+        encoding="utf-8",
+    )
+    labeled = _load_labels(f)
+    assert [lq.query for lq in labeled] == [
+        "how do I install",
+        "what is the architecture",
+        "pipe sep query",
+    ]
+    # comment, blank, and the separator-less line are dropped; multi-path splits on comma.
+    assert labeled[1].relevant == ["docs/arch.md", "ARCHITECTURE.md"]
+    assert _load_labels(tmp_path / "nope.tsv") == []  # missing file → empty, no raise
+
+
+def test_bench_retrieval_flags_registered():
+    from typer.main import get_command
+
+    params = {p.name for p in get_command(app).commands["bench"].params}
+    assert {"retrieval", "labels"} <= params
+
+
+def test_bench_json_serializes_retrieval_stats():
+    import json
+
+    from trovex.cli import _bench_json
+    from trovex.retrieval_eval import RetrievalStats
+
+    s = RetrievalStats(n=2, k=3, hit_at_1=0.5, hit_at_k=1.0, mrr=0.75, recall_at_k=0.5, misses=["q"])
+    d = json.loads(_bench_json(s))
+    assert d["hit_at_1"] == 0.5 and d["misses"] == ["q"]
+
+
 def test_bench_json_serializes_latency_stats():
     import json
 

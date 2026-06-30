@@ -389,7 +389,7 @@ def bench(
     import os
     import tempfile
 
-    from .embedder import build_embedder
+    from .embedder import embedder_from_settings
 
     # Check the key BEFORE the (slow) index, so --eval without a key fails fast.
     # --latency / --retrieval never need a key (no LLM), so don't gate them.
@@ -419,7 +419,7 @@ def bench(
 
     with tempfile.TemporaryDirectory() as td:
         settings = Settings(data_dir=Path(td), sources_config_path=Path(td) / "none.yaml")
-        emb = build_embedder(settings.embed_model)
+        emb = embedder_from_settings(settings)
         stats = Indexer(settings, embedder=emb).reindex(root=repo.resolve())
         if not stats.get("added"):
             console.print(f"[yellow]No .md indexed under {repo}.[/yellow]")

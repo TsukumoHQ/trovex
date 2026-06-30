@@ -26,11 +26,18 @@ MODEL_REGISTRY = {
 
 
 def model_dim(model_name: str) -> int:
-    return MODEL_REGISTRY.get(model_name, (384, "fastembed"))[0]
+    """Registry dim, or 0 for an unknown model (caller supplies an explicit dim).
+
+    0 is a sentinel — resolved_embed_dim() falls back to the configured embed_dim,
+    so a bring-your-own model is honoured via TROVEX_EMBED_DIM rather than being
+    silently coerced to some other model's dimension.
+    """
+    return MODEL_REGISTRY.get(model_name, (0, "fastembed"))[0]
 
 
 def model_provider(model_name: str) -> str:
-    return MODEL_REGISTRY.get(model_name, (384, "fastembed"))[1]
+    """Registry provider, defaulting to local fastembed for unknown models."""
+    return MODEL_REGISTRY.get(model_name, (0, "fastembed"))[1]
 
 
 class Embedder(Protocol):
@@ -41,11 +48,13 @@ class Embedder(Protocol):
 
 
 class FastEmbedEmbedder:
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str, dim: int | None = None):
         import fastembed
 
         self.name = model_name
-        self.dim = model_dim(model_name)
+        # Bring-your-own fastembed model: honour an explicit dim, else the
+        # registry dim, else bge-small's 384 as a last resort.
+        self.dim = dim or model_dim(model_name) or 384
         self._client = fastembed.TextEmbedding(model_name=model_name)
 
     def embed(self, texts: Iterable[str]) -> Iterable[np.ndarray]:
@@ -53,7 +62,12 @@ class FastEmbedEmbedder:
 
 
 class OpenAIEmbedder:
-    """Batches calls to OpenAI's embeddings endpoint.
+    """Batches calls to an OpenAI-compatible embeddings endpoint.
+
+    The endpoint defaults to OpenAI's hosted API, but `base_url` can point at any
+    OpenAI-compatible server — including a LOCAL one (Ollama, LM Studio, vLLM,
+    LocalAI). A localhost base_url keeps embeddings fully on your machine while
+    reusing the OpenAI client + batching.
 
     The OpenAI API limit per request is 2048 input items or ~300k tokens. We
     keep batches modest (64 items) to stay well under both limits while
@@ -63,17 +77,30 @@ class OpenAIEmbedder:
     BATCH_SIZE = 64
     MAX_RETRIES = 3
 
-    def __init__(self, model_name: str, api_key: str | None = None):
+    def __init__(
+        self,
+        model_name: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        dim: int | None = None,
+    ):
         from openai import OpenAI
 
         self.name = model_name
-        self.dim = model_dim(model_name)
+        # Custom/unknown models on a compatible endpoint declare their dim explicitly.
+        self.dim = dim or model_dim(model_name)
         key = api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("TROVEX_OPENAI_KEY")
         if not key:
-            raise RuntimeError(
-                "OpenAI embedder needs a key. Set OPENAI_API_KEY env or pass api_key."
-            )
-        self._client = OpenAI(api_key=key, timeout=30)
+            if base_url:
+                # Local servers (Ollama et al.) often ignore the key — use a placeholder
+                # so the client constructs, rather than forcing a real OpenAI key.
+                key = "not-needed"
+            else:
+                raise RuntimeError(
+                    "OpenAI embedder needs a key. Set OPENAI_API_KEY env or pass api_key. "
+                    "For a local OpenAI-compatible server, set TROVEX_OPENAI_BASE_URL instead."
+                )
+        self._client = OpenAI(api_key=key, timeout=30, base_url=base_url or None)
 
     def embed(self, texts: Iterable[str]) -> Iterable[np.ndarray]:
         # Materialise to a list so we can batch + retry.
@@ -101,8 +128,30 @@ class OpenAIEmbedder:
         raise RuntimeError(f"OpenAI embed failed after retries: {last_err}")
 
 
-def build_embedder(model_name: str) -> Embedder:
-    provider = model_provider(model_name)
-    if provider == "openai":
-        return OpenAIEmbedder(model_name)
-    return FastEmbedEmbedder(model_name)
+def build_embedder(
+    model_name: str,
+    *,
+    provider: str = "",
+    base_url: str = "",
+    dim: int = 0,
+) -> Embedder:
+    """Construct an embedder for `model_name`.
+
+    provider: "openai" | "fastembed" | "" (infer from the registry; unknown → local).
+    base_url: an OpenAI-compatible endpoint (e.g. a local Ollama/LM Studio server).
+    dim: explicit vector dimension for a bring-your-own model not in the registry.
+    """
+    prov = provider or model_provider(model_name)
+    if prov == "openai":
+        return OpenAIEmbedder(model_name, base_url=base_url or None, dim=dim or None)
+    return FastEmbedEmbedder(model_name, dim=dim or None)
+
+
+def embedder_from_settings(settings) -> Embedder:
+    """Build the embedder described by a Settings object (the BYO-embedder path)."""
+    return build_embedder(
+        settings.embed_model,
+        provider=settings.embed_provider,
+        base_url=settings.openai_base_url,
+        dim=settings.resolved_embed_dim(),
+    )

@@ -173,6 +173,22 @@ The reasoning behind the ~60% number is written up in
 - sqlite-vec (vector search in SQLite)
 - Jinja2 + HTMX (UI, no build step)
 
+## Embeddings — local by default, bring your own
+
+trovex embeds locally out of the box with `BAAI/bge-small-en-v1.5` (ONNX, 384-d) —
+no API key, nothing leaves your machine. You can swap in any embedder:
+
+- **Another local model:** `TROVEX_EMBED_MODEL=<fastembed model>` plus
+  `TROVEX_EMBED_DIM=<its dimension>` if it's not a built-in.
+- **An OpenAI-compatible endpoint** (incl. a local server like Ollama, LM Studio,
+  vLLM): `TROVEX_EMBED_PROVIDER=openai`, `TROVEX_EMBED_MODEL=<model>`,
+  `TROVEX_OPENAI_BASE_URL=http://localhost:11434/v1`, `TROVEX_EMBED_DIM=<dim>`.
+  Point it at `localhost` and you stay fully local; point it at OpenAI
+  (`text-embedding-3-large`) for stronger retrieval at the cost of sending each
+  chunk to OpenAI's API.
+
+Changing the model changes the vector dimension, so switching requires a reindex.
+
 ## Public beta
 
 trovex is in public beta. Install it, run it on your repo, and if it saves you tokens a

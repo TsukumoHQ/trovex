@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     embed_model: str = "BAAI/bge-small-en-v1.5"
     embed_dim: int = 384
 
+    # Bring your own embedder. For a model NOT in the built-in registry, set
+    # TROVEX_EMBED_MODEL plus TROVEX_EMBED_DIM (the vector dimension — must match
+    # the model, else sqlite-vec knn breaks). embed_provider forces the backend
+    # when the model name can't be inferred: "fastembed" (local ONNX) or "openai"
+    # (an OpenAI-compatible HTTP endpoint). "" = infer (unknown → local fastembed).
+    embed_provider: str = ""
+    # OpenAI-compatible endpoint for the "openai" provider. Point this at a LOCAL
+    # server (Ollama / LM Studio / vLLM / LocalAI, e.g. http://localhost:11434/v1)
+    # to keep embeddings on your machine, or at a proxy. Empty = OpenAI's hosted API.
+    openai_base_url: str = ""
+
     # Indexing
     max_file_size_bytes: int = 1_000_000
     ignore_dirs: list[str] = [

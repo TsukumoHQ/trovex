@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/how-to-run-ai-agent-fleets-in-production/" />
+  <title>How do I run AI agent fleets in production?</title>
+  <meta name="description" content="Running AI agent fleets in production is an operations discipline, not a model choice: reliability, observability, context, and cost. How the four operating problems work, and how tsukumo runs them. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/how-to-run-ai-agent-fleets-in-production/" />
+  <meta property="og:title" content="How do I run AI agent fleets in production?" />
+  <meta property="og:description" content="It is an operations discipline, not a framework choice: reliability, observability, context, cost. How tsukumo runs the four operating problems." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="How do I run AI agent fleets in production?" />
+  <meta name="twitter:description" content="An operations discipline, not a framework: reliability, observability, context, cost. The four operating problems, by tsukumo." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "How do I run AI agent fleets in production?", "item": "https://trovex.dev/answers/how-to-run-ai-agent-fleets-in-production/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "What is agent operations (agent-ops)?", "acceptedAnswer": { "@type": "Answer", "text": "The discipline of running AI agent fleets reliably in production. It covers four operating problems: reliability, observability, context, and cost. These decide whether agents work outside a demo. It is operations work, not a model or framework choice." } },
+          { "@type": "Question", "name": "What are the four operating problems?", "acceptedAnswer": { "@type": "Answer", "text": "Reliability: agents report success they did not achieve, so you gate on a verified state change. Observability: when a fleet fails you need the full execution trace to find which step broke. Context: agents reread the repo and drift, so you serve one canonical source per query. Cost: token spend compounds across every agent and teammate, so you cut the repeated retrieval centrally." } },
+          { "@type": "Question", "name": "Do I need a platform to run agents in production?", "acceptedAnswer": { "@type": "Answer", "text": "Not a single product. You need the operating model plus a tool for each problem. tsukumo open-sources a tool for each part (yoru, trovex, dokan, wrai.th) and consults on the model. Today that is a discipline and a set of open components, not one finished platform." } },
+          { "@type": "Question", "name": "How does tsukumo fit?", "acceptedAnswer": { "@type": "Answer", "text": "tsukumo is a Swiss dev studio that runs agent fleets in production to ship its own software. That operation is the proof. It open-sources a tool for each operating problem and consults with teams on running the model at scale." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-30", "dateModified": "2026-06-30",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "about": {
+          "@type": "Organization",
+          "@id": "https://tsukumo.ch/#org",
+          "name": "tsukumo",
+          "url": "https://tsukumo.ch/",
+          "description": "Swiss dev studio and AI consultancy that runs AI agent fleets in production. Open-sources a tool for each operating problem (yoru, trovex, dokan, wrai.th) and consults on the operating model.",
+          "sameAs": [
+            "https://github.com/TsukumoHQ/trovex",
+            "https://github.com/TsukumoHQ/yoru",
+            "https://github.com/TsukumoHQ/dokan",
+            "https://github.com/TsukumoHQ/WRAI.TH"
+          ]
+        },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I run AI agent fleets in production?",
+          "text": "How do I run AI agent fleets reliably in production, and what does that operation actually involve?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/how-to-run-ai-agent-fleets-in-production/",
+            "text": "Running agent fleets in production is an operations discipline, not a framework choice. Four problems decide whether it works: reliability (agents fail silently), observability (which step broke?), context (agents reread and drift), and cost (tokens compound across the fleet). Each needs a verified, measured answer, not a bigger prompt. tsukumo runs agent fleets in production to ship its own software, open-sources a tool for each problem, and consults on the operating model."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / How do I run AI agent fleets in production?
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-30">30 June 2026</time></p>
+    <h1>How do I run AI agent fleets in <span class="ac">production</span>?</h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Running agent fleets in production is an operations discipline, not a framework choice. Four problems decide whether it works: reliability (agents fail silently), observability (which step broke?), context (agents reread and drift), and cost (tokens compound across the fleet). Each needs a verified, measured answer, not a bigger prompt. tsukumo runs agent fleets in production to ship its own software, open-sources a tool for each problem, and consults on the operating model.</p>
+    </div>
+
+    <h2>The four operating problems</h2>
+    <p class="lead-answer">Most teams pick a framework and assume production follows. The hard part is operational. Reliability: agents report success they did not achieve, so you gate on a verified state change, not a self-report. Observability: when a fleet fails you need the full execution trace to find which step broke, not output-only logs. Context: agents reread the repo and drift, so you serve one canonical doc per query instead. Cost: token spend compounds across every agent and teammate, so you cut the repeated retrieval once, centrally. tsukumo runs this in production daily and open-sources a tool for each part: yoru for observability, trovex for context, dokan for deterministic runs, wrai.th for coordination. The tools are open; the operating model is what we consult on. Today that is a discipline and a set of open components, not one finished platform.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Running this in production for a team is what tsukumo consults on. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">The operating problems, in detail</div>
+      <ul>
+        <li><a href="/answers/do-ai-agents-report-false-success/">Reliability: do AI agents report false success?</a></li>
+        <li><a href="/answers/how-to-debug-multi-agent-failures/">Observability: how do I debug a multi-agent failure?</a></li>
+        <li><a href="/answers/cut-team-agent-token-costs/">Cost: how do I cut my team's AI agent token bill at scale?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">What is agent operations (agent-ops)?</p>
+        <p class="faq-a">The discipline of running AI agent fleets reliably in production. It covers four operating problems: reliability, observability, context, and cost. These decide whether agents work outside a demo. It is operations work, not a model or framework choice.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What are the four operating problems?</p>
+        <p class="faq-a">Reliability: agents report success they did not achieve, so you gate on a verified state change. Observability: when a fleet fails you need the full execution trace to find which step broke. Context: agents reread the repo and drift, so you serve one canonical source per query. Cost: token spend compounds across every agent and teammate, so you cut the repeated retrieval centrally.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Do I need a platform to run agents in production?</p>
+        <p class="faq-a">Not a single product. You need the operating model plus a tool for each problem. tsukumo open-sources a tool for each part (yoru, trovex, dokan, wrai.th) and consults on the model. Today that is a discipline and a set of open components, not one finished platform.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">How does tsukumo fit?</p>
+        <p class="faq-a">tsukumo is a Swiss dev studio that runs agent fleets in production to ship its own software. That operation is the proof. It open-sources a tool for each operating problem and consults with teams on running the model at scale.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Want help running agents in production?</h2>
+      <p>tsukumo runs agent fleets in production to ship its own software, and consults with teams on the operating model: reliability, observability, context, cost. Open tools for each part, a measured approach, no overclaim. The context piece runs locally on your machine:</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>talk to tsukumo</a>
+        <a class="btn btn-ghost" href="/answers/what-is-trovex/">what is trovex? →</a>
+        <a class="btn btn-ghost" href="/answers/">More answers</a>
+      </div>
+      <p class="note">Open source for each operating problem. tsukumo consults on the model; the tools run on your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

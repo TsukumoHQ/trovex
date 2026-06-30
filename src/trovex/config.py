@@ -63,11 +63,15 @@ class Settings(BaseSettings):
     # falls back to a single source built from project_root.
     sources_config_path: Path = Path.home() / ".trovex-data" / "sources.yaml"
 
-    # Embedding — defaults to OpenAI text-embedding-3-large (3072 dims, top
-    # MTEB retrieval). Override via TROVEX_EMBED_MODEL env var; fastembed models
-    # (e.g. BAAI/bge-small-en-v1.5) work too but trail OpenAI on retrieval.
-    embed_model: str = "text-embedding-3-large"
-    embed_dim: int = 3072
+    # Embedding — defaults to a LOCAL fastembed/ONNX model (BAAI/bge-small-en-v1.5,
+    # 384 dims). This keeps trovex's promise: no API key, no cloud, your code and
+    # docs never leave your machine out of the box. To opt into OpenAI's hosted
+    # embeddings (e.g. text-embedding-3-large, 3072 dims — stronger MTEB retrieval,
+    # but sends every chunk to OpenAI and needs OPENAI_API_KEY), set
+    # TROVEX_EMBED_MODEL explicitly. Changing the model changes the vector
+    # dimension, so a switch requires a reindex.
+    embed_model: str = "BAAI/bge-small-en-v1.5"
+    embed_dim: int = 384
 
     # Indexing
     max_file_size_bytes: int = 1_000_000

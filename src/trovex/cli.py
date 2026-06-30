@@ -63,7 +63,15 @@ def index(
             console.print(f"  {exists} [cyan]{s.id}[/cyan]  {s.root}")
         stats = indexer.reindex(sources=sources)
 
-    console.print(f"[dim]Model: {settings.embed_model}[/dim]")
+    from .embedder import model_provider
+
+    _prov = model_provider(settings.embed_model)
+    _where = (
+        "local ONNX, nothing leaves your machine"
+        if _prov != "openai"
+        else "OpenAI API — chunks are sent to OpenAI"
+    )
+    console.print(f"[dim]Model: {settings.embed_model} ({_where})[/dim]")
     console.print(
         f"[green]Done in {stats['duration_sec']:.1f}s[/green]  "
         f"added={stats['added']} updated={stats['updated']} "

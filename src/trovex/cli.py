@@ -196,6 +196,30 @@ def mcp() -> None:
     mcp_server.run(transport="stdio")
 
 
+@app.command()
+def setup(
+    skill: bool = typer.Option(True, "--skill/--no-skill", help="Install the Claude Code skill."),
+    hooks: bool = typer.Option(
+        True, "--hooks/--no-hooks", help="Install + register the Active-Memory hooks."
+    ),
+    mcp: bool = typer.Option(
+        True, "--mcp/--no-mcp", help="Register the MCP server with Claude Code."
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing skill/hook files."),
+) -> None:
+    """Wire trovex into Claude Code: skill + hooks + MCP registration.
+
+    Run once after `uv tool install trovex`. Idempotent and non-destructive —
+    safe to re-run; existing files are kept unless --force, and settings.json is
+    merged, never overwritten.
+    """
+    from .setup_cmd import run_setup
+
+    code = run_setup(skill=skill, hooks=hooks, mcp=mcp, force=force)
+    if code != 0:
+        raise typer.Exit(code)
+
+
 def _print_update_notice() -> None:
     """Light, fail-safe startup notice for long-running commands. Honors the 24h
     cache and never raises — a version check must never break or slow `serve`."""

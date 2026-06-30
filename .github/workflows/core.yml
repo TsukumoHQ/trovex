@@ -48,3 +48,57 @@ jobs:
         # Security gate: the Python equivalent of `npm audit`. Non-zero exit on any
         # known advisory. --skip-editable skips the local trovex package itself.
         run: uv run --with pip-audit pip-audit --skip-editable
+
+  # Activation gate (TSU-220): prove a COLD install works from the built wheel, not
+  # the editable tree — assets ship, the console script runs, and `trovex setup`
+  # lands the skill + hooks + settings on a fresh CLAUDE_CONFIG_DIR, idempotently.
+  # This is the clean-env install contract: if a packaging or asset-bundling change
+  # breaks the one-command setup, this job fails before users hit it.
+  install-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # hatch-vcs version from tags
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: build wheel
+        run: uv build --wheel -o dist
+      - name: install the wheel into a clean venv
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install dist/*.whl
+      - name: trovex setup on a fresh CLAUDE dir (no mcp — no claude CLI in CI)
+        env:
+          CLAUDE_CONFIG_DIR: /tmp/cc
+        run: |
+          set -euo pipefail
+          /tmp/venv/bin/trovex setup --no-mcp
+          test -f /tmp/cc/skills/trovex/SKILL.md
+          test -x /tmp/cc/hooks/trovex/trovex-boot.sh
+          test -x /tmp/cc/hooks/trovex/trovex-prompt.sh
+          test -x /tmp/cc/hooks/trovex/trovex-postcompact.sh
+          python - <<'PY'
+          import json
+          d = json.load(open("/tmp/cc/settings.json"))
+          ev = d["hooks"]
+          for k in ("SessionStart", "UserPromptSubmit", "PostCompact"):
+              assert k in ev, f"missing hook event {k}"
+              cmds = [h["command"] for e in ev[k] for h in e["hooks"]]
+              assert any("trovex" in c for c in cmds), f"no trovex hook for {k}"
+          print("settings.json OK")
+          PY
+      - name: idempotent re-run (must exit 0, no duplication)
+        env:
+          CLAUDE_CONFIG_DIR: /tmp/cc
+        run: |
+          set -euo pipefail
+          /tmp/venv/bin/trovex setup --no-mcp
+          python - <<'PY'
+          import json
+          d = json.load(open("/tmp/cc/settings.json"))
+          for k in ("SessionStart", "UserPromptSubmit", "PostCompact"):
+              assert len(d["hooks"][k]) == 1, f"duplicated {k} on re-run"
+          print("idempotent OK")
+          PY

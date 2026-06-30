@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .config import Settings
-from .embedder import build_embedder
+from .embedder import embedder_from_settings
 from .indexer import Indexer
 from .search import Searcher
 from .store import SqliteStore
@@ -41,7 +41,7 @@ def get_state() -> AppState:
                 "ANONYMOUS writes (no token). Only safe on localhost / a trusted "
                 "network; set TROVEX_WRITE_TOKEN to require auth."
             )
-        embedder = build_embedder(settings.embed_model)
+        embedder = embedder_from_settings(settings)
         searcher = Searcher(settings, embedder=embedder)
         indexer = Indexer(settings, embedder=embedder)
         store = SqliteStore(settings, embedder=embedder)

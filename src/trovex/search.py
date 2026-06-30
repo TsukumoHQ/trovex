@@ -7,7 +7,7 @@ import sqlite_vec
 
 from .config import Settings
 from .db import open_db
-from .embedder import Embedder, build_embedder
+from .embedder import Embedder, embedder_from_settings
 
 STATUS_MARKER = {"canonical": "★", "plan": "◯", "stale": "✗", "duplicate": "⚠"}
 STATUS_WEIGHT = {"canonical": 1.0, "plan": 0.85, "stale": 0.5, "duplicate": 0.6}
@@ -47,7 +47,7 @@ class Searcher:
     def __init__(self, settings: Settings, embedder: Embedder | None = None):
         self.settings = settings
         self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim())
-        self.embedder = embedder or build_embedder(settings.embed_model)
+        self.embedder = embedder or embedder_from_settings(settings)
 
     def search(
         self,

@@ -27,7 +27,7 @@ import sqlite_vec
 from .chunking import chunk_markdown
 from .config import Settings
 from .db import like_escape, open_db
-from .embedder import Embedder, build_embedder
+from .embedder import Embedder, embedder_from_settings
 
 TROVEX_SOURCE_ID = "trovex"
 
@@ -79,7 +79,7 @@ class SqliteStore:
         self.db: sqlite3.Connection = open_db(
             settings.data_dir / "trovex.db", settings.resolved_embed_dim()
         )
-        self.embedder = embedder or build_embedder(settings.embed_model)
+        self.embedder = embedder or embedder_from_settings(settings)
         # Serialize writes: the sqlite connection is shared across the server's
         # worker threads, and put() is a multi-statement insert+embed+commit.
         self._lock = threading.Lock()

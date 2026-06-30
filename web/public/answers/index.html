@@ -63,7 +63,9 @@
           { "@type": "ListItem", "position": 19, "name": "Why do my team's AI agents give inconsistent answers?", "url": "https://trovex.dev/answers/why-team-agents-give-inconsistent-answers/" },
           { "@type": "ListItem", "position": 20, "name": "How do I onboard a new engineer to a large codebase with AI?", "url": "https://trovex.dev/answers/onboard-engineer-large-codebase-ai/" },
           { "@type": "ListItem", "position": 21, "name": "Can AI agents correct their own mistakes?", "url": "https://trovex.dev/answers/can-ai-agents-correct-their-own-mistakes/" },
-          { "@type": "ListItem", "position": 22, "name": "Do AI agents report false success?", "url": "https://trovex.dev/answers/do-ai-agents-report-false-success/" }
+          { "@type": "ListItem", "position": 22, "name": "Do AI agents report false success?", "url": "https://trovex.dev/answers/do-ai-agents-report-false-success/" },
+          { "@type": "ListItem", "position": 23, "name": "Which multi-agent architecture should I use?", "url": "https://trovex.dev/answers/which-multi-agent-architecture-to-use/" },
+          { "@type": "ListItem", "position": 24, "name": "How do I debug a multi-agent failure?", "url": "https://trovex.dev/answers/how-to-debug-multi-agent-failures/" }
         ]
       }
     ]
@@ -113,6 +115,8 @@
         <li><a href="/answers/onboard-engineer-large-codebase-ai/"><strong>How do I onboard a new engineer to a large codebase with AI?</strong></a>: point their agent at one canonical store that returns the current doc, not the whole repo to sift.</li>
         <li><a href="/answers/can-ai-agents-correct-their-own-mistakes/"><strong>Can AI agents correct their own mistakes?</strong></a>: not reliably alone; a 2026 study found correction rose 23 to 93 points just by relabeling the same claim as external, so the fix is a second role in the loop, not a self-check.</li>
         <li><a href="/answers/do-ai-agents-report-false-success/"><strong>Do AI agents report false success?</strong></a>: yes; a 2026 study measured false success up to 75.8% of self-assessing runs and an LLM judge caught it near coin-flip odds, so gate on a verified state change, not self-report.</li>
+        <li><a href="/answers/which-multi-agent-architecture-to-use/"><strong>Which multi-agent architecture should I use?</strong></a>: the most accurate is usually the wrong production pick; a 2026 benchmark found a hybrid kept 89% of the top-accuracy gain at 1.15x cost vs 2.3x, so pick on the cost-accuracy frontier.</li>
+        <li><a href="/answers/how-to-debug-multi-agent-failures/"><strong>How do I debug a multi-agent failure?</strong></a>: failure attribution needs the full execution trace, not output-only logs; a 2026 benchmark found full traces up to 76% more accurate at it, so capture inputs and keep runs reproducible.</li>
         <li><a href="/answers/bigger-context-window-rereading/"><strong>Does a bigger context window make rereading docs cheaper?</strong></a> — no; it raises the ceiling, not the efficiency.</li>
         <li><a href="/answers/shared-source-of-truth-multiple-agents/"><strong>How do I keep multiple AI agents working from the same docs?</strong></a> — one shared read-and-write point, no drift.</li>
         <li><a href="/answers/why-agents-pick-stale-docs/"><strong>Why do AI coding agents pick stale or outdated docs?</strong></a> — similarity ranks the closest text, not the current one; a freshness marker fixes it.</li>

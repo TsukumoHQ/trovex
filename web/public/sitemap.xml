@@ -151,6 +151,18 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://trovex.dev/answers/which-multi-agent-architecture-to-use/</loc>
+    <lastmod>2026-06-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://trovex.dev/answers/how-to-debug-multi-agent-failures/</loc>
+    <lastmod>2026-06-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://trovex.dev/answers/agent-memory-vs-rag/</loc>
     <lastmod>2026-06-23</lastmod>
     <changefreq>monthly</changefreq>

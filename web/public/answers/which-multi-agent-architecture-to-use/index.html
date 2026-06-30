@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/which-multi-agent-architecture-to-use/" />
+  <title>Which multi-agent architecture should I use?</title>
+  <meta name="description" content="The most accurate one is usually the wrong production pick. In a 2026 financial-doc benchmark a self-correcting setup took top F1 at 2.3x the cost; a hybrid kept 89% of the gain at 1.15x. Pick on the cost-accuracy frontier. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/which-multi-agent-architecture-to-use/" />
+  <meta property="og:title" content="Which multi-agent architecture should I use?" />
+  <meta property="og:description" content="Pick on the cost-accuracy frontier, not the peak. A 2026 financial-doc benchmark, arXiv:2603.22651." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Which multi-agent architecture should I use?" />
+  <meta name="twitter:description" content="Top-accuracy setup cost 2.3x; a hybrid got 89% of the gain for 1.15x. Ship the frontier, not the peak. arXiv:2603.22651." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Which multi-agent architecture should I use?", "item": "https://trovex.dev/answers/which-multi-agent-architecture-to-use/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Should I pick the most accurate multi-agent architecture?", "acceptedAnswer": { "@type": "Answer", "text": "Usually not. The top-accuracy setup is often the worst value on the cost-accuracy curve. In a 2026 financial-doc benchmark a reflexive self-correcting architecture reached the highest F1 of 0.943 but cost 2.3 times the sequential baseline, while a hybrid recovered 89% of the accuracy gain at 1.15 times the cost. Decide the accuracy you need, then buy it as cheaply as the curve allows." } },
+          { "@type": "Question", "name": "Is a self-correcting agent worth the cost?", "acceptedAnswer": { "@type": "Answer", "text": "Only if you need the last few points of accuracy and can pay for them. In the benchmark the reflexive self-correcting loop bought the top score at 2.3 times the cost. If a hybrid gets you 89% of the gain for 1.15 times, the self-correcting premium is rarely worth it outside high-stakes extraction. These figures are domain-specific; the trade-off generalizes." } },
+          { "@type": "Question", "name": "What does it mean to pick on the cost-accuracy frontier?", "acceptedAnswer": { "@type": "Answer", "text": "The frontier is the set of architectures where you cannot get more accuracy without paying more, and cannot cut cost without losing accuracy. A leaderboard ranks only by accuracy, so it points you at the peak, which is usually off the efficient frontier. Pick the cheapest architecture that clears the accuracy you actually need." } },
+          { "@type": "Question", "name": "Do these benchmark numbers apply to my use case?", "acceptedAnswer": { "@type": "Answer", "text": "Treat the exact numbers as domain-specific. They come from a financial-document extraction benchmark, so the F1 and cost multiples will differ for your task. What carries over is the shape: accuracy has a steep price near the top, and a hybrid often captures most of the gain for a fraction of the cost. Measure your own curve before committing." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-30", "dateModified": "2026-06-30",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "Which multi-agent architecture should I use?",
+          "text": "Which multi-agent architecture should I ship, and is a self-correcting agent worth the cost?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/which-multi-agent-architecture-to-use/",
+            "text": "The most accurate one is usually the wrong production pick. In a 2026 financial-doc benchmark (arXiv:2603.22651), a reflexive self-correcting architecture took the top F1 of 0.943 at 2.3 times the sequential baseline cost, while a hybrid recovered 89% of the gains at 1.15 times. Pick on the cost-accuracy frontier, not the peak. The numbers are domain-specific; the principle generalizes."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Which multi-agent architecture should I use?
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-30">30 June 2026</time></p>
+    <h1>Which multi-agent architecture should I <span class="ac">use</span>?</h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>The most accurate one is usually the wrong production pick. In a 2026 financial-doc benchmark (<a href="https://arxiv.org/abs/2603.22651" target="_blank" rel="noopener noreferrer">arXiv:2603.22651</a>), a reflexive self-correcting architecture took the top F1 of 0.943 at 2.3 times the sequential baseline cost, while a hybrid recovered 89% of the gains at 1.15 times. Pick on the cost-accuracy frontier, not the peak. The numbers are domain-specific; the principle generalizes.</p>
+    </div>
+
+    <h2>Ship the frontier, not the peak</h2>
+    <p class="lead-answer">A leaderboard ranks by accuracy alone, so it points you at the peak, which is almost always off the efficient frontier. Decide the accuracy your task actually needs, then buy it as cheaply as the curve allows. The benchmark's figures come from financial-document extraction, so your own F1 and cost multiples will differ. What carries over is the shape: the last few points of accuracy carry a steep price, and a hybrid often captures most of the gain for a fraction of the spend. Measure your own curve before you commit an architecture to production.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Choosing the architecture that fits your accuracy budget, then running it in production, is what tsukumo does. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/answers/do-ai-agents-report-false-success/">Do AI agents report false success?</a></li>
+        <li><a href="/answers/cut-team-agent-token-costs/">How do I cut my team's AI agent token bill at scale?</a></li>
+        <li><a href="/answers/token-cost-of-agent-context/">What does context cost your coding agents?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Should I pick the most accurate multi-agent architecture?</p>
+        <p class="faq-a">Usually not. The top-accuracy setup is often the worst value on the cost-accuracy curve. In a 2026 financial-doc benchmark a reflexive self-correcting architecture reached the highest F1 of 0.943 but cost 2.3 times the sequential baseline, while a hybrid recovered 89% of the accuracy gain at 1.15 times the cost. Decide the accuracy you need, then buy it as cheaply as the curve allows.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Is a self-correcting agent worth the cost?</p>
+        <p class="faq-a">Only if you need the last few points of accuracy and can pay for them. In the benchmark the reflexive self-correcting loop bought the top score at 2.3 times the cost. If a hybrid gets you 89% of the gain for 1.15 times, the self-correcting premium is rarely worth it outside high-stakes extraction. These figures are domain-specific; the trade-off generalizes.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What does it mean to pick on the cost-accuracy frontier?</p>
+        <p class="faq-a">The frontier is the set of architectures where you cannot get more accuracy without paying more, and cannot cut cost without losing accuracy. A leaderboard ranks only by accuracy, so it points you at the peak, which is usually off the efficient frontier. Pick the cheapest architecture that clears the accuracy you actually need.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Do these benchmark numbers apply to my use case?</p>
+        <p class="faq-a">Treat the exact numbers as domain-specific. They come from a financial-document extraction benchmark, so the F1 and cost multiples will differ for your task. What carries over is the shape: accuracy has a steep price near the top, and a hybrid often captures most of the gain for a fraction of the cost. Measure your own curve before committing.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Cut the context cost so you can spend it on accuracy.</h2>
+      <p>A lot of a multi-agent bill is agents rereading the same docs to re-derive context. trovex serves one canonical doc per query and cuts about 60% of the tokens per lookup, which frees budget for the accuracy you actually need. Open source, local, about a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/answers/cut-team-agent-token-costs/">cut your team's agent token bill →</a>
+        <a class="btn btn-ghost" href="/answers/">More answers</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

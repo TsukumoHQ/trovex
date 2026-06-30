@@ -66,7 +66,8 @@
           { "@type": "ListItem", "position": 22, "name": "Do AI agents report false success?", "url": "https://trovex.dev/answers/do-ai-agents-report-false-success/" },
           { "@type": "ListItem", "position": 23, "name": "Which multi-agent architecture should I use?", "url": "https://trovex.dev/answers/which-multi-agent-architecture-to-use/" },
           { "@type": "ListItem", "position": 24, "name": "How do I debug a multi-agent failure?", "url": "https://trovex.dev/answers/how-to-debug-multi-agent-failures/" },
-          { "@type": "ListItem", "position": 25, "name": "How do I run AI agent fleets in production?", "url": "https://trovex.dev/answers/how-to-run-ai-agent-fleets-in-production/" }
+          { "@type": "ListItem", "position": 25, "name": "How do I run AI agent fleets in production?", "url": "https://trovex.dev/answers/how-to-run-ai-agent-fleets-in-production/" },
+          { "@type": "ListItem", "position": 26, "name": "Is AI agent memory any good?", "url": "https://trovex.dev/answers/is-ai-agent-memory-good/" }
         ]
       }
     ]
@@ -119,6 +120,7 @@
         <li><a href="/answers/which-multi-agent-architecture-to-use/"><strong>Which multi-agent architecture should I use?</strong></a>: the most accurate is usually the wrong production pick; a 2026 benchmark found a hybrid kept 89% of the top-accuracy gain at 1.15 times the cost vs 2.3 times, so pick on the cost-accuracy frontier.</li>
         <li><a href="/answers/how-to-debug-multi-agent-failures/"><strong>How do I debug a multi-agent failure?</strong></a>: failure attribution needs the full execution trace, not output-only logs; a 2026 benchmark found full traces up to 76% more accurate at it, so capture inputs and keep runs reproducible.</li>
         <li><a href="/answers/how-to-run-ai-agent-fleets-in-production/"><strong>How do I run AI agent fleets in production?</strong></a>: it is an operations discipline, not a framework choice; four operating problems decide it (reliability, observability, context, cost), and tsukumo runs them in production and consults on the model.</li>
+        <li><a href="/answers/is-ai-agent-memory-good/"><strong>Is AI agent memory any good?</strong></a>: not in real group settings; a 2026 benchmark (GroupMemBench) found the best system scored 46.0% and a plain BM25 keyword search matched or beat most, so memory is a retrieval-quality problem, not a vector DB you bolt on.</li>
         <li><a href="/answers/bigger-context-window-rereading/"><strong>Does a bigger context window make rereading docs cheaper?</strong></a> — no; it raises the ceiling, not the efficiency.</li>
         <li><a href="/answers/shared-source-of-truth-multiple-agents/"><strong>How do I keep multiple AI agents working from the same docs?</strong></a> — one shared read-and-write point, no drift.</li>
         <li><a href="/answers/why-agents-pick-stale-docs/"><strong>Why do AI coding agents pick stale or outdated docs?</strong></a> — similarity ranks the closest text, not the current one; a freshness marker fixes it.</li>

@@ -169,6 +169,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://trovex.dev/answers/is-ai-agent-memory-good/</loc>
+    <lastmod>2026-07-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://trovex.dev/answers/agent-memory-vs-rag/</loc>
     <lastmod>2026-06-23</lastmod>
     <changefreq>monthly</changefreq>

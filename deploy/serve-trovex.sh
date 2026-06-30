@@ -61,6 +61,15 @@ if [ -f "$ENV_FILE" ]; then
   set +a
 fi
 
+# Owner/hosted opt-in to OpenAI embeddings. The SHIPPED default is local ONNX
+# (BAAI/bge-small-en-v1.5, 384 dims) so end users stay fully local with no key —
+# that is the honest out-of-box behaviour. THIS instance is a deliberately-keyed
+# BYOK demo box, so we pin the high-retrieval OpenAI model. Pinning also keeps the
+# vector dimension at 3072, matching the already-indexed ~/.trovex-data store: if
+# the default flipped to 384 on restart, knn would mismatch the existing table.
+# Override TROVEX_EMBED_MODEL upstream to change. Needs OPENAI_API_KEY (sourced above).
+export TROVEX_EMBED_MODEL="${TROVEX_EMBED_MODEL:-text-embedding-3-large}"
+
 refresh=1
 dry=0
 exec_mode=0

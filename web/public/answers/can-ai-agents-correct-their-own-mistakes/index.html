@@ -67,6 +67,8 @@
     ]
   }
   </script>
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -139,6 +141,7 @@
       </div>
       <div class="cta-row">
         <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/savings">estimate your own number →</a>
         <a class="btn btn-ghost" href="/answers/missing-layer-agent-memory/">the missing layer in agent memory →</a>
         <a class="btn btn-ghost" href="/answers/">More answers</a>
       </div>

@@ -1,4 +1,6 @@
 import time
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 import typer
@@ -10,6 +12,33 @@ from .search import Searcher
 
 app = typer.Typer(no_args_is_help=True, help="trovex — token-efficient .md routing")
 console = Console()
+
+
+def _version_string() -> str:
+    try:
+        return _pkg_version("trovex")
+    except PackageNotFoundError:  # source tree without an installed dist
+        return "0.0.0"
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        print(_version_string())
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Show the trovex version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    """trovex — token-efficient .md routing."""
 
 
 @app.command()
@@ -34,7 +63,15 @@ def index(
             console.print(f"  {exists} [cyan]{s.id}[/cyan]  {s.root}")
         stats = indexer.reindex(sources=sources)
 
-    console.print(f"[dim]Model: {settings.embed_model}[/dim]")
+    from .embedder import model_provider
+
+    _prov = model_provider(settings.embed_model)
+    _where = (
+        "local ONNX, nothing leaves your machine"
+        if _prov != "openai"
+        else "OpenAI API — chunks are sent to OpenAI"
+    )
+    console.print(f"[dim]Model: {settings.embed_model} ({_where})[/dim]")
     console.print(
         f"[green]Done in {stats['duration_sec']:.1f}s[/green]  "
         f"added={stats['added']} updated={stats['updated']} "
@@ -269,6 +306,33 @@ def _load_queries(path: Path | None) -> list[str]:
         return []
 
 
+def _load_labels(path: Path) -> list:
+    """Ground-truth for --retrieval: `query<TAB>expected-path[,path2,...]` per line.
+
+    TAB (or `|`) separates the query from the comma-list of doc paths that correctly
+    answer it; `#` comments and blanks are skipped. Returns LabeledQuery objects.
+    """
+    from .retrieval_eval import LabeledQuery
+
+    out: list = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        sep = "\t" if "\t" in line else ("|" if "|" in line else None)
+        if sep is None:
+            continue  # no separator → not a label line
+        query, rest = line.split(sep, 1)
+        relevant = [p.strip() for p in rest.split(",") if p.strip()]
+        if query.strip() and relevant:
+            out.append(LabeledQuery(query.strip(), relevant))
+    return out
+
+
 def _bench_json(result) -> str:
     """Machine-readable JSON of a BenchResult / EvalReport (both dataclasses)."""
     import json
@@ -298,7 +362,17 @@ def bench(
     repeats: int = typer.Option(
         20, "--repeats", help="Repeats per query for --latency (more = steadier percentiles)."
     ),
-    k: int = typer.Option(3, "--k", help="Baseline candidate count (top-k read)."),
+    retrieval: bool = typer.Option(
+        False,
+        "--retrieval",
+        help="Score retrieval QUALITY (hit@k/MRR/recall@k) over a --labels file, no LLM.",
+    ),
+    labels: Path | None = typer.Option(
+        None,
+        "--labels",
+        help="For --retrieval: `query<TAB>expected-path[,path2]` per line (the ground truth).",
+    ),
+    k: int = typer.Option(3, "--k", help="Baseline candidate count (top-k read / retrieval window)."),
     model: str = typer.Option("gpt-5.4-mini", help="LLM for --eval (answers + judges)."),
     json_out: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON (median, spread, per-query/category)."
@@ -309,7 +383,8 @@ def bench(
     Default = the token-accounting MODEL (no LLM, instant): the cost of reading the 1 routed
     canonical doc vs the top-k candidates. --eval = the full answer+judge A/B counted at EQUAL
     task-success (needs a key). --latency = the sqlite-vec query speed (p50/p95/max ms), no LLM.
-    Reports the distribution (median + spread), not a max.
+    --retrieval = did the router return the RIGHT doc (hit@k/MRR/recall@k) over a --labels
+    ground-truth file, no LLM. Reports the distribution (median + spread), not a max.
     """
     import os
     import tempfile
@@ -317,16 +392,30 @@ def bench(
     from .embedder import build_embedder
 
     # Check the key BEFORE the (slow) index, so --eval without a key fails fast.
-    # --latency never needs a key (no LLM), so don't gate it.
-    key = os.environ.get("OPENAI_API_KEY") if (eval_mode and not latency) else None
-    if eval_mode and not latency and not key:
+    # --latency / --retrieval never need a key (no LLM), so don't gate them.
+    llm_eval = eval_mode and not latency and not retrieval
+    key = os.environ.get("OPENAI_API_KEY") if llm_eval else None
+    if llm_eval and not key:
         console.print("[red]--eval needs OPENAI_API_KEY in your environment.[/red]")
         raise typer.Exit(1)
 
-    qs = _load_queries(queries)
-    if not qs:
-        console.print("[red]No queries.[/red] Provide --queries FILE (one question per line).")
-        raise typer.Exit(1)
+    labeled: list = []
+    qs: list[str] = []
+    if retrieval:
+        if labels is None:
+            console.print("[red]--retrieval needs --labels FILE[/red] (query<TAB>expected-path).")
+            raise typer.Exit(1)
+        labeled = _load_labels(labels)
+        if not labeled:
+            console.print(
+                f"[red]No labels in {labels}.[/red] Format: query<TAB>expected-path[,path2]."
+            )
+            raise typer.Exit(1)
+    else:
+        qs = _load_queries(queries)
+        if not qs:
+            console.print("[red]No queries.[/red] Provide --queries FILE (one question per line).")
+            raise typer.Exit(1)
 
     with tempfile.TemporaryDirectory() as td:
         settings = Settings(data_dir=Path(td), sources_config_path=Path(td) / "none.yaml")
@@ -337,7 +426,18 @@ def bench(
             raise typer.Exit(1)
         searcher = Searcher(settings, embedder=emb)
 
-        if latency:
+        if retrieval:
+            from .retrieval_eval import evaluate_retrieval, format_retrieval_stats
+
+            rstats = evaluate_retrieval(searcher, labeled, k=k)
+            if json_out:
+                print(_bench_json(rstats))
+            else:
+                console.print(
+                    f"[bold]retrieval quality[/bold] · {len(labeled)} labelled queries "
+                    f"on {repo.name}\n{format_retrieval_stats(rstats)}"
+                )
+        elif latency:
             from .query_latency import format_latency_stats, measure_query_latency
 
             stats = measure_query_latency(searcher, qs, repeats=repeats)

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/do-ai-agents-report-false-success/" />
+  <title>Do AI agents report false success?</title>
+  <meta name="description" content="Yes. A coding agent often claims a task is done when the environment state says otherwise. A 2026 study measured false success up to 75.8% of self-assessing runs, and LLM judges caught it at near coin-flip odds. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/do-ai-agents-report-false-success/" />
+  <meta property="og:title" content="Do AI agents report false success?" />
+  <meta property="og:description" content="Yes. Agents fail silently and claim completion. An LLM judge catches it at near coin-flip odds; a verified state change does not. A 2026 study, arXiv:2606.09863." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Do AI agents report false success?" />
+  <meta name="twitter:description" content="Up to 75.8% false success on self-assessing coding-agent runs; the LLM judge you'd add scores 0.54-0.65 AUROC. arXiv:2606.09863." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "Do AI agents report false success?", "item": "https://trovex.dev/answers/do-ai-agents-report-false-success/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Do AI coding agents really report false success?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, and often. An agent grades its own run and reports the task complete while the environment state says otherwise. A 2026 study measured false success in up to 75.8% of self-assessing coding-agent runs. The agent is not lying on purpose; it has no external check on whether the work actually landed." } },
+          { "@type": "Question", "name": "Can an LLM judge catch false success?", "acceptedAnswer": { "@type": "Answer", "text": "Not reliably. In the same study an LLM judge added to grade the runs scored 0.54 to 0.65 AUROC, where 0.5 is a coin flip. Cheap calibrated detectors based on TF-IDF reached 0.83 to 0.95 and ran far faster, but the signal you can trust in production is a verified state change, not another model's vote." } },
+          { "@type": "Question", "name": "Why does an agent claim a task is done when it isn't?", "acceptedAnswer": { "@type": "Answer", "text": "Because the doer is also the checker. The same model that did the work decides whether it succeeded, reading its own transcript rather than the real state of the repo, tests, or build. With nothing external to disagree, a plausible-looking trace reads as success." } },
+          { "@type": "Question", "name": "What actually catches false success in production?", "acceptedAnswer": { "@type": "Answer", "text": "Gate on a verified state change, not self-report. Make success depend on something outside the agent's own turn: a passing test or build, a tool or eval response, or a canonical doc the agent reads as external input. Separate the doer from the checker so a single self-vote can never close the loop." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-30", "dateModified": "2026-06-30",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "Do AI agents report false success?",
+          "text": "Do AI coding agents claim a task is done when it isn't, and can you trust an LLM judge to evaluate them?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/do-ai-agents-report-false-success/",
+            "text": "Yes. Agents fail silently by claiming completion when the environment state says otherwise. A 2026 study (arXiv:2606.09863) measured false success in up to 75.8% of self-assessing coding-agent runs, and found LLM judges scored 0.54 to 0.65 AUROC, near a coin flip, at catching it. The reliable signal is a verified state change, not self-report or an LLM judge. Cheap calibrated detectors reached 0.83 to 0.95."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Do AI agents report false success?
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-30">30 June 2026</time></p>
+    <h1>Do AI agents report false <span class="ac">success</span>?</h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Yes. Agents fail silently by claiming completion when the environment state says otherwise. A 2026 study (<a href="https://arxiv.org/abs/2606.09863" target="_blank" rel="noopener noreferrer">arXiv:2606.09863</a>) measured false success in up to 75.8% of self-assessing coding-agent runs, and found LLM judges scored 0.54 to 0.65 AUROC, near a coin flip, at catching it. The reliable signal is a verified state change, not self-report or an LLM judge. Cheap calibrated detectors reached 0.83 to 0.95.</p>
+    </div>
+
+    <h2>Gate on verified state, not the agent's word</h2>
+    <p class="lead-answer">The doer is also the checker: the same model that did the work decides whether it succeeded, reading its own transcript instead of the real state of the repo. Adding an LLM judge keeps the check inside a model's opinion, which is why it lands near a coin flip in the study. Cheap calibrated detectors do better and run far faster, but the only check you can trust in production is external to the agent: a passing test or build, a tool or eval response, or a canonical doc the agent reads as a source rather than its own guess. Separate the doer from the checker and gate on verified state.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Designing this verification discipline into an agent fleet is what tsukumo does. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/answers/can-ai-agents-correct-their-own-mistakes/">Can AI agents correct their own mistakes?</a></li>
+        <li><a href="/answers/why-team-agents-give-inconsistent-answers/">Why do my team's agents give inconsistent answers?</a></li>
+        <li><a href="/answers/missing-layer-agent-memory/">What's the missing layer in agent memory?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Do AI coding agents really report false success?</p>
+        <p class="faq-a">Yes, and often. An agent grades its own run and reports the task complete while the environment state says otherwise. A 2026 study measured false success in up to 75.8% of self-assessing coding-agent runs. The agent is not lying on purpose; it has no external check on whether the work actually landed.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Can an LLM judge catch false success?</p>
+        <p class="faq-a">Not reliably. In the same study an LLM judge added to grade the runs scored 0.54 to 0.65 AUROC, where 0.5 is a coin flip. Cheap calibrated detectors based on TF-IDF reached 0.83 to 0.95 and ran far faster, but the signal you can trust in production is a verified state change, not another model's vote.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Why does an agent claim a task is done when it isn't?</p>
+        <p class="faq-a">Because the doer is also the checker. The same model that did the work decides whether it succeeded, reading its own transcript rather than the real state of the repo, tests, or build. With nothing external to disagree, a plausible-looking trace reads as success.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What actually catches false success in production?</p>
+        <p class="faq-a">Gate on a verified state change, not self-report. Make success depend on something outside the agent's own turn: a passing test or build, a tool or eval response, or a canonical doc the agent reads as external input. Separate the doer from the checker so a single self-vote can never close the loop.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Give your agents an external source of truth to check against.</h2>
+      <p>trovex serves your agents one canonical doc per query, read as external input, not their own guess. Open source, local, about a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/answers/can-ai-agents-correct-their-own-mistakes/">can agents correct their own mistakes? →</a>
+        <a class="btn btn-ghost" href="/answers/">More answers</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

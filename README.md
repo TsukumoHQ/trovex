@@ -41,6 +41,7 @@ on your PATH:
 
 ```bash
 uv tool install trovex   # one-time, no clone
+trovex setup             # wire into Claude Code (skill + hooks + MCP); idempotent
 
 trovex index /path/to/your/repo        # index your markdown (~1 min)
 trovex search "how do we roll back a deploy?"   # ask, prints the tokens it saved
@@ -62,7 +63,18 @@ wired into your agent over MCP, the same numbers accumulate on the savings dashb
 
 trovex is an MCP server. Point your client at `http://localhost:8765/mcp` after `trovex serve`.
 Per-client setup (Claude Code, Cursor, Windsurf, Cline, Zed, Roo) is at
-[trovex.dev/for](https://trovex.dev/for/). For Claude Code:
+[trovex.dev/for](https://trovex.dev/for/).
+
+**Claude Code — one command.** `trovex setup` installs the Claude Code skill, the
+Active-Memory hooks, and registers the MCP server in one step (idempotent, safe to
+re-run):
+
+```bash
+trovex setup
+```
+
+Restart Claude Code afterwards so it loads the skill + hooks. Prefer to wire just the
+MCP server by hand? `trovex setup --no-skill --no-hooks`, or:
 
 ```bash
 claude mcp add --transport http trovex http://localhost:8765/mcp

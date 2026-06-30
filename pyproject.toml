@@ -80,6 +80,8 @@ raw-options = { local_scheme = "no-local-version", fallback_version = "0.0.0" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/trovex"]
+# Ship the non-Python data files (Claude Code skill + hooks) `trovex setup` installs.
+artifacts = ["src/trovex/assets/**/*"]
 
 [tool.hatch.build.targets.sdist]
 only-include = ["src/trovex"]

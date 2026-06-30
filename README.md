@@ -65,7 +65,7 @@ trovex is an MCP server. Point your client at `http://localhost:8765/mcp` after 
 Per-client setup (Claude Code, Cursor, Windsurf, Cline, Zed, Roo) is at
 [trovex.dev/for](https://trovex.dev/for/).
 
-**Claude Code — one command.** `trovex setup` installs the Claude Code skill, the
+**Claude Code, one command.** `trovex setup` installs the Claude Code skill, the
 Active-Memory hooks, and registers the MCP server in one step (idempotent, safe to
 re-run):
 
@@ -185,10 +185,10 @@ The reasoning behind the ~60% number is written up in
 - sqlite-vec (vector search in SQLite)
 - Jinja2 + HTMX (UI, no build step)
 
-## Embeddings — local by default, bring your own
+## Embeddings: local by default, bring your own
 
-trovex embeds locally out of the box with `BAAI/bge-small-en-v1.5` (ONNX, 384-d) —
-no API key, nothing leaves your machine. You can swap in any embedder:
+trovex embeds locally out of the box with `BAAI/bge-small-en-v1.5` (ONNX, 384-d).
+No API key, nothing leaves your machine. You can swap in any embedder:
 
 - **Another local model:** `TROVEX_EMBED_MODEL=<fastembed model>` plus
   `TROVEX_EMBED_DIM=<its dimension>` if it's not a built-in.

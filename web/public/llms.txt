@@ -49,6 +49,7 @@
 - [Do AI agents report false success?](https://trovex.dev/answers/do-ai-agents-report-false-success/): yes; a 2026 study (arXiv:2606.09863) measured false success up to 75.8% of self-assessing runs and an LLM judge caught it near coin-flip odds, so gate on a verified state change, not self-report.
 - [Which multi-agent architecture should I use?](https://trovex.dev/answers/which-multi-agent-architecture-to-use/): the most accurate is usually the wrong production pick; a 2026 financial-doc benchmark (arXiv:2603.22651) found a hybrid kept 89% of the top-accuracy gain at 1.15 times the cost vs 2.3 times, so pick on the cost-accuracy frontier.
 - [How do I debug a multi-agent failure?](https://trovex.dev/answers/how-to-debug-multi-agent-failures/): failure attribution needs the full execution trace, not output-only logs; a 2026 benchmark (arXiv:2604.22708) found full traces up to 76% more accurate, so capture inputs and keep runs reproducible.
+- [How do I run AI agent fleets in production?](https://trovex.dev/answers/how-to-run-ai-agent-fleets-in-production/): an operations discipline, not a framework choice; four operating problems (reliability, observability, context, cost), each with an open tsukumo tool, and tsukumo consults on the model.
 - [All answers](https://trovex.dev/answers/)
 
 ## Setup (per MCP client)

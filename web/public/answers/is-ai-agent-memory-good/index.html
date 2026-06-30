@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/is-ai-agent-memory-good/" />
+  <title>Is AI agent memory any good?</title>
+  <meta name="description" content="AI agent memory works in a 1:1 demo but collapses in real group settings. A 2026 benchmark found the best system scored 46.0% average and a plain BM25 keyword search matched or beat most. Memory is a retrieval problem. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/is-ai-agent-memory-good/" />
+  <meta property="og:title" content="Is AI agent memory any good?" />
+  <meta property="og:description" content="Best AI agent memory system scored 46.0% in a real group benchmark; a plain BM25 keyword search matched or beat most. Memory is retrieval, not storage. arXiv:2605.14498." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Is AI agent memory any good?" />
+  <meta name="twitter:description" content="Best AI agent memory system scored 46.0% in a real group benchmark; a plain BM25 keyword search matched or beat most. Memory is retrieval, not storage. arXiv:2605.14498." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "trovex",
+            "item": "https://trovex.dev/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Answers",
+            "item": "https://trovex.dev/answers/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Is AI agent memory any good?",
+            "item": "https://trovex.dev/answers/is-ai-agent-memory-good/"
+          }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is AI agent memory reliable?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Not in realistic multi-user settings. A 2026 benchmark found the best memory system scored 46.0% average accuracy, with knowledge-update at 27.1%. A 1:1 demo hides this; a real group chat exposes it."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does a vector database give agents good memory?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Not on its own. In the benchmark a plain BM25 keyword search matched or beat most vector-based memory stacks. Storing more is not the problem; returning the one correct item is. Memory is a retrieval-quality problem."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why does agent memory fail in group settings?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Multiple users, updated facts, and ambiguous terms break naive recall. The benchmark measured 27.1% on knowledge updates and 37.7% on ambiguous terms: the system returns stale or plausible-but-wrong context instead of the current right answer."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What should I spend on for agent memory?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Retrieval precision, not storage sophistication. A search that returns the right item beats a vector stack that returns plausible-but-wrong context. Treat it as a retrieval problem: rank for the correct, current answer and verify what comes back."
+            }
+          }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-07-01",
+        "dateModified": "2026-07-01",
+        "speakable": {
+          "@type": "SpeakableSpecification",
+          "cssSelector": [
+            "h1",
+            ".verdict p"
+          ]
+        },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "Is AI agent memory any good?",
+          "text": "Is AI agent memory actually good, and does a vector database give agents reliable memory?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/is-ai-agent-memory-good/",
+            "text": "Not in real group settings. A 2026 benchmark (arXiv:2605.14498) found the strongest memory system scored 46.0% average accuracy (knowledge-update 27.1%, term-ambiguity 37.7%), and a plain BM25 keyword search matched or beat most. Memory is a retrieval-quality problem, not a vector database you bolt on."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / Is AI agent memory any good?
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-07-01">1 July 2026</time></p>
+    <h1>Is AI agent memory any <span class="ac">good</span>?</h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Not in real group settings. A 2026 benchmark (<a href="https://arxiv.org/abs/2605.14498" target="_blank" rel="noopener noreferrer">arXiv:2605.14498</a>) found the strongest memory system scored 46.0% average accuracy (knowledge-update 27.1%, term-ambiguity 37.7%), and a plain BM25 keyword search matched or beat most. Memory is a retrieval-quality problem, not a vector database you bolt on.</p>
+    </div>
+
+    <h2>Memory is a retrieval problem, not a storage one</h2>
+    <p class="lead-answer">The pitch is a vector database that remembers everything. In a real group setting that is not what you get. A 2026 benchmark (GroupMemBench) put memory systems into multi-user chats and the strongest scored 46.0% average accuracy, dropping to 27.1% on knowledge updates and 37.7% on ambiguous terms. A plain BM25 keyword search matched or beat most of them. What fails is retrieval precision, returning the one right item, not storage capacity. Spend on returning the correct context, not on a fancier place to keep it. The numbers are the paper's, on its benchmark.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Designing agent memory that returns the right context, not a plausible-but-wrong one, is what tsukumo consults on. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/answers/agent-memory-vs-rag/">What's the difference between agent memory and RAG?</a></li>
+        <li><a href="/answers/missing-layer-agent-memory/">What's the missing layer in agent memory?</a></li>
+        <li><a href="/answers/why-team-agents-give-inconsistent-answers/">Why do my team's agents give inconsistent answers?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">Is AI agent memory reliable?</p>
+        <p class="faq-a">Not in realistic multi-user settings. A 2026 benchmark found the best memory system scored 46.0% average accuracy, with knowledge-update at 27.1%. A 1:1 demo hides this; a real group chat exposes it.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Does a vector database give agents good memory?</p>
+        <p class="faq-a">Not on its own. In the benchmark a plain BM25 keyword search matched or beat most vector-based memory stacks. Storing more is not the problem; returning the one correct item is. Memory is a retrieval-quality problem.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Why does agent memory fail in group settings?</p>
+        <p class="faq-a">Multiple users, updated facts, and ambiguous terms break naive recall. The benchmark measured 27.1% on knowledge updates and 37.7% on ambiguous terms: the system returns stale or plausible-but-wrong context instead of the current right answer.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What should I spend on for agent memory?</p>
+        <p class="faq-a">Retrieval precision, not storage sophistication. A search that returns the right item beats a vector stack that returns plausible-but-wrong context. Treat it as a retrieval problem: rank for the correct, current answer and verify what comes back.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Give your agents context you can trust.</h2>
+      <p>trovex serves your agents one canonical doc per query, current and inspectable, so the context they read is the right one, not a plausible guess from a vector store. Open source, local, about a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/answers/agent-memory-vs-rag/">agent memory vs RAG →</a>
+        <a class="btn btn-ghost" href="/answers/">More answers</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

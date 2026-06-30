@@ -60,7 +60,12 @@
           "name": "trovex",
           "url": "https://trovex.dev/",
           "logo": "https://trovex.dev/favicon.svg",
-          "sameAs": ["https://github.com/TsukumoHQ/trovex"],
+          "description": "trovex is the open-source canonical-context tool (MCP server and CLI) for AI coding agents, made by the Swiss dev studio tsukumo.",
+          "disambiguatingDescription": "Developer tool for AI coding agents: canonical context and token reduction. One of the tsukumo OSS suite. Not affiliated with other products that share the name trovex.",
+          "sameAs": [
+            "https://github.com/TsukumoHQ/trovex",
+            "https://pypi.org/project/trovex/"
+          ],
           "parentOrganization": { "@id": "https://tsukumo.ch/#org" }
         },
         {
@@ -68,9 +73,12 @@
           "@id": "https://tsukumo.ch/#org",
           "name": "tsukumo",
           "url": "https://tsukumo.ch/",
-          "description": "Swiss dev studio and AI consultancy that runs AI agents in production. Maker of the open trovex / WRAI.TH / yoru suite.",
+          "description": "Swiss dev studio and AI consultancy that runs AI agents in production for dev teams. Maker of the open-source suite: trovex (canonical context), yoru (agent session record and replay), dokan (deterministic job runtime), and wrai.th (agent relay).",
           "sameAs": [
             "https://trovex.dev",
+            "https://github.com/TsukumoHQ/trovex",
+            "https://github.com/TsukumoHQ/yoru",
+            "https://github.com/TsukumoHQ/dokan",
             "https://github.com/TsukumoHQ/WRAI.TH",
             "https://yoru.sh",
             "https://www.linkedin.com/company/130104119"
@@ -89,11 +97,16 @@
           "@type": "SoftwareApplication",
           "@id": "https://trovex.dev/#software",
           "name": "trovex",
+          "disambiguatingDescription": "Context and memory infrastructure for AI coding agents (MCP server and CLI), part of the tsukumo OSS suite. Not affiliated with other products named trovex.",
           "url": "https://trovex.dev/",
+          "sameAs": [
+            "https://github.com/TsukumoHQ/trovex",
+            "https://pypi.org/project/trovex/"
+          ],
           "applicationCategory": "DeveloperApplication",
           "applicationSubCategory": "Context / memory infrastructure for AI coding agents (MCP server + CLI)",
           "operatingSystem": "macOS, Linux, Windows",
-          "softwareVersion": "0.11.0",
+          "softwareVersion": "0.13.0",
           "softwareRequirements": "Python >= 3.11",
           "downloadUrl": "https://github.com/TsukumoHQ/trovex",
           "installUrl": "https://trovex.dev/#install",

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0e14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="canonical" href="https://trovex.dev/answers/how-to-debug-multi-agent-failures/" />
+  <title>How do I debug a multi-agent failure?</title>
+  <meta name="description" content="Find which agent and step caused it: failure attribution needs the full execution trace, inputs and context, not just outputs. A 2026 benchmark found full traces improve attribution accuracy up to 76% over output-only logs. By tsukumo." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="trovex" />
+  <meta property="og:url" content="https://trovex.dev/answers/how-to-debug-multi-agent-failures/" />
+  <meta property="og:title" content="How do I debug a multi-agent failure?" />
+  <meta property="og:description" content="Failure attribution needs full traces, not output-only logs. A 2026 benchmark, arXiv:2604.22708." />
+  <meta property="og:image" content="https://trovex.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="How do I debug a multi-agent failure?" />
+  <meta name="twitter:description" content="Output-only logs hide most failure causes. Full traces: up to 76% better failure attribution. arXiv:2604.22708." />
+  <meta name="twitter:image" content="https://trovex.dev/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/vs/compare.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "trovex", "item": "https://trovex.dev/" },
+          { "@type": "ListItem", "position": 2, "name": "Answers", "item": "https://trovex.dev/answers/" },
+          { "@type": "ListItem", "position": 3, "name": "How do I debug a multi-agent failure?", "item": "https://trovex.dev/answers/how-to-debug-multi-agent-failures/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "How do I find which agent caused a multi-agent failure?", "acceptedAnswer": { "@type": "Answer", "text": "That is failure attribution, and it needs the full execution trace, not just the final outputs. You have to see each step's inputs and the context it ran on to tell which agent and which turn went wrong. A 2026 benchmark found full traces improve attribution accuracy by up to 76% over output-only logs. If you only logged outputs, you usually cannot tell what broke." } },
+          { "@type": "Question", "name": "Do you need full traces to debug AI agents?", "acceptedAnswer": { "@type": "Answer", "text": "For attribution, yes. Output-only logging hides most failure causes because the wrong output often comes from a bad input or stale context two steps earlier. Capture each step's inputs and context, not just what it returned, and keep the run reproducible so you can replay the exact path that failed." } },
+          { "@type": "Question", "name": "Why isn't output logging enough to debug agents?", "acceptedAnswer": { "@type": "Answer", "text": "Because every agent in the log can report that it did its part while the system still fails. The fault is usually in what one step fed the next, which an output-only log never shows. The trace you trimmed to save space is the one that could have told you what broke." } },
+          { "@type": "Question", "name": "What makes a multi-agent trace useful for debugging?", "acceptedAnswer": { "@type": "Answer", "text": "Make it step-addressable: each step records its inputs, the context it read, and its output, so you can point at one node and replay it. Capture inputs, not just results; keep runs reproducible; and feed agents context from a canonical source you can inspect, so stale or wrong context is one less variable when you trace a failure." } }
+        ]
+      },
+      {
+        "@type": "QAPage",
+        "datePublished": "2026-06-30", "dateModified": "2026-06-30",
+        "speakable": { "@type": "SpeakableSpecification", "cssSelector": ["h1", ".verdict p"] },
+        "mainEntity": {
+          "@type": "Question",
+          "name": "How do I debug a multi-agent failure?",
+          "text": "How do I find which agent and step caused a multi-agent failure, and do I need full traces?",
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "url": "https://trovex.dev/answers/how-to-debug-multi-agent-failures/",
+            "text": "Find which agent and step caused it: that is failure attribution, and it needs the full execution trace, inputs and context, not just outputs. A 2026 benchmark (arXiv:2604.22708) found full traces improve attribution accuracy by up to 76% over output-only logs. Output-only logging hides most failure causes. Capture inputs, keep runs reproducible, and make the trace step-addressable."
+          }
+        }
+      }
+    ]
+  }
+  </script>
+  <!-- Privacy-respecting analytics (Plausible): cookieless, no banner, first-party via /js/script.js (see web/vercel.json). Auto-skips localhost. -->
+  <script defer data-domain="trovex.dev" data-api="/api/event" src="/js/script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a class="lk" href="/vs/">Compare</a>
+      <a class="lk" href="/answers/">Answers</a>
+      <a class="lk" href="/use-cases/">Use cases</a>
+      <a class="lk" href="/for/">Setup</a>
+      <a class="btn btn-ghost" href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">star on GitHub</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href="/">trovex</a> / <a href="/answers/">Answers</a> / How do I debug a multi-agent failure?
+    </nav>
+
+    <p class="updated">Updated <time datetime="2026-06-30">30 June 2026</time></p>
+    <h1>How do I debug a multi-agent <span class="ac">failure</span>?</h1>
+
+    <div class="verdict">
+      <div class="l">Short answer</div>
+      <p>Find which agent and step caused it: that is failure attribution, and it needs the full execution trace, inputs and context, not just outputs. A 2026 benchmark (<a href="https://arxiv.org/abs/2604.22708" target="_blank" rel="noopener noreferrer">arXiv:2604.22708</a>) found full traces improve attribution accuracy by up to 76% over output-only logs. Output-only logging hides most failure causes. Capture inputs, keep runs reproducible, and make the trace step-addressable.</p>
+    </div>
+
+    <h2>Capture inputs, not just outputs</h2>
+    <p class="lead-answer">Every agent in the log can report that it did its part while the system still fails. The fault usually lives in what one step fed the next, which an output-only log never shows. So log each step's inputs and the context it read, keep the run reproducible so you can replay the exact failed path, and make the trace step-addressable so you can point at one node and inspect it. One thing you can take off the table up front: feed agents context from a canonical source you can inspect, so stale or wrong context is not the variable you are chasing.</p>
+
+    <aside class="consult-band" aria-label="Consulting">
+      <p>Building this trace discipline into an agent fleet, so a failure is attributable instead of a mystery, is what tsukumo does. <a href="https://tsukumo.ch/go/call?s=answers-band" target="_blank" rel="noopener noreferrer" data-consult>Book a 30-min call →</a></p>
+    </aside>
+
+    <div class="related">
+      <div class="l">Related</div>
+      <ul>
+        <li><a href="/answers/do-ai-agents-report-false-success/">Do AI agents report false success?</a></li>
+        <li><a href="/answers/can-ai-agents-correct-their-own-mistakes/">Can AI agents correct their own mistakes?</a></li>
+        <li><a href="/answers/why-team-agents-give-inconsistent-answers/">Why do my team's agents give inconsistent answers?</a></li>
+      </ul>
+    </div>
+
+    <section class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <p class="faq-q">How do I find which agent caused a multi-agent failure?</p>
+        <p class="faq-a">That is failure attribution, and it needs the full execution trace, not just the final outputs. You have to see each step's inputs and the context it ran on to tell which agent and which turn went wrong. A 2026 benchmark found full traces improve attribution accuracy by up to 76% over output-only logs. If you only logged outputs, you usually cannot tell what broke.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Do you need full traces to debug AI agents?</p>
+        <p class="faq-a">For attribution, yes. Output-only logging hides most failure causes because the wrong output often comes from a bad input or stale context two steps earlier. Capture each step's inputs and context, not just what it returned, and keep the run reproducible so you can replay the exact path that failed.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Why isn't output logging enough to debug agents?</p>
+        <p class="faq-a">Because every agent in the log can report that it did its part while the system still fails. The fault is usually in what one step fed the next, which an output-only log never shows. The trace you trimmed to save space is the one that could have told you what broke.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">What makes a multi-agent trace useful for debugging?</p>
+        <p class="faq-a">Make it step-addressable: each step records its inputs, the context it read, and its output, so you can point at one node and replay it. Capture inputs, not just results; keep runs reproducible; and feed agents context from a canonical source you can inspect, so stale or wrong context is one less variable when you trace a failure.</p>
+      </div>
+    </section>
+
+    <div class="cta">
+      <h2>Take stale context off the list of suspects.</h2>
+      <p>trovex is not a tracing tool, but it removes one common failure source: agents acting on stale or wrong context. It serves one canonical doc per query, current and inspectable, so when you trace a failure that variable is already controlled. Open source, local, about a minute to set up.</p>
+      <div class="qs-cmd qs-aha" data-install-block>
+        <code>uv tool install trovex</code>
+        <button class="qs-copy" type="button" data-copy="uv tool install trovex" data-cmd="install" data-label="copy">copy</button>
+      </div>
+      <div class="cta-row">
+        <a class="btn" href="/#start">get started</a>
+        <a class="btn btn-ghost" href="/answers/why-team-agents-give-inconsistent-answers/">why agents give inconsistent answers →</a>
+        <a class="btn btn-ghost" href="/answers/">More answers</a>
+      </div>
+      <p class="note">Open source. No cloud, no API keys. Your docs never leave your machine.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="/">trovex</a>
+      <span class="sp"></span>
+      <a href="/answers/">Answers</a>
+      <a href="/vs/">Compare</a>
+      <a href="https://github.com/TsukumoHQ/trovex" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <small>&copy; 2026 trovex</small>
+    </div>
+  </footer>
+  <script defer src="/copy-track.js"></script>
+</body>
+</html>

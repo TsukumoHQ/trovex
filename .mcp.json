@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agent-relay": {
+      "type": "http",
+      "url": "http://localhost:8090/mcp?tools=full"
+    }
+  }
+}

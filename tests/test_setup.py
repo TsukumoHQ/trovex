@@ -11,7 +11,7 @@ import stat
 
 import pytest
 
-from trovex.setup_cmd import HOOK_EVENTS, run_setup
+from trovex.setup_cmd import HOOK_EVENTS, configure_mcp, run_setup
 
 
 @pytest.fixture
@@ -40,11 +40,7 @@ def test_setup_lands_skill_hooks_and_settings(claude_dir):
 
     settings = _read_settings(claude_dir)
     for event in HOOK_EVENTS:
-        cmds = [
-            hk["command"]
-            for entry in settings["hooks"][event]
-            for hk in entry["hooks"]
-        ]
+        cmds = [hk["command"] for entry in settings["hooks"][event] for hk in entry["hooks"]]
         assert any("trovex" in c for c in cmds)
 
 
@@ -61,9 +57,7 @@ def test_setup_preserves_existing_settings(claude_dir):
     claude_dir.mkdir(parents=True)
     existing = {
         "model": "opus",
-        "hooks": {
-            "SessionStart": [{"hooks": [{"type": "command", "command": "/my/own/hook.sh"}]}]
-        },
+        "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "/my/own/hook.sh"}]}]},
     }
     (claude_dir / "settings.json").write_text(json.dumps(existing))
 
@@ -91,3 +85,25 @@ def test_setup_no_hooks_flag(claude_dir):
     assert (claude_dir / "skills" / "trovex" / "SKILL.md").is_file()
     assert not (claude_dir / "hooks" / "trovex").exists()
     assert not (claude_dir / "settings.json").exists()
+
+
+def test_configure_mcp_registers_at_user_scope(monkeypatch):
+    """MCP must register once for every project, not just the cwd — claude's
+    default scope is `local` (keyed to $PWD), which strands the server."""
+    calls = []
+
+    class _Result:
+        returncode = 0
+        stdout = ""  # `mcp list` shows no trovex → we proceed to add
+
+    def fake_run(argv, *a, **k):
+        calls.append(argv)
+        return _Result()
+
+    monkeypatch.setattr("trovex.setup_cmd.shutil.which", lambda _: "/fake/claude")
+    monkeypatch.setattr("trovex.setup_cmd.subprocess.run", fake_run)
+
+    configure_mcp()
+
+    add = next(c for c in calls if "add" in c)
+    assert add[add.index("--scope") + 1] == "user"

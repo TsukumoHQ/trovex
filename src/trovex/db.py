@@ -36,9 +36,24 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     # 30s: the reindex writes the whole corpus in one ~25s transaction; a chunk
     # write or backfill racing it must wait that out, not fail at 5s.
     conn.execute("PRAGMA busy_timeout=30000")
-    conn.enable_load_extension(True)
-    sqlite_vec.load(conn)
-    conn.enable_load_extension(False)
+    try:
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+    except AttributeError as e:
+        # Some Python builds (common with pyenv / Homebrew on macOS) compile
+        # sqlite3 without loadable-extension support, so `enable_load_extension`
+        # is missing and trovex can't load sqlite-vec (its vector index). Fail
+        # with an actionable fix instead of a raw traceback on the first index.
+        raise RuntimeError(
+            "This Python's sqlite3 was built without loadable-extension support, "
+            "so trovex can't load sqlite-vec (its vector index). Common with some "
+            "pyenv/Homebrew Python builds.\n"
+            "Fix — reinstall trovex on uv's managed Python, which has it:\n"
+            "  uv tool install --force --python-preference only-managed trovex\n"
+            "or rebuild your Python with "
+            "PYTHON_CONFIGURE_OPTS='--enable-loadable-sqlite-extensions'."
+        ) from e
     # Migration must run BEFORE _init_schema: CREATE TABLE IF NOT EXISTS won't
     # add columns to a pre-existing legacy docs table; we need to recreate it.
     _migrate_to_multi_source(conn)

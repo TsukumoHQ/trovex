@@ -106,16 +106,14 @@ def merge_settings(hook_dir: Path) -> None:
 
 def configure_mcp() -> None:
     """Register the MCP server with Claude Code (idempotent), or print the command."""
-    manual = f"claude mcp add --transport http trovex {MCP_URL}"
+    manual = f"claude mcp add --scope user --transport http trovex {MCP_URL}"
     claude = shutil.which("claude")
     if not claude:
         console.print("[yellow]mcp:[/yellow]      `claude` CLI not on PATH. Register manually:")
         console.print(f"            [cyan]{manual}[/cyan]")
         return
     try:
-        listed = subprocess.run(
-            [claude, "mcp", "list"], capture_output=True, text=True, timeout=15
-        )
+        listed = subprocess.run([claude, "mcp", "list"], capture_output=True, text=True, timeout=15)
         if "trovex" in (listed.stdout or ""):
             console.print("[dim]mcp:      already registered with Claude Code[/dim]")
             return
@@ -123,7 +121,10 @@ def configure_mcp() -> None:
         pass
     try:
         r = subprocess.run(
-            [claude, "mcp", "add", "--transport", "http", "trovex", MCP_URL],
+            # --scope user: register once for every project, not just the cwd
+            # (claude's default scope is `local`, which is keyed to $PWD — a dev
+            # who runs `trovex setup` in one dir wouldn't see trovex elsewhere).
+            [claude, "mcp", "add", "--scope", "user", "--transport", "http", "trovex", MCP_URL],
             capture_output=True,
             text=True,
             timeout=30,
@@ -138,7 +139,9 @@ def configure_mcp() -> None:
         console.print(f"            [cyan]{manual}[/cyan]")
 
 
-def run_setup(*, skill: bool = True, hooks: bool = True, mcp: bool = True, force: bool = False) -> int:
+def run_setup(
+    *, skill: bool = True, hooks: bool = True, mcp: bool = True, force: bool = False
+) -> int:
     """Wire trovex into Claude Code. Returns a process exit code (0 = ok)."""
     console.print("[bold]trovex setup[/bold] — wiring trovex into Claude Code\n")
     try:

@@ -1,14 +1,56 @@
+import hashlib
 import logging
 import secrets
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 log = logging.getLogger("trovex.config")
 
 WRITE_TOKEN_FILE = ".write_token"
+LEGACY_DATA_DIR = Path.home() / ".trovex-data"
+
+
+def _git_worktree_root(cwd: Path | None = None) -> Path | None:
+    """Return the current Git worktree root, or None outside Git.
+
+    Git worktrees share a common .git directory, so keying trovex storage from
+    Git internals accidentally centralizes every checkout on one index. Use the
+    concrete worktree path instead so agents/tools running in sibling worktrees
+    get isolated indexes by default.
+    """
+    here = cwd or Path.cwd()
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(here), "rev-parse", "--show-toplevel"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return Path(out).resolve() if out else None
+
+
+def default_data_dir() -> Path:
+    """Default to a per-worktree index when invoked from a Git checkout.
+
+    TROVEX_DATA_DIR still overrides this through pydantic-settings. Outside Git,
+    keep the historical ~/.trovex-data path for existing non-repo deployments.
+    """
+    root = _git_worktree_root()
+    if root is None:
+        return LEGACY_DATA_DIR
+    digest = hashlib.sha256(str(root).encode("utf-8", errors="replace")).hexdigest()[:12]
+    return LEGACY_DATA_DIR / "worktrees" / f"{root.name}-{digest}"
+
+
+def default_sources_config_path() -> Path:
+    return default_data_dir() / "sources.yaml"
 
 
 @dataclass(frozen=True)
@@ -37,7 +79,7 @@ class Settings(BaseSettings):
 
     # Paths
     project_root: Path = Path.cwd()  # legacy, kept for back-compat
-    data_dir: Path = Path.home() / ".trovex-data"
+    data_dir: Path = Field(default_factory=default_data_dir)
 
     # Shared write token (env TROVEX_WRITE_TOKEN). When empty, the effective token
     # is resolved at boot by `resolve_write_token()` — which, by default, auto-
@@ -61,7 +103,7 @@ class Settings(BaseSettings):
 
     # Multi-source: file at sources_config_path takes precedence; otherwise
     # falls back to a single source built from project_root.
-    sources_config_path: Path = Path.home() / ".trovex-data" / "sources.yaml"
+    sources_config_path: Path = Field(default_factory=default_sources_config_path)
 
     # Embedding — defaults to a LOCAL fastembed/ONNX model (BAAI/bge-small-en-v1.5,
     # 384 dims). This keeps trovex's promise: no API key, no cloud, your code and
@@ -144,6 +186,13 @@ class Settings(BaseSettings):
 
     # Ranking weights
     freshness_half_life_days: float = 90.0
+
+    def model_post_init(self, __context) -> None:
+        # Keep the sources file beside an overridden TROVEX_DATA_DIR unless the
+        # caller explicitly supplied TROVEX_SOURCES_CONFIG_PATH. This avoids a
+        # hidden central sources.yaml when the index itself is worktree-local.
+        if "sources_config_path" not in self.model_fields_set:
+            self.sources_config_path = self.data_dir / "sources.yaml"
 
     def resolved_embed_dim(self) -> int:
         """Return the dim matching embed_model, fall back to declared embed_dim."""

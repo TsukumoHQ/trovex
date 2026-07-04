@@ -41,7 +41,7 @@ export type EventName =
   | 'waitlist_submitted'
   | 'newsletter_signup'
   // canonical cross-property suite→agency funnel (funnel-event-taxonomy memory).
-  // trovex = reference impl; wrai.th/yoru inherit this module + fire the same events.
+  // trovex = reference impl; wraith/yoru inherit this module + fire the same events.
   | 'oss_surface_view'
   | 'oss_adopt'
   | 'suite_to_agency_click'

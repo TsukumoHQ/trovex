@@ -1,0 +1,33 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "trovex",
+    "identifier": "trovex.dev",
+    "documentationUrl": "https://github.com/TsukumoHQ/trovex#readme",
+    "logoUrl": "https://trovex.dev/wordmark.png"
+  },
+  "entries": [
+    {
+      "identifier": "urn:ai:trovex.dev:context:trovex-mcp",
+      "displayName": "trovex MCP server",
+      "type": "application/mcp-server+json",
+      "url": "https://raw.githubusercontent.com/TsukumoHQ/trovex/main/server.json",
+      "description": "Serves coding agents one canonical doc per query instead of rereading the repo. About 60% fewer tokens per doc lookup. Runs locally (SQLite + ONNX, no cloud); open source, by tsukumo.",
+      "tags": ["context", "docs", "mcp-server", "coding-agents", "token-cost", "local-first", "source-of-truth"],
+      "capabilities": ["trovex", "trovex_read", "trovex_search", "trovex_write", "trovex_tag", "trovex_delete"],
+      "representativeQueries": [
+        "stop my coding agent rereading the same docs every session",
+        "serve my repo docs to coding agents over MCP",
+        "cut my coding agent's token costs on doc lookups",
+        "keep multiple agents working from one current source of truth"
+      ],
+      "updatedAt": "2026-07-04T00:00:00Z",
+      "metadata": {
+        "publisher": "tsukumo",
+        "publisherUrl": "https://tsukumo.ch",
+        "install": "uvx trovex mcp",
+        "registry": "io.github.TsukumoHQ/trovex (Official MCP Registry)"
+      }
+    }
+  ]
+}

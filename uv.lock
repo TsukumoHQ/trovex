@@ -780,7 +780,7 @@ wheels = [
 
 [[package]]
 name = "mcp"
-version = "1.27.1"
+version = "1.28.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -798,9 +798,9 @@ dependencies = [
     { name = "typing-inspection" },
     { name = "uvicorn", marker = "sys_platform != 'emscripten'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/83/d1efe7c2980d8a3afa476f4e3d42d53dd54c0ab94c27bee5d755b45c8b73/mcp-1.27.1.tar.gz", hash = "sha256:0f47e1820f8f8f941466b39749eb1d1839a04caddca2bc60e9d46e8a99914924", size = 608458, upload-time = "2026-05-08T16:50:12.601Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/77/9450b8f251a13affb6281997d0523c4615f8a8b35d0b21ff30db3a5aac9d/mcp-1.28.1.tar.gz", hash = "sha256:d51e36a5f5644faea4f85ea649bfffa6bc6c26770d42798ad6a3de3d2ba69683", size = 638501, upload-time = "2026-06-26T12:57:29.093Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/73/42d9596facebdb533b7f0b86c1b0364ef350d1f8ba78b1052e8a58b48b65/mcp-1.27.1-py3-none-any.whl", hash = "sha256:1af3c4203b329430fde7a87b4fcb6392a041f5cb851fd68fc674016ab4e7c06f", size = 216260, upload-time = "2026-05-08T16:50:10.547Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/5e/d118fce19f87a2e7d8101c35c8ae0ec289098a4df0ff244cec23e415aca0/mcp-1.28.1-py3-none-any.whl", hash = "sha256:2726bca5e7193f61c5dde8b12500a6de2d9acf6d1a1c0be9e8c2e706437991df", size = 222620, upload-time = "2026-06-26T12:57:27.218Z" },
 ]
 
 [[package]]
@@ -814,11 +814,11 @@ wheels = [
 
 [[package]]
 name = "mistune"
-version = "3.2.1"
+version = "3.3.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ca/84/620cc3f7e3adf6f5067e10f4dbae71295d8f9e16d5d3f9ef97c40f2f592c/mistune-3.2.1.tar.gz", hash = "sha256:7c8e5501d38bac1582e067e46c8343f17d57ea1aaa735823f3aba1fd59c88a28", size = 98003, upload-time = "2026-05-03T14:33:22.312Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/92/328a294a6de83bacb95bed01f04e0eaff4e3616ee359fc821a5dfc539b02/mistune-3.3.4.tar.gz", hash = "sha256:58b5c96d6fcb61190dfe5fae498d2b2065f99cf61e9649418fd54cf1ada86dfe", size = 121426, upload-time = "2026-07-22T05:22:30.89Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/7f/a946aa4f8752b37102b41e64dca18a1976ac705c3a0d1dfe74d820a02552/mistune-3.2.1-py3-none-any.whl", hash = "sha256:78cdb0ba5e938053ccf63651b352508d2efa9411dc8810bfb05f2dc5140c0048", size = 53749, upload-time = "2026-05-03T14:33:20.551Z" },
+    { url = "https://files.pythonhosted.org/packages/77/e4/288365afae98953bc01de09f686f40d8ee84578135aa7767d5d4e60b5278/mistune-3.3.4-py3-none-any.whl", hash = "sha256:ee015381e955e370962968befe1d729ab60fafb6a715ac6751763fbce38c8d4a", size = 66862, upload-time = "2026-07-22T05:22:29.419Z" },
 ]
 
 [[package]]
@@ -1815,7 +1815,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "mcp", specifier = ">=1.2" },
-    { name = "mistune", specifier = ">=3.0" },
+    { name = "mistune", specifier = ">=3.3.0" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "openai", specifier = ">=1.50" },
     { name = "pydantic", specifier = ">=2.9" },

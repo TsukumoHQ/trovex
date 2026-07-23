@@ -7,6 +7,8 @@ import logging
 import os
 import secrets
 import time
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -15,6 +17,14 @@ from .state import get_state
 from .store import TROVEX_SOURCE_ID, extract_section, replace_section
 
 log = logging.getLogger("trovex.mcp")
+
+
+def _version_string() -> str:
+    try:
+        return _pkg_version("trovex")
+    except PackageNotFoundError:  # source tree without an installed dist
+        return "0.0.0"
+
 
 # Allow override via env so the same code runs locally and behind Traefik.
 EXTRA_HOSTS = [h for h in os.environ.get("TROVEX_MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
@@ -54,6 +64,10 @@ mcp = FastMCP(
         ],
     ),
 )
+# FastMCP (mcp==1.27.1) has no `version` kwarg — it forwards name/instructions to the
+# low-level Server but leaves `version` unset, which falls back to the `mcp` package's
+# own version for serverInfo.version. Set it directly so clients see trovex's version.
+mcp._mcp_server.version = _version_string()
 
 
 @mcp.tool()

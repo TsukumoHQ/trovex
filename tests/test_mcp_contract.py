@@ -83,3 +83,13 @@ def test_client_facing_defaults_pinned():
     assert _params("trovex_search")["kind"].default == ""
     assert _params("trovex_read")["full"].default is False
     assert _params("trovex_write")["force"].default is False
+
+
+def test_server_info_reports_trovex_version():
+    """serverInfo.version must be trovex's own version, not the `mcp` SDK's — FastMCP
+    has no `version` kwarg, so this only holds because mcp_app sets it explicitly on
+    the low-level server (see _version_string() + the assignment after FastMCP())."""
+    import importlib.metadata
+
+    assert mcp_app.mcp._mcp_server.version == mcp_app._version_string()
+    assert mcp_app.mcp._mcp_server.version != importlib.metadata.version("mcp")

@@ -215,7 +215,11 @@ export default async function handler(req, res) {
     // Ping the owner on a genuinely new signup (skip known duplicates). Best-effort
     // + env-gated; awaited (a plain Vercel function may freeze after the response).
     // A failed notify never affects the stored signup.
-    if (sb !== 'duplicate') {
+    // channel:'healthcheck' is the reserved synthetic source (same convention as the
+    // /go?s=healthcheck shortlink probes) — the dokan funnel-health canary (script 439)
+    // POSTs a real signup to prove the write path end-to-end, then deletes the row. It
+    // must never page the owner or create a Twenty CRM contact on every run.
+    if (sb !== 'duplicate' && attribution.channel !== 'healthcheck') {
       const { source, utm } = buildSourceAndUtm(attribution)
       // Best-effort side-effects: owner ping + Twenty CRM pipeline mirror.
       // Neither affects the stored signup; run concurrently so latency doesn't

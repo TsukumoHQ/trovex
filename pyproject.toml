@@ -57,6 +57,7 @@ dev = [
 constraint-dependencies = [
     "pyjwt>=2.13.0",        # PYSEC-2026-175..179
     "cryptography>=48.0.1", # GHSA-537c-gmf6-5ccf
+    "pillow>=12.3.0",       # PYSEC-2026-2253..3454, CVE-2026-54058/59198/59200/59204
 ]
 
 [project.scripts]

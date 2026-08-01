@@ -181,3 +181,31 @@ def test_search_partial_renders_no_results_state(client):
     res = client.get("/search/partial", params={"q": "current state", "kind": "note"})
     assert res.status_code == 200
     assert "no results" in res.text
+
+
+def test_api_search_scopes_by_source(client):
+    """A project must be able to restrict retrieval to its own source. Without
+    this, an agent on a 14-doc project searches all 2800 docs in the store and
+    gets buried by whichever project is biggest."""
+    q = "current state resume work"
+
+    unscoped = client.get("/api/search", params={"q": q, "limit": 5}).json()
+    assert len(unscoped) > 0
+
+    # The fixture's docs are all trovex-owned; 'code' is the configured file
+    # source and holds nothing.
+    owned = client.get("/api/search", params={"q": q, "limit": 5, "source": "trovex"}).json()
+    assert {r["source_id"] for r in owned} == {"trovex"}
+    assert len(owned) == len(unscoped)
+
+    empty = client.get("/api/search", params={"q": q, "limit": 5, "source": "code"}).json()
+    assert empty == []
+
+
+def test_api_search_rejects_unknown_source(client):
+    """A typo'd source must fail loudly. Silently filtering everything away
+    would read as 'trovex found nothing' and send the caller debugging the
+    wrong thing."""
+    r = client.get("/api/search", params={"q": "anything", "source": "nope"})
+    assert r.status_code == 422
+    assert "unknown source" in r.json()["error"]

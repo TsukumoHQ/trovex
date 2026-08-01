@@ -680,6 +680,11 @@ def build_app() -> FastAPI:
             description="filter to one doc kind, e.g. 'record'",
         ),
         tags: str | None = Query(None, description="comma-separated tags; any-match scope"),
+        source: str | None = Query(
+            None,
+            max_length=MAX_TAG_LEN,
+            description="restrict to one source id (project); omit to search all",
+        ),
     ) -> JSONResponse:
         state = get_state()
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
@@ -690,7 +695,15 @@ def build_app() -> FastAPI:
             for t in tag_list:
                 if len(t) > MAX_TAG_LEN or not _re_tag.match(t):
                     return JSONResponse({"error": f"invalid tag: {_redact(t)!r}"}, status_code=422)
-        results = state.searcher.search(q, limit=limit, kind=kind, tags=tag_list)
+        if source:
+            known = {s.id for s in state.settings.load_sources()} | {"trovex"}
+            if source not in known:
+                return JSONResponse(
+                    {"error": f"unknown source: {_redact(source)!r}"}, status_code=422
+                )
+        results = state.searcher.search(
+            q, limit=limit, kind=kind, tags=tag_list, source_ids=[source] if source else None
+        )
         return JSONResponse(
             [
                 {
@@ -703,6 +716,9 @@ def build_app() -> FastAPI:
                     "marker": r.marker,
                     "tokens_est": r.tokens_est,
                     "size_bytes": r.size_bytes,
+                    # Which project a hit came from — needed to make sense of an
+                    # unscoped result set, and to know what to pass as `source`.
+                    "source_id": r.source_id,
                 }
                 for r in results
             ]

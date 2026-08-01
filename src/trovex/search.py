@@ -9,6 +9,10 @@ from .config import Settings
 from .db import open_db
 from .embedder import Embedder, embedder_from_settings
 
+# Ceiling for the widened-pool retry below: a scoped query that comes back short
+# rescans the index, and this bounds that scan on a large store.
+MAX_KNN_POOL = 20_000
+
 STATUS_MARKER = {"canonical": "★", "plan": "◯", "stale": "✗", "duplicate": "⚠"}
 STATUS_WEIGHT = {"canonical": 1.0, "plan": 0.85, "stale": 0.5, "duplicate": 0.6}
 
@@ -62,7 +66,8 @@ class Searcher:
         query_emb = next(self.embedder.embed([query]))
         # Widen the knn pool when metadata filters are on, so post-filtering
         # doesn't starve a tightly-scoped query (e.g. owner/<agent> + kind=record).
-        pool = max(limit * 5, 50) if (kind or tags) else limit * 5
+        filtered = bool(kind or tags or source_ids)
+        pool = max(limit * 5, 50) if filtered else limit * 5
         sql = """SELECT d.path, d.title, d.mtime, d.status, d.size_bytes,
                         d.tokens_est, d.absolute_path, d.source_id, v.distance
                  FROM vec_docs v
@@ -82,6 +87,17 @@ class Searcher:
             params.extend(tags)
         sql += " ORDER BY v.distance"
         rows = self.db.execute(sql, params).fetchall()
+
+        # sqlite-vec applies `k` before these filters, so a scope that is a thin
+        # slice of a skewed corpus gets squeezed out of the pool before it is
+        # ever filtered — a 14-doc project inside a 2831-doc store returned zero
+        # hits at pool=50 because the dominant source filled every slot. When a
+        # filtered query comes back short, retry once over the whole index.
+        if filtered and len(rows) < limit:
+            total = self.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+            if total > pool:
+                params[1] = min(total, MAX_KNN_POOL)
+                rows = self.db.execute(sql, params).fetchall()
 
         now = time.time()
         half_life = self.settings.freshness_half_life_days

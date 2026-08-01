@@ -193,7 +193,7 @@ def multi_source_client(tmp_path):
 
 
 def test_api_reindex_indexes_every_configured_source(multi_source_client):
-    client, store = multi_source_client
+    client, _store = multi_source_client
     resp = client.post("/api/reindex", headers={"X-TROVEX-Write-Token": "test-token"})
     assert resp.status_code == 200
     stats = resp.json()

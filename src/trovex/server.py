@@ -715,7 +715,9 @@ def build_app() -> FastAPI:
         agent: str = Query(..., min_length=1, max_length=MAX_TAG_LEN),
         k: int = Query(5, ge=1, le=search_max),
         floor: float = Query(0.62, ge=0.0, le=1.0),
-        q: str | None = Query(None, max_length=500, description="override the generic boot query"),
+        # No max_length: the prompt hook sends whole prompts here, and a 422 is a
+        # silently-dropped recall. boot_pointers truncates to BOOT_Q_MAX instead.
+        q: str | None = Query(None, description="override the generic boot query"),
     ) -> JSONResponse:
         """Active-memory recall: the agent's own records as a ~80-token pointer
         pack (RFC 330e7d43, step 2). Read-only; empty when nothing clears

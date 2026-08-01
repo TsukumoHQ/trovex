@@ -134,6 +134,20 @@ def test_api_boot_unknown_agent_is_empty(client):
     assert out["tokens_est"] == 0
 
 
+def test_api_boot_truncates_long_query_instead_of_rejecting(client):
+    """Regression: the prompt hook passes the WHOLE user prompt as q=, and long
+    agent preambles used to 422 — a silently-dropped recall, since the hook
+    swallows the error. Over-long queries must truncate and still recall."""
+    from trovex.boot import BOOT_Q_MAX
+
+    long_q = "COO handoff current state " + ("filler padding text " * 3000)
+    assert len(long_q) > BOOT_Q_MAX * 10
+
+    resp = client.get("/api/boot", params={"agent": "coo", "floor": 0.0, "q": long_q})
+    assert resp.status_code == 200
+    assert [p["title"] for p in resp.json()["pointers"]] == ["COO handoff"]
+
+
 def test_api_boot_owner_scope_excludes_other_owners(client):
     """Boot is owner-scoped: alpha never sees beta's or coo's records."""
     out = client.get("/api/boot", params={"agent": "alpha", "floor": 0.0}).json()

@@ -85,9 +85,18 @@ def _migrate_embed_dim(conn: sqlite3.Connection, embed_dim: int) -> None:
     current_dim = int(m.group(1))
     if current_dim == embed_dim:
         return
-    # Dim mismatch — wipe the vec table and clear any docs that referenced it
-    # (forces a full reindex). docs.content_hash will be 0 → all rows re-embed.
+    # Dim mismatch — wipe BOTH vec tables and clear any docs that referenced
+    # them (forces a full reindex). docs.content_hash '' → all rows re-embed.
+    # vec_chunks must go too: leaving it at the old dim made every
+    # trovex_write crash with "Expected N dimensions" after an embedder
+    # switch (found live). The chunk rows themselves are re-derived from doc
+    # content, so they are dropped alongside their embeddings.
     conn.execute("DROP TABLE IF EXISTS vec_docs")
+    conn.execute("DROP TABLE IF EXISTS vec_chunks")
+    # DROP, not DELETE: this runs before _init_schema, and a legacy db can
+    # carry vec_docs without the chunk tables. _init_schema recreates all.
+    conn.execute("DROP TABLE IF EXISTS chunks_fts")
+    conn.execute("DROP TABLE IF EXISTS chunks")
     conn.execute("UPDATE docs SET content_hash = ''")
     conn.commit()
 

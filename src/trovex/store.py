@@ -25,11 +25,11 @@ from typing import Protocol
 import sqlite_vec
 
 from .chunking import chunk_markdown
-from .config import Settings
+from .config import RESERVED_SOURCE_ID, Settings
 from .db import like_escape, open_db
 from .embedder import Embedder, embedder_from_settings
 
-TROVEX_SOURCE_ID = "trovex"
+TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 TITLE_RE = re.compile(r"^\s*#\s+(.+)$", re.MULTILINE)

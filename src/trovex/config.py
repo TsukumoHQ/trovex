@@ -10,6 +10,13 @@ log = logging.getLogger("trovex.config")
 
 WRITE_TOKEN_FILE = ".write_token"
 
+# The trovex-owned store's virtual source id (store.TROVEX_SOURCE_ID aliases
+# this — defined here so config never imports store). A CONFIGURED source must
+# never claim it: the indexer's vanished-file purge would then treat every
+# owned doc (receipts, verdicts, captures) as a deleted file of that source
+# and silently destroy the store on each reindex. Found live.
+RESERVED_SOURCE_ID = "trovex"
+
 
 @dataclass(frozen=True)
 class Source:
@@ -187,6 +194,18 @@ class Settings(BaseSettings):
                 data = yaml.safe_load(f) or {}
             raw = data.get("sources", [])
             sources = [Source.from_dict(d) for d in raw if d.get("root")]
+            # The owned store's virtual source id is not configurable: a
+            # source named "trovex" would make the indexer purge every owned
+            # doc as a vanished file. Drop it loudly, keep the rest.
+            reserved = [s for s in sources if s.id == RESERVED_SOURCE_ID]
+            if reserved:
+                log.warning(
+                    "sources.yaml: source id %r is reserved for the trovex-owned "
+                    "store and was skipped — rename it (e.g. %r)",
+                    RESERVED_SOURCE_ID,
+                    f"{RESERVED_SOURCE_ID}-repo",
+                )
+                sources = [s for s in sources if s.id != RESERVED_SOURCE_ID]
             if sources:
                 return sources
         # Single-source fallback (legacy behaviour).

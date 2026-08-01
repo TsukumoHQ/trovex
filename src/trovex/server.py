@@ -793,7 +793,12 @@ def build_app() -> FastAPI:
         if not _write_authorized(request):
             return _unauthorized()
         state = get_state()
-        stats = state.indexer.reindex(state.settings.project_root)
+        # No explicit root: an explicit root forces the single-source
+        # fallback and silently skips every configured source (found live —
+        # a freshly added source never indexed over HTTP). Bonus: with no
+        # root, load_sources() re-reads sources.yaml on every call, so a
+        # source added after boot is picked up without a restart.
+        stats = state.indexer.reindex()
         return JSONResponse(stats)
 
     @app.get("/healthz", response_class=PlainTextResponse)

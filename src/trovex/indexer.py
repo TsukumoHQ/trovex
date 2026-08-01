@@ -7,7 +7,7 @@ from pathlib import Path
 
 import sqlite_vec
 
-from .config import Settings, Source
+from .config import RESERVED_SOURCE_ID, Settings, Source
 from .db import open_db
 from .embedder import Embedder, embedder_from_settings
 
@@ -90,6 +90,10 @@ class Indexer:
                 sources = [Source(id="code", label=root.name, root=root.resolve())]
             else:
                 sources = self.settings.load_sources()
+        # Defense in depth (load_sources already filters): scanning a source
+        # whose id equals the owned store's virtual id would purge every
+        # owned doc as a "vanished file" of that source.
+        sources = [s for s in sources if s.id != RESERVED_SOURCE_ID]
 
         start = time.time()
         agg = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0, "by_source": []}

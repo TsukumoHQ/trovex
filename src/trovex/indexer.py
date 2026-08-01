@@ -8,7 +8,7 @@ from pathlib import Path
 import sqlite_vec
 
 from .config import RESERVED_SOURCE_ID, Settings, Source
-from .db import open_db
+from .db import delete_doc_cascade, open_db
 from .embedder import Embedder, embedder_from_settings
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
@@ -197,8 +197,10 @@ class Indexer:
                         (source.id, old_path),
                     ).fetchone()
                     if old:
-                        self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (old["id"],))
-                        self.db.execute("DELETE FROM docs WHERE id = ?", (old["id"],))
+                        # Full cascade, not just vec_docs+docs: the bare delete
+                        # left this doc's tags and versions behind on every
+                        # reindex that saw a file disappear.
+                        delete_doc_cascade(self.db, old["id"])
                         s_removed += 1
 
             agg["added"] += s_added

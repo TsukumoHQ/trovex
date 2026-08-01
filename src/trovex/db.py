@@ -60,7 +60,75 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_embed_dim(conn, embed_dim)
     _migrate_add_trovex_store_columns(conn)
     _init_schema(conn, embed_dim)
+    _migrate_purge_orphans(conn)
     return conn
+
+
+# Child tables keyed by docs.id. They all declare ON DELETE CASCADE, but the
+# `foreign_keys` pragma is OFF (SQLite's default) and cannot simply be turned
+# on: docs.dup_of_id references docs(id) with NO ACTION, and ~2/3 of a real
+# store's rows carry one, so enforcement would turn every reindex delete of a
+# dup-target into "FOREIGN KEY constraint failed". Giving dup_of_id ON DELETE
+# SET NULL needs a full docs rebuild — until then, deletes cascade by hand and
+# this tuple is the single list both delete paths walk.
+_DOC_CHILD_TABLES = ("doc_tags", "doc_versions", "collection_docs")
+
+
+def delete_doc_cascade(conn: sqlite3.Connection, doc_id: int) -> None:
+    """Delete a doc and every row that hangs off it. Does NOT commit.
+
+    Both delete paths (the store's trovex-owned docs and the indexer's
+    file-backed ones) must go through here: deleting from `docs` alone leaks
+    tags and versions, which is how a live store reached 2395 orphaned
+    doc_tags rows and 648 orphaned doc_versions.
+    """
+    for c in conn.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
+        conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+        conn.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
+    conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+    for table in _DOC_CHILD_TABLES:
+        conn.execute(
+            f"DELETE FROM {table} WHERE doc_id = ?",  # sql-safe: fixed literal tuple
+            (doc_id,),
+        )
+    conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
+    conn.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
+
+
+def _migrate_purge_orphans(conn: sqlite3.Connection) -> None:
+    """Drop child rows whose doc is already gone (idempotent).
+
+    One-time cleanup of the rows the pre-cascade delete paths left behind. Runs
+    on open and is a no-op once clean, so it costs one indexed anti-join per
+    child table.
+    """
+    if not conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='docs'"
+    ).fetchone():
+        return
+    existing = {
+        r["name"]
+        for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    }
+    for table in _DOC_CHILD_TABLES:
+        if table not in existing:
+            continue
+        conn.execute(
+            # sql-safe: table from the fixed literal tuple above, never user input
+            f"DELETE FROM {table} WHERE doc_id NOT IN (SELECT id FROM docs)"
+        )
+    # Chunks carry their own children keyed by chunk id, so they can't be swept
+    # with a bare DELETE — drop the embeddings and FTS rows first.
+    if "chunks" in existing:
+        orphans = conn.execute(
+            "SELECT id FROM chunks WHERE doc_id NOT IN (SELECT id FROM docs)"
+        ).fetchall()
+        for c in orphans:
+            conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
+            conn.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
+        if orphans:
+            conn.execute("DELETE FROM chunks WHERE doc_id NOT IN (SELECT id FROM docs)")
+    conn.commit()
 
 
 def _migrate_embed_dim(conn: sqlite3.Connection, embed_dim: int) -> None:

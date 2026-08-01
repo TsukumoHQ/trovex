@@ -26,7 +26,7 @@ import sqlite_vec
 
 from .chunking import chunk_markdown
 from .config import RESERVED_SOURCE_ID, Settings
-from .db import like_escape, open_db
+from .db import delete_doc_cascade, like_escape, open_db
 from .embedder import Embedder, embedder_from_settings
 
 TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
@@ -300,15 +300,9 @@ class SqliteStore:
             return True
 
     def _delete_cascade_locked(self, doc_id: int) -> None:
-        """Proper cascade delete by internal id — no orphan vec rows. Caller holds _lock
-        and commits. Removes chunks (+ vec_chunks/chunks_fts), doc_versions, vec_docs, docs."""
-        for c in self.db.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
-            self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
-            self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
-        self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
-        self.db.execute("DELETE FROM doc_versions WHERE doc_id = ?", (doc_id,))
-        self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
-        self.db.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
+        """Proper cascade delete by internal id — no orphan rows. Caller holds _lock
+        and commits. See db.delete_doc_cascade for what gets removed."""
+        delete_doc_cascade(self.db, doc_id)
 
     def put_batch(self, items: list[dict], *, embed_chunks: bool = False) -> list[str]:
         """Bulk insert/update + a single batched embed call. For migrations + import.

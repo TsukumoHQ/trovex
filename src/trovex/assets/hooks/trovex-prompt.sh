@@ -9,7 +9,11 @@ TROVEX="${TROVEX_URL:-http://127.0.0.1:8765}"
 AGENT="${TROVEX_AGENT:-$(basename "$PWD")}"
 PROMPT="$(jq -r '.prompt // empty' <<<"$(cat)")"
 [ -n "$PROMPT" ] || exit 0
-Q="$(jq -rn --arg p "$PROMPT" '$p|@uri')"
+# Slice to 2000 chars before encoding: matches the server's BOOT_Q_MAX (the
+# encoder's 512-token window), and keeps a 36k-char prompt out of the URL.
+# jq slices by codepoint, so this can't split a multi-byte char the way
+# `head -c` would.
+Q="$(jq -rn --arg p "$PROMPT" '$p[0:2000]|@uri')"
 render="$(curl -fsS -m 2 "$TROVEX/api/boot?agent=$AGENT&k=3&q=$Q" 2>/dev/null \
           | jq -r '.render // empty')" || exit 0
 [ -z "$render" ] && exit 0

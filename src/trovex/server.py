@@ -680,6 +680,11 @@ def build_app() -> FastAPI:
             description="filter to one doc kind, e.g. 'record'",
         ),
         tags: str | None = Query(None, description="comma-separated tags; any-match scope"),
+        source: str | None = Query(
+            None,
+            max_length=MAX_TAG_LEN,
+            description="restrict to one source id (project); omit to search all",
+        ),
     ) -> JSONResponse:
         state = get_state()
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
@@ -690,7 +695,15 @@ def build_app() -> FastAPI:
             for t in tag_list:
                 if len(t) > MAX_TAG_LEN or not _re_tag.match(t):
                     return JSONResponse({"error": f"invalid tag: {_redact(t)!r}"}, status_code=422)
-        results = state.searcher.search(q, limit=limit, kind=kind, tags=tag_list)
+        if source:
+            known = {s.id for s in state.settings.load_sources()} | {"trovex"}
+            if source not in known:
+                return JSONResponse(
+                    {"error": f"unknown source: {_redact(source)!r}"}, status_code=422
+                )
+        results = state.searcher.search(
+            q, limit=limit, kind=kind, tags=tag_list, source_ids=[source] if source else None
+        )
         return JSONResponse(
             [
                 {
@@ -703,6 +716,9 @@ def build_app() -> FastAPI:
                     "marker": r.marker,
                     "tokens_est": r.tokens_est,
                     "size_bytes": r.size_bytes,
+                    # Which project a hit came from — needed to make sense of an
+                    # unscoped result set, and to know what to pass as `source`.
+                    "source_id": r.source_id,
                 }
                 for r in results
             ]
@@ -715,7 +731,9 @@ def build_app() -> FastAPI:
         agent: str = Query(..., min_length=1, max_length=MAX_TAG_LEN),
         k: int = Query(5, ge=1, le=search_max),
         floor: float = Query(0.62, ge=0.0, le=1.0),
-        q: str | None = Query(None, max_length=500, description="override the generic boot query"),
+        # No max_length: the prompt hook sends whole prompts here, and a 422 is a
+        # silently-dropped recall. boot_pointers truncates to BOOT_Q_MAX instead.
+        q: str | None = Query(None, description="override the generic boot query"),
     ) -> JSONResponse:
         """Active-memory recall: the agent's own records as a ~80-token pointer
         pack (RFC 330e7d43, step 2). Read-only; empty when nothing clears
@@ -793,7 +811,12 @@ def build_app() -> FastAPI:
         if not _write_authorized(request):
             return _unauthorized()
         state = get_state()
-        stats = state.indexer.reindex(state.settings.project_root)
+        # No explicit root: an explicit root forces the single-source
+        # fallback and silently skips every configured source (found live —
+        # a freshly added source never indexed over HTTP). Bonus: with no
+        # root, load_sources() re-reads sources.yaml on every call, so a
+        # source added after boot is picked up without a restart.
+        stats = state.indexer.reindex()
         return JSONResponse(stats)
 
     @app.get("/healthz", response_class=PlainTextResponse)

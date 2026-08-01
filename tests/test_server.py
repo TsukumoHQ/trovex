@@ -134,6 +134,20 @@ def test_api_boot_unknown_agent_is_empty(client):
     assert out["tokens_est"] == 0
 
 
+def test_api_boot_truncates_long_query_instead_of_rejecting(client):
+    """Regression: the prompt hook passes the WHOLE user prompt as q=, and long
+    agent preambles used to 422 — a silently-dropped recall, since the hook
+    swallows the error. Over-long queries must truncate and still recall."""
+    from trovex.boot import BOOT_Q_MAX
+
+    long_q = "COO handoff current state " + ("filler padding text " * 3000)
+    assert len(long_q) > BOOT_Q_MAX * 10
+
+    resp = client.get("/api/boot", params={"agent": "coo", "floor": 0.0, "q": long_q})
+    assert resp.status_code == 200
+    assert [p["title"] for p in resp.json()["pointers"]] == ["COO handoff"]
+
+
 def test_api_boot_owner_scope_excludes_other_owners(client):
     """Boot is owner-scoped: alpha never sees beta's or coo's records."""
     out = client.get("/api/boot", params={"agent": "alpha", "floor": 0.0}).json()
@@ -167,3 +181,31 @@ def test_search_partial_renders_no_results_state(client):
     res = client.get("/search/partial", params={"q": "current state", "kind": "note"})
     assert res.status_code == 200
     assert "no results" in res.text
+
+
+def test_api_search_scopes_by_source(client):
+    """A project must be able to restrict retrieval to its own source. Without
+    this, an agent on a 14-doc project searches all 2800 docs in the store and
+    gets buried by whichever project is biggest."""
+    q = "current state resume work"
+
+    unscoped = client.get("/api/search", params={"q": q, "limit": 5}).json()
+    assert len(unscoped) > 0
+
+    # The fixture's docs are all trovex-owned; 'code' is the configured file
+    # source and holds nothing.
+    owned = client.get("/api/search", params={"q": q, "limit": 5, "source": "trovex"}).json()
+    assert {r["source_id"] for r in owned} == {"trovex"}
+    assert len(owned) == len(unscoped)
+
+    empty = client.get("/api/search", params={"q": q, "limit": 5, "source": "code"}).json()
+    assert empty == []
+
+
+def test_api_search_rejects_unknown_source(client):
+    """A typo'd source must fail loudly. Silently filtering everything away
+    would read as 'trovex found nothing' and send the caller debugging the
+    wrong thing."""
+    r = client.get("/api/search", params={"q": "anything", "source": "nope"})
+    assert r.status_code == 422
+    assert "unknown source" in r.json()["error"]

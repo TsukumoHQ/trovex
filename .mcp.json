@@ -3,6 +3,10 @@
     "agent-relay": {
       "type": "http",
       "url": "http://localhost:8090/mcp?tools=full"
+    },
+    "trovex": {
+      "type": "http",
+      "url": "http://127.0.0.1:8765/mcp/?source=trovex-repo"
     }
   }
 }

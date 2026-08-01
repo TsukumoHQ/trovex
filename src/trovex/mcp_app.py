@@ -70,8 +70,51 @@ mcp = FastMCP(
 mcp._mcp_server.version = _version_string()
 
 
+ALL_SOURCES = "*"
+
+
+def _pinned_source() -> str:
+    """The `?source=` a project pinned on the MCP server URL in its .mcp.json.
+
+    One trovex daemon serves every project, and it cannot see a client's cwd —
+    so the scope has to travel with the connection. The client re-POSTs to the
+    same URL for every call, so the param is present on each request, not just
+    on initialize.
+    """
+    try:
+        request = mcp.get_context().request_context.request
+    except (LookupError, ValueError, AttributeError):
+        return ""  # stdio transport, or called outside a request
+    try:
+        return (request.query_params.get("source") or "").strip()
+    except AttributeError:
+        return ""
+
+
+def _resolve_source(explicit: str = "") -> str | None:
+    """Which source_id to scope a query to, or None for the whole store.
+
+    Precedence: an explicit tool argument beats the URL pin, so an agent can
+    reach across projects on purpose; `*` at either level means all sources.
+    Nothing set anywhere keeps the original behaviour — search everything.
+
+    Raises ValueError on an unknown id. A typo'd .mcp.json would otherwise
+    filter every result away and read as "trovex found nothing".
+    """
+    value = (explicit or "").strip() or _pinned_source()
+    if not value or value == ALL_SOURCES:
+        return None
+    known = {s.id for s in get_state().settings.load_sources()} | {TROVEX_SOURCE_ID}
+    if value not in known:
+        raise ValueError(
+            f"unknown source {value!r} — configured: {', '.join(sorted(known))} "
+            f"(or {ALL_SOURCES!r} for all)"
+        )
+    return value
+
+
 @mcp.tool()
-def trovex(q: str, summary: bool = False) -> str:
+def trovex(q: str, summary: bool = False, source: str = "") -> str:
     """Find canonical docs for a query.
 
     Returns one result per line: path + marker (★ canonical, ◯ plan,
@@ -81,6 +124,8 @@ def trovex(q: str, summary: bool = False) -> str:
     Args:
         q: Natural-language query (e.g. "auth JWT", "deployment cron").
         summary: Include a 50-word extract per result. Default False.
+        source: Restrict to one source id (project). Defaults to whatever this
+            connection is pinned to; pass "*" to search every source.
     """
     import time as _time
 
@@ -93,12 +138,20 @@ def trovex(q: str, summary: bool = False) -> str:
     db = state.searcher.db
     t0 = _time.perf_counter()
 
+    try:
+        scope = _resolve_source(source)
+    except ValueError as e:
+        return f"(error: {e})"
+
     # Exact-match query cache: a repeat against an unchanged corpus skips the
     # candidate search + the LLM reranker (the cost driver). corpus_version is
     # derived from the docs table, so any trovex_write/delete auto-invalidates.
     # Token metrics are replayed so usage/savings dashboards stay accurate.
+    # The scope is part of the key: without it the first project to run a query
+    # would serve its results to every other project asking the same thing.
     ver = _qcache.corpus_version(db)
-    cached = _qcache.get(db, q, summary, ver)
+    cache_key = q if scope is None else f"{q}\x00source={scope}"
+    cached = _qcache.get(db, cache_key, summary, ver)
     if cached is not None:
         try:
             log_query(
@@ -116,7 +169,7 @@ def trovex(q: str, summary: bool = False) -> str:
         return cached["output"]
 
     # Fetch a wider candidate pool when reranking is possible.
-    candidates = state.searcher.search(q, limit=20)
+    candidates = state.searcher.search(q, limit=20, source_ids=[scope] if scope else None)
     pre_rerank_paths = [c.path for c in candidates]
     results, rerank_info = maybe_rerank(q, candidates, limit=5)
 
@@ -158,7 +211,15 @@ def trovex(q: str, summary: bool = False) -> str:
         log.debug("log_query failed", exc_info=True)
     try:
         _qcache.put(
-            db, q, summary, ver, out, len(results), would_have_read, top_tokens, resp_tokens
+            db,
+            cache_key,
+            summary,
+            ver,
+            out,
+            len(results),
+            would_have_read,
+            top_tokens,
+            resp_tokens,
         )
     except Exception:  # noqa: BLE001 — cache is best-effort, never block the tool
         log.debug("query-cache put failed", exc_info=True)
@@ -357,7 +418,13 @@ def trovex_read(query: str = "", doc_id: str = "", section: str = "", full: bool
 
 
 @mcp.tool()
-def trovex_search(query: str, k: int = 5, kind: str = "", tags: list[str] | None = None) -> str:
+def trovex_search(
+    query: str,
+    k: int = 5,
+    kind: str = "",
+    tags: list[str] | None = None,
+    source: str = "",
+) -> str:
     """Search the store — returns the top K relevant *passages* (not whole docs).
 
     The RAG entry point: chunk-level retrieval with metadata filters. Each result
@@ -368,13 +435,20 @@ def trovex_search(query: str, k: int = 5, kind: str = "", tags: list[str] | None
         k: How many passages (default 5).
         kind: Filter by kind (e.g. "record").
         tags: List of tags to filter by (any-match). A comma string also works.
+        source: Restrict to one source id (project). Defaults to whatever this
+            connection is pinned to; pass "*" to search every source.
     """
     state = get_state()
     t0 = time.perf_counter()
+    try:
+        scope = _resolve_source(source)
+    except ValueError as e:
+        return f"(error: {e})"
     hits = state.store.search_chunks(
         query,
         limit=k,
         kind=kind or None,
+        source=scope,
         tags=_as_taglist(tags) or None,
     )
     out = "\n\n———\n\n".join(_fmt_passage(h) for h in hits) if hits else "(no results)"

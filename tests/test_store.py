@@ -411,3 +411,91 @@ def test_concurrent_puts_are_serialized(store):
     assert len(set(ids)) == 20
     assert len(store.list_docs()) == 20
     assert store.get("id-7").content == "# Doc 7\n\nbody 7"
+
+
+def test_delete_cascades_tags_and_versions(store):
+    """Deleting a doc must take its tags and version history with it. The bare
+    `DELETE FROM docs` this replaces left both behind — a live store had 2395
+    orphaned doc_tags rows and 648 orphaned doc_versions from that path."""
+    tags = ["owner/alpha", "domain/x"]
+    ext_id = store.put("# Cascade\n\nbody one", kind="record", tags=tags)
+    # Overwrite → a doc_versions row. Tags are re-passed because put() replaces
+    # the whole tag set rather than merging into it.
+    store.put("# Cascade\n\nbody two", ext_id=ext_id, kind="record", tags=tags)
+    doc_id = store.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()["id"]
+
+    assert (
+        store.db.execute("SELECT count(*) c FROM doc_tags WHERE doc_id = ?", (doc_id,)).fetchone()[
+            "c"
+        ]
+        > 0
+    )
+    assert (
+        store.db.execute(
+            "SELECT count(*) c FROM doc_versions WHERE doc_id = ?", (doc_id,)
+        ).fetchone()["c"]
+        > 0
+    )
+
+    assert store.delete(ext_id) is True
+
+    for table in ("doc_tags", "doc_versions", "chunks"):
+        left = store.db.execute(
+            f"SELECT count(*) c FROM {table} WHERE doc_id = ?", (doc_id,)
+        ).fetchone()["c"]
+        assert left == 0, f"{table} kept {left} orphan row(s) after delete"
+
+
+def test_open_db_purges_pre_existing_orphans(settings, store):
+    """Rows orphaned by the old delete path are swept on open — idempotently."""
+    from trovex.db import open_db
+
+    ext_id = store.put("# Orphan source\n\nbody", tags=["owner/beta"])
+    doc_id = store.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()["id"]
+    # Reproduce the leak exactly: drop the doc row alone, children left behind.
+    store.db.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
+    store.db.commit()
+    assert (
+        store.db.execute("SELECT count(*) c FROM doc_tags WHERE doc_id = ?", (doc_id,)).fetchone()[
+            "c"
+        ]
+        > 0
+    )
+
+    conn = open_db(settings.data_dir / "trovex.db", 384)
+    assert (
+        conn.execute("SELECT count(*) c FROM doc_tags WHERE doc_id = ?", (doc_id,)).fetchone()["c"]
+        == 0
+    )
+    # Second open is a no-op, not an error.
+    open_db(settings.data_dir / "trovex.db", 384)
+
+
+def test_scoped_search_survives_a_dominant_source(settings):
+    """sqlite-vec applies `k` before the source filter, so a small project inside
+    a corpus dominated by a big one used to return NOTHING: the dominant source
+    filled the whole knn pool and the filter then had nothing left to keep.
+    Reproduced live — a 14-doc source in a 2831-doc store gave 0 hits."""
+    store = SqliteStore(settings, embedder=BagEmbedder())
+    # 60 docs that match the query, and 2 that share no vocabulary with it, so
+    # the small ones rank below the default pool (50) on distance alone.
+    for i in range(60):
+        store.put(f"# Big {i}\n\nauthentication token refresh rotation policy {i}")
+    small = [store.put(f"# Small {i}\n\nzzz unrelated vocabulary {i}") for i in range(2)]
+
+    ids = ",".join("?" * len(small))
+    store.db.execute(
+        f"UPDATE docs SET source_id = 'small' WHERE ext_id IN ({ids})",  # noqa: S608
+        small,
+    )
+    store.db.commit()
+
+    searcher = Searcher(settings, embedder=BagEmbedder())
+    q = "authentication token refresh"
+
+    unscoped = searcher.search(q, limit=5)
+    assert {r.source_id for r in unscoped} == {"trovex"}, "the big source should dominate"
+
+    scoped = searcher.search(q, limit=5, source_ids=["small"])
+    assert len(scoped) == 2, "the small source must still be reachable when scoped"
+    assert {r.source_id for r in scoped} == {"small"}

@@ -15,13 +15,17 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+
 from trovex import mcp_app
 
 # Frozen contract. props = the FULL set of parameters a client may send; required = the
 # subset it MUST send. Both are part of the public wire contract.
 CONTRACT: dict[str, dict[str, set[str]]] = {
-    "trovex": {"props": {"q", "summary"}, "required": {"q"}},
-    "trovex_search": {"props": {"query", "k", "kind", "tags"}, "required": {"query"}},
+    # `source` (added with per-project scoping) is optional everywhere it appears:
+    # an existing client that never sends it keeps searching the whole store.
+    "trovex": {"props": {"q", "summary", "source"}, "required": {"q"}},
+    "trovex_search": {"props": {"query", "k", "kind", "tags", "source"}, "required": {"query"}},
     "trovex_read": {"props": {"query", "doc_id", "section", "full"}, "required": set()},
     "trovex_write": {
         "props": {"content", "kind", "doc_id", "tags", "ticket", "force", "section"},
@@ -93,3 +97,103 @@ def test_server_info_reports_trovex_version():
 
     assert mcp_app.mcp._mcp_server.version == mcp_app._version_string()
     assert mcp_app.mcp._mcp_server.version != importlib.metadata.version("mcp")
+
+
+# ── per-project scoping ──────────────────────────────────────────────────
+
+
+class _FakeRequest:
+    def __init__(self, params: dict):
+        self.query_params = params
+
+
+@pytest.fixture
+def two_projects(tmp_path):
+    """App state whose sources.yaml declares two known projects, so the resolver
+    validates against those and never the developer's real ~/.trovex-data one."""
+    import yaml
+
+    from trovex import state as state_mod
+    from trovex.config import Settings
+    from trovex.state import AppState
+
+    cfg = tmp_path / "sources.yaml"
+    cfg.write_text(
+        yaml.safe_dump(
+            {
+                "sources": [
+                    {"id": "alpha", "label": "alpha", "root": str(tmp_path / "a")},
+                    {"id": "beta", "label": "beta", "root": str(tmp_path / "b")},
+                ]
+            }
+        )
+    )
+    settings = Settings(data_dir=tmp_path, sources_config_path=cfg)
+    state_mod._state = AppState(
+        settings=settings, embedder=None, searcher=None, indexer=None, store=None
+    )
+    try:
+        yield settings
+    finally:
+        state_mod.reset_state()
+
+
+def _scope(monkeypatch, *, pinned: str | None, explicit: str = ""):
+    """Resolve a scope with the MCP request pinned to `?source=<pinned>`."""
+    monkeypatch.setattr(mcp_app, "_pinned_source", lambda: pinned or "")
+    return mcp_app._resolve_source(explicit)
+
+
+def test_scope_defaults_to_whole_store(monkeypatch, two_projects):
+    """Nothing pinned, nothing passed → unchanged behaviour. This is what keeps
+    an existing user-global .mcp.json working exactly as before."""
+    assert _scope(monkeypatch, pinned=None) is None
+
+
+def test_scope_uses_the_url_pin(monkeypatch, two_projects):
+    """A project pins ?source=<id> in its .mcp.json and every call inherits it —
+    the daemon is shared and cannot see the client's cwd."""
+    assert _scope(monkeypatch, pinned="alpha") == "alpha"
+
+
+def test_explicit_argument_overrides_the_pin(monkeypatch, two_projects):
+    """An agent can reach into another project on purpose."""
+    assert _scope(monkeypatch, pinned="alpha", explicit="beta") == "beta"
+
+
+def test_owned_store_is_a_valid_scope(monkeypatch, two_projects):
+    """'trovex' never appears in sources.yaml (it's reserved) but owns every
+    written doc, so it must still be scopable."""
+    assert _scope(monkeypatch, pinned="trovex") == "trovex"
+
+
+def test_star_means_all_sources(monkeypatch, two_projects):
+    """The escape hatch: search everything even from a pinned connection."""
+    assert _scope(monkeypatch, pinned="alpha", explicit="*") is None
+    assert _scope(monkeypatch, pinned="*") is None
+
+
+def test_unknown_source_raises(monkeypatch, two_projects):
+    """A typo must not silently filter every result away."""
+    with pytest.raises(ValueError, match="unknown source"):
+        _scope(monkeypatch, pinned="typo-project")
+
+
+def test_pinned_source_reads_the_request_query_param(monkeypatch):
+    """_pinned_source pulls ?source= off the live MCP request."""
+
+    class _Ctx:
+        request_context = type("RC", (), {"request": _FakeRequest({"source": " wraith "})})()
+
+    monkeypatch.setattr(mcp_app.mcp, "get_context", lambda: _Ctx())
+    assert mcp_app._pinned_source() == "wraith"
+
+
+def test_pinned_source_is_empty_outside_a_request(monkeypatch):
+    """stdio transport / no active request → no pin, not a crash."""
+
+    def _boom():
+        raise LookupError("no active request")
+
+    monkeypatch.setattr(mcp_app.mcp, "get_context", _boom)
+    assert mcp_app._pinned_source() == ""

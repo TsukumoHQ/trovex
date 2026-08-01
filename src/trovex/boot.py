@@ -13,6 +13,16 @@ from .search import Searcher
 
 BOOT_QUERY = "current state resume open work in flight next steps gotchas"
 
+# The prompt hook passes the WHOLE user prompt as q=. Agent preambles and task
+# notifications run to tens of thousands of chars, and rejecting those was a
+# silently-lost recall: the hook swallows the error, so the agent just got no
+# pointers. Truncate instead. 2000 chars ≈ the 512-token window of the default
+# encoder (bge-small-en-v1.5), so anything past it never reached the vector
+# anyway — the cap observes that limit rather than adding one. Head, not tail:
+# in these prompts the task identity (name, branch, id) leads and the
+# boilerplate trails.
+BOOT_Q_MAX = 2000
+
 
 def boot_pointers(
     searcher: Searcher,
@@ -25,7 +35,7 @@ def boot_pointers(
     """The agent's own records as a pointer pack. Empty (zero cost) when nothing
     clears scope + floor — a session for an unknown agent injects nothing."""
     results = searcher.search(
-        q or BOOT_QUERY,
+        (q or BOOT_QUERY)[:BOOT_Q_MAX],
         limit=k,
         source_ids=["trovex"],
         kind="record",

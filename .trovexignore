@@ -34,3 +34,6 @@ growth/process/**
 growth/launch/mcp-registry-kit.md
 growth/launch/wraith-mcp-registry-kit.md
 growth/launch/free-tool-directory-kit.md
+
+# niwa gate control file (transient, per-worktree; not a doc)
+.niwa-decision.md

@@ -60,8 +60,40 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_embed_dim(conn, embed_dim)
     _migrate_add_trovex_store_columns(conn)
     _init_schema(conn, embed_dim)
+    _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
     return conn
+
+
+def upsert_docs_fts(conn: sqlite3.Connection, doc_id: int, title: str, body: str) -> None:
+    """(Re)index one doc's title+body into docs_fts (the doc-level BM25 side of the
+    hybrid doc-router search). Delete-then-insert — FTS5 has no UPSERT. Does NOT
+    commit. Called from both write paths (indexer._upsert_doc + store.put)."""
+    conn.execute("DELETE FROM docs_fts WHERE doc_id = ?", (doc_id,))
+    conn.execute(
+        "INSERT INTO docs_fts(title, body, doc_id) VALUES (?, ?, ?)",
+        (title or "", body or "", doc_id),
+    )
+
+
+def _backfill_docs_fts(conn: sqlite3.Connection) -> None:
+    """One-time populate docs_fts for a store created before the doc-router hybrid.
+    Owned docs carry their body in docs.content; file-backed docs are read from disk
+    (best-effort). Runs only when docs_fts is empty but docs exist, so it's a no-op
+    on every subsequent open."""
+    if conn.execute("SELECT 1 FROM docs_fts LIMIT 1").fetchone():
+        return
+    for r in conn.execute("SELECT id, title, content, absolute_path FROM docs").fetchall():
+        body = r["content"]
+        if not body and r["absolute_path"]:
+            try:
+                body = Path(r["absolute_path"]).read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                body = ""
+        conn.execute(
+            "INSERT INTO docs_fts(title, body, doc_id) VALUES (?, ?, ?)",
+            (r["title"] or "", body or "", r["id"]),
+        )
 
 
 # Child tables keyed by docs.id. They all declare ON DELETE CASCADE, but the
@@ -91,6 +123,7 @@ def delete_doc_cascade(conn: sqlite3.Connection, doc_id: int) -> None:
             f"DELETE FROM {table} WHERE doc_id = ?",  # sql-safe: fixed literal tuple
             (doc_id,),
         )
+    conn.execute("DELETE FROM docs_fts WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
 
@@ -347,6 +380,14 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         -- Keyword side of hybrid retrieval (BM25). chunk_id = chunks.id.
         CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
             content, chunk_id UNINDEXED
+        );
+        -- Keyword side of the DOC-ROUTER hybrid (BM25 over whole docs). doc_id =
+        -- docs.id. The flagship `trovex`/`trovex_search` fuses this with the dense
+        -- vec_docs KNN via RRF so exact tokens (error codes, fn/API names, paths,
+        -- flags, versions) the embedding blurs still rank. Maintained on every doc
+        -- upsert (indexer + store) and pruned in delete_doc_cascade.
+        CREATE VIRTUAL TABLE IF NOT EXISTS docs_fts USING fts5(
+            title, body, doc_id UNINDEXED
         );
 
         -- Tags (free + hierarchical 'a/b/c') for org + metadata filtering

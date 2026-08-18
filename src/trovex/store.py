@@ -26,7 +26,7 @@ import sqlite_vec
 
 from .chunking import chunk_markdown
 from .config import RESERVED_SOURCE_ID, Settings
-from .db import delete_doc_cascade, like_escape, open_db
+from .db import delete_doc_cascade, like_escape, open_db, upsert_docs_fts
 from .embedder import Embedder, embedder_from_settings
 
 TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
@@ -145,6 +145,7 @@ class SqliteStore:
                 )
                 doc_id = cur.lastrowid
 
+            upsert_docs_fts(self.db, doc_id, title, content)
             self._embed(doc_id, content, title)
             self._embed_chunks(self._insert_chunks(doc_id, content, title))
             self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
@@ -364,6 +365,7 @@ class SqliteStore:
                         ),
                     )
                     doc_id = cur.lastrowid
+                upsert_docs_fts(self.db, doc_id, title, content)
                 ext_ids.append(ext_id)
                 text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
                 to_embed.append((doc_id, text))

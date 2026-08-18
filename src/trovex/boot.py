@@ -42,6 +42,12 @@ def boot_pointers(
         # owner tags are stored lower-cased; normalise the query so a mixed-case
         # agent (e.g. "COO") recalls its own records instead of nothing.
         tags=[f"owner/{agent.lower()}"],
+        # Dense-only: `floor` is an absolute cosine-similarity threshold (~0.62).
+        # The flagship search now fuses BM25+dense via RRF, whose scores are ~an
+        # order of magnitude smaller — using it here would floor every record out
+        # and return empty recall. Scope (owner+record) is what yields precision
+        # here; the dense score is the semantic-relevance gate on top.
+        hybrid=False,
     )
     results = [r for r in results if r.score >= floor]
     if not results:

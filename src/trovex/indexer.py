@@ -8,7 +8,7 @@ from pathlib import Path
 import sqlite_vec
 
 from .config import RESERVED_SOURCE_ID, Settings, Source
-from .db import delete_doc_cascade, open_db
+from .db import delete_doc_cascade, open_db, upsert_docs_fts
 from .embedder import Embedder, embedder_from_settings
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
@@ -309,6 +309,8 @@ class Indexer:
             doc_id = cur.lastrowid
             action = "added"
 
+        # Doc-level BM25 side of the hybrid doc-router search.
+        upsert_docs_fts(self.db, doc_id, title, content)
         embed_batch.append((doc_id, self._embed_text(content, title)))
         if len(embed_batch) >= 32:
             self._flush_embeddings(embed_batch)

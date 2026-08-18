@@ -1,4 +1,5 @@
 import re
+import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,10 @@ from .embedder import Embedder, embedder_from_settings
 # Ceiling for the widened-pool retry below: a scoped query that comes back short
 # rescans the index, and this bounds that scan on a large store.
 MAX_KNN_POOL = 20_000
+
+# Reciprocal-rank-fusion constant (the standard k0=60), shared with the chunk
+# store's hybrid retrieval (store.py) so both surfaces fuse identically.
+RRF_K0 = 60
 
 STATUS_MARKER = {"canonical": "★", "plan": "◯", "stale": "✗", "duplicate": "⚠"}
 STATUS_WEIGHT = {"canonical": 1.0, "plan": 0.85, "stale": 0.5, "duplicate": 0.6}
@@ -60,15 +65,114 @@ class Searcher:
         source_ids: list[str] | None = None,
         kind: str | None = None,
         tags: list[str] | None = None,
+        hybrid: bool = True,
     ) -> list[SearchResult]:
+        """Hybrid doc retrieval: dense vector KNN fused with BM25 (docs_fts) by
+        reciprocal rank, then reweighted by freshness + status. Dense finds
+        semantic matches; BM25 catches the exact tokens (error codes, fn/API
+        names, paths, flags, versions) an embedding blurs. `hybrid=False` runs
+        dense-only (the retrieval_eval baseline)."""
         if not query.strip():
             return []
-        query_emb = next(self.embedder.embed([query]))
-        # Widen the knn pool when metadata filters are on, so post-filtering
-        # doesn't starve a tightly-scoped query (e.g. owner/<agent> + kind=record).
         filtered = bool(kind or tags or source_ids)
         pool = max(limit * 5, 50) if filtered else limit * 5
-        sql = """SELECT d.path, d.title, d.mtime, d.status, d.size_bytes,
+
+        # Dense side — full metadata rows, already scoped + widen-retried (the
+        # proven path). row_by_id caches every row we touch, for both signals.
+        vec_rows = self._vector_rows(query, pool, source_ids, kind, tags, filtered, limit)
+        row_by_id = {r["id"]: r for r in vec_rows}
+        vec_order = [r["id"] for r in vec_rows]
+        # Only vector hits carry a cosine distance; a BM25-only hit gets the
+        # max-distance sentinel (2.0) since it never entered the KNN.
+        dist_by_id = {r["id"]: r["distance"] for r in vec_rows}
+
+        now = time.time()
+        half_life = self.settings.freshness_half_life_days
+
+        if not hybrid:
+            # Dense-only: cosine similarity x freshness x status, ranked by that.
+            # This is the LEGACY scoring, kept intact because it preserves the
+            # absolute-score SCALE (~0.6 for a good match) that boot_pointers
+            # floors on — an RRF fusion score is ~an order of magnitude smaller
+            # and would fail an absolute floor (empty Active-Memory boot recall).
+            results = [
+                self._make_result(r, dist_by_id.get(r["id"], 2.0), now, half_life) for r in vec_rows
+            ]
+            results.sort(key=lambda x: -x.score)
+            return results[:limit]
+
+        # Keyword side — BM25 over docs_fts, filtered post-hoc to match scope.
+        bm_order: list[int] = []
+        for did in self._bm25_ids(query, pool):
+            r = row_by_id.get(did)
+            if r is None:
+                r = self._fetch_doc_row(did)
+                if r is None or not self._passes_filters(r, source_ids, kind, tags):
+                    continue
+                row_by_id[did] = r
+            bm_order.append(did)
+
+        # Reciprocal rank fusion (k0=60, matching the chunk store).
+        rrf: dict[int, float] = {}
+        for order in (vec_order, bm_order):
+            for rank, did in enumerate(order):
+                rrf[did] = rrf.get(did, 0.0) + 1.0 / (RRF_K0 + rank)
+        if not rrf:
+            return []
+
+        results = []
+        for did, fusion in rrf.items():
+            r = row_by_id[did]
+            age_days = max(0.0, (now - r["mtime"]) / 86400)
+            freshness = 0.5 + 0.5 * (1.0 / (1.0 + age_days / half_life))
+            status_w = STATUS_WEIGHT.get(r["status"], 1.0)
+            # Freshness/status weighting preserved — now multiplying the RRF
+            # fusion score instead of the raw cosine similarity. This score is a
+            # RANKING signal for the flagship surface, NOT an absolute-scale
+            # gate; recall floors (boot) must use the dense path (hybrid=False).
+            results.append(
+                self._build_result(
+                    r, dist_by_id.get(did, 2.0), fusion * freshness * status_w, age_days
+                )
+            )
+        results.sort(key=lambda x: -x.score)
+        return results[:limit]
+
+    def _make_result(self, r, distance: float, now: float, half_life: float) -> SearchResult:
+        """Legacy dense scoring: cosine similarity × freshness × status."""
+        age_days = max(0.0, (now - r["mtime"]) / 86400)
+        similarity = max(0.0, 1.0 - distance / 2)
+        freshness = 0.5 + 0.5 * (1.0 / (1.0 + age_days / half_life))
+        status_w = STATUS_WEIGHT.get(r["status"], 1.0)
+        return self._build_result(r, distance, similarity * freshness * status_w, age_days)
+
+    @staticmethod
+    def _build_result(r, distance: float, score: float, age_days: float) -> SearchResult:
+        return SearchResult(
+            path=r["path"],
+            title=r["title"] or r["path"],
+            distance=distance,
+            score=score,
+            age_days=age_days,
+            status=r["status"],
+            size_bytes=r["size_bytes"],
+            tokens_est=r["tokens_est"],
+            absolute_path=r["absolute_path"],
+            source_id=r["source_id"] or "code",
+        )
+
+    def _vector_rows(
+        self,
+        query: str,
+        pool: int,
+        source_ids: list[str] | None,
+        kind: str | None,
+        tags: list[str] | None,
+        filtered: bool,
+        limit: int,
+    ) -> list:
+        query_emb = next(self.embedder.embed([query]))
+        sql = """SELECT d.id, d.path, d.title, d.mtime, d.status, d.size_bytes,
                         d.tokens_est, d.absolute_path, d.source_id, v.distance
                  FROM vec_docs v
                  JOIN docs d ON d.id = v.rowid
@@ -98,32 +202,48 @@ class Searcher:
             if total > pool:
                 params[1] = min(total, MAX_KNN_POOL)
                 rows = self.db.execute(sql, params).fetchall()
+        return rows
 
-        now = time.time()
-        half_life = self.settings.freshness_half_life_days
-        results: list[SearchResult] = []
-        for r in rows:
-            age_days = max(0.0, (now - r["mtime"]) / 86400)
-            similarity = max(0.0, 1.0 - r["distance"] / 2)
-            freshness = 0.5 + 0.5 * (1.0 / (1.0 + age_days / half_life))
-            status_w = STATUS_WEIGHT.get(r["status"], 1.0)
-            score = similarity * freshness * status_w
-            results.append(
-                SearchResult(
-                    path=r["path"],
-                    title=r["title"] or r["path"],
-                    distance=r["distance"],
-                    score=score,
-                    age_days=age_days,
-                    status=r["status"],
-                    size_bytes=r["size_bytes"],
-                    tokens_est=r["tokens_est"],
-                    absolute_path=r["absolute_path"],
-                    source_id=r["source_id"] or "code",
+    def _bm25_ids(self, query: str, pool: int) -> list[int]:
+        """BM25 doc ids from docs_fts, best rank first. An OR of the query terms —
+        the same shape the chunk store uses — so any exact token can hit."""
+        terms = re.findall(r"[a-z0-9]{2,}", query.lower())[:24]
+        if not terms:
+            return []
+        try:
+            return [
+                r["doc_id"]
+                for r in self.db.execute(
+                    "SELECT doc_id FROM docs_fts WHERE docs_fts MATCH ? ORDER BY rank LIMIT ?",
+                    (" OR ".join(terms), pool),
                 )
-            )
-        results.sort(key=lambda x: -x.score)
-        return results[:limit]
+            ]
+        except sqlite3.OperationalError:
+            # No docs_fts (pre-migration store) or a malformed MATCH → dense-only.
+            return []
+
+    def _fetch_doc_row(self, doc_id: int):
+        return self.db.execute(
+            """SELECT id, path, title, mtime, status, size_bytes, tokens_est,
+                      absolute_path, source_id, kind FROM docs WHERE id = ?""",
+            (doc_id,),
+        ).fetchone()
+
+    def _passes_filters(
+        self, r, source_ids: list[str] | None, kind: str | None, tags: list[str] | None
+    ) -> bool:
+        if source_ids and r["source_id"] not in source_ids:
+            return False
+        if kind and r["kind"] != kind:
+            return False
+        if tags:
+            dtags = {
+                t["tag"]
+                for t in self.db.execute("SELECT tag FROM doc_tags WHERE doc_id = ?", (r["id"],))
+            }
+            if not (set(tags) & dtags):
+                return False
+        return True
 
     def savings_estimate(self, results: list[SearchResult]) -> dict | None:
         """Per-query token-savings estimate, same model as the savings dashboard.

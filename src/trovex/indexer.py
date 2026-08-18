@@ -106,26 +106,55 @@ class Indexer:
             seen_paths: set[str] = set()
             s_added = s_updated = s_unchanged = 0
 
+            # Bulk-load this source's known docs ONCE (one query, not one SELECT
+            # per file) so the scan loop is a dict lookup. Also serves the
+            # removal pass below — the row ids are already here.
+            existing_by_path = {
+                r["path"]: r
+                for r in self.db.execute(
+                    """SELECT id, path, mtime, content_hash FROM docs
+                       WHERE source_id = ? AND workspace_id = 'default'""",
+                    (source.id,),
+                ).fetchall()
+            }
+
             for path in self.scan(sr):
                 try:
-                    content = path.read_text(encoding="utf-8", errors="replace")
+                    stat = path.stat()
                 except OSError:
                     continue
                 rel_path = str(path.relative_to(sr))
                 seen_paths.add(rel_path)
-                content_hash = hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
+                existing = existing_by_path.get(rel_path)
 
-                existing = self.db.execute(
-                    """SELECT id, content_hash FROM docs
-                       WHERE source_id = ? AND path = ? AND workspace_id = 'default'""",
-                    (source.id, rel_path),
-                ).fetchone()
-
-                if existing and existing["content_hash"] == content_hash:
+                # mtime fast-path: an unchanged file skips read()+sha256 entirely
+                # (1 stat, not a full read+hash of the whole corpus every run).
+                # The hash stays the authority — mtime is only trusted to prove
+                # NON-change. Documented tradeoff: a content edit that PRESERVES
+                # mtime (same-second overwrite, mtime restore/`touch -r`) is
+                # missed until the file's mtime moves again. Same bar make/rsync
+                # accept; a conscious choice, not a silent gap.
+                if existing is not None and existing["mtime"] == stat.st_mtime:
                     s_unchanged += 1
                     continue
 
-                stat = path.stat()
+                try:
+                    content = path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                content_hash = hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
+
+                if existing is not None and existing["content_hash"] == content_hash:
+                    # mtime moved but content is identical (e.g. `git checkout`,
+                    # a rebuild). Refresh the stored mtime so the fast-path hits
+                    # next run — no re-embed.
+                    self.db.execute(
+                        "UPDATE docs SET mtime=?, last_indexed=? WHERE id=?",
+                        (stat.st_mtime, time.time(), existing["id"]),
+                    )
+                    s_unchanged += 1
+                    continue
+
                 title = self._extract_title(content, path.name)
                 author = self._extract_author(content)
                 tokens_est = len(content) // 4
@@ -179,29 +208,16 @@ class Indexer:
                     self._flush_embeddings(embed_batch)
                     embed_batch.clear()
 
-            # Cleanup this source's removed docs
+            # Cleanup this source's removed docs. The bulk map already holds the
+            # row ids, so a vanished file is a dict-key diff — no re-query.
             s_removed = 0
-            existing_paths = [
-                r["path"]
-                for r in self.db.execute(
-                    """SELECT path FROM docs
-                       WHERE source_id = ? AND workspace_id = 'default'""",
-                    (source.id,),
-                ).fetchall()
-            ]
-            for old_path in existing_paths:
+            for old_path, row in existing_by_path.items():
                 if old_path not in seen_paths:
-                    old = self.db.execute(
-                        """SELECT id FROM docs
-                           WHERE source_id = ? AND path = ? AND workspace_id = 'default'""",
-                        (source.id, old_path),
-                    ).fetchone()
-                    if old:
-                        # Full cascade, not just vec_docs+docs: the bare delete
-                        # left this doc's tags and versions behind on every
-                        # reindex that saw a file disappear.
-                        delete_doc_cascade(self.db, old["id"])
-                        s_removed += 1
+                    # Full cascade, not just vec_docs+docs: the bare delete
+                    # left this doc's tags and versions behind on every
+                    # reindex that saw a file disappear.
+                    delete_doc_cascade(self.db, row["id"])
+                    s_removed += 1
 
             agg["added"] += s_added
             agg["updated"] += s_updated

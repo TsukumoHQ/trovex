@@ -441,6 +441,12 @@ def bench(
         "--labels",
         help="For --retrieval: `query<TAB>expected-path[,path2]` per line (the ground truth).",
     ),
+    rerank: bool = typer.Option(
+        False,
+        "--rerank",
+        help="For --retrieval: apply the local cross-encoder rerank (the default "
+        "runtime tier) before scoring — measures the rerank hit@1 lift.",
+    ),
     k: int = typer.Option(
         3, "--k", help="Baseline candidate count (top-k read / retrieval window)."
     ),
@@ -500,7 +506,7 @@ def bench(
         if retrieval:
             from .retrieval_eval import evaluate_retrieval, format_retrieval_stats
 
-            rstats = evaluate_retrieval(searcher, labeled, k=k)
+            rstats = evaluate_retrieval(searcher, labeled, k=k, rerank=rerank)
             # Persist to the LIVE store so the savings receipt can gate its number
             # on this measured hit@1 (the eval ran on a hermetic temp index of the
             # same repo — a fair proxy for live routing quality). Best-effort: a
@@ -521,7 +527,8 @@ def bench(
             else:
                 console.print(
                     f"[bold]retrieval quality[/bold] · {len(labeled)} labelled queries "
-                    f"on {repo.name}\n{format_retrieval_stats(rstats)}\n"
+                    f"on {repo.name}{' · reranked (local cross-encoder)' if rerank else ''}\n"
+                    f"{format_retrieval_stats(rstats)}\n"
                     f"[dim]recorded hit@1={rstats.hit_at_1:.2f} to the store — "
                     f"the savings receipt now gates on it.[/dim]"
                 )

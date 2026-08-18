@@ -40,6 +40,7 @@ def evaluate_retrieval(
     source_ids: list[str] | None = None,
     kind: str | None = None,
     tags: list[str] | None = None,
+    rerank: bool = False,
 ) -> RetrievalStats:
     """Score the router's ranking over a labelled query set.
 
@@ -48,6 +49,10 @@ def evaluate_retrieval(
     - MRR: mean reciprocal rank of the FIRST relevant hit (0 if none in top-k).
     - recall@k: mean fraction of a query's relevant docs found in top-k.
     Empty/zeroed when there are no queries.
+
+    rerank=True applies the local cross-encoder (the default runtime tier) over a
+    wider candidate pool before scoring — this is the before/after knob that
+    quantifies the rerank hit@1 lift the way the live tool experiences it.
     """
     valid = [lq for lq in labeled if lq.query.strip() and lq.relevant]
     if not valid:
@@ -55,11 +60,19 @@ def evaluate_retrieval(
 
     hit1 = hitk = mrr_sum = recall_sum = 0.0
     misses: list[str] = []
+    # Fetch the same wide candidate pool the live tool pools (trovex() always
+    # retrieves ~20 then shows top-k), for BOTH baseline and reranked runs, so
+    # the only variable is the rerank step — a fair, apples-to-apples delta.
+    fetch = max(k, 20)
     for lq in valid:
         results = searcher.search(
-            lq.query, limit=k, source_ids=source_ids, kind=kind, tags=tags
+            lq.query, limit=fetch, source_ids=source_ids, kind=kind, tags=tags
         )
-        ranked = [r.path for r in results]
+        if rerank:
+            from .rerank_local import rerank_results
+
+            results = rerank_results(lq.query, results, k)
+        ranked = [r.path for r in results[:k]]
         relevant = set(lq.relevant)
 
         if ranked and ranked[0] in relevant:

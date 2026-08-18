@@ -54,21 +54,45 @@ def maybe_rerank(
     candidates: list[SearchResult],
     limit: int,
 ) -> tuple[list[SearchResult], RerankInfo | None]:
-    """Return (results, rerank_info or None).
+    """Return (results, rerank_info or None). Tiered:
+
+    1. LLM BYOK (premium) — when the caller sent an OpenAI key.
+    2. Local cross-encoder (DEFAULT, key-free) — otherwise, and as the fallback
+       if the LLM tier errors.
+    3. Passthrough — if the local tier is disabled/unavailable.
 
     Always returns at least the original top-`limit` candidates so the caller
     can blindly use the result.
     """
-    key = current_openai_key.get()
-    if not key or not candidates:
+    if not candidates:
         return candidates[:limit], None
 
-    try:
-        client = OpenAI(api_key=key, timeout=RERANK_TIMEOUT_SEC)
-        return _rerank(client, query, candidates, limit)
-    except Exception as e:  # noqa: BLE001 — never block the tool
-        log.warning("rerank failed: %s", e.__class__.__name__)
-        return candidates[:limit], None
+    key = current_openai_key.get()
+    if key:
+        try:
+            client = OpenAI(api_key=key, timeout=RERANK_TIMEOUT_SEC)
+            return _rerank(client, query, candidates, limit)
+        except Exception as e:  # noqa: BLE001 — never block the tool; fall through to local
+            log.warning("LLM rerank failed (%s); falling back to local", e.__class__.__name__)
+
+    # Default key-free tier: the local cross-encoder.
+    return _local_rerank(query, candidates, limit)
+
+
+def _local_rerank(
+    query: str, candidates: list[SearchResult], limit: int
+) -> tuple[list[SearchResult], RerankInfo | None]:
+    from . import rerank_local
+
+    results, info = rerank_local.rerank(query, candidates, limit)
+    if info is None:
+        return results, None
+    return results, RerankInfo(
+        model=info["model"],
+        tokens_in=info["tokens_in"],
+        tokens_out=info["tokens_out"],
+        elapsed_ms=info["elapsed_ms"],
+    )
 
 
 def _rerank(

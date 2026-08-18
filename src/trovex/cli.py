@@ -106,6 +106,51 @@ def index(
 
 
 @app.command()
+def watch(
+    debounce: float = typer.Option(
+        0.5, "--debounce", help="Seconds of quiet before a burst of changes is re-indexed."
+    ),
+) -> None:
+    """Watch the doc-store roots and incrementally re-index on file changes.
+
+    Does one full index first (so the store is consistent), then re-indexes only
+    the paths that actually change — catching even mtime-preserving edits that a
+    periodic `trovex index` would miss. Ctrl-C to stop."""
+    import time as _time
+
+    from .watch import Watcher
+
+    settings = Settings()
+    indexer = Indexer(settings)
+    sources = [s for s in settings.load_sources() if s.root.exists()]
+    if not sources:
+        console.print("[yellow]No existing sources to watch.[/yellow] Configure sources.yaml.")
+        raise typer.Exit()
+
+    console.print(f"[bold]Initial index[/bold] of {len(sources)} source(s)…")
+    indexer.reindex(sources=sources)
+
+    def _report(st: dict) -> None:
+        console.print(
+            f"[green]reindex[/green] +{st['added']} ~{st['updated']} "
+            f"={st['unchanged']} -{st['removed']} [dim]({st['duration_sec']:.2f}s)[/dim]"
+        )
+
+    watcher = Watcher(indexer, sources, debounce_sec=debounce, on_reindex=_report)
+    for s in sources:
+        console.print(f"  [cyan]{s.id}[/cyan]  {s.root}")
+    console.print("[bold]Watching[/bold] — Ctrl-C to stop.")
+    watcher.start()
+    try:
+        while True:
+            _time.sleep(1)
+    except KeyboardInterrupt:
+        console.print("\n[dim]Stopping…[/dim]")
+    finally:
+        watcher.stop()
+
+
+@app.command()
 def search(
     query: str = typer.Argument(..., help="Query string"),
     limit: int = typer.Option(5, "-n", "--limit"),
@@ -396,7 +441,9 @@ def bench(
         "--labels",
         help="For --retrieval: `query<TAB>expected-path[,path2]` per line (the ground truth).",
     ),
-    k: int = typer.Option(3, "--k", help="Baseline candidate count (top-k read / retrieval window)."),
+    k: int = typer.Option(
+        3, "--k", help="Baseline candidate count (top-k read / retrieval window)."
+    ),
     model: str = typer.Option("gpt-5.4-mini", help="LLM for --eval (answers + judges)."),
     json_out: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON (median, spread, per-query/category)."

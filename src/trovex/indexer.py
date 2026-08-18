@@ -29,6 +29,16 @@ def _load_ignore_patterns(root: Path) -> list[str]:
     return [s.strip() for s in lines if s.strip() and not s.strip().startswith("#")]
 
 
+def _safe_resolve(p: Path) -> Path:
+    """`p.resolve()` that never raises — a removed file still yields its absolute,
+    symlink-normalised path (macOS FSEvents reports /private/var, a Source.root may
+    be the /var symlink form; both must compare equal)."""
+    try:
+        return p.resolve()
+    except OSError:
+        return p
+
+
 def _is_ignored(rel_posix: str, patterns: list[str]) -> bool:
     """Match a source-relative POSIX path against .trovexignore globs. We match the
     full relative path, every parent prefix, and the basename — so `docs/*`,
@@ -54,6 +64,44 @@ class Indexer:
         self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim())
         self.embedder = embedder or embedder_from_settings(settings)
 
+    def _accept(
+        self,
+        root: Path,
+        root_resolved: Path,
+        path: Path,
+        ignore_dirs: set[str],
+        ignore_patterns: list[str],
+        max_size: int,
+    ) -> bool:
+        """Whether `path` is an indexable doc under `root`. The single predicate
+        behind both the full scan() and the fs-watch path re-index, so a watched
+        file is accepted/rejected on EXACTLY the same rules a full index uses."""
+        if path.suffix.lower().lstrip(".") not in ("md", "mdx", "markdown"):
+            return False
+        try:
+            rel = path.relative_to(root)
+        except ValueError:
+            return False
+        if any(part in ignore_dirs for part in rel.parts):
+            return False
+        # Path-traversal / symlink guard: a .md that is a symlink (or sits under a
+        # symlinked dir) pointing outside the source root — e.g. /etc/passwd — must
+        # NOT be indexed. Canonicalize and require the real target to stay inside.
+        try:
+            real = path.resolve()
+        except OSError:
+            return False
+        if real != root_resolved and not real.is_relative_to(root_resolved):
+            return False
+        if ignore_patterns and _is_ignored(rel.as_posix(), ignore_patterns):
+            return False
+        try:
+            if path.stat().st_size > max_size:
+                return False
+        except OSError:
+            return False
+        return True
+
     def scan(self, root: Path) -> Iterator[Path]:
         ignore = set(self.settings.ignore_dirs)
         max_size = self.settings.max_file_size_bytes
@@ -61,27 +109,8 @@ class Indexer:
         ignore_patterns = _load_ignore_patterns(root)
         for ext in ("md", "mdx", "markdown"):
             for p in root.rglob(f"*.{ext}"):
-                rel = p.relative_to(root)
-                if any(part in ignore for part in rel.parts):
-                    continue
-                # Path-traversal / symlink guard: a .md that is a symlink (or sits
-                # under a symlinked dir) pointing outside the source root — e.g.
-                # /etc/passwd — must NOT be indexed. Canonicalize and require the
-                # real target to stay inside the root.
-                try:
-                    real = p.resolve()
-                except OSError:
-                    continue
-                if real != root_resolved and not real.is_relative_to(root_resolved):
-                    continue
-                if ignore_patterns and _is_ignored(rel.as_posix(), ignore_patterns):
-                    continue
-                try:
-                    if p.stat().st_size > max_size:
-                        continue
-                except OSError:
-                    continue
-                yield p
+                if self._accept(root, root_resolved, p, ignore, ignore_patterns, max_size):
+                    yield p
 
     def reindex(self, root: Path | None = None, sources: list[Source] | None = None) -> dict:
         """Index all configured sources, or a single root for back-compat."""
@@ -155,58 +184,15 @@ class Indexer:
                     s_unchanged += 1
                     continue
 
-                title = self._extract_title(content, path.name)
-                author = self._extract_author(content)
-                tokens_est = len(content) // 4
-                now = time.time()
-
-                if existing:
-                    self.db.execute(
-                        """UPDATE docs SET content_hash=?, size_bytes=?, tokens_est=?,
-                           mtime=?, last_indexed=?, title=?, absolute_path=?, author_agent=?
-                           WHERE id=?""",
-                        (
-                            content_hash,
-                            stat.st_size,
-                            tokens_est,
-                            stat.st_mtime,
-                            now,
-                            title,
-                            str(path),
-                            author,
-                            existing["id"],
-                        ),
+                if (
+                    self._upsert_doc(
+                        source, path, rel_path, stat, content, content_hash, existing, embed_batch
                     )
-                    doc_id = existing["id"]
+                    == "updated"
+                ):
                     s_updated += 1
                 else:
-                    cur = self.db.execute(
-                        """INSERT INTO docs (source_id, path, absolute_path, content_hash,
-                           size_bytes, tokens_est, mtime, first_indexed, last_indexed,
-                           title, author_agent)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (
-                            source.id,
-                            rel_path,
-                            str(path),
-                            content_hash,
-                            stat.st_size,
-                            tokens_est,
-                            stat.st_mtime,
-                            now,
-                            now,
-                            title,
-                            author,
-                        ),
-                    )
-                    doc_id = cur.lastrowid
                     s_added += 1
-
-                embed_batch.append((doc_id, self._embed_text(content, title)))
-
-                if len(embed_batch) >= 32:
-                    self._flush_embeddings(embed_batch)
-                    embed_batch.clear()
 
             # Cleanup this source's removed docs. The bulk map already holds the
             # row ids, so a vanished file is a dict-key diff — no re-query.
@@ -262,6 +248,176 @@ class Indexer:
             "status": status_stats,
             "by_source": agg["by_source"],
         }
+
+    def _upsert_doc(
+        self,
+        source: Source,
+        path: Path,
+        rel_path: str,
+        stat,
+        content: str,
+        content_hash: str,
+        existing,
+        embed_batch: list[tuple[int, str]],
+    ) -> str:
+        """Insert-or-update one doc row and queue its embedding. Returns "added"
+        or "updated". Shared by the full reindex() and the fs-watch reindex_paths()
+        so both write a doc identically."""
+        title = self._extract_title(content, path.name)
+        author = self._extract_author(content)
+        tokens_est = len(content) // 4
+        now = time.time()
+        if existing:
+            self.db.execute(
+                """UPDATE docs SET content_hash=?, size_bytes=?, tokens_est=?,
+                   mtime=?, last_indexed=?, title=?, absolute_path=?, author_agent=?
+                   WHERE id=?""",
+                (
+                    content_hash,
+                    stat.st_size,
+                    tokens_est,
+                    stat.st_mtime,
+                    now,
+                    title,
+                    str(path),
+                    author,
+                    existing["id"],
+                ),
+            )
+            doc_id = existing["id"]
+            action = "updated"
+        else:
+            cur = self.db.execute(
+                """INSERT INTO docs (source_id, path, absolute_path, content_hash,
+                   size_bytes, tokens_est, mtime, first_indexed, last_indexed,
+                   title, author_agent)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    source.id,
+                    rel_path,
+                    str(path),
+                    content_hash,
+                    stat.st_size,
+                    tokens_est,
+                    stat.st_mtime,
+                    now,
+                    now,
+                    title,
+                    author,
+                ),
+            )
+            doc_id = cur.lastrowid
+            action = "added"
+
+        embed_batch.append((doc_id, self._embed_text(content, title)))
+        if len(embed_batch) >= 32:
+            self._flush_embeddings(embed_batch)
+            embed_batch.clear()
+        return action
+
+    def reindex_paths(self, paths, sources: list[Source] | None = None) -> dict:
+        """Re-index a KNOWN set of changed/added/removed paths (from fs-watch events),
+        touching only those docs — the rest of the store is left untouched.
+
+        Unlike reindex(), there is NO mtime fast-path here: a real filesystem event
+        proves the file changed even when its mtime is preserved (same-second
+        overwrite, `touch -r`), so every event path is read+hashed. The content
+        hash still gates re-embedding — an event that didn't actually change bytes
+        refreshes mtime only. Vectors stay 1:1 (delete_doc_cascade on removal)."""
+        if sources is None:
+            sources = self.settings.load_sources()
+        sources = [s for s in sources if s.id != RESERVED_SOURCE_ID and s.root.exists()]
+
+        start = time.time()
+        counts = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0}
+        embed_batch: list[tuple[int, str]] = []
+        max_size = self.settings.max_file_size_bytes
+        ignore_dirs = set(self.settings.ignore_dirs)
+        # Per-source context, all in RESOLVED-path space so a macOS /private/var
+        # event path matches a /var Source.root (and vice-versa).
+        resolved_root = {s.id: _safe_resolve(s.root) for s in sources}
+        ctx = {s.id: (resolved_root[s.id], _load_ignore_patterns(s.root)) for s in sources}
+        seen: set[tuple[str, str]] = set()
+
+        for raw in paths:
+            p_real = _safe_resolve(Path(raw))
+            owner = None
+            rel_path = ""
+            for s in sources:
+                try:
+                    rel_path = str(p_real.relative_to(resolved_root[s.id]))
+                    owner = s
+                    break
+                except ValueError:
+                    continue
+            if owner is None:
+                continue  # event outside every watched source root
+            key = (owner.id, rel_path)
+            if key in seen:
+                continue  # a burst can name the same path repeatedly — do it once
+            seen.add(key)
+
+            existing = self.db.execute(
+                """SELECT id, content_hash FROM docs
+                   WHERE source_id = ? AND path = ? AND workspace_id = 'default'""",
+                (owner.id, rel_path),
+            ).fetchone()
+
+            root_resolved, ignore_patterns = ctx[owner.id]
+            # Removed, or no longer indexable (deleted / became ignored / oversized):
+            # prune its doc + vectors if we had it.
+            if not p_real.exists() or not self._accept(
+                root_resolved, root_resolved, p_real, ignore_dirs, ignore_patterns, max_size
+            ):
+                if existing:
+                    delete_doc_cascade(self.db, existing["id"])
+                    counts["removed"] += 1
+                continue
+
+            try:
+                content = p_real.read_text(encoding="utf-8", errors="replace")
+                stat = p_real.stat()
+            except OSError:
+                continue
+            content_hash = hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
+
+            if existing and existing["content_hash"] == content_hash:
+                # Event fired but bytes are identical → refresh mtime, no re-embed.
+                self.db.execute(
+                    "UPDATE docs SET mtime=?, last_indexed=? WHERE id=?",
+                    (stat.st_mtime, time.time(), existing["id"]),
+                )
+                counts["unchanged"] += 1
+                continue
+
+            counts[
+                self._upsert_doc(
+                    owner, p_real, rel_path, stat, content, content_hash, existing, embed_batch
+                )
+            ] += 1
+
+        if embed_batch:
+            self._flush_embeddings(embed_batch)
+
+        from .status import compute_status
+
+        compute_status(self.db, self.settings)
+        elapsed = time.time() - start
+        self.db.execute(
+            """INSERT INTO index_runs (ts, duration_sec, added, updated, unchanged, removed)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                time.time(),
+                elapsed,
+                counts["added"],
+                counts["updated"],
+                counts["unchanged"],
+                counts["removed"],
+            ),
+        )
+        self.db.commit()
+        counts["duration_sec"] = elapsed
+        return counts
 
     def _flush_embeddings(self, batch: list[tuple[int, str]]) -> None:
         ids = [doc_id for doc_id, _ in batch]

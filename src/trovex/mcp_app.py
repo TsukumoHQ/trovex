@@ -16,8 +16,37 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from .state import get_state
 from .store import TROVEX_SOURCE_ID, extract_section, replace_section
+from .tokens import count_tokens as _count_tokens
 
 log = logging.getLogger("trovex.mcp")
+
+# The inline cumulative savings counter appended to tool output ("~1.2k tok
+# saved this call · ~48k this session"). On by default; TROVEX_INLINE_SAVINGS=0
+# turns it off for a caller that wants the byte-minimal raw output.
+_INLINE_SAVINGS_ON = os.environ.get("TROVEX_INLINE_SAVINGS", "1") != "0"
+
+
+def _with_inline(db, out: str, this_call_saved: int) -> str:
+    """Append the one-line cumulative savings counter to a tool's output.
+
+    Off via env, and skipped entirely when there's nothing to show (no savings
+    this call and none banked this session) so trivial calls stay quiet. Never
+    raises — the counter is a nicety, never a reason a tool fails."""
+    if not _INLINE_SAVINGS_ON:
+        return out
+    try:
+        from . import savings as _savings
+        from .usage import current_session
+
+        session = current_session.get()
+        session_total = _savings.session_saved(db, session)
+        if this_call_saved <= 0 and session_total <= 0:
+            return out
+        precision, _ = _savings.latest_precision(db)
+        return out + "\n\n" + _savings.inline_counter(this_call_saved, session_total, precision)
+    except Exception:  # noqa: BLE001 — the counter must never break the tool
+        log.debug("inline savings counter failed", exc_info=True)
+        return out
 
 
 def _version_string() -> str:
@@ -191,7 +220,8 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
             )
         except Exception:  # noqa: BLE001 — logging must never break the tool
             log.debug("log_query (cache-hit path) failed", exc_info=True)
-        return cached["output"]
+        cached_saved = max(0, cached["whr"] - cached["top_tokens"] - cached["resp_tokens"])
+        return _with_inline(db, cached["output"], cached_saved)
 
     # Fetch a wider candidate pool when reranking is possible.
     candidates = state.searcher.search(q, limit=20, source_ids=[scope] if scope else None)
@@ -206,7 +236,7 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
     elapsed_ms = int((_time.perf_counter() - t0) * 1000)
     would_have_read = sum(r.tokens_est for r in results[:3])
     top_tokens = results[0].tokens_est if results else 0
-    resp_tokens = len(out) // 4
+    resp_tokens = _count_tokens(out)
     try:
         log_query(
             db,
@@ -248,7 +278,7 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
         )
     except Exception:  # noqa: BLE001 — cache is best-effort, never block the tool
         log.debug("query-cache put failed", exc_info=True)
-    return out
+    return _with_inline(db, out, max(0, would_have_read - top_tokens - resp_tokens))
 
 
 def _authorized() -> bool:
@@ -461,8 +491,8 @@ def trovex_read(
         out = _fmt_passage({**h, "content": section})
     else:
         out = "(no results)"
-    _log_retrieval(state, query, hits, out, t0)
-    return out
+    saved = _log_retrieval(state, query, hits, out, t0)
+    return _with_inline(state.searcher.db, out, saved)
 
 
 @mcp.tool()
@@ -511,8 +541,8 @@ def trovex_search(
         tags=_as_taglist(tags) or None,
     )
     out = "\n\n———\n\n".join(_fmt_passage(h) for h in hits) if hits else "(no results)"
-    _log_retrieval(state, query, hits, out, t0)
-    return out
+    saved = _log_retrieval(state, query, hits, out, t0)
+    return _with_inline(state.searcher.db, out, saved)
 
 
 def _fmt_passage(h: dict) -> str:
@@ -520,25 +550,29 @@ def _fmt_passage(h: dict) -> str:
     return f"{bc}\n\n{h['content']}\n\n— trovex:{h['ext_id']}"
 
 
-def _log_retrieval(state, query: str, hits: list, response: str, t0: float) -> None:
-    """Log a chunk-retrieval call for usage/savings/insights. Savings story:
-    baseline = reading the whole parent doc(s); served = the passages."""
+def _log_retrieval(state, query: str, hits: list, response: str, t0: float) -> int:
+    """Log a chunk-retrieval call for usage/savings/insights and return the raw
+    tokens saved for this call. Savings story: baseline = reading the whole
+    parent doc(s); served = the passages (the response)."""
     try:
         from .usage import log_query
 
         would_have_read = sum({h["ext_id"]: h.get("doc_tokens", 0) for h in hits}.values())
+        resp_tokens = _count_tokens(response)
         log_query(
             state.searcher.db,
             query,
             len(hits),
             False,
-            response_tokens_est=len(response) // 4,
+            response_tokens_est=resp_tokens,
             elapsed_ms=int((time.perf_counter() - t0) * 1000),
             would_have_read_tokens=would_have_read,
             top_result_tokens=0,
         )
+        return max(0, would_have_read - resp_tokens)
     except Exception:  # noqa: BLE001 — logging must never break a tool
         log.debug("log_query (chunk path) failed", exc_info=True)
+        return 0
 
 
 @mcp.tool()
@@ -629,6 +663,26 @@ def _render_doc_line(row, now: float) -> str:
         f"- {mark} {title} · ~{row['tokens_est']}tok · "
         f"{_fresh_label(row['mtime'], now)} · {_doc_handle(row)}"
     )
+
+
+@mcp.resource("trovex://savings", name="savings", mime_type="text/markdown")
+def savings_receipt() -> str:
+    """The token-savings receipt — lifetime + last-7d tokens saved, the tokenizer
+    used, and the measured routing precision the number is gated on. trovex's
+    core claim, made auditable: real tokenizer, conservative counterfactual, and
+    no precision-adjusted figure until an eval has measured hit@1."""
+    from . import savings as _savings
+
+    return _savings.render_receipt_md(get_state().searcher.db)
+
+
+@mcp.resource("trovex://savings/{session}", name="session-savings", mime_type="text/markdown")
+def savings_for_session(session: str) -> str:
+    """One session's savings receipt. `session` is an Mcp-Session-Id (or an
+    X-TROVEX-Session value) seen in the query log."""
+    from . import savings as _savings
+
+    return _savings.render_session_md(get_state().searcher.db, session)
 
 
 @mcp.resource("trovex://sources", name="sources", mime_type="text/markdown")

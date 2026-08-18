@@ -501,12 +501,29 @@ def bench(
             from .retrieval_eval import evaluate_retrieval, format_retrieval_stats
 
             rstats = evaluate_retrieval(searcher, labeled, k=k)
+            # Persist to the LIVE store so the savings receipt can gate its number
+            # on this measured hit@1 (the eval ran on a hermetic temp index of the
+            # same repo — a fair proxy for live routing quality). Best-effort: a
+            # failure here must not fail the bench.
+            try:
+                from .savings import record_eval_run
+                from .store import SqliteStore
+
+                record_eval_run(SqliteStore(Settings()).db, rstats)
+            except Exception:  # noqa: BLE001
+                import logging
+
+                logging.getLogger("trovex.cli").debug(
+                    "failed to persist retrieval eval run", exc_info=True
+                )
             if json_out:
                 print(_bench_json(rstats))
             else:
                 console.print(
                     f"[bold]retrieval quality[/bold] · {len(labeled)} labelled queries "
-                    f"on {repo.name}\n{format_retrieval_stats(rstats)}"
+                    f"on {repo.name}\n{format_retrieval_stats(rstats)}\n"
+                    f"[dim]recorded hit@1={rstats.hit_at_1:.2f} to the store — "
+                    f"the savings receipt now gates on it.[/dim]"
                 )
         elif latency:
             from .query_latency import format_latency_stats, measure_query_latency

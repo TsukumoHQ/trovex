@@ -104,4 +104,6 @@ def capture_state(
         # the agent name's case (the store lower-cases tags on write anyway).
         tags=[f"owner/{agent.lower()}", "type/current-state", f"capture/{reason}"],
     )
-    return {"captured": True, "doc_id": doc_id, "tokens": max(1, len(content) // 4)}
+    from .tokens import count_tokens
+
+    return {"captured": True, "doc_id": doc_id, "tokens": count_tokens(content)}

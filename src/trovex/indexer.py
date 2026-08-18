@@ -265,7 +265,9 @@ class Indexer:
         so both write a doc identically."""
         title = self._extract_title(content, path.name)
         author = self._extract_author(content)
-        tokens_est = len(content) // 4
+        from .tokens import count_tokens
+
+        tokens_est = count_tokens(content)
         now = time.time()
         if existing:
             self.db.execute(

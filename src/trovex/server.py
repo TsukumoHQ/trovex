@@ -36,6 +36,12 @@ from .usage import UserHeaderMiddleware
 log = logging.getLogger("trovex.server")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+# The React savings-receipt bundle — a SEPARATE build from the marketing site.
+# trovex-frontend builds it to web/dist-receipt (base '/receipt/', via
+# `npm run build:receipt`); web/dist is the public marketing build and must NOT
+# be served here (it would expose the dashboard under a wrong base). Mounted at
+# /receipt only when present — see create_app.
+WEB_DIST = Path(__file__).parent.parent.parent / "web" / "dist-receipt"
 
 # Validation patterns for free-text filter params (finding 6). kind is a bare
 # slug; tags allow `/` (owner/alpha scope) but nothing else exotic.
@@ -314,6 +320,15 @@ def build_app() -> FastAPI:
 
     # Mount MCP HTTP transport at /mcp
     app.mount("/mcp", mcp.streamable_http_app())
+
+    # Serve the React savings-receipt SPA same-origin with /api/savings* so the
+    # view needs no CORS and no separate host. Best-effort: registered only when
+    # the built bundle exists (web/dist-receipt), so a source/installed tree
+    # without a build still boots. html=True gives SPA fallback to index.html.
+    if WEB_DIST.is_dir():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/receipt", StaticFiles(directory=str(WEB_DIST), html=True), name="receipt")
 
     # ── HTML pages ───────────────────────────────────────────────────
 
@@ -1081,6 +1096,23 @@ def build_app() -> FastAPI:
         days = max(1, min(90, int(days)))
         since = _now() - days * 86400
         return JSONResponse(savings_mod.totals(db, since))
+
+    @app.get("/api/savings/lifetime")
+    async def api_savings_lifetime() -> JSONResponse:
+        state = get_state()
+        return JSONResponse(savings_mod.totals(state.searcher.db, 0.0))
+
+    @app.get("/api/savings/agents")
+    async def api_savings_agents(days: int = 7) -> JSONResponse:
+        state = get_state()
+        since = _now() - max(1, min(90, int(days))) * 86400
+        return JSONResponse(savings_mod.per_agent(state.searcher.db, since))
+
+    @app.get("/api/savings/sessions")
+    async def api_savings_sessions(days: int = 7) -> JSONResponse:
+        state = get_state()
+        since = _now() - max(1, min(90, int(days))) * 86400
+        return JSONResponse(savings_mod.per_session(state.searcher.db, since))
 
     @app.get("/api/usage")
     async def api_usage(days: int = 7) -> JSONResponse:

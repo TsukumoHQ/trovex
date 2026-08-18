@@ -40,7 +40,9 @@ class Chunk:
 
 
 def _est_tokens(text: str) -> int:
-    return len(text) // 4
+    from .tokens import count_tokens
+
+    return count_tokens(text)
 
 
 def _split_to_size(text: str, max_tokens: int) -> list[str]:

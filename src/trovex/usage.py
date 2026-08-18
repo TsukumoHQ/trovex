@@ -55,6 +55,9 @@ def purge_old_queries(db, retention_days: int) -> int:
 current_user: contextvars.ContextVar[str] = contextvars.ContextVar(
     "trovex_current_user", default="unknown"
 )
+current_session: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "trovex_current_session", default="unknown"
+)
 current_openai_key: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "trovex_openai_key", default=None
 )
@@ -74,6 +77,21 @@ class UserHeaderMiddleware(BaseHTTPMiddleware):
         clean = "".join(c for c in user if c.isalnum() or c in "._-")[:32] or "unknown"
         u_token = current_user.set(clean)
 
+        # Per-session attribution for the savings receipt. Prefer an explicit
+        # X-TROVEX-Session; otherwise fall back to the MCP transport's own
+        # Mcp-Session-Id (present on every streamable-HTTP call after initialize)
+        # — a real per-connection id with zero client config. Sanitised like the
+        # user, "unknown" when neither is present (e.g. stdio / a bare request).
+        raw_session = (
+            request.headers.get("x-trovex-session")
+            or request.headers.get("mcp-session-id")
+            or "unknown"
+        )
+        clean_session = (
+            "".join(c for c in raw_session if c.isalnum() or c in "._-")[:64] or "unknown"
+        )
+        s_token = current_session.set(clean_session)
+
         # BYOK: optional OpenAI key for reranking. Never persist, never log.
         raw_key = request.headers.get("x-trovex-openai-key")
         if raw_key and raw_key.startswith("sk-") and len(raw_key) > 20:
@@ -91,6 +109,7 @@ class UserHeaderMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         finally:
             current_user.reset(u_token)
+            current_session.reset(s_token)
             current_openai_key.reset(k_token)
             current_rerank_model.reset(m_token)
             current_write_token.reset(w_token)
@@ -132,14 +151,15 @@ def log_query(
 
     cur = db.execute(
         """INSERT INTO mcp_queries
-           (ts, user, query, n_results, summary, response_tokens_est, elapsed_ms,
+           (ts, user, session_id, query, n_results, summary, response_tokens_est, elapsed_ms,
             would_have_read_tokens, top_result_tokens,
             reranked, llm_model, llm_tokens_in, llm_tokens_out, llm_elapsed_ms,
             pre_top1_path, top1_changed, top1_lift, top5_overlap)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             time.time(),
             current_user.get(),
+            current_session.get(),
             redact_secrets(query)[:500],
             n_results,
             int(summary),

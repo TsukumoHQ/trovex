@@ -10,6 +10,7 @@ pulls a full record on demand via trovex_read(doc_id).
 from __future__ import annotations
 
 from .search import Searcher
+from .tokens import count_tokens as _count_tokens
 
 BOOT_QUERY = "current state resume open work in flight next steps gotchas"
 
@@ -62,5 +63,5 @@ def boot_pointers(
         "agent": agent,
         "pointers": pointers,
         "render": render,
-        "tokens_est": max(1, len(render) // 4),
+        "tokens_est": _count_tokens(render),
     }

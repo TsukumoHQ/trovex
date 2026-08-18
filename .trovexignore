@@ -2,6 +2,10 @@
 # Everything else routes to the trovex store (trovex_write).
 # Owner directive (2026-06-20): full-trovex, EXCEPT blog articles.
 #
+# niwa review-gate artifact: the per-worktree decision note the qa gate requires
+# on disk (the scribe folds it into the feature-doc). Transient, untracked.
+.niwa-decision.md
+#
 # Kept on disk for correctness (toolchain / harness / agents read these from
 # disk — routing them to the store would break the repo):
 README.md

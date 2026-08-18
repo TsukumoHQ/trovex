@@ -59,6 +59,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_to_multi_source(conn)
     _migrate_embed_dim(conn, embed_dim)
     _migrate_add_trovex_store_columns(conn)
+    _migrate_add_query_session(conn)
     _init_schema(conn, embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
@@ -285,6 +286,27 @@ def _migrate_add_trovex_store_columns(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_add_query_session(conn: sqlite3.Connection) -> None:
+    """Add mcp_queries.session_id to an existing query log (additive).
+
+    The savings receipt aggregates per session as well as per agent/lifetime;
+    a store created before that has the rows but not the column. Nullable with a
+    'unknown' default so old rows attribute to no session rather than breaking.
+    Skip if the table doesn't exist yet — _init_schema creates it with the column.
+    """
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_queries'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(mcp_queries)")}
+    if "session_id" not in cols:
+        conn.execute(
+            "ALTER TABLE mcp_queries ADD COLUMN session_id TEXT NOT NULL DEFAULT 'unknown'"
+        )
+        conn.commit()
+
+
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
     conn.executescript(
         f"""
@@ -328,6 +350,7 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             id INTEGER PRIMARY KEY,
             ts REAL NOT NULL,
             user TEXT NOT NULL DEFAULT 'unknown',
+            session_id TEXT NOT NULL DEFAULT 'unknown',
             query TEXT NOT NULL,
             n_results INTEGER NOT NULL DEFAULT 0,
             summary INTEGER NOT NULL DEFAULT 0,
@@ -347,6 +370,22 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_ts ON mcp_queries(ts DESC);
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_user ON mcp_queries(user, ts DESC);
+        CREATE INDEX IF NOT EXISTS idx_mcp_queries_session ON mcp_queries(session_id, ts DESC);
+
+        -- Latest retrieval-quality eval runs (retrieval_eval.evaluate_retrieval),
+        -- persisted so the savings receipt can gate its number on measured hit@1
+        -- instead of assuming perfect routing. The receipt reads the newest row.
+        CREATE TABLE IF NOT EXISTS retrieval_eval_runs (
+            id INTEGER PRIMARY KEY,
+            ts REAL NOT NULL,
+            n INTEGER NOT NULL,
+            k INTEGER NOT NULL,
+            hit_at_1 REAL NOT NULL,
+            hit_at_k REAL NOT NULL,
+            mrr REAL NOT NULL,
+            recall_at_k REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_retrieval_eval_ts ON retrieval_eval_runs(ts DESC);
 
         CREATE TABLE IF NOT EXISTS mcp_query_results (
             query_id INTEGER NOT NULL REFERENCES mcp_queries(id) ON DELETE CASCADE,

@@ -3,6 +3,7 @@
 Single tool, minimal output by design — see project README for rationale.
 """
 
+import json
 import logging
 import os
 import secrets
@@ -24,6 +25,18 @@ def _version_string() -> str:
         return _pkg_version("trovex")
     except PackageNotFoundError:  # source tree without an installed dist
         return "0.0.0"
+
+
+# CCAR 2.2 — actionable, typed tool errors. A tool that hits a real error returns
+# this compact JSON object (still a str, so the wire contract is unchanged) an
+# agent can branch on, instead of a bare human sentence or a raw pydantic dump.
+# `category` is one of: "validation" (the caller must fix the call — never retry
+# as-is), "permission" (missing/!wrong auth), "transient" (safe to retry).
+def _err(code: str, category: str, hint: str, *, retryable: bool = False) -> str:
+    return json.dumps(
+        {"error": {"code": code, "category": category, "isRetryable": retryable, "hint": hint}},
+        ensure_ascii=False,
+    )
 
 
 # Allow override via env so the same code runs locally and behind Traefik.
@@ -114,7 +127,7 @@ def _resolve_source(explicit: str = "") -> str | None:
 
 
 @mcp.tool()
-def trovex(q: str, summary: bool = False, source: str = "") -> str:
+def trovex(q: str = "", summary: bool = False, source: str = "", query: str = "") -> str:
     """Find canonical docs for a query.
 
     Returns one result per line: path + marker (★ canonical, ◯ plan,
@@ -122,10 +135,14 @@ def trovex(q: str, summary: bool = False, source: str = "") -> str:
     minimal output is ambiguous (adds ~150 tokens).
 
     Args:
-        q: Natural-language query (e.g. "auth JWT", "deployment cron").
+        q: Natural-language query (e.g. "auth JWT", "deployment cron"). The
+            alias `query` is also accepted (trovex_search/trovex_read use
+            `query`) — pass either.
         summary: Include a 50-word extract per result. Default False.
         source: Restrict to one source id (project). Defaults to whatever this
             connection is pinned to; pass "*" to search every source.
+        query: Alias for `q` (accepted so a caller that learned `query` from the
+            other tools doesn't misfire).
     """
     import time as _time
 
@@ -134,6 +151,14 @@ def trovex(q: str, summary: bool = False, source: str = "") -> str:
 
     from . import cache as _qcache
 
+    q = (q or query).strip()
+    if not q:
+        return _err(
+            "missing_query",
+            "validation",
+            'Pass the search text as `q` (alias `query`), e.g. trovex(q="auth jwt").',
+        )
+
     state = get_state()
     db = state.searcher.db
     t0 = _time.perf_counter()
@@ -141,7 +166,7 @@ def trovex(q: str, summary: bool = False, source: str = "") -> str:
     try:
         scope = _resolve_source(source)
     except ValueError as e:
-        return f"(error: {e})"
+        return _err("unknown_source", "validation", str(e))
 
     # Exact-match query cache: a repeat against an unchanged corpus skips the
     # candidate search + the LLM reranker (the cost driver). corpus_version is
@@ -242,9 +267,11 @@ def _authorized() -> bool:
     return secrets.compare_digest(current_write_token.get() or "", tok)
 
 
-_DENY = (
-    "(unauthorized — send the X-TROVEX-Write-Token header. The token is at "
-    "<data_dir>/.write_token, or set TROVEX_WRITE_TOKEN to a shared value.)"
+_DENY = _err(
+    "unauthorized",
+    "permission",
+    "Send the X-TROVEX-Write-Token header. The token is at <data_dir>/.write_token, "
+    "or set TROVEX_WRITE_TOKEN to a shared value.",
 )
 
 
@@ -262,7 +289,7 @@ def trovex_write(
     content: str,
     kind: str = "",
     doc_id: str = "",
-    tags: list[str] | None = None,
+    tags: list[str] | str | None = None,
     ticket: str = "",
     force: bool = False,
     section: str = "",
@@ -308,18 +335,25 @@ def trovex_write(
     if section:
         # PATCH-in-place — never fall through to a whole-doc overwrite (the data-loss bug).
         if not doc_id:
-            return "✗ section write needs doc_id — pass the doc to patch. (Nothing written.)"
+            return _err(
+                "missing_doc_id",
+                "validation",
+                "A section write needs doc_id — pass the doc to patch. Nothing written.",
+            )
         doc = state.store.get(resolved) if resolved else None
         if doc is None:
-            return (
-                f"✗ doc '{doc_id}' not found — cannot patch section '{section}'. (Nothing written.)"
+            return _err(
+                "doc_not_found",
+                "validation",
+                f"doc '{doc_id}' not found — cannot patch section '{section}'. Nothing written.",
             )
         patched = replace_section(doc.content, section, content)
         if patched is None:
-            return (
-                f"✗ section '{section}' not found in doc {resolved} — NOTHING written "
-                f"(refused to overwrite the whole doc). Read its headings first: "
-                f'trovex_read(doc_id="{resolved}").'
+            return _err(
+                "section_not_found",
+                "validation",
+                f"section '{section}' not found in doc {resolved} — NOTHING written (refused to "
+                f'overwrite the whole doc). Read its headings first: trovex_read(doc_id="{resolved}").',
             )
         content = patched
         doc_id = resolved
@@ -355,13 +389,18 @@ def trovex_write(
 
 
 @mcp.tool()
-def trovex_tag(doc_id: str, add: list[str] | None = None, remove: list[str] | None = None) -> str:
+def trovex_tag(
+    doc_id: str,
+    add: list[str] | str | None = None,
+    remove: list[str] | str | None = None,
+) -> str:
     """Add/remove tags on a trovex-owned doc — returns the doc's new tag set.
 
     Args:
         doc_id: The doc to tag.
-        add: List of tags to add (free or hierarchical "a/b/c").
-        remove: List of tags to remove.
+        add: Tags to add — a list (e.g. ["owner/cto", "type/report"]) or a
+            comma string ("owner/cto,type/report"). Free or hierarchical "a/b/c".
+        remove: Tags to remove — same list-or-comma-string form.
     """
     if not _authorized():
         return _DENY
@@ -375,19 +414,24 @@ def trovex_tag(doc_id: str, add: list[str] | None = None, remove: list[str] | No
 
 
 @mcp.tool()
-def trovex_read(query: str = "", doc_id: str = "", section: str = "", full: bool = False) -> str:
+def trovex_read(
+    query: str = "", doc_id: str = "", section: str = "", full: bool = False, q: str = ""
+) -> str:
     """Read a trovex-owned doc — by default returns the most relevant *passage*.
 
     Token-minimal by design: a query returns the single best chunk (with its
     heading breadcrumb), not the whole doc. Set full=true for the whole doc.
 
     Args:
-        query: Natural-language query → the best-matching passage.
+        query: Natural-language query → the best-matching passage. The alias `q`
+            is also accepted (the `trovex` tool uses `q`) — pass either.
         doc_id: Opaque id → that exact doc (whole, or just `section`).
         section: With doc_id, return only that heading's section.
         full: With query, return the whole best-matching doc instead of a passage.
+        q: Alias for `query`.
     """
     state = get_state()
+    query = (query or q).strip()
     if doc_id:
         # Accept a full OR short/prefix id (a bare short id used to return (not found)).
         resolved = state.store.resolve_ext_id(doc_id)
@@ -398,8 +442,12 @@ def trovex_read(query: str = "", doc_id: str = "", section: str = "", full: bool
             sec = extract_section(doc.content, section)
             return sec if sec is not None else f"(section '{section}' not found)"
         return doc.content
-    if not query.strip():
-        return "(provide query or doc_id)"
+    if not query:
+        return _err(
+            "missing_input",
+            "validation",
+            "Provide a `query` (alias `q`) for the best passage, or a `doc_id` for an exact doc.",
+        )
     if full:
         results = state.searcher.search(query, limit=1, source_ids=[TROVEX_SOURCE_ID])
         doc = state.store.get(results[0].path) if results else None
@@ -419,11 +467,12 @@ def trovex_read(query: str = "", doc_id: str = "", section: str = "", full: bool
 
 @mcp.tool()
 def trovex_search(
-    query: str,
+    query: str = "",
     k: int = 5,
     kind: str = "",
-    tags: list[str] | None = None,
+    tags: list[str] | str | None = None,
     source: str = "",
+    q: str = "",
 ) -> str:
     """Search the store — returns the top K relevant *passages* (not whole docs).
 
@@ -431,19 +480,29 @@ def trovex_search(
     is a passage with its heading breadcrumb + source doc id.
 
     Args:
-        query: Natural-language query.
+        query: Natural-language query. The alias `q` is also accepted (the
+            `trovex` tool uses `q`) — pass either.
         k: How many passages (default 5).
         kind: Filter by kind (e.g. "record").
-        tags: List of tags to filter by (any-match). A comma string also works.
+        tags: Tags to filter by, any-match — a list (e.g. ["owner/cto", "kind/record"])
+            or a comma string ("owner/cto,kind/record").
         source: Restrict to one source id (project). Defaults to whatever this
             connection is pinned to; pass "*" to search every source.
+        q: Alias for `query`.
     """
     state = get_state()
     t0 = time.perf_counter()
+    query = (query or q).strip()
+    if not query:
+        return _err(
+            "missing_query",
+            "validation",
+            'Pass the search text as `query` (alias `q`), e.g. trovex_search(query="deploy cron").',
+        )
     try:
         scope = _resolve_source(source)
     except ValueError as e:
-        return f"(error: {e})"
+        return _err("unknown_source", "validation", str(e))
     hits = state.store.search_chunks(
         query,
         limit=k,

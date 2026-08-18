@@ -24,9 +24,15 @@ from trovex import mcp_app
 CONTRACT: dict[str, dict[str, set[str]]] = {
     # `source` (added with per-project scoping) is optional everywhere it appears:
     # an existing client that never sends it keeps searching the whole store.
-    "trovex": {"props": {"q", "summary", "source"}, "required": {"q"}},
-    "trovex_search": {"props": {"query", "k", "kind", "tags", "source"}, "required": {"query"}},
-    "trovex_read": {"props": {"query", "doc_id", "section", "full"}, "required": set()},
+    #
+    # CCAR G1 alias migration: `trovex` uses `q`, the other tools use `query`. To
+    # stop agents misfiring on the mismatch each now ACCEPTS the other name as an
+    # alias, so `q`/`query` moved from required→optional (a tool returns a typed
+    # `missing_query` error when neither is given). Backward-compatible: a client
+    # that always sent the original name is unaffected.
+    "trovex": {"props": {"q", "summary", "source", "query"}, "required": set()},
+    "trovex_search": {"props": {"query", "k", "kind", "tags", "source", "q"}, "required": set()},
+    "trovex_read": {"props": {"query", "doc_id", "section", "full", "q"}, "required": set()},
     "trovex_write": {
         "props": {"content", "kind", "doc_id", "tags", "ticket", "force", "section"},
         "required": {"content"},

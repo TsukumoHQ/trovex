@@ -1,0 +1,216 @@
+/* trovex savings receipt — private local dashboard. Inherits fonts/colors from
+ * index.css (Fira families, #06080d dark, --accent green). Local layout only.
+ * Under-claim aesthetic: the number is big, everything qualifying it stays
+ * legible right next to it — no hero gradients, no marketing shine. */
+
+.rc {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.rc-home {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--fg-muted);
+}
+.rc-home:hover { color: var(--fg); }
+
+.rc-head h1 {
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  line-height: 1.15;
+  margin: 0.1rem 0 0.5rem;
+}
+.rc-eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0;
+}
+.rc-sub {
+  max-width: 46rem;
+  color: var(--fg-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+.rc-sub code { color: var(--fg); background: var(--bg-input); padding: 0.05em 0.35em; border-radius: var(--radius-sm); }
+
+.rc-lifetime {
+  margin: 1.1rem 0 0;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.rc-lifetime b { color: var(--fg); }
+.rc-lifetime-note { color: var(--fg-subtle); }
+
+/* Range tabs */
+.rc-range {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin: 1.5rem 0 1rem;
+  padding: 0.25rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.rc-range-btn {
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.rc-range-btn:hover { color: var(--fg); }
+.rc-range-btn.is-on { background: var(--accent-soft); color: var(--fg); }
+
+/* Main card */
+.rc-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+}
+
+.rc-headline { text-align: left; }
+.rc-big {
+  font-size: clamp(2.6rem, 8vw, 4rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+}
+.rc-headline.is-verified .rc-big { color: var(--accent); }
+.rc-big-label {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  margin-top: 0.35rem;
+}
+.rc-ratio { margin-top: 0.6rem; font-size: 0.9rem; color: var(--fg-subtle); }
+
+.rc-secondary {
+  margin: 0.9rem 0 0;
+  font-size: 0.85rem;
+  color: var(--fg-subtle);
+}
+
+.rc-caveat {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  margin: 1rem 0 0;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  color: var(--fg-muted);
+  background: var(--duplicate-bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--duplicate);
+  border-radius: var(--radius-sm);
+}
+.rc-caveat-tag {
+  flex: none;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--duplicate);
+}
+
+.rc-assumption {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  margin: 1rem 0 0;
+  font-size: 0.83rem;
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+.rc-assumption-tag {
+  flex: none;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-subtle);
+}
+.rc-tokenizer { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--fg-subtle); }
+.rc-tokenizer b { color: var(--fg-muted); }
+
+/* would-have-read vs actual bars */
+.rc-bars { margin-top: 1.4rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.rc-bar { display: flex; align-items: center; gap: 0.75rem; }
+.rc-bar-label { flex: none; width: 8.5rem; font-size: 0.75rem; color: var(--fg-subtle); text-align: right; }
+.rc-bar-track {
+  flex: 1;
+  height: 0.7rem;
+  background: var(--bg-input);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.rc-bar-fill { display: block; height: 100%; border-radius: 999px; }
+.rc-bar--ghost .rc-bar-fill { background: var(--border-strong); }
+.rc-bar--solid .rc-bar-fill { background: var(--accent); }
+.rc-bars-legend { margin: 0.6rem 0 0; font-size: 0.78rem; color: var(--fg-subtle); }
+
+/* States */
+.rc-skeleton {
+  min-height: 12rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--bg-elevated), var(--bg-hover), var(--bg-elevated));
+  background-size: 200% 100%;
+  animation: rc-shimmer 1.4s ease-in-out infinite;
+}
+.rc-skeleton--table { min-height: 8rem; margin-top: 0.5rem; }
+@keyframes rc-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .rc-skeleton { animation: none; } }
+
+.rc-empty, .rc-error { color: var(--fg-muted); line-height: 1.55; }
+.rc-empty-h { color: var(--fg); font-weight: 600; margin: 0 0 0.4rem; }
+.rc-error-detail { font-size: 0.8rem; color: var(--stale); margin: 0.3rem 0; }
+.rc-error-hint code, .rc-empty code { color: var(--fg); background: var(--bg-input); padding: 0.05em 0.35em; border-radius: var(--radius-sm); }
+.rc-retry {
+  margin-top: 0.8rem;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.rc-retry:hover { background: var(--bg-hover); }
+
+/* Breakdown tables */
+.rc-breakdown { margin-top: 2rem; display: grid; gap: 2rem; }
+.rc-h2 { font-size: 1rem; margin: 0 0 0.75rem; color: var(--fg); }
+.rc-tbl-msg { color: var(--fg-subtle); font-size: 0.85rem; }
+.rc-table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.rc-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.rc-table th, .rc-table td { padding: 0.55rem 0.8rem; text-align: left; white-space: nowrap; }
+.rc-table thead th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-subtle);
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+}
+.rc-table tbody tr { border-top: 1px solid var(--border); }
+.rc-table tbody tr:hover { background: var(--bg-hover); }
+.rc-num { text-align: right; }
+.rc-td-name { color: var(--fg); }
+.rc-td-time { color: var(--fg-subtle); }
+
+.rc-foot {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--fg-subtle);
+}

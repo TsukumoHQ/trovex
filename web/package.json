@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && node scripts/check-no-blog.mjs && node scripts/check-no-client-secrets.mjs && node scripts/check-pii-openai.mjs && node scripts/check-voice.mjs && node scripts/check-internal-links.mjs && node scripts/check-silo-schema.mjs && node scripts/check-install-cta.mjs && node scripts/check-analytics.mjs && npm run lint && npm run typecheck:api && tsc -b && vitest run && vite build && node scripts/gen-md-twins.mjs",
     "lint": "eslint .",
+    "build:receipt": "tsc -b && vite build --config vite.receipt.config.ts",
     "preview": "vite preview",
     "indexnow": "node scripts/indexnow-ping.mjs"
   },

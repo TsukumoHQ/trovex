@@ -8,6 +8,14 @@ import tailwindcss from '@tailwindcss/vite'
 // (savings.html). Each is its own entry so they ship independent bundles.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Dev only: the /receipt dashboard (served at /receipt.html here) fetches the
+  // local trovex server's real savings data. Proxy /api to it so same-origin
+  // relative fetches work in `vite dev`. No effect on the production build.
+  server: {
+    proxy: {
+      '/api': { target: 'http://localhost:8765', changeOrigin: true },
+    },
+  },
   build: {
     rollupOptions: {
       input: {

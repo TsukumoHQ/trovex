@@ -16,5 +16,9 @@ REFONTE.md
 **/CLAUDE.md
 **/AGENTS.md
 
+# NOTE: niwa qa-gate artifacts (.niwa-decision.md, .niwa-*.md, anything under a
+# .niwa/ workdir) are auto-exempt by the guard itself — you do NOT need to list
+# them here. Pre-check any path with: trovex-md-guard.sh --check <path>
+
 # Anything a build/site generator consumes
 docs/site/**

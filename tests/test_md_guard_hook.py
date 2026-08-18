@@ -126,3 +126,48 @@ def test_write_guard_install_location_independent(tmp_path, trovex_up):
     scratch.parent.mkdir()
     scratch.write_text("# scratch\n")
     assert not _is_deny(_run(installed, "Write", str(scratch), trovex_up))
+
+
+# --- niwa qa-gate artifacts: never blocked, even inside the trovex repo ---------
+# (e179d285) The gate REQUIRES these on disk; the doc-regime must not collide.
+
+
+def test_write_guard_allows_niwa_decision_doc(trovex_up):
+    # .niwa-decision.md sits IN the trovex repo and is NOT on .trovexignore, yet the
+    # built-in exemption must let it through — else the qa gate can't run.
+    target = str(_REPO / ".niwa-decision.md")
+    assert not _is_deny(_run(_WRITE_GUARD, "Write", target, trovex_up))
+
+
+def test_write_guard_allows_niwa_workdir(trovex_up):
+    target = str(_REPO / ".niwa" / "feature-doc.md")
+    assert not _is_deny(_run(_WRITE_GUARD, "Write", target, trovex_up))
+
+
+# --- pre-write --check mode: verdict BEFORE the doc is composed -----------------
+
+
+def _check(path: str, trovex_url: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["bash", str(_WRITE_GUARD), "--check", path],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "TROVEX_URL": trovex_url},
+        check=False,
+    )
+
+
+def test_check_mode_allows_niwa_artifact(trovex_up):
+    res = _check(str(_REPO / ".niwa-decision.md"), trovex_up)
+    assert res.stdout.strip() == "ALLOW" and res.returncode == 0
+
+
+def test_check_mode_allows_keeplist(trovex_up):
+    res = _check(str(_REPO / "README.md"), trovex_up)
+    assert res.stdout.strip() == "ALLOW" and res.returncode == 0
+
+
+def test_check_mode_denies_ssot_md_before_compose(trovex_up):
+    res = _check(str(_REPO / "__guard_probe__.md"), trovex_up)
+    assert res.stdout.startswith("DENY:") and res.returncode == 1
+    assert "trovex_write" in res.stdout  # the deny still names the fix

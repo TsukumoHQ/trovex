@@ -496,3 +496,147 @@ def trovex_delete(doc_id: str) -> str:
         return _DENY
     state = get_state()
     return "deleted" if state.store.delete(doc_id) else "(not found)"
+
+
+# ---------------------------------------------------------------------------
+# MCP resources — the doc/topic catalog, exposed at connection time.
+#
+# trovex IS a documentation catalog (a doc-router), but it exposed only tools:
+# an agent had to call `trovex_search` even to see WHAT exists. CCAR 2.4 =
+# expose the content catalog as read-only MCP RESOURCES, so an MCP client gets
+# the index at connect time without an exploratory tool call — the token-
+# efficiency story trovex already sells, made stronger. Strictly additive: the
+# tools above are unchanged, and resources are read-only.
+# ---------------------------------------------------------------------------
+
+_CATALOG_CAP = 1000  # hard ceiling on a per-source listing (token safety)
+_CATALOG_PREVIEW = 40  # docs per source shown inline in the global catalog
+
+
+def _source_labels() -> dict[str, str]:
+    """source id → display label, including the trovex-owned virtual source."""
+    labels = {TROVEX_SOURCE_ID: "trovex (owned records)"}
+    try:
+        for s in get_state().settings.load_sources():
+            labels[s.id] = s.label
+    except Exception:  # noqa: BLE001 — a bad sources.yaml must not break the resource
+        log.debug("load_sources failed while labelling catalog", exc_info=True)
+    return labels
+
+
+def _known_source_ids(db) -> set[str]:
+    return {
+        r["source_id"]
+        for r in db.execute(
+            "SELECT DISTINCT source_id FROM docs WHERE workspace_id = 'default'"
+        ).fetchall()
+    }
+
+
+def _fresh_label(mtime: float, now: float) -> str:
+    days = max(0.0, (now - (mtime or 0.0)) / 86400)
+    return f"{int(days * 24)}h" if days < 1 else f"{int(days)}d"
+
+
+def _catalog_rows(db, source: str | None, limit: int) -> list:
+    """Canonical docs (never stale/duplicate), newest first, grouped by source."""
+    where = ["workspace_id = 'default'", "status NOT IN ('stale', 'duplicate')"]
+    params: list = []
+    if source:
+        where.append("source_id = ?")
+        params.append(source)
+    return db.execute(
+        f"""SELECT ext_id, path, title, status, tokens_est, source_id, mtime
+            FROM docs WHERE {" AND ".join(where)}
+            ORDER BY source_id, mtime DESC LIMIT ?""",
+        (*params, limit),
+    ).fetchall()
+
+
+def _doc_handle(row) -> str:
+    """How an agent addresses this doc: an owned record by its trovex id, a
+    filesystem doc by its source-relative path."""
+    if row["source_id"] == TROVEX_SOURCE_ID and row["ext_id"]:
+        return f"trovex:{row['ext_id']}"
+    return row["path"] or (f"trovex:{row['ext_id']}" if row["ext_id"] else "?")
+
+
+def _render_doc_line(row, now: float) -> str:
+    from .search import STATUS_MARKER
+
+    mark = STATUS_MARKER.get(row["status"], "★")
+    title = (row["title"] or "(untitled)").strip()
+    return (
+        f"- {mark} {title} · ~{row['tokens_est']}tok · "
+        f"{_fresh_label(row['mtime'], now)} · {_doc_handle(row)}"
+    )
+
+
+@mcp.resource("trovex://sources", name="sources", mime_type="text/markdown")
+def catalog_sources() -> str:
+    """The configured sources (projects) and their doc counts — the top of the
+    territory. Read `trovex://catalog/{source}` for one source's doc listing."""
+    db = get_state().searcher.db
+    labels = _source_labels()
+    meta = db.execute(
+        """SELECT source_id, COUNT(*) AS c FROM docs
+           WHERE workspace_id = 'default' GROUP BY source_id ORDER BY c DESC"""
+    ).fetchall()
+    if not meta:
+        return "# trovex sources\n\n(store is empty)"
+    lines = ["# trovex sources", ""]
+    for m in meta:
+        lines.append(
+            f"- **{m['source_id']}** — {labels.get(m['source_id'], m['source_id'])} · {m['c']} docs"
+        )
+    lines += [
+        "",
+        "Read `trovex://catalog` for the canonical doc index, or "
+        "`trovex://catalog/{source}` for one source.",
+    ]
+    return "\n".join(lines)
+
+
+@mcp.resource("trovex://catalog", name="catalog", mime_type="text/markdown")
+def catalog_index() -> str:
+    """The canonical doc/topic index across every source — what trovex can
+    answer, available at connect time so an agent needn't call a search tool to
+    see what exists. Grouped by source, capped preview per source (read
+    `trovex://catalog/{source}` for a source's full list)."""
+    db = get_state().searcher.db
+    now = time.time()
+    rows = _catalog_rows(db, None, _CATALOG_CAP)
+    if not rows:
+        return "# trovex catalog\n\n(store is empty)"
+    labels = _source_labels()
+    groups: dict[str, list] = {}
+    for r in rows:
+        groups.setdefault(r["source_id"], []).append(r)
+    out = [f"# trovex catalog — {len(rows)} canonical docs across {len(groups)} sources", ""]
+    for sid, docs in groups.items():
+        out.append(f"## {labels.get(sid, sid)} ({sid}) — {len(docs)} docs")
+        out += [_render_doc_line(r, now) for r in docs[:_CATALOG_PREVIEW]]
+        if len(docs) > _CATALOG_PREVIEW:
+            out.append(f"- … +{len(docs) - _CATALOG_PREVIEW} more — read `trovex://catalog/{sid}`")
+        out.append("")
+    return "\n".join(out).rstrip() + "\n"
+
+
+@mcp.resource("trovex://catalog/{source}", name="source-catalog", mime_type="text/markdown")
+def catalog_for_source(source: str) -> str:
+    """One source's full canonical doc listing (capped). `source` is a source id
+    from `trovex://sources` (e.g. "trovex" for owned records, "code")."""
+    db = get_state().searcher.db
+    now = time.time()
+    labels = _source_labels()
+    if source not in (set(labels) | _known_source_ids(db)):
+        # Unknown id → say so, never a silent empty listing that reads as "none".
+        return f"# {source}\n\n(unknown source — read `trovex://sources` for valid ids)"
+    rows = _catalog_rows(db, source, _CATALOG_CAP)
+    if not rows:
+        return f"# {labels.get(source, source)} ({source})\n\n(no canonical docs)"
+    out = [f"# {labels.get(source, source)} ({source}) — {len(rows)} canonical docs", ""]
+    out += [_render_doc_line(r, now) for r in rows]
+    if len(rows) >= _CATALOG_CAP:
+        out.append(f"\n(capped at {_CATALOG_CAP})")
+    return "\n".join(out) + "\n"

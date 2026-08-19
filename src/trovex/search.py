@@ -84,9 +84,7 @@ class Searcher:
 
         # Dense side — full metadata rows, already scoped + widen-retried (the
         # proven path). row_by_id caches every row we touch, for both signals.
-        vec_rows = self._vector_rows(
-            query, pool, source_ids, kind, tags, filtered, limit, include_archived
-        )
+        vec_rows = self._vector_rows(query, pool, source_ids, kind, tags, limit, include_archived)
         row_by_id = {r["id"]: r for r in vec_rows}
         vec_order = [r["id"] for r in vec_rows]
         # Only vector hits carry a cosine distance; a BM25-only hit gets the
@@ -177,7 +175,6 @@ class Searcher:
         source_ids: list[str] | None,
         kind: str | None,
         tags: list[str] | None,
-        filtered: bool,
         limit: int,
         include_archived: bool = False,
     ) -> list:
@@ -212,9 +209,11 @@ class Searcher:
         # sqlite-vec applies `k` before these filters, so a scope that is a thin
         # slice of a skewed corpus gets squeezed out of the pool before it is
         # ever filtered — a 14-doc project inside a 2831-doc store returned zero
-        # hits at pool=50 because the dominant source filled every slot. When a
-        # filtered query comes back short, retry once over the whole index.
-        if filtered and len(rows) < limit:
+        # hits at pool=50 because the dominant source filled every slot. Retry
+        # once over the whole index whenever the result comes back short: the
+        # lifecycle exclusion (archived/pending_delete) is ALWAYS applied, so even
+        # an otherwise-unfiltered query can be squeezed by an archived-heavy pool.
+        if len(rows) < limit:
             total = self.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
             if total > pool:
                 params[1] = min(total, MAX_KNN_POOL)

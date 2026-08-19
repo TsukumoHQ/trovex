@@ -39,9 +39,6 @@ TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
 # surfaced by retrieval); 'stale' mirrors the content-status axis for callers
 # that want to park a doc without archiving it.
 LIFECYCLE_STATES = ("active", "archived", "pending_delete", "stale")
-# Never surfaced by retrieval unless explicitly asked (archived) / at all
-# (pending_delete).
-_HIDDEN_LIFECYCLE = frozenset({"archived", "pending_delete"})
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 TITLE_RE = re.compile(r"^\s*#\s+(.+)$", re.MULTILINE)
@@ -116,26 +113,35 @@ class SqliteStore:
 
         with self._lock:
             existing = self.db.execute(
-                "SELECT id, content_hash FROM docs WHERE ext_id = ?", (ext_id,)
+                "SELECT id, content_hash, title FROM docs WHERE ext_id = ?", (ext_id,)
             ).fetchone()
 
             if existing:
                 doc_id = existing["id"]
-                # Incremental: an overwrite with byte-identical content is a no-op
-                # for the expensive + snapshot-polluting work — skip the version
-                # snapshot, the doc re-embed, the re-chunk, and dup-detection. Only
-                # the cheap metadata (title/kind/tags/mtime) is refreshed, so a
-                # tag-only or title-only update still lands.
-                content_unchanged = bool(existing["content_hash"]) and (
-                    existing["content_hash"] == content_hash
+                # Incremental: an overwrite whose content AND title are both
+                # byte-identical is a no-op for the expensive + snapshot-polluting
+                # work — skip the version snapshot, the doc re-embed, the re-chunk,
+                # and dup-detection. Title is part of the check because embed_text
+                # (doc + chunk) fuses the title in, so a title change MUST re-embed
+                # or the vectors keep the stale title.
+                content_unchanged = (
+                    bool(existing["content_hash"])
+                    and existing["content_hash"] == content_hash
+                    and existing["title"] == title
                 )
                 if not content_unchanged:
                     # Non-clobber: snapshot the current content before overwriting
                     # it, so a bad save is always recoverable (the vague2 loss class).
                     self._snapshot_version_locked(doc_id, now)
+                # A write is a "this doc is live" signal: reset lifecycle to active
+                # so re-writing (e.g. an Active-Memory capture to a stable
+                # owner-current-state ext_id) an archived doc resurrects it into
+                # retrieval instead of silently vanishing. Re-archive via
+                # trovex_archive after, if that's really intended.
                 self.db.execute(
                     """UPDATE docs SET content=?, content_hash=?, title=?, kind=?, tokens_est=?,
-                           size_bytes=?, mtime=?, last_indexed=?, author_agent=?
+                           size_bytes=?, mtime=?, last_indexed=?, author_agent=?,
+                           lifecycle='active'
                        WHERE id=?""",
                     (
                         content,

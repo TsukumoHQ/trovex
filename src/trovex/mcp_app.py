@@ -542,7 +542,9 @@ def trovex_read(
         h = hits[0]
         if rung == "card":
             # Tier 1: breadcrumb + ~50-word extract of the matched chunk — no
-            # small-to-big expansion, so it's strictly cheaper than the passage.
+            # small-to-big expansion, so it's cheaper than the passage for any
+            # section past ~50 words (a very short section can tie — the ledger
+            # stays honest either way).
             out = _fmt_card(h)
         else:
             # Tier 2 (default): small-to-big — match the chunk, return its full
@@ -630,8 +632,9 @@ def _extract_words(text: str, words: int = 50) -> str:
 
 def _fmt_card(h: dict) -> str:
     """Tier-1 summary card: heading breadcrumb + a ~50-word extract + an escalation
-    hint. The cheapest rung of the access ladder — enough to decide whether to
-    escalate, not the whole passage."""
+    hint. The lowest rung of the access ladder — enough to decide whether to
+    escalate, not the whole passage (cheaper than the passage for any section
+    past ~50 words; a very short section can tie)."""
     bc = _breadcrumb(h)
     extract = _extract_words(h.get("content", ""))
     return (

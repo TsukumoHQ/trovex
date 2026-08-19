@@ -27,10 +27,27 @@ import sqlite_vec
 
 from .chunking import chunk_markdown
 from .config import RESERVED_SOURCE_ID, Settings
-from .db import delete_doc_cascade, like_escape, open_db, upsert_docs_fts
+from .db import (
+    canonical_topic_slug,
+    delete_doc_cascade,
+    like_escape,
+    open_db,
+    upsert_docs_fts,
+)
 from .embedder import Embedder, embedder_from_settings
 
 TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
+
+
+class TopicCollisionError(Exception):
+    """A CREATE would fork a SECOND live canonical for a topic that already has
+    one, and force was not set. Carries the existing canon so the caller can
+    block-and-point (update it, or force=true to supersede it)."""
+
+    def __init__(self, ext_id: str, title: str | None):
+        self.ext_id = ext_id
+        self.title = title
+        super().__init__(f"topic already has a live canonical: {ext_id}")
 
 # Curation lifecycle (see docs.lifecycle). Distinct from `status` (a ranking
 # weight): lifecycle FILTERS visibility. 'active' is the default + only state
@@ -102,10 +119,18 @@ class SqliteStore:
         title: str | None = None,
         author: str | None = None,
         tags: list[str] | None = None,
+        force: bool = False,
     ) -> str:
-        """Create or replace a trovex-owned doc; return its opaque ext_id."""
+        """Create or replace a trovex-owned doc; return its opaque ext_id.
+
+        SSOT: a CREATE (no ext_id) of a non-ephemeral doc whose topic already has a
+        live canonical raises TopicCollisionError unless force=True, which atomically
+        SUPERSEDES the existing canon (status='superseded' + lifecycle='archived')
+        so exactly one live canonical per topic survives. Ephemeral kinds
+        (record/checkpoint/resume) carry no topic and are exempt."""
         ext_id = ext_id or uuid.uuid4().hex
         title = title or _extract_title(content)
+        topic = None if self.settings.is_ephemeral_kind(kind) else canonical_topic_slug(title)
         now = time.time()
         tokens_est = len(content) // 4
         size = len(content.encode("utf-8"))
@@ -141,7 +166,7 @@ class SqliteStore:
                 self.db.execute(
                     """UPDATE docs SET content=?, content_hash=?, title=?, kind=?, tokens_est=?,
                            size_bytes=?, mtime=?, last_indexed=?, author_agent=?,
-                           lifecycle='active'
+                           canonical_topic=?, lifecycle='active'
                        WHERE id=?""",
                     (
                         content,
@@ -153,6 +178,7 @@ class SqliteStore:
                         now,
                         now,
                         author,
+                        topic,
                         doc_id,
                     ),
                 )
@@ -162,12 +188,32 @@ class SqliteStore:
                     self.db.commit()
                     return ext_id
             else:
+                # SSOT enforcement on CREATE: if this topic already has a live
+                # canonical, either supersede it (force) or refuse (block-and-point).
+                if topic is not None:
+                    prior = self.db.execute(
+                        """SELECT id, ext_id, title FROM docs
+                           WHERE workspace_id = 'default' AND canonical_topic = ?
+                             AND status = 'canonical'
+                           LIMIT 1""",
+                        (topic,),
+                    ).fetchone()
+                    if prior is not None:
+                        if not force:
+                            raise TopicCollisionError(prior["ext_id"], prior["title"])
+                        # Atomic swap: the old canon steps down (superseded +
+                        # archived) in the SAME transaction as the new insert.
+                        self.db.execute(
+                            "UPDATE docs SET status = 'superseded', lifecycle = 'archived' "
+                            "WHERE id = ?",
+                            (prior["id"],),
+                        )
                 cur = self.db.execute(
                     """INSERT INTO docs
                            (source_id, path, absolute_path, content_hash, size_bytes,
                             tokens_est, mtime, first_indexed, last_indexed, title,
-                            author_agent, content, ext_id, kind)
-                       VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            author_agent, content, ext_id, kind, canonical_topic)
+                       VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         TROVEX_SOURCE_ID,
                         ext_id,
@@ -182,6 +228,7 @@ class SqliteStore:
                         content,
                         ext_id,
                         kind,
+                        topic,
                     ),
                 )
                 doc_id = cur.lastrowid

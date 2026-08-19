@@ -24,8 +24,8 @@ SQLITE_VEC_MAX_K = 4096
 # store's hybrid retrieval (store.py) so both surfaces fuse identically.
 RRF_K0 = 60
 
-STATUS_MARKER = {"canonical": "★", "plan": "◯", "stale": "✗", "duplicate": "⚠"}
-STATUS_WEIGHT = {"canonical": 1.0, "plan": 0.85, "stale": 0.5, "duplicate": 0.6}
+STATUS_MARKER = {"canonical": "★", "plan": "◯", "stale": "✗", "duplicate": "⚠", "superseded": "⤺"}
+STATUS_WEIGHT = {"canonical": 1.0, "plan": 0.85, "stale": 0.5, "duplicate": 0.6, "superseded": 0.3}
 
 
 @dataclass

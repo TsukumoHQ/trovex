@@ -21,7 +21,7 @@ import re
 import numpy as np
 import pytest
 
-from trovex.boot import boot_pointers
+from trovex.boot import BOOT_QUERY, boot_pointers
 from trovex.config import Settings
 from trovex.search import Searcher
 from trovex.store import SqliteStore
@@ -210,6 +210,90 @@ def test_knn_ceiling_boot_and_search_survive_over_4096_docs(settings, store):
     # A plain unfiltered search over the same >4096-doc store must not throw.
     results = searcher.search("reverse proxy tls nginx", limit=5)
     assert isinstance(results, list)
+
+
+def test_widen_retry_clamp_recalls_owner_records_past_first_pool(settings, store):
+    """ISOLATES the search.py widen-retry clamp (review follow-up on 4d832f33).
+
+    The prior outage test could not catch a dropped SQLITE_VEC_MAX_K clamp: boot's
+    try/except swallows the throw and the plain limit=5 search never fires the
+    widen-retry, so removing the clamp stayed green. This test constructs the
+    exact failing shape and asserts RECALL, not just no-throw:
+
+      • 60 near padding docs at distance 0 (unscoped 'code') fill the k=50 first
+        pass, so an owner-scoped query comes back empty on the first pass;
+      • ONE owner-scoped record sits just behind them (small distance) — inside the
+        clamped 4096 pool but past the first pass, so ONLY the widen-retry recalls
+        it;
+      • 4050 far padding docs push the corpus past 4096.
+
+    With the clamp: widen-retry k=4096 recalls the owner record → boot non-empty.
+    Without it: k=count>4096 raises, boot fail-opens to EMPTY → this fails, so a
+    regression that drops the clamp silently-empties Active-Memory recall and is
+    caught here rather than shipping."""
+    import time
+
+    import numpy as np
+    import sqlite_vec
+
+    from trovex.search import SQLITE_VEC_MAX_K
+
+    emb = BagEmbedder()
+    qvec = next(iter(emb.embed([BOOT_QUERY])))  # the exact vector boot embeds
+    near_blob = sqlite_vec.serialize_float32(qvec.tolist())
+
+    # Owner vector: qvec nudged on a dim it doesn't use → distance just above 0
+    # (behind the near padding) but cosine ≈ 1 (clears the boot floor 0.62).
+    zero_dims = [i for i in range(len(qvec)) if qvec[i] == 0.0]
+    owner_vec = qvec.copy()
+    owner_vec[zero_dims[0]] = 0.1
+    owner_vec /= np.linalg.norm(owner_vec)
+    owner_blob = sqlite_vec.serialize_float32(owner_vec.tolist())
+
+    # Far vector: orthogonal (distance 1) — pads the count without ever entering
+    # the owner's neighbourhood.
+    far_vec = np.zeros(len(qvec), dtype=np.float32)
+    far_vec[zero_dims[1]] = 1.0
+    far_blob = sqlite_vec.serialize_float32(far_vec.tolist())
+
+    now = time.time()  # fresh, so the owner record clears the boot freshness floor
+
+    def _insert(path, src, kind, blob, status="canonical"):
+        cur = store.db.execute(
+            """INSERT INTO docs
+                 (source_id, path, absolute_path, content_hash, size_bytes,
+                  tokens_est, mtime, first_indexed, last_indexed, title, kind, status)
+               VALUES (?, ?, ?, ?, 10, 3, ?, ?, ?, ?, ?, ?)""",
+            (src, path, "/" + path, "h" + path, now, now, now, path, kind, status),
+        )
+        store.db.execute(
+            "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)", (cur.lastrowid, blob)
+        )
+        return cur.lastrowid
+
+    for i in range(60):  # near padding — fills the k=50 first pass
+        _insert(f"near/{i}.md", "code", None, near_blob)
+    owner_id = _insert("owner/rec.md", "trovex", "record", owner_blob)
+    store.db.execute("INSERT INTO doc_tags(doc_id, tag) VALUES (?, 'owner/isolagent')", (owner_id,))
+    for i in range(4050):  # far padding — pushes total past 4096
+        _insert(f"far/{i}.md", "code", None, far_blob)
+    store.db.commit()
+
+    total = store.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+    assert total > SQLITE_VEC_MAX_K  # the widen-retry k would exceed the ceiling
+
+    searcher = Searcher(settings, embedder=BagEmbedder())
+
+    # Direct scoped search: recalls the owner record ONLY via the clamped
+    # widen-retry (first pass is all near-padding). A dropped clamp raises here.
+    scoped = searcher.search(
+        BOOT_QUERY, limit=5, source_ids=["trovex"], kind="record", tags=["owner/isolagent"]
+    )
+    assert [r.path for r in scoped] == ["owner/rec.md"]
+
+    # And through boot: a dropped clamp fail-opens to empty → this assertion fails.
+    pack = boot_pointers(searcher, "isolagent")
+    assert [p["id"] for p in pack["pointers"]] == ["owner/rec.md"]
 
 
 # --- status='duplicate' excluded from the default retrieval pool -----------

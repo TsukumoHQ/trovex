@@ -160,8 +160,8 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
     """Find canonical docs for a query.
 
     Returns one result per line: path + marker (★ canonical, ◯ plan,
-    ✗ stale, ⚠ duplicate) + freshness. Set summary=True only when
-    minimal output is ambiguous (adds ~150 tokens).
+    ✗ stale) + freshness. Set summary=True only when minimal output is
+    ambiguous (adds ~150 tokens).
 
     Args:
         q: Natural-language query (e.g. "auth JWT", "deployment cron"). The

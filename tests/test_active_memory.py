@@ -210,3 +210,35 @@ def test_knn_ceiling_boot_and_search_survive_over_4096_docs(settings, store):
     # A plain unfiltered search over the same >4096-doc store must not throw.
     results = searcher.search("reverse proxy tls nginx", limit=5)
     assert isinstance(results, list)
+
+
+# --- status='duplicate' excluded from the default retrieval pool -----------
+
+
+def test_duplicate_status_excluded_from_default_pool(settings, store):
+    """A status='duplicate' doc is a near-copy of a canonical one — it must be
+    dropped from the default candidate pool (not merely down-weighted), so a
+    dup-heavy corpus doesn't crowd canonical hits out of top-K / the rerank pool.
+    include_duplicates=True opts back in.
+
+    The store's write-path dedup flags the OLDER near-copy status='duplicate' and
+    keeps the newer as canonical — we use that real path rather than hand-setting
+    the column, so the test tracks how duplicates actually arise."""
+    query = "kubernetes pod rollout crash loop deploy rollback"
+    older = store.put(f"# runbook\n\n{query}", kind="reference")
+    newer = store.put(f"# runbook copy\n\n{query}", kind="reference")
+    # Write-path dedup demoted the older near-copy to status='duplicate'.
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (older,)).fetchone()[
+        "status"
+    ] == "duplicate"
+
+    searcher = Searcher(settings, embedder=BagEmbedder())
+
+    default = {r.path for r in searcher.search(query, limit=10)}
+    assert newer in default  # the canonical survivor
+    assert older not in default  # duplicate dropped from the default pool
+
+    # Opt-in surfaces it again → proves the emptiness above was the dup filter,
+    # not a scope/recall miss.
+    opted_in = {r.path for r in searcher.search(query, limit=10, include_duplicates=True)}
+    assert older in opted_in

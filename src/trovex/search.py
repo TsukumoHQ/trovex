@@ -73,6 +73,7 @@ class Searcher:
         tags: list[str] | None = None,
         hybrid: bool = True,
         include_archived: bool = False,
+        include_duplicates: bool = False,
     ) -> list[SearchResult]:
         """Hybrid doc retrieval: dense vector KNN fused with BM25 (docs_fts) by
         reciprocal rank, then reweighted by freshness + status. Dense finds
@@ -82,7 +83,11 @@ class Searcher:
 
         Lifecycle-filtered: retrieval shows the active canon only —
         'pending_delete' docs are never surfaced and 'archived' docs only when
-        include_archived=True."""
+        include_archived=True. status='duplicate' docs are excluded from the
+        default pool (opt-in via include_duplicates): they are a near-copy of a
+        canonical doc and only diluted top-K / the rerank pool — down-weighting
+        left them in the candidate set, so on a dup-heavy corpus they still
+        crowded out canonical hits before scoring."""
         if not query.strip():
             return []
         filtered = bool(kind or tags or source_ids)
@@ -90,7 +95,9 @@ class Searcher:
 
         # Dense side — full metadata rows, already scoped + widen-retried (the
         # proven path). row_by_id caches every row we touch, for both signals.
-        vec_rows = self._vector_rows(query, pool, source_ids, kind, tags, limit, include_archived)
+        vec_rows = self._vector_rows(
+            query, pool, source_ids, kind, tags, limit, include_archived, include_duplicates
+        )
         row_by_id = {r["id"]: r for r in vec_rows}
         vec_order = [r["id"] for r in vec_rows]
         # Only vector hits carry a cosine distance; a BM25-only hit gets the
@@ -119,7 +126,7 @@ class Searcher:
             if r is None:
                 r = self._fetch_doc_row(did)
                 if r is None or not self._passes_filters(
-                    r, source_ids, kind, tags, include_archived
+                    r, source_ids, kind, tags, include_archived, include_duplicates
                 ):
                     continue
                 row_by_id[did] = r
@@ -183,6 +190,7 @@ class Searcher:
         tags: list[str] | None,
         limit: int,
         include_archived: bool = False,
+        include_duplicates: bool = False,
     ) -> list:
         query_emb = next(self.embedder.embed([query]))
         pool = min(pool, SQLITE_VEC_MAX_K)  # never hand sqlite-vec a k it rejects
@@ -199,6 +207,11 @@ class Searcher:
             if include_archived
             else " AND d.lifecycle NOT IN ('archived', 'pending_delete')"
         )
+        # status='duplicate' is a near-copy of a canonical doc — drop it from the
+        # candidate pool (not just down-weight it), so a dup-heavy corpus doesn't
+        # crowd canonical hits out of top-K / the rerank pool. Opt-in to see them.
+        if not include_duplicates:
+            sql += " AND d.status != 'duplicate'"
         if source_ids:
             placeholders = ",".join("?" * len(source_ids))
             sql += f" AND d.source_id IN ({placeholders})"
@@ -262,9 +275,12 @@ class Searcher:
         kind: str | None,
         tags: list[str] | None,
         include_archived: bool = False,
+        include_duplicates: bool = False,
     ) -> bool:
         lc = r["lifecycle"]
         if lc == "pending_delete" or (lc == "archived" and not include_archived):
+            return False
+        if r["status"] == "duplicate" and not include_duplicates:
             return False
         if source_ids and r["source_id"] not in source_ids:
             return False

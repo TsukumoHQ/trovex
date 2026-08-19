@@ -77,11 +77,17 @@ QUERIES = [
 ]
 
 
-def _build(tmp_path, embedder):
+def _build(tmp_path, embedder, dup_threshold: float = 0.90):
+    # ConstEmbedder maps every doc to the SAME vector, so the write-path dedup
+    # (cosine > dup_cosine_threshold) would flag all-but-one CORPUS doc as a
+    # duplicate — a harness artifact, not real behaviour (distinct docs get
+    # distinct embeddings). A >1.0 threshold disables that flagging so these
+    # BM25-fusion tests see the whole corpus, which is the point they measure.
     settings = Settings(
         data_dir=tmp_path,
         embed_model="BAAI/bge-small-en-v1.5",
         sources_config_path=tmp_path / "no-such-sources.yaml",
+        dup_cosine_threshold=dup_threshold,
     )
     store = SqliteStore(settings, embedder=embedder)
     ids = {tag: store.put(body, tags=[f"topic/{tag}"]) for body, tag in CORPUS}
@@ -94,7 +100,7 @@ def _labeled(ids):
 
 def test_hybrid_beats_dense_on_exact_tokens(tmp_path):
     """With dense blind (ConstEmbedder), BM25 must carry every exact-token query."""
-    settings, ids = _build(tmp_path, ConstEmbedder())
+    settings, ids = _build(tmp_path, ConstEmbedder(), dup_threshold=1.1)
     searcher = Searcher(settings, embedder=ConstEmbedder())
     labeled = _labeled(ids)
 
@@ -108,7 +114,7 @@ def test_hybrid_beats_dense_on_exact_tokens(tmp_path):
 
 def test_hybrid_rescues_a_query_dense_ranks_wrong(tmp_path):
     """Sharp mechanism check: dense (blind) puts the wrong doc first; hybrid fixes it."""
-    settings, ids = _build(tmp_path, ConstEmbedder())
+    settings, ids = _build(tmp_path, ConstEmbedder(), dup_threshold=1.1)
     searcher = Searcher(settings, embedder=ConstEmbedder())
 
     dense = searcher.search("ERR_ROLL_4213", limit=1, source_ids=["trovex"], hybrid=False)
@@ -155,21 +161,28 @@ def test_boot_recall_survives_hybrid_default_floor(tmp_path):
 
 
 def test_freshness_status_weighting_preserved(tmp_path):
-    """A stale duplicate must not outrank a canonical doc for the same query — the
-    status/freshness reweight still applies on top of the RRF score."""
+    """A stale doc must not outrank a canonical one for the same query — the
+    status/freshness reweight still applies on top of the RRF score. (Uses
+    'stale', not 'duplicate': duplicates are now dropped from the pool entirely,
+    so the weighting invariant is exercised with a status that stays in-pool.)"""
     settings = Settings(
         data_dir=tmp_path,
         embed_model="BAAI/bge-small-en-v1.5",
         sources_config_path=tmp_path / "no-such-sources.yaml",
+        # Two identical-vector docs would auto-flag one as a duplicate (excluded);
+        # disable that here so BOTH stay in the pool and the test isolates the
+        # status WEIGHT, not the duplicate filter.
+        dup_cosine_threshold=1.1,
     )
     store = SqliteStore(settings, embedder=BagEmbedder())
     good = store.put("# Runbook\n\ndeploy rollback procedure canonical")
-    dup = store.put("# Runbook copy\n\ndeploy rollback procedure canonical")
-    # Force the second into 'duplicate' status.
-    store.db.execute("UPDATE docs SET status='duplicate' WHERE ext_id=?", (dup,))
+    weak = store.put("# Runbook copy\n\ndeploy rollback procedure canonical")
+    # Force the second into 'stale' (down-weighted 0.5, but still retrievable).
+    store.db.execute("UPDATE docs SET status='stale' WHERE ext_id=?", (weak,))
     store.db.commit()
 
     hits = Searcher(settings, embedder=BagEmbedder()).search(
         "deploy rollback procedure", limit=2, source_ids=["trovex"]
     )
-    assert hits and hits[0].path == good  # canonical outranks the duplicate
+    assert hits and hits[0].path == good  # canonical outranks the stale doc
+    assert {h.path for h in hits} == {good, weak}  # both stay in the pool

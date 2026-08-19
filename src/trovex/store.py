@@ -32,6 +32,17 @@ from .embedder import Embedder, embedder_from_settings
 
 TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
 
+# Curation lifecycle (see docs.lifecycle). Distinct from `status` (a ranking
+# weight): lifecycle FILTERS visibility. 'active' is the default + only state
+# retrieval shows unless asked; 'archived' is reversibly hidden (reachable
+# explicitly); 'pending_delete' is queued for removal (a grace window, never
+# surfaced by retrieval); 'stale' mirrors the content-status axis for callers
+# that want to park a doc without archiving it.
+LIFECYCLE_STATES = ("active", "archived", "pending_delete", "stale")
+# Never surfaced by retrieval unless explicitly asked (archived) / at all
+# (pending_delete).
+_HIDDEN_LIFECYCLE = frozenset({"archived", "pending_delete"})
+
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 TITLE_RE = re.compile(r"^\s*#\s+(.+)$", re.MULTILINE)
 ANY_HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.+?)\s*$", re.MULTILINE)
@@ -184,6 +195,19 @@ class SqliteStore:
             except Exception:
                 pass
         return ext_id
+
+    def set_lifecycle(self, ext_id: str, state: str) -> bool:
+        """Move a doc to a curation lifecycle state (reversible). Returns True if
+        the doc exists, False if no doc has that ext_id. Raises ValueError on an
+        unknown state so a typo fails loud rather than silently hiding a doc."""
+        if state not in LIFECYCLE_STATES:
+            raise ValueError(
+                f"unknown lifecycle state {state!r}; valid: {', '.join(LIFECYCLE_STATES)}"
+            )
+        with self._lock:
+            cur = self.db.execute("UPDATE docs SET lifecycle = ? WHERE ext_id = ?", (state, ext_id))
+            self.db.commit()
+        return cur.rowcount > 0
 
     def check_duplicate(self, content: str, title: str | None = None) -> dict | None:
         """Pre-insert near-duplicate check for the interactive write path.
@@ -592,10 +616,15 @@ class SqliteStore:
         kind: str | None = None,
         source: str | None = None,
         tags: list[str] | None = None,
+        include_archived: bool = False,
     ) -> list[dict]:
         """Hybrid chunk retrieval: vector + BM25 fused by reciprocal rank, then
         metadata-filtered. Vector finds semantic matches; BM25 catches exact terms
-        (error codes, function names, ids) the embedding blurs."""
+        (error codes, function names, ids) the embedding blurs.
+
+        Lifecycle-filtered: 'pending_delete' docs are never surfaced and
+        'archived' docs only when include_archived=True — retrieval defaults to
+        the active canon."""
         if not query.strip():
             return []
         pool = max(limit * 6, 30)
@@ -635,11 +664,15 @@ class SqliteStore:
         for cid in ranked:
             r = self.db.execute(
                 """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
-                          d.ext_id, d.title, d.kind, d.source_id, d.tokens_est AS doc_tokens
+                          d.ext_id, d.title, d.kind, d.source_id, d.lifecycle,
+                          d.tokens_est AS doc_tokens
                    FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.id = ?""",
                 (cid,),
             ).fetchone()
             if not r:
+                continue
+            lc = r["lifecycle"]
+            if lc == "pending_delete" or (lc == "archived" and not include_archived):
                 continue
             if kind and r["kind"] != kind:
                 continue

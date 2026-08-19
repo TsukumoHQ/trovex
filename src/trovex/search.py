@@ -66,12 +66,17 @@ class Searcher:
         kind: str | None = None,
         tags: list[str] | None = None,
         hybrid: bool = True,
+        include_archived: bool = False,
     ) -> list[SearchResult]:
         """Hybrid doc retrieval: dense vector KNN fused with BM25 (docs_fts) by
         reciprocal rank, then reweighted by freshness + status. Dense finds
         semantic matches; BM25 catches the exact tokens (error codes, fn/API
         names, paths, flags, versions) an embedding blurs. `hybrid=False` runs
-        dense-only (the retrieval_eval baseline)."""
+        dense-only (the retrieval_eval baseline).
+
+        Lifecycle-filtered: retrieval shows the active canon only —
+        'pending_delete' docs are never surfaced and 'archived' docs only when
+        include_archived=True."""
         if not query.strip():
             return []
         filtered = bool(kind or tags or source_ids)
@@ -79,7 +84,9 @@ class Searcher:
 
         # Dense side — full metadata rows, already scoped + widen-retried (the
         # proven path). row_by_id caches every row we touch, for both signals.
-        vec_rows = self._vector_rows(query, pool, source_ids, kind, tags, filtered, limit)
+        vec_rows = self._vector_rows(
+            query, pool, source_ids, kind, tags, filtered, limit, include_archived
+        )
         row_by_id = {r["id"]: r for r in vec_rows}
         vec_order = [r["id"] for r in vec_rows]
         # Only vector hits carry a cosine distance; a BM25-only hit gets the
@@ -107,7 +114,9 @@ class Searcher:
             r = row_by_id.get(did)
             if r is None:
                 r = self._fetch_doc_row(did)
-                if r is None or not self._passes_filters(r, source_ids, kind, tags):
+                if r is None or not self._passes_filters(
+                    r, source_ids, kind, tags, include_archived
+                ):
                     continue
                 row_by_id[did] = r
             bm_order.append(did)
@@ -170,6 +179,7 @@ class Searcher:
         tags: list[str] | None,
         filtered: bool,
         limit: int,
+        include_archived: bool = False,
     ) -> list:
         query_emb = next(self.embedder.embed([query]))
         sql = """SELECT d.id, d.path, d.title, d.mtime, d.status, d.size_bytes,
@@ -178,6 +188,13 @@ class Searcher:
                  JOIN docs d ON d.id = v.rowid
                  WHERE v.embedding MATCH ? AND k = ?"""
         params: list = [sqlite_vec.serialize_float32(query_emb.tolist()), pool]
+        # Lifecycle default: active canon only. pending_delete is always hidden;
+        # archived is hidden unless explicitly requested.
+        sql += (
+            " AND d.lifecycle != 'pending_delete'"
+            if include_archived
+            else " AND d.lifecycle NOT IN ('archived', 'pending_delete')"
+        )
         if source_ids:
             placeholders = ",".join("?" * len(source_ids))
             sql += f" AND d.source_id IN ({placeholders})"
@@ -225,13 +242,21 @@ class Searcher:
     def _fetch_doc_row(self, doc_id: int):
         return self.db.execute(
             """SELECT id, path, title, mtime, status, size_bytes, tokens_est,
-                      absolute_path, source_id, kind FROM docs WHERE id = ?""",
+                      absolute_path, source_id, kind, lifecycle FROM docs WHERE id = ?""",
             (doc_id,),
         ).fetchone()
 
     def _passes_filters(
-        self, r, source_ids: list[str] | None, kind: str | None, tags: list[str] | None
+        self,
+        r,
+        source_ids: list[str] | None,
+        kind: str | None,
+        tags: list[str] | None,
+        include_archived: bool = False,
     ) -> bool:
+        lc = r["lifecycle"]
+        if lc == "pending_delete" or (lc == "archived" and not include_archived):
+            return False
         if source_ids and r["source_id"] not in source_ids:
             return False
         if kind and r["kind"] != kind:

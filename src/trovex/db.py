@@ -61,6 +61,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_add_trovex_store_columns(conn)
     _migrate_add_query_session(conn)
     _migrate_add_chunk_hash(conn)
+    _migrate_add_lifecycle(conn)
     _init_schema(conn, embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
@@ -308,6 +309,28 @@ def _migrate_add_chunk_hash(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _migrate_add_lifecycle(conn: sqlite3.Connection) -> None:
+    """Add docs.lifecycle to an existing store (additive).
+
+    The curation-lifecycle axis (active/archived/pending_delete) that retrieval
+    filters on, distinct from the quality `status`. Default 'active' so every
+    pre-migration doc stays visible — no retrieval regression. Skip if the docs
+    table doesn't exist yet; _init_schema creates it with the column.
+    """
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='docs'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    if "lifecycle" not in cols:
+        conn.execute("ALTER TABLE docs ADD COLUMN lifecycle TEXT NOT NULL DEFAULT 'active'")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_docs_lifecycle ON docs(workspace_id, lifecycle)"
+        )
+        conn.commit()
+
+
 def _migrate_add_query_session(conn: sqlite3.Connection) -> None:
     """Add mcp_queries.session_id to an existing query log (additive).
 
@@ -352,9 +375,18 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             ext_id TEXT,
             kind TEXT,
             origin TEXT,
+            -- Curation lifecycle (distinct from `status`, which is a
+            -- quality/dup CLASS that only *weights* ranking). Lifecycle
+            -- FILTERS visibility: retrieval shows 'active' only by default.
+            -- 'archived' = reversibly hidden (reachable explicitly), the soft
+            -- alternative to hard-deleting a superseded/near-dup doc;
+            -- 'pending_delete' = queued for removal (a grace window, hidden
+            -- from retrieval). Everything defaults to 'active'.
+            lifecycle TEXT NOT NULL DEFAULT 'active',
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
+        CREATE INDEX IF NOT EXISTS idx_docs_lifecycle ON docs(workspace_id, lifecycle);
         CREATE INDEX IF NOT EXISTS idx_docs_mtime ON docs(workspace_id, mtime DESC);
         CREATE INDEX IF NOT EXISTS idx_docs_source ON docs(workspace_id, source_id);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_ext_id

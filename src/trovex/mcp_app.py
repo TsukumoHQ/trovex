@@ -565,6 +565,7 @@ def trovex_search(
     tags: list[str] | str | None = None,
     source: str = "",
     q: str = "",
+    include_archived: bool = False,
 ) -> str:
     """Search the store — returns the top K relevant *passages* (not whole docs).
 
@@ -581,6 +582,8 @@ def trovex_search(
         source: Restrict to one source id (project). Defaults to whatever this
             connection is pinned to; pass "*" to search every source.
         q: Alias for `query`.
+        include_archived: Also surface archived docs (hidden from retrieval by
+            default). pending_delete docs are never returned.
     """
     state = get_state()
     t0 = time.perf_counter()
@@ -601,6 +604,7 @@ def trovex_search(
         kind=kind or None,
         source=scope,
         tags=_as_taglist(tags) or None,
+        include_archived=include_archived,
     )
     out = "\n\n———\n\n".join(_fmt_passage(h) for h in hits) if hits else "(no results)"
     saved = _log_retrieval(state, query, hits, out, t0)
@@ -683,6 +687,30 @@ def trovex_delete(doc_id: str) -> str:
         return _DENY
     state = get_state()
     return "deleted" if state.store.delete(doc_id) else "(not found)"
+
+
+@mcp.tool()
+def trovex_archive(doc_id: str, restore: bool = False) -> str:
+    """Archive a trovex-owned doc — a reversible alternative to deleting it.
+
+    Archiving hides a doc from retrieval (it no longer surfaces in `trovex`,
+    `trovex_search`, or `trovex_read` by default) WITHOUT removing it — the soft
+    cleanup path for a superseded or near-duplicate doc you don't want to hard
+    delete. Fully reversible: pass restore=true to bring it back to the active
+    canon. Archived docs stay reachable explicitly (search with include_archived).
+
+    Args:
+        doc_id: Opaque id of the doc to archive (full or a unique short prefix).
+        restore: Pass true to un-archive (return the doc to 'active') instead.
+    """
+    if not _authorized():
+        return _DENY
+    state = get_state()
+    resolved = state.store.resolve_ext_id(doc_id)
+    if not resolved:
+        return "(not found)"
+    state.store.set_lifecycle(resolved, "active" if restore else "archived")
+    return f"{'restored' if restore else 'archived'} {resolved}"
 
 
 @mcp.tool()

@@ -31,7 +31,12 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     # `missing_query` error when neither is given). Backward-compatible: a client
     # that always sent the original name is unaffected.
     "trovex": {"props": {"q", "summary", "source", "query"}, "required": set()},
-    "trovex_search": {"props": {"query", "k", "kind", "tags", "source", "q"}, "required": set()},
+    # trovex_search gained `include_archived` (optional) with the doc lifecycle —
+    # retrieval defaults to active; pass it to also surface archived docs. Additive.
+    "trovex_search": {
+        "props": {"query", "k", "kind", "tags", "source", "q", "include_archived"},
+        "required": set(),
+    },
     # trovex_read gained `versions`/`version_id` (both optional) for the non-clobber
     # history: list prior snapshots or read one. Additive — existing readers unaffected.
     # It then gained `tier` (optional) for the graduated-access ladder
@@ -47,6 +52,9 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     },
     "trovex_tag": {"props": {"doc_id", "add", "remove"}, "required": {"doc_id"}},
     "trovex_delete": {"props": {"doc_id"}, "required": {"doc_id"}},
+    # Archive/unarchive a doc — reversible curation (hide from retrieval without
+    # deleting); write-gated. `restore` optional (default archive).
+    "trovex_archive": {"props": {"doc_id", "restore"}, "required": {"doc_id"}},
     # Roll a doc back to a prior version (the undo for a bad overwrite); write-gated.
     "trovex_restore": {"props": {"doc_id", "version_id"}, "required": {"doc_id", "version_id"}},
     # Recover a DELETED doc from its tombstone (the undo for delete); write-gated.

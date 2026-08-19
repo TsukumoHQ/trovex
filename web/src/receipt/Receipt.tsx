@@ -12,16 +12,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   type AgentRow,
+  type BenchmarkResult,
   type SavingsTotals,
   type SessionRow,
   fetchAgents,
+  fetchBenchmark,
   fetchLifetime,
   fetchSessions,
   fetchTotals,
   resolveHeadline,
   showAtPrecision,
 } from './api'
-import { humanTokens, pct, relativeTime, tokenizerLabel } from './format'
+import { humanTokens, money, pct, pricingNote, relativeTime, tokenizerLabel } from './format'
+import { downloadShareCard } from './shareCard'
 
 const RANGES = [7, 30, 90] as const
 type Range = (typeof RANGES)[number]
@@ -46,6 +49,7 @@ export default function Receipt() {
   const [agentsRes, setAgentsRes] = useState<Res<AgentRow[]> | null>(null)
   const [sessionsRes, setSessionsRes] = useState<Res<SessionRow[]> | null>(null)
   const [lifetime, setLifetime] = useState<SavingsTotals | null>(null)
+  const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null)
 
   const totals = view(totalsRes, range)
   const agents = view(agentsRes, range)
@@ -78,6 +82,16 @@ export default function Receipt() {
     return () => ac.abort()
   }, [])
 
+  // Reproducible-benchmark card — fetched once. Absent (older server, or no
+  // committed result) → the card simply doesn't render; never a hard error.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetchBenchmark(ac.signal)
+      .then((d) => setBenchmark(d))
+      .catch(() => setBenchmark(null))
+    return () => ac.abort()
+  }, [])
+
   return (
     <main className="rc">
       <a className="rc-home" href="/">← trovex</a>
@@ -91,6 +105,8 @@ export default function Receipt() {
         </p>
         {lifetime && lifetime.queries > 0 && <LifetimeStrip t={lifetime} />}
       </header>
+
+      {benchmark && <BenchmarkCard b={benchmark} />}
 
       <div className="rc-range" role="tablist" aria-label="Time range">
         {RANGES.map((d) => (
@@ -109,6 +125,8 @@ export default function Receipt() {
 
       <TotalsCard load={totals} onRetry={() => load(range, new AbortController().signal)} />
 
+      {totals.state === 'ok' && totals.data.queries > 0 && <ShareCard t={totals.data} />}
+
       <section className="rc-breakdown">
         <AgentsTable load={agents} totals={totals} />
         <SessionsTable load={sessions} totals={totals} />
@@ -123,11 +141,12 @@ export default function Receipt() {
 
 function LifetimeStrip({ t }: { t: SavingsTotals }) {
   const h = resolveHeadline(t)
+  const hasUsd = Number.isFinite(h.savedUsd) && t.pricing != null
   return (
     <p className="rc-lifetime mono">
       since day one:{' '}
-      <b>{humanTokens(h.saved)}</b> tokens saved across <b>{t.queries.toLocaleString('en-US')}</b>{' '}
-      queries{' '}
+      <b>{humanTokens(h.saved)}</b> tokens{hasUsd && <> ≈ <b>{money(h.savedUsd)}</b></>} saved across{' '}
+      <b>{t.queries.toLocaleString('en-US')}</b> queries{' '}
       <span className="rc-lifetime-note">
         ({h.verified ? 'routing verified' : 'raw estimate'} · {tokenizerLabel(t.tokenizer)})
       </span>
@@ -166,18 +185,27 @@ function TotalsCard({ load, onRetry }: { load: Load<SavingsTotals>; onRetry: () 
 
   const h = resolveHeadline(t)
   const readPct = t.would_have_read > 0 ? Math.round((t.actual_read / t.would_have_read) * 100) : 0
+  // The $ layer is additive: an older server (or one deployed before the $
+  // fields land) has no saved_usd/pricing. Show tokens-only then, never a
+  // fabricated "$0.00" — honesty rule #4, under-claim.
+  const hasUsd = Number.isFinite(h.savedUsd) && t.pricing != null
 
   return (
     <div className="rc-card">
       <div className={`rc-headline${h.verified ? ' is-verified' : ''}`}>
         <div className="rc-big mono">{humanTokens(h.saved)}</div>
+        {hasUsd && <div className="rc-big-usd mono">≈ {money(h.savedUsd)} saved</div>}
         <div className="rc-big-label">{h.label}</div>
         <div className="rc-ratio mono">~{pct(t.ratio)}% fewer tokens · {t.queries.toLocaleString('en-US')} queries</div>
       </div>
 
+      {/* $ provenance rides with the number: which rate priced it (rule #1). */}
+      {hasUsd && <p className="rc-pricing mono">{pricingNote(t.pricing)}</p>}
+
       {h.secondary && (
         <p className="rc-secondary">
-          {humanTokens(h.secondary.saved)} · {h.secondary.label}
+          {humanTokens(h.secondary.saved)}
+          {hasUsd && <> ≈ {money(h.secondary.savedUsd)}</>} · {h.secondary.label}
         </p>
       )}
 
@@ -304,6 +332,104 @@ function SessionsTable({ load, totals }: { load: Load<SessionRow[]>; totals: Loa
         </div>
       )}
     </div>
+  )
+}
+
+function BenchmarkCard({ b }: { b: BenchmarkResult }) {
+  const readPct = b.baseline_tokens > 0 ? Math.round((b.trovex_tokens / b.baseline_tokens) * 100) : 0
+  return (
+    <section className="rc-bench">
+      <div className="rc-bench-head">
+        <p className="rc-eyebrow mono">reproducible benchmark</p>
+        {b.deterministic && <span className="rc-bench-badge mono">deterministic · same result on re-run</span>}
+      </div>
+      <div className="rc-bench-body">
+        <div className="rc-bench-figure">
+          <div className="rc-big mono">~{pct(b.savings_pct / 100)}%</div>
+          <div className="rc-big-usd mono">≈ {money(b.saved_usd)} saved</div>
+          <div className="rc-big-label">fewer tokens vs a full-dump baseline</div>
+        </div>
+        <p className="rc-bench-detail mono">
+          {b.baseline_tokens.toLocaleString('en-US')} → {b.trovex_tokens.toLocaleString('en-US')} tokens
+          {' '}({readPct}% of the naive cost) over {b.queries.toLocaleString('en-US')} queries on{' '}
+          <b>{b.corpus}</b>
+        </p>
+        <p className="rc-bench-spread mono">
+          per-query ratio: median ~{pct(b.median_ratio)}% · pooled ~{pct(b.pooled_ratio)}%
+        </p>
+        <p className="rc-pricing mono">{pricingNote(b.pricing)}</p>
+      </div>
+      <p className="rc-bench-foot">
+        A fixed corpus + fixed query set, re-runnable to the same number: the savings figure is a
+        measurement, not a claim.
+        {b.methodology_url && (
+          <>
+            {' '}
+            <a href={b.methodology_url}>How it's measured →</a>
+          </>
+        )}
+      </p>
+    </section>
+  )
+}
+
+function ShareCard({ t }: { t: SavingsTotals }) {
+  const [done, setDone] = useState<string>('')
+  const h = resolveHeadline(t)
+  const hasUsd = Number.isFinite(h.savedUsd) && t.pricing != null
+  const tokensLabel = humanTokens(h.saved)
+  const moneyLabel = hasUsd ? money(h.savedUsd) : ''
+  const pctVal = pct(t.ratio)
+
+  const flash = (k: string) => {
+    setDone(k)
+    window.setTimeout(() => setDone(''), 1800)
+  }
+
+  // The share line carries only aggregate figures: no repo, path, or query.
+  const figures = hasUsd ? `${tokensLabel} ≈ ${moneyLabel}` : `${tokensLabel} tokens`
+  const line = `trovex saved my coding agents ~${pctVal}% of doc-lookup tokens (${figures}) on this repo. one canonical answer instead of rereading. trovex.dev`
+
+  async function saveCard() {
+    try {
+      const ok = await downloadShareCard({
+        pct: pctVal,
+        tokensLabel,
+        moneyLabel,
+        queries: t.queries,
+        verified: h.verified,
+      })
+      if (ok) flash('card')
+    } catch {
+      /* canvas/image blocked — no-op; the copy-line path still works */
+    }
+  }
+
+  async function copyLine() {
+    try {
+      await navigator.clipboard.writeText(line)
+      flash('line')
+    } catch {
+      /* clipboard blocked — no-op */
+    }
+  }
+
+  return (
+    <section className="rc-share">
+      <h2 className="rc-h2">Share this receipt</h2>
+      <p className="rc-share-sub">
+        A card of your aggregate saving: no repo, paths, or queries, only the totals above. The
+        dashboard stays private; this is the one thing you choose to post.
+      </p>
+      <div className="rc-share-row">
+        <button type="button" className="rc-share-btn mono" onClick={saveCard}>
+          {done === 'card' ? 'saved ✓' : 'save receipt card (png)'}
+        </button>
+        <button type="button" className="rc-share-btn mono" onClick={copyLine}>
+          {done === 'line' ? 'copied ✓' : 'copy line'}
+        </button>
+      </div>
+    </section>
   )
 }
 

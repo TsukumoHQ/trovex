@@ -207,6 +207,77 @@
 .rc-td-name { color: var(--fg); }
 .rc-td-time { color: var(--fg-subtle); }
 
+/* $ figure paired with the big token number + its pricing provenance */
+.rc-big-usd {
+  font-size: clamp(1.1rem, 3.5vw, 1.6rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+  margin-top: 0.35rem;
+}
+.rc-headline.is-verified .rc-big-usd { color: var(--fg); }
+.rc-pricing { margin: 0.75rem 0 0; font-size: 0.78rem; color: var(--fg-subtle); }
+
+/* Reproducible-benchmark card — the proof panel above the range tabs */
+.rc-bench {
+  margin: 1.75rem 0 0;
+  padding: 1.5rem 1.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+.rc-bench-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.rc-bench-badge {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  padding: 0.2rem 0.55rem;
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
+.rc-bench-figure .rc-big { color: var(--accent); }
+.rc-bench-detail { margin: 0.9rem 0 0; font-size: 0.85rem; color: var(--fg-muted); line-height: 1.5; }
+.rc-bench-detail b { color: var(--fg); }
+.rc-bench-spread { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-subtle); }
+.rc-bench-foot {
+  margin: 1.1rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.83rem;
+  color: var(--fg-muted);
+  line-height: 1.55;
+}
+.rc-bench-foot a { color: var(--accent); }
+
+/* Shareable receipt — the one deliberate outbound artifact */
+.rc-share {
+  margin: 2rem 0 0;
+  padding: 1.5rem 1.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.rc-share-sub { margin: 0.35rem 0 1rem; max-width: 42rem; font-size: 0.85rem; color: var(--fg-muted); line-height: 1.55; }
+.rc-share-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.rc-share-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  color: var(--fg);
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.rc-share-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+
 .rc-foot {
   margin-top: 3rem;
   padding-top: 1.25rem;

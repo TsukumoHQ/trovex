@@ -13,6 +13,24 @@ export function pct(ratio: number): number {
   return Math.round(ratio * 100)
 }
 
+/**
+ * Format a USD saving. Under-claims by construction: sub-cent rounds to $0.00
+ * (never invents a number), cents shown below $10 where they matter, whole
+ * comma-grouped dollars above. No "$0" hiding a real fraction, no inflation.
+ */
+export function money(usd: number): string {
+  if (!Number.isFinite(usd) || usd <= 0) return '$0.00'
+  if (usd < 10) return `$${usd.toFixed(2)}`
+  if (usd < 1000) return `$${Math.round(usd)}`
+  return `$${Math.round(usd).toLocaleString('en-US')}`
+}
+
+/** One-line provenance for the $ figure: which rate priced it. */
+export function pricingNote(p: { model: string; input_per_mtok: number; source: string }): string {
+  const rate = `$${p.input_per_mtok.toFixed(2)}/M input tokens`
+  return `priced at ${rate} · ${p.model} (${p.source})`
+}
+
 /** o200k_base → shown as-is; the "chars/4" fallback labelled as an approximation. */
 export function tokenizerLabel(tokenizer: string): string {
   const t = (tokenizer || '').trim()

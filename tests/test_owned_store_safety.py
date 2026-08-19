@@ -135,7 +135,8 @@ def test_dim_migration_recreates_chunk_tables_at_new_dim(tmp_path):
 
     chunk_id = conn.execute("SELECT id FROM chunks").fetchone()["id"]
     conn.execute(
-        "INSERT INTO vec_chunks(rowid, embedding) VALUES (?, ?)",
+        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
+        "VALUES (?, 's', ?, 'doc', 'active', 'canonical')",
         (chunk_id, sqlite_vec.serialize_float32([0.0] * 8)),
     )
     conn.commit()
@@ -150,7 +151,8 @@ def test_dim_migration_recreates_chunk_tables_at_new_dim(tmp_path):
     assert conn.execute("SELECT COUNT(*) c FROM chunks").fetchone()["c"] == 0
     # A new-dim insert must not raise (the live failure mode).
     conn.execute(
-        "INSERT INTO vec_chunks(rowid, embedding) VALUES (1, ?)",
+        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
+        "VALUES (1, 's', ?, 'doc', 'active', 'canonical')",
         (sqlite_vec.serialize_float32([0.0] * 4),),
     )
     conn.close()

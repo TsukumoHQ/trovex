@@ -32,7 +32,11 @@ from .db import (
     delete_doc_cascade,
     like_escape,
     open_db,
+    reconcile_vec_meta,
     upsert_docs_fts,
+    vec_chunks_put,
+    vec_docs_put,
+    vec_sync_meta,
 )
 from .embedder import Embedder, embedder_from_settings
 
@@ -163,6 +167,7 @@ class SqliteStore:
                             "WHERE id = ?",
                             (prior["id"],),
                         )
+                        vec_sync_meta(self.db, prior["id"])  # vec0 metadata follows the swap
                 # Incremental: an overwrite whose content AND title are both
                 # byte-identical is a no-op for the expensive + snapshot-polluting
                 # work — skip the version snapshot, the doc re-embed, the re-chunk,
@@ -205,6 +210,9 @@ class SqliteStore:
                 if content_unchanged:
                     upsert_docs_fts(self.db, doc_id, title, content)  # title may have moved
                     self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
+                    # No re-embed on an identical rewrite, but lifecycle just reset to
+                    # 'active' (and kind may have changed) — sync vec0 metadata.
+                    vec_sync_meta(self.db, doc_id)
                     self.db.commit()
                     return ext_id
             else:
@@ -228,6 +236,7 @@ class SqliteStore:
                             "WHERE id = ?",
                             (prior["id"],),
                         )
+                        vec_sync_meta(self.db, prior["id"])  # vec0 metadata follows the swap
                 cur = self.db.execute(
                     """INSERT INTO docs
                            (source_id, path, absolute_path, content_hash, size_bytes,
@@ -279,6 +288,9 @@ class SqliteStore:
             )
         with self._lock:
             cur = self.db.execute("UPDATE docs SET lifecycle = ? WHERE ext_id = ?", (state, ext_id))
+            row = self.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()
+            if row is not None:
+                vec_sync_meta(self.db, row["id"])  # keep vec0 lifecycle metadata in step
             self.db.commit()
         return cur.rowcount > 0
 
@@ -535,6 +547,7 @@ class SqliteStore:
                 (TROVEX_SOURCE_ID, cutoff),
             )
             collapsed = self._collapse_ephemeral_owners_locked()
+            reconcile_vec_meta(self.db)  # sync vec0 status for the age-stale'd docs
             self.db.commit()
         return {
             "superseded_deleted": len(superseded),
@@ -726,11 +739,7 @@ class SqliteStore:
 
             embeddings = list(self.embedder.embed([t for _, t in to_embed]))
             for (doc_id, _), emb in zip(to_embed, embeddings, strict=True):
-                self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
-                self.db.execute(
-                    "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)",
-                    (doc_id, sqlite_vec.serialize_float32(emb.tolist())),
-                )
+                vec_docs_put(self.db, doc_id, sqlite_vec.serialize_float32(emb.tolist()))
             for doc_id, tags in tag_jobs:
                 self._set_tags(doc_id, tags)
             self._embed_chunks(chunk_pairs)
@@ -805,10 +814,7 @@ class SqliteStore:
             return
         embs = list(self.embedder.embed([t for _, t in pairs]))
         for (cid, _), emb in zip(pairs, embs, strict=True):
-            self.db.execute(
-                "INSERT INTO vec_chunks(rowid, embedding) VALUES (?, ?)",
-                (cid, sqlite_vec.serialize_float32(emb.tolist())),
-            )
+            vec_chunks_put(self.db, cid, sqlite_vec.serialize_float32(emb.tolist()))
 
     def search_chunks(
         self,
@@ -829,17 +835,36 @@ class SqliteStore:
         the active canon."""
         if not query.strip():
             return []
-        # Clamp to sqlite-vec's 4096 KNN ceiling: a MATCH with k > 4096 raises
-        # OperationalError. A caller-supplied limit could push limit*6 past it.
-        pool = min(max(limit * 6, 30), 4096)
+        # Partitioned chunk KNN (P2a): scan the target source's shard, pre-filtering
+        # lifecycle/status/kind on the vec0 metadata columns. Default → the SSOT
+        # ('trovex') partition. Tags are post-filtered (not a vec0 column), so a
+        # tag-scoped query scans the whole bounded partition; else a small k. k tops
+        # out at vec0's hard limit (4096) — no clamp/widen, partitions are bounded.
         qemb = next(iter(self.embedder.embed([query])))
-        vec_ids = [
-            r["rowid"]
-            for r in self.db.execute(
-                "SELECT v.rowid FROM vec_chunks v WHERE v.embedding MATCH ? AND k = ? ORDER BY v.distance",
-                (sqlite_vec.serialize_float32(qemb.tolist()), pool),
-            )
-        ]
+        qblob = sqlite_vec.serialize_float32(qemb.tolist())
+        targets = [source] if source else [TROVEX_SOURCE_ID]
+        k = 4096 if tags else max(limit * 6, 50)
+        pool = k  # BM25 side reuses this candidate budget
+        # vec0 pushes '=', '!=' and 'IN' into the KNN, but NOT 'NOT IN' (it would
+        # post-filter the k-window and squeeze recall on an archived-heavy shard) —
+        # so exclude with chained '!=', each pushed into the KNN.
+        lifecycle_clause = (
+            "v.lifecycle != 'pending_delete'"
+            if include_archived
+            else "v.lifecycle != 'archived' AND v.lifecycle != 'pending_delete'"
+        )
+        vsql = (
+            f"SELECT v.rowid FROM vec_chunks v "
+            f"WHERE v.embedding MATCH ? AND k = ? AND v.source_id = ? "
+            f"AND {lifecycle_clause} AND v.status != 'duplicate'"
+        )
+        if kind:
+            vsql += " AND v.kind = ?"
+        vsql += " ORDER BY v.distance"
+        vec_ids: list[int] = []
+        for src in targets:
+            vparams = [qblob, k, src] + ([kind] if kind else [])
+            vec_ids.extend(r["rowid"] for r in self.db.execute(vsql, vparams))
 
         terms = re.findall(r"[a-z0-9]{2,}", query.lower())[:24]
         bm_ids: list[int] = []
@@ -1073,11 +1098,7 @@ class SqliteStore:
     def _embed(self, doc_id: int, content: str, title: str) -> None:
         text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
         emb = next(iter(self.embedder.embed([text])))
-        self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
-        self.db.execute(
-            "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)",
-            (doc_id, sqlite_vec.serialize_float32(emb.tolist())),
-        )
+        vec_docs_put(self.db, doc_id, sqlite_vec.serialize_float32(emb.tolist()))
 
 
 def _row_to_doc(row: sqlite3.Row) -> StoredDoc:

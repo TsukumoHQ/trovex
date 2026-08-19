@@ -125,17 +125,17 @@ def test_api_boot_recalls_mixed_case_owner(client):
 def test_api_boot_and_search_200_over_4096_docs(client):
     """OUTAGE regression at the HTTP surface: once the corpus crossed sqlite-vec's
     4096 KNN ceiling, the widen-retry issued a k>4096 MATCH that raised and
-    /api/boot 500'd for the whole fleet. Both routes must now return 200."""
-    import sqlite3
-
+    /api/boot 500'd for the whole fleet. P2a retires the ceiling structurally —
+    source_id partitions the vec0 shards, so 4100 docs live in a bounded 'code'
+    shard the owner-scoped boot never scans. Both routes must return 200."""
     import sqlite_vec
 
     store = state_mod._state.store
     emb = next(iter(store.embedder.embed(["reverse proxy tls nginx seed"]))).tolist()
     blob = sqlite_vec.serialize_float32(emb)
     now = 1_600_000_000.0
-    # 4100 unscoped docs (source_id='code', no kind) → owner boot scope matches
-    # none → short first pass → the widen-retry that used to throw.
+    # 4100 docs in the 'code' partition (source_id='code', no kind) → never matches
+    # the owner boot scope, so the boot query stays scoped to the small trovex shard.
     store.db.executemany(
         """INSERT INTO docs
              (source_id, path, absolute_path, content_hash, size_bytes,
@@ -144,17 +144,14 @@ def test_api_boot_and_search_200_over_4096_docs(client):
         [(f"seed/{i}.md", f"/seed/{i}.md", f"h{i}", now, now, now, f"seed {i}") for i in range(4100)],
     )
     ids = [r["id"] for r in store.db.execute("SELECT id FROM docs WHERE path LIKE 'seed/%'")]
+    # Partitioned vec_docs: 'code' shard, metadata from the docs defaults.
     store.db.executemany(
-        "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)", [(i, blob) for i in ids]
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
+        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical')",
+        [(i, blob) for i in ids],
     )
     store.db.commit()
     assert store.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"] > 4096
-
-    # Prove the ceiling is genuinely crossed: an un-clamped k=count MATCH raises.
-    with pytest.raises(sqlite3.OperationalError):
-        store.db.execute(
-            "SELECT rowid FROM vec_docs WHERE embedding MATCH ? AND k = ?", (blob, len(ids))
-        ).fetchall()
 
     boot = client.get("/api/boot", params={"agent": "nobody"})
     assert boot.status_code == 200

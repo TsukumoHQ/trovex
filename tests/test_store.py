@@ -472,27 +472,35 @@ def test_open_db_purges_pre_existing_orphans(settings, store):
 
 
 def test_scoped_search_survives_a_dominant_source(settings):
-    """sqlite-vec applies `k` before the source filter, so a small project inside
-    a corpus dominated by a big one used to return NOTHING: the dominant source
-    filled the whole knn pool and the filter then had nothing left to keep.
-    Reproduced live — a 14-doc source in a 2831-doc store gave 0 hits."""
+    """A thin source inside a corpus dominated by a big one must stay reachable when
+    scoped. Under the partitioned index (P2a) source_id is the vec0 partition key, so
+    a scoped query hits ONLY that source's shard — the old cross-source squeeze (a
+    14-doc source in a 2831-doc store gave 0 hits) is impossible by construction."""
     store = SqliteStore(settings, embedder=BagEmbedder())
-    # 60 docs that match the query, and 2 that share no vocabulary with it, so
-    # the small ones rank below the default pool (50) on distance alone.
+    # 60 docs that match the query, and 2 that share no vocabulary with it.
     for i in range(60):
         store.put(f"# Big {i}\n\nauthentication token refresh rotation policy {i}")
     small = [store.put(f"# Small {i}\n\nzzz unrelated vocabulary {i}") for i in range(2)]
 
+    # Move the 2 small docs into a 'small' source: source_id is a vec0 partition key
+    # (immutable in place), so change docs.source_id AND re-embed so the vec rows
+    # land in the 'small' partition — the same state the indexer produces natively.
     ids = ",".join("?" * len(small))
     store.db.execute(
         f"UPDATE docs SET source_id = 'small' WHERE ext_id IN ({ids})",  # noqa: S608
         small,
     )
+    for ext in small:
+        r = store.db.execute(
+            "SELECT id, content, title FROM docs WHERE ext_id = ?", (ext,)
+        ).fetchone()
+        store._embed(r["id"], r["content"], r["title"])
     store.db.commit()
 
     searcher = Searcher(settings, embedder=BagEmbedder())
     q = "authentication token refresh"
 
+    # Default scans the SSOT ('trovex') partition — the small source isn't even seen.
     unscoped = searcher.search(q, limit=5)
     assert {r.source_id for r in unscoped} == {"trovex"}, "the big source should dominate"
 

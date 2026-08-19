@@ -6,19 +6,16 @@ from pathlib import Path
 
 import sqlite_vec
 
-from .config import Settings
+from .config import RESERVED_SOURCE_ID, Settings
 from .db import open_db
 from .embedder import Embedder, embedder_from_settings
 
-# Ceiling for the widened-pool retry below: a scoped query that comes back short
-# rescans the index, and this bounds that scan on a large store.
-MAX_KNN_POOL = 20_000
-
-# Hard ceiling sqlite-vec enforces on a vec0 KNN `k`: a MATCH with k > 4096
-# raises OperationalError("k value in knn query too large"). Every knn site must
-# clamp to this, or a store that crosses 4096 docs throws on the widen-retry and
-# takes /api/boot (Active-Memory) down with a 500.
-SQLITE_VEC_MAX_K = 4096
+# vec0's hard API ceiling on a KNN `k`. With the partitioned index (P2a) each
+# source is its OWN bounded shard, so a query never needs a k anywhere near this —
+# the old SQLITE_VEC_MAX_K clamp + widen-to-4096 retry are retired. It survives
+# only as the k used to scan a whole (bounded) partition for a tag-scoped query,
+# where tags — not a vec0 metadata column — are filtered after the KNN.
+VEC0_MAX_K = 4096
 
 # Reciprocal-rank-fusion constant (the standard k0=60), shared with the chunk
 # store's hybrid retrieval (store.py) so both surfaces fuse identically.
@@ -184,7 +181,7 @@ class Searcher:
     def _vector_rows(
         self,
         query: str,
-        pool: int,
+        pool: int,  # retained for signature compat; k is now partition-derived
         source_ids: list[str] | None,
         kind: str | None,
         tags: list[str] | None,
@@ -192,55 +189,53 @@ class Searcher:
         include_archived: bool = False,
         include_duplicates: bool = False,
     ) -> list:
+        """Partitioned KNN (P2a). source_id is the vec0 PARTITION KEY, so the search
+        is restricted to the target source's shard — k stays bounded per source and
+        the 4096 ceiling (clamp + widen retry) is gone. kind/lifecycle/status are
+        vec0 METADATA columns, pre-filtered INSIDE the KNN so no post-filter squeeze;
+        tags are the one non-vec0 filter, so a tag-scoped query scans the whole
+        (bounded) partition. Default target = the SSOT ('trovex') partition."""
         query_emb = next(self.embedder.embed([query]))
-        pool = min(pool, SQLITE_VEC_MAX_K)  # never hand sqlite-vec a k it rejects
-        sql = """SELECT d.id, d.path, d.title, d.mtime, d.status, d.size_bytes,
-                        d.tokens_est, d.absolute_path, d.source_id, v.distance
-                 FROM vec_docs v
-                 JOIN docs d ON d.id = v.rowid
-                 WHERE v.embedding MATCH ? AND k = ?"""
-        params: list = [sqlite_vec.serialize_float32(query_emb.tolist()), pool]
-        # Lifecycle default: active canon only. pending_delete is always hidden;
-        # archived is hidden unless explicitly requested.
-        sql += (
-            " AND d.lifecycle != 'pending_delete'"
+        qblob = sqlite_vec.serialize_float32(query_emb.tolist())
+        targets = source_ids if source_ids else [RESERVED_SOURCE_ID]
+        # A tag filter is applied AFTER the KNN (tags aren't a vec0 column), so scan
+        # the whole bounded partition; otherwise a small k suffices — every other
+        # constraint pre-filters in the KNN.
+        k = VEC0_MAX_K if tags else max(limit * 5, 50)
+        # vec0 pushes '=', '!=' and 'IN' metadata constraints INTO the KNN, but NOT
+        # 'NOT IN' — a NOT IN would post-filter the k-window instead, silently
+        # squeezing recall on an archived-heavy partition. So exclude with chained
+        # '!=' (each pushed), never NOT IN.
+        lifecycle_clause = (
+            "v.lifecycle != 'pending_delete'"
             if include_archived
-            else " AND d.lifecycle NOT IN ('archived', 'pending_delete')"
+            else "v.lifecycle != 'archived' AND v.lifecycle != 'pending_delete'"
         )
-        # status='duplicate' is a near-copy of a canonical doc — drop it from the
-        # candidate pool (not just down-weight it), so a dup-heavy corpus doesn't
-        # crowd canonical hits out of top-K / the rerank pool. Opt-in to see them.
+        sql = f"""SELECT d.id, d.path, d.title, d.mtime, d.status, d.size_bytes,
+                         d.tokens_est, d.absolute_path, d.source_id, v.distance
+                  FROM vec_docs v JOIN docs d ON d.id = v.rowid
+                  WHERE v.embedding MATCH ? AND k = ? AND v.source_id = ?
+                    AND {lifecycle_clause}"""
+        tail = ""
+        tail_params: list = []
+        # status='duplicate' is a near-copy of a canonical doc — pre-filtered out of
+        # the KNN pool (not just down-weighted). Opt-in to include them.
         if not include_duplicates:
-            sql += " AND d.status != 'duplicate'"
-        if source_ids:
-            placeholders = ",".join("?" * len(source_ids))
-            sql += f" AND d.source_id IN ({placeholders})"
-            params.extend(source_ids)
+            tail += " AND v.status != 'duplicate'"
         if kind:
-            sql += " AND d.kind = ?"
-            params.append(kind)
+            tail += " AND v.kind = ?"
+            tail_params.append(kind)
         if tags:
             placeholders = ",".join("?" * len(tags))
-            sql += f" AND d.id IN (SELECT doc_id FROM doc_tags WHERE tag IN ({placeholders}))"
-            params.extend(tags)
-        sql += " ORDER BY v.distance"
-        rows = self.db.execute(sql, params).fetchall()
+            tail += f" AND d.id IN (SELECT doc_id FROM doc_tags WHERE tag IN ({placeholders}))"
+            tail_params.extend(tags)
+        sql += tail + " ORDER BY v.distance"
 
-        # sqlite-vec applies `k` before these filters, so a scope that is a thin
-        # slice of a skewed corpus gets squeezed out of the pool before it is
-        # ever filtered — a 14-doc project inside a 2831-doc store returned zero
-        # hits at pool=50 because the dominant source filled every slot. Retry
-        # once over the whole index whenever the result comes back short: the
-        # lifecycle exclusion (archived/pending_delete) is ALWAYS applied, so even
-        # an otherwise-unfiltered query can be squeezed by an archived-heavy pool.
-        # k is clamped to SQLITE_VEC_MAX_K: sqlite-vec throws once k > 4096, which
-        # is exactly what took the fleet's Active-Memory boot down when the corpus
-        # crossed 4096 docs — the widen scan is capped there, not at the doc count.
-        if len(rows) < limit:
-            total = self.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
-            if total > pool:
-                params[1] = min(total, MAX_KNN_POOL, SQLITE_VEC_MAX_K)
-                rows = self.db.execute(sql, params).fetchall()
+        rows: list = []
+        for src in targets:
+            rows.extend(self.db.execute(sql, [qblob, k, src, *tail_params]).fetchall())
+        if len(targets) > 1:
+            rows.sort(key=lambda r: r["distance"])  # merge partitions by distance
         return rows
 
     def _bm25_ids(self, query: str, pool: int) -> list[int]:

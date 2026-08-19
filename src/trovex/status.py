@@ -11,6 +11,7 @@ import sqlite3
 import time
 
 from .config import Settings
+from .db import reconcile_vec_meta, vec_sync_meta
 from .indexer import FRONTMATTER_RE
 
 PLAN_TITLE_RE = re.compile(r"^\s*(?:plan|todo|draft|wip|brouillon)\b", re.IGNORECASE)
@@ -95,6 +96,9 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
     # Pass 2: duplicate detection (pairwise, only for canonical+plan docs)
     dup_count = _detect_duplicates(db, settings)
 
+    # Sync vec0 metadata for every doc this pass re-classified (partitioned KNN
+    # pre-filters on vec_docs.status, so it must track docs.status).
+    reconcile_vec_meta(db)
     db.commit()
     return {
         "plan": plan_count,
@@ -222,6 +226,7 @@ def detect_duplicate_for(db: sqlite3.Connection, settings: Settings, doc_id: int
             "UPDATE docs SET status = 'duplicate', dup_of_id = ? WHERE id = ?",
             (newer_id, older_id),
         )
+        vec_sync_meta(db, older_id)  # live write-path: sync vec0 status immediately
         db.commit()
         return older_id
     return None

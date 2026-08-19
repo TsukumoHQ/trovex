@@ -8,7 +8,7 @@ from pathlib import Path
 import sqlite_vec
 
 from .config import RESERVED_SOURCE_ID, Settings, Source
-from .db import delete_doc_cascade, open_db, upsert_docs_fts
+from .db import delete_doc_cascade, open_db, upsert_docs_fts, vec_docs_put
 from .embedder import Embedder, embedder_from_settings
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
@@ -437,11 +437,7 @@ class Indexer:
         texts = [text for _, text in batch]
         embeddings = list(self.embedder.embed(texts))
         for doc_id, emb in zip(ids, embeddings, strict=True):
-            self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
-            self.db.execute(
-                "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)",
-                (doc_id, sqlite_vec.serialize_float32(emb.tolist())),
-            )
+            vec_docs_put(self.db, doc_id, sqlite_vec.serialize_float32(emb.tolist()))
 
     @staticmethod
     def _embed_text(content: str, title: str) -> str:

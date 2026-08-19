@@ -83,6 +83,9 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_add_lifecycle(conn)
     _migrate_add_canonical_topic(conn)  # AFTER lifecycle: supersede sets lifecycle='archived'
     _init_schema(conn, embed_dim)
+    # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
+    # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
+    _migrate_partition_vec(conn, embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
     return conn
@@ -127,6 +130,92 @@ def _backfill_docs_fts(conn: sqlite3.Connection) -> None:
 # SET NULL needs a full docs rebuild — until then, deletes cascade by hand and
 # this tuple is the single list both delete paths walk.
 _DOC_CHILD_TABLES = ("doc_tags", "doc_versions", "collection_docs")
+
+
+# --- partitioned vec0 write helpers (P2a) ----------------------------------
+# vec_docs/vec_chunks carry the doc's source_id (partition key) + kind/lifecycle/
+# status (metadata, never NULL). These helpers are the SINGLE denormalisation
+# point so the ~dozen embed/status sites can't drift the metadata out of sync.
+
+
+def _doc_vec_meta(conn: sqlite3.Connection, doc_id: int) -> tuple | None:
+    """(source_id, kind, lifecycle, status) for a doc, kind COALESCEd to 'doc' so
+    the vec0 metadata column is never NULL (vec0 rejects NULL metadata)."""
+    r = conn.execute(
+        "SELECT source_id, kind, lifecycle, status FROM docs WHERE id = ?", (doc_id,)
+    ).fetchone()
+    if r is None:
+        return None
+    return (r["source_id"], r["kind"] or "doc", r["lifecycle"], r["status"])
+
+
+def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes) -> None:
+    """Upsert a doc's embedding + partition/metadata into vec_docs. Does NOT commit."""
+    meta = _doc_vec_meta(conn, doc_id)
+    if meta is None:
+        return
+    src, kind, lifecycle, status = meta
+    conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
+    conn.execute(
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (doc_id, src, emb_blob, kind, lifecycle, status),
+    )
+
+
+def vec_chunks_put(conn: sqlite3.Connection, chunk_id: int, emb_blob: bytes) -> None:
+    """Upsert a chunk's embedding into vec_chunks with its PARENT doc's partition +
+    metadata (a chunk inherits them). Looks up the parent doc from the chunk row.
+    Does NOT commit."""
+    parent = conn.execute("SELECT doc_id FROM chunks WHERE id = ?", (chunk_id,)).fetchone()
+    if parent is None:
+        return
+    meta = _doc_vec_meta(conn, parent["doc_id"])
+    if meta is None:
+        return
+    src, kind, lifecycle, status = meta
+    conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (chunk_id,))
+    conn.execute(
+        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (chunk_id, src, emb_blob, kind, lifecycle, status),
+    )
+
+
+def vec_sync_meta(conn: sqlite3.Connection, doc_id: int) -> None:
+    """Sync a doc's (and its chunks') vec0 METADATA to the current docs row after a
+    status/lifecycle/kind change that did NOT re-embed. source_id (partition key)
+    never changes for a doc, so it is not touched. Does NOT commit."""
+    meta = _doc_vec_meta(conn, doc_id)
+    if meta is None:
+        return
+    _src, kind, lifecycle, status = meta
+    conn.execute(
+        "UPDATE vec_docs SET kind = ?, lifecycle = ?, status = ? WHERE rowid = ?",
+        (kind, lifecycle, status, doc_id),
+    )
+    for c in conn.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
+        conn.execute(
+            "UPDATE vec_chunks SET kind = ?, lifecycle = ?, status = ? WHERE rowid = ?",
+            (kind, lifecycle, status, c["id"]),
+        )
+
+
+def reconcile_vec_meta(conn: sqlite3.Connection) -> int:
+    """Sync vec0 metadata to docs for every row whose kind/lifecycle/status DRIFTED
+    (e.g. after compute_status' bulk status rewrite). Only touches genuinely-changed
+    rows — cheap when most are unchanged. vec0 forbids a correlated bulk UPDATE
+    (partition-key restriction), so it re-syncs the mismatches one rowid at a time.
+    Returns the count synced. Does NOT commit."""
+    mismatched = conn.execute(
+        """SELECT d.id FROM docs d JOIN vec_docs v ON v.rowid = d.id
+           WHERE v.kind != COALESCE(d.kind, 'doc')
+              OR v.lifecycle != d.lifecycle
+              OR v.status != d.status"""
+    ).fetchall()
+    for r in mismatched:
+        vec_sync_meta(conn, r["id"])
+    return len(mismatched)
 
 
 def delete_doc_cascade(conn: sqlite3.Connection, doc_id: int) -> None:
@@ -435,6 +524,79 @@ def _migrate_add_canonical_topic(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_partition_vec(conn: sqlite3.Connection, embed_dim: int) -> None:
+    """Rebuild vec_docs/vec_chunks as PARTITIONED vec0 (P2a), REUSING the existing
+    embeddings — no re-embed. Runs AFTER _init_schema: on a fresh store _init_schema
+    already made the partitioned tables (DDL has 'partition key') so this no-ops; on
+    a legacy store _init_schema's CREATE IF NOT EXISTS left the flat tables in place
+    and this rebuilds them.
+
+    Offline + fast: snapshot each old embedding to a temp table, drop the flat vec
+    tables, recreate partitioned, and re-insert with source_id (partition key) +
+    kind/lifecycle/status (from docs/chunks; kind COALESCEd to 'doc'). boot stays
+    fail-open throughout — a partial state just yields empty recall, never a 500.
+    """
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_docs'"
+    ).fetchone()
+    if not row:
+        return  # no vec_docs at all — nothing to migrate
+    if "partition key" in (row["sql"] or ""):
+        return  # already partitioned (fresh store or prior run)
+
+    # Snapshot old embeddings (plain temp tables survive until dropped / conn close).
+    conn.execute("CREATE TEMP TABLE _vd_old AS SELECT rowid AS rid, embedding AS emb FROM vec_docs")
+    has_chunks = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vec_chunks'"
+    ).fetchone()
+    if has_chunks:
+        conn.execute(
+            "CREATE TEMP TABLE _vc_old AS SELECT rowid AS rid, embedding AS emb FROM vec_chunks"
+        )
+    conn.execute("DROP TABLE vec_docs")
+    conn.execute("DROP TABLE IF EXISTS vec_chunks")
+    # Recreate partitioned (keep in sync with _init_schema's vec0 DDL).
+    conn.executescript(
+        f"""
+        CREATE VIRTUAL TABLE vec_docs USING vec0(
+            source_id TEXT partition key,
+            embedding float[{embed_dim}] distance_metric=cosine,
+            kind TEXT, lifecycle TEXT, status TEXT
+        );
+        CREATE VIRTUAL TABLE vec_chunks USING vec0(
+            source_id TEXT partition key,
+            embedding float[{embed_dim}] distance_metric=cosine,
+            kind TEXT, lifecycle TEXT, status TEXT
+        );
+        """
+    )
+    # Re-insert docs (JOIN docs for partition + metadata; orphan embeddings dropped).
+    for r in conn.execute(
+        """SELECT o.rid, o.emb, d.source_id, COALESCE(d.kind, 'doc') AS kind,
+                  d.lifecycle, d.status
+           FROM _vd_old o JOIN docs d ON d.id = o.rid"""
+    ).fetchall():
+        conn.execute(
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (r["rid"], r["source_id"], r["emb"], r["kind"], r["lifecycle"], r["status"]),
+        )
+    if has_chunks:
+        for r in conn.execute(
+            """SELECT o.rid, o.emb, d.source_id, COALESCE(d.kind, 'doc') AS kind,
+                      d.lifecycle, d.status
+               FROM _vc_old o JOIN chunks c ON c.id = o.rid JOIN docs d ON d.id = c.doc_id"""
+        ).fetchall():
+            conn.execute(
+                "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (r["rid"], r["source_id"], r["emb"], r["kind"], r["lifecycle"], r["status"]),
+            )
+        conn.execute("DROP TABLE _vc_old")
+    conn.execute("DROP TABLE _vd_old")
+    conn.commit()
+
+
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
     conn.executescript(
         f"""
@@ -546,8 +708,18 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         CREATE INDEX IF NOT EXISTS idx_mqr_path ON mcp_query_results(path);
         CREATE INDEX IF NOT EXISTS idx_mqr_query ON mcp_query_results(query_id);
 
+        -- Partitioned vector index (P2a). source_id is a vec0 PARTITION KEY: a KNN
+        -- constrained to `source_id = ?` scans ONLY that source's shard, so k stays
+        -- tiny and bounded per source — the 4096 KNN ceiling is gone structurally
+        -- (no more clamp/widen). kind/lifecycle/status are METADATA columns, usable
+        -- in the KNN WHERE to pre-filter WITHIN the partition (never NULL — vec0
+        -- rejects NULL metadata; kind is COALESCEd to 'doc' at the write boundary).
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_docs USING vec0(
-            embedding float[{embed_dim}] distance_metric=cosine
+            source_id TEXT partition key,
+            embedding float[{embed_dim}] distance_metric=cosine,
+            kind TEXT,
+            lifecycle TEXT,
+            status TEXT
         );
 
         -- Chunk-level retrieval (structure-aware chunks + their embeddings)
@@ -567,8 +739,15 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(doc_id, content_hash);
         CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(doc_id);
+        -- Same partitioning as vec_docs; chunk metadata is DENORMALISED from its
+        -- parent doc (a chunk inherits source_id/kind/lifecycle/status), kept in
+        -- sync by vec_sync_meta on any parent-doc status/lifecycle change.
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-            embedding float[{embed_dim}] distance_metric=cosine
+            source_id TEXT partition key,
+            embedding float[{embed_dim}] distance_metric=cosine,
+            kind TEXT,
+            lifecycle TEXT,
+            status TEXT
         );
         -- Keyword side of hybrid retrieval (BM25). chunk_id = chunks.id.
         CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(

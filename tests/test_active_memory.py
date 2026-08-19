@@ -547,7 +547,11 @@ def test_sweep_bloat_tombstones_superseded_and_ages_owned_idempotent(settings, s
     ] == "canonical"
 
     # Idempotent: a second run finds nothing to do.
-    assert store.sweep_bloat() == {"superseded_deleted": 0, "stale_marked": 0}
+    assert store.sweep_bloat() == {
+        "superseded_deleted": 0,
+        "stale_marked": 0,
+        "ephemeral_owners_collapsed": 0,
+    }
 
 
 def test_reindex_enforces_builtin_agent_artifact_ignores(tmp_path):
@@ -582,3 +586,58 @@ def test_reindex_enforces_builtin_agent_artifact_ignores(tmp_path):
 
     idx.reindex(root=repo)  # re-index must not re-add the ignored globs
     assert not ({"resume.md", "checkpoint-2.md", "lessons.md"} & _names())
+
+
+def test_compute_status_preserves_superseded_no_ssot_crash(settings, store):
+    """Regression (bc4d183d review r1): compute_status bulk-reset every doc to
+    'canonical', which reset an SSOT-superseded doc back to canonical while its live
+    canonical still existed → IntegrityError on the partial unique index, crashing
+    the reindex; it also erased the superseded flag the sweep needs. compute_status
+    must LEAVE superseded docs alone."""
+    from trovex.status import compute_status
+
+    old = store.put("# Topic Z\n\noriginal", kind="reference")
+    store.put("# Topic Z\n\nreplacement body", kind="reference", force=True)  # supersedes old
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (old,)).fetchone()[
+        "status"
+    ] == "superseded"
+
+    compute_status(store.db, store.settings)  # must NOT raise on the SSOT unique index
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (old,)).fetchone()[
+        "status"
+    ] == "superseded"  # left intact, so the reindex-order sweep can still tombstone it
+
+    assert store.sweep_bloat()["superseded_deleted"] == 1
+    assert store.db.execute("SELECT 1 FROM docs WHERE ext_id = ?", (old,)).fetchone() is None
+
+
+def test_sweep_collapses_numeric_suffix_ephemeral_owner_forks(settings, store):
+    """A respawned agent leaves owner/<name>-<N> record forks. The sweep tombstones
+    them: keep the unsuffixed owner/<name> if it exists, else keep the highest N.
+    Reversible (tombstoned, recoverable) and idempotent."""
+    # Group A: an unsuffixed canonical owner + two numbered respawn forks.
+    a_canon = store.put("# dev state\n\ncanonical dev owner", kind="record", tags=["owner/dev"])
+    a60 = store.put("# dev 60\n\nrespawn sixty", kind="record", tags=["owner/dev-60"])
+    a61 = store.put("# dev 61\n\nrespawn sixtyone", kind="record", tags=["owner/dev-61"])
+    # Group B: NO unsuffixed — only numbered respawns; keep the highest.
+    b1 = store.put("# qa 1\n\nrespawn one", kind="record", tags=["owner/qa-1"])
+    b2 = store.put("# qa 2\n\nrespawn two", kind="record", tags=["owner/qa-2"])
+    # A normal owner with no forks — untouched.
+    cmo = store.put("# cmo state\n\nlaunch metrics", kind="record", tags=["owner/cmo"])
+
+    def _alive(ext):
+        return store.db.execute("SELECT 1 FROM docs WHERE ext_id = ?", (ext,)).fetchone() is not None
+
+    result = store.sweep_bloat()
+    assert result["ephemeral_owners_collapsed"] == 3  # a60, a61, b1
+
+    assert _alive(a_canon) and not _alive(a60) and not _alive(a61)  # unsuffixed kept
+    assert _alive(b2) and not _alive(b1)  # highest-N kept
+    assert _alive(cmo)  # unrelated owner untouched
+
+    # Reversible: the forks are tombstoned (recoverable), not hard-erased.
+    tomb_titles = {t["title"] for t in store.list_tombstones()}
+    assert {"dev 60", "dev 61", "qa 1"} <= tomb_titles
+
+    # Idempotent: nothing left to collapse.
+    assert store.sweep_bloat()["ephemeral_owners_collapsed"] == 0

@@ -34,15 +34,22 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
       4. duplicate: nearest-neighbour cosine > threshold, older wins
       5. stale (cascading): if duplicate's canonical is fresher than X
     """
-    db.execute("UPDATE docs SET status = 'canonical', dup_of_id = NULL")
+    # 'superseded' is SSOT-managed, not a heuristic status: a doc stepped down by a
+    # newer canonical (store.put force / the canonical_topic migration) must STAY
+    # superseded. Resetting it to canonical would (a) trip the partial unique index
+    # (two live canonicals per topic → IntegrityError, crashing the reindex) and
+    # (b) hide it from sweep_bloat's fork tombstoning. Leave it untouched here.
+    db.execute("UPDATE docs SET status = 'canonical', dup_of_id = NULL WHERE status != 'superseded'")
 
     plan_re = re.compile("|".join(settings.plan_path_patterns))
     now = time.time()
     stale_cutoff = now - settings.stale_age_days * 86400
 
-    # Pass 1: plan + stale (single-doc rules)
+    # Pass 1: plan + stale (single-doc rules). Skip superseded — re-marking one
+    # plan/stale would silently un-supersede an SSOT-retired doc.
     rows = db.execute(
-        "SELECT id, path, absolute_path, mtime, kind FROM docs WHERE workspace_id = 'default'"
+        "SELECT id, path, absolute_path, mtime, kind FROM docs "
+        "WHERE workspace_id = 'default' AND status != 'superseded'"
     ).fetchall()
 
     plan_count = stale_count = 0

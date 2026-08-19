@@ -505,12 +505,16 @@ class SqliteStore:
             actually SHRINKS — a lifecycle flag alone would leave the row counting
             toward the sqlite-vec KNN ceiling.
           • Age-stale owned docs: an owned (source='trovex') non-record canonical
-            older than stale_age_days is re-marked 'stale'. compute_status already
-            ages file-backed docs on every reindex; owned docs have no file on disk,
-            so the sweep owns their staleness. Records are event-anchored — never aged.
+            older than stale_age_days is re-marked 'stale'. This is a safety net for
+            the STANDALONE `trovex sweep` path — on a reindex compute_status already
+            applies the same age rule to every doc (it ignores file existence), so
+            the UPDATE is a redundant no-op there. Records are event-anchored — never aged.
+          • Ephemeral-owner forks: a respawned/numbered agent leaves owner records
+            tagged owner/<name>-<N>. Collapse them (see _collapse_ephemeral_owners).
 
-        Idempotent: a second run finds no superseded docs and re-marks nothing new.
-        Returns {"superseded_deleted", "stale_marked"}.
+        Idempotent: a second run finds no superseded docs, re-marks nothing new, and
+        collapses no owners. Returns {"superseded_deleted", "stale_marked",
+        "ephemeral_owners_collapsed"}.
         """
         with self._lock:
             superseded = [
@@ -530,8 +534,75 @@ class SqliteStore:
                      AND mtime < ?""",
                 (TROVEX_SOURCE_ID, cutoff),
             )
+            collapsed = self._collapse_ephemeral_owners_locked()
             self.db.commit()
-        return {"superseded_deleted": len(superseded), "stale_marked": stale.rowcount}
+        return {
+            "superseded_deleted": len(superseded),
+            "stale_marked": stale.rowcount,
+            "ephemeral_owners_collapsed": collapsed,
+        }
+
+    _OWNER_SUFFIX_RE = re.compile(r"^owner/(?P<base>.+)-(?P<n>\d+)$")
+
+    def _collapse_ephemeral_owners_locked(self) -> int:
+        """Tombstone the numeric-suffix owner-record forks a respawned agent leaves.
+
+        A respawn tags its records owner/<name>-<N> (e.g. owner/dev-60, owner/dev-61)
+        instead of the canonical owner/<name>. Per group <name>:
+          • if a NON-suffixed owner/<name> record exists → tombstone every
+            owner/<name>-<N> (the unsuffixed one is the canonical owner);
+          • else → keep the HIGHEST N (the most recent respawn) and tombstone the
+            lower ones.
+        Tombstone = the store's reversible delete (doc_tombstones snapshot + cascade),
+        so it stays recoverable and consistent with the superseded pass; deleting the
+        row also drops it from the KNN corpus. Idempotent: once collapsed, a re-run
+        finds each group with ≤1 member and does nothing. Caller holds ``_lock`` and
+        commits.
+        """
+        # One owner tag per record is the norm, but a record could carry several;
+        # map each owner tag → the doc ids that wear it.
+        rows = self.db.execute(
+            """SELECT d.id, dt.tag
+               FROM docs d JOIN doc_tags dt ON dt.doc_id = d.id
+               WHERE d.kind = 'record' AND dt.tag LIKE 'owner/%'"""
+        ).fetchall()
+        # base -> {"unsuffixed": set(ids), "suffixed": {n: set(ids)}}
+        groups: dict[str, dict] = {}
+        for r in rows:
+            m = self._OWNER_SUFFIX_RE.match(r["tag"])
+            if m:
+                g = groups.setdefault(m["base"], {"unsuffixed": set(), "suffixed": {}})
+                g["suffixed"].setdefault(int(m["n"]), set()).add(r["id"])
+            else:
+                base = r["tag"][len("owner/") :]
+                groups.setdefault(base, {"unsuffixed": set(), "suffixed": {}})["unsuffixed"].add(
+                    r["id"]
+                )
+
+        victims: set[int] = set()
+        for g in groups.values():
+            if not g["suffixed"]:
+                continue
+            if g["unsuffixed"]:
+                keep_ns: set[int] = set()  # keep the unsuffixed canonical, drop all forks
+            else:
+                keep_ns = g["suffixed"][max(g["suffixed"])]  # keep the highest-N respawn
+            for ids in g["suffixed"].values():
+                victims |= ids - keep_ns
+        # Never tombstone a doc that also wears a keeper tag (a record shared across
+        # owners): only collapse docs that are PURELY suffixed-fork owners.
+        keepers = {i for g in groups.values() for i in g["unsuffixed"]}
+        for g in groups.values():
+            if g["unsuffixed"]:
+                continue
+            if g["suffixed"]:
+                keepers |= g["suffixed"][max(g["suffixed"])]
+        victims -= keepers
+
+        for doc_id in sorted(victims):
+            self._tombstone_locked(doc_id)
+            self._delete_cascade_locked(doc_id)
+        return len(victims)
 
     def list_tombstones(self, limit: int = 100) -> list[dict]:
         """Deleted owned docs still recoverable (newest first)."""

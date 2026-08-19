@@ -145,6 +145,10 @@ describe('format', () => {
     expect(hasDollarFigure({ saved_usd: Number.NaN, pricing })).toBe(false)
     expect(hasDollarFigure({ saved_usd: 1.8, pricing: null })).toBe(false) // pricing absent
     expect(hasDollarFigure({ saved_usd: 1.8 })).toBe(false)
+    // present-but-partial pricing ({} from malformed JSON) must NOT pass —
+    // pricingNote would then crash on undefined.toFixed().
+    expect(hasDollarFigure({ saved_usd: 1.8, pricing: {} })).toBe(false)
+    expect(hasDollarFigure({ saved_usd: 1.8, pricing: { input_per_mtok: Number.NaN } })).toBe(false)
   })
 })
 

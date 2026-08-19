@@ -40,9 +40,13 @@ export function pricingNote(p: { model: string; input_per_mtok: number; source: 
  */
 export function hasDollarFigure(x: {
   saved_usd?: number
-  pricing?: { input_per_mtok: number } | null
+  pricing?: { input_per_mtok?: number } | null
 }): boolean {
-  return Number.isFinite(x.saved_usd) && x.pricing != null
+  // Require the FIELD pricingNote dereferences, not just a non-null block: a
+  // present-but-partial pricing object ({} from malformed JSON) would otherwise
+  // pass and then crash pricingNote on `undefined.toFixed()` — the same class
+  // this guard exists to stop.
+  return Number.isFinite(x.saved_usd) && Number.isFinite(x.pricing?.input_per_mtok)
 }
 
 /** o200k_base → shown as-is; the "chars/4" fallback labelled as an approximation. */

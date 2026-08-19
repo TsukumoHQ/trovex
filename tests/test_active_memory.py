@@ -136,3 +136,77 @@ def test_near_dup_guard_blocks_canonical_create_but_skips_records(settings, stor
     # A record neighbour must NOT block (records are upsert-by-owner, not dup bloat).
     store.put("# cmo state\n\nmoonshot launch metrics current state", kind="record", tags=["owner/cmo"])
     assert store.check_duplicate("moonshot launch metrics current state") is None
+
+
+# --- OUTAGE regression: sqlite-vec 4096 KNN ceiling ------------------------
+
+
+def _bulk_seed_docs(store, n: int) -> None:
+    """Insert `n` unscoped docs straight into docs+vec_docs in one transaction.
+    Fast path: 4000+ store.put() calls (embed+chunk+fts+commit each) would take
+    far too long for a gate test, and here we only need the vec_docs row COUNT to
+    cross the ceiling — the bodies are irrelevant."""
+    import sqlite_vec
+
+    emb = next(iter(store.embedder.embed(["reverse proxy tls nginx seed"]))).tolist()
+    blob = sqlite_vec.serialize_float32(emb)
+    now = 1_600_000_000.0
+    rows = [
+        # source_id='code' (NOT 'trovex') + no kind → never matches the owner boot
+        # scope, so the boot query comes back short and hits the widen-retry.
+        ("code", f"seed/{i}.md", f"/seed/{i}.md", f"h{i}", 10, 3, now, now, now, f"seed {i}")
+        for i in range(n)
+    ]
+    store.db.executemany(
+        """INSERT INTO docs
+             (source_id, path, absolute_path, content_hash, size_bytes,
+              tokens_est, mtime, first_indexed, last_indexed, title)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        rows,
+    )
+    ids = [r["id"] for r in store.db.execute("SELECT id FROM docs")]
+    store.db.executemany(
+        "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)",
+        [(i, blob) for i in ids],
+    )
+    store.db.commit()
+
+
+def test_knn_ceiling_boot_and_search_survive_over_4096_docs(settings, store):
+    """Regression for the fleet OUTAGE: once the corpus crossed sqlite-vec's 4096
+    KNN ceiling, the widen-retry issued a k>4096 MATCH that raised
+    OperationalError, and /api/boot (Active-Memory) 500'd for every agent.
+
+    Non-vacuous by construction: we first PROVE the corpus genuinely exceeds the
+    ceiling (a raw k=count MATCH still raises), then assert the clamped paths —
+    boot_pointers and Searcher.search — return normally instead of throwing."""
+    import sqlite3
+
+    import sqlite_vec
+
+    N = 4100  # > 4096: the exact condition that took the fleet down
+    _bulk_seed_docs(store, N)
+    count = store.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+    assert count == N
+
+    # Prove the ceiling is real: an un-clamped k = count MATCH still throws, so a
+    # regression that drops the clamp fails this test rather than silently passing.
+    qblob = sqlite_vec.serialize_float32(
+        next(iter(store.embedder.embed(["reverse proxy tls nginx"]))).tolist()
+    )
+    with pytest.raises(sqlite3.OperationalError):
+        store.db.execute(
+            "SELECT rowid FROM vec_docs WHERE embedding MATCH ? AND k = ?",
+            (qblob, N),
+        ).fetchall()
+
+    searcher = Searcher(settings, embedder=BagEmbedder())
+
+    # Boot for any agent forces the owner-scoped short first pass → widen-retry.
+    # Before the clamp this raised (→ boot 500); now it fail-opens to an empty pack.
+    pack = boot_pointers(searcher, "anyagent")
+    assert pack["pointers"] == []
+
+    # A plain unfiltered search over the same >4096-doc store must not throw.
+    results = searcher.search("reverse proxy tls nginx", limit=5)
+    assert isinstance(results, list)

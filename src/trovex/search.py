@@ -14,6 +14,12 @@ from .embedder import Embedder, embedder_from_settings
 # rescans the index, and this bounds that scan on a large store.
 MAX_KNN_POOL = 20_000
 
+# Hard ceiling sqlite-vec enforces on a vec0 KNN `k`: a MATCH with k > 4096
+# raises OperationalError("k value in knn query too large"). Every knn site must
+# clamp to this, or a store that crosses 4096 docs throws on the widen-retry and
+# takes /api/boot (Active-Memory) down with a 500.
+SQLITE_VEC_MAX_K = 4096
+
 # Reciprocal-rank-fusion constant (the standard k0=60), shared with the chunk
 # store's hybrid retrieval (store.py) so both surfaces fuse identically.
 RRF_K0 = 60
@@ -179,6 +185,7 @@ class Searcher:
         include_archived: bool = False,
     ) -> list:
         query_emb = next(self.embedder.embed([query]))
+        pool = min(pool, SQLITE_VEC_MAX_K)  # never hand sqlite-vec a k it rejects
         sql = """SELECT d.id, d.path, d.title, d.mtime, d.status, d.size_bytes,
                         d.tokens_est, d.absolute_path, d.source_id, v.distance
                  FROM vec_docs v
@@ -213,10 +220,13 @@ class Searcher:
         # once over the whole index whenever the result comes back short: the
         # lifecycle exclusion (archived/pending_delete) is ALWAYS applied, so even
         # an otherwise-unfiltered query can be squeezed by an archived-heavy pool.
+        # k is clamped to SQLITE_VEC_MAX_K: sqlite-vec throws once k > 4096, which
+        # is exactly what took the fleet's Active-Memory boot down when the corpus
+        # crossed 4096 docs — the widen scan is capped there, not at the doc count.
         if len(rows) < limit:
             total = self.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
             if total > pool:
-                params[1] = min(total, MAX_KNN_POOL)
+                params[1] = min(total, MAX_KNN_POOL, SQLITE_VEC_MAX_K)
                 rows = self.db.execute(sql, params).fetchall()
         return rows
 

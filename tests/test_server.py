@@ -121,6 +121,46 @@ def test_api_boot_recalls_mixed_case_owner(client):
     assert [p["title"] for p in upper["pointers"]] == ["COO handoff"]
     assert upper["tokens_est"] > 0
 
+
+def test_api_boot_and_search_200_over_4096_docs(client):
+    """OUTAGE regression at the HTTP surface: once the corpus crossed sqlite-vec's
+    4096 KNN ceiling, the widen-retry issued a k>4096 MATCH that raised and
+    /api/boot 500'd for the whole fleet. Both routes must now return 200."""
+    import sqlite3
+
+    import sqlite_vec
+
+    store = state_mod._state.store
+    emb = next(iter(store.embedder.embed(["reverse proxy tls nginx seed"]))).tolist()
+    blob = sqlite_vec.serialize_float32(emb)
+    now = 1_600_000_000.0
+    # 4100 unscoped docs (source_id='code', no kind) → owner boot scope matches
+    # none → short first pass → the widen-retry that used to throw.
+    store.db.executemany(
+        """INSERT INTO docs
+             (source_id, path, absolute_path, content_hash, size_bytes,
+              tokens_est, mtime, first_indexed, last_indexed, title)
+           VALUES ('code', ?, ?, ?, 10, 3, ?, ?, ?, ?)""",
+        [(f"seed/{i}.md", f"/seed/{i}.md", f"h{i}", now, now, now, f"seed {i}") for i in range(4100)],
+    )
+    ids = [r["id"] for r in store.db.execute("SELECT id FROM docs WHERE path LIKE 'seed/%'")]
+    store.db.executemany(
+        "INSERT INTO vec_docs(rowid, embedding) VALUES (?, ?)", [(i, blob) for i in ids]
+    )
+    store.db.commit()
+    assert store.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"] > 4096
+
+    # Prove the ceiling is genuinely crossed: an un-clamped k=count MATCH raises.
+    with pytest.raises(sqlite3.OperationalError):
+        store.db.execute(
+            "SELECT rowid FROM vec_docs WHERE embedding MATCH ? AND k = ?", (blob, len(ids))
+        ).fetchall()
+
+    boot = client.get("/api/boot", params={"agent": "nobody"})
+    assert boot.status_code == 200
+    search = client.get("/api/search", params={"q": "reverse proxy tls nginx", "limit": 5})
+    assert search.status_code == 200
+
     # The already-lower-case spelling resolves to the same record.
     lower = client.get("/api/boot", params={"agent": "coo", "floor": 0.0}).json()
     assert [p["title"] for p in lower["pointers"]] == ["COO handoff"]

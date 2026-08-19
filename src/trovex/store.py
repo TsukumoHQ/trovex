@@ -633,7 +633,9 @@ class SqliteStore:
         the active canon."""
         if not query.strip():
             return []
-        pool = max(limit * 6, 30)
+        # Clamp to sqlite-vec's 4096 KNN ceiling: a MATCH with k > 4096 raises
+        # OperationalError. A caller-supplied limit could push limit*6 past it.
+        pool = min(max(limit * 6, 30), 4096)
         qemb = next(iter(self.embedder.embed([query])))
         vec_ids = [
             r["rowid"]

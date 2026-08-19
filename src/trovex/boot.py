@@ -9,6 +9,8 @@ pulls a full record on demand via trovex_read(doc_id).
 
 from __future__ import annotations
 
+import sqlite3
+
 from .search import Searcher
 from .tokens import count_tokens as _count_tokens
 
@@ -34,22 +36,29 @@ def boot_pointers(
     q: str | None = None,
 ) -> dict:
     """The agent's own records as a pointer pack. Empty (zero cost) when nothing
-    clears scope + floor — a session for an unknown agent injects nothing."""
-    results = searcher.search(
-        (q or BOOT_QUERY)[:BOOT_Q_MAX],
-        limit=k,
-        source_ids=["trovex"],
-        kind="record",
-        # owner tags are stored lower-cased; normalise the query so a mixed-case
-        # agent (e.g. "COO") recalls its own records instead of nothing.
-        tags=[f"owner/{agent.lower()}"],
-        # Dense-only: `floor` is an absolute cosine-similarity threshold (~0.62).
-        # The flagship search now fuses BM25+dense via RRF, whose scores are ~an
-        # order of magnitude smaller — using it here would floor every record out
-        # and return empty recall. Scope (owner+record) is what yields precision
-        # here; the dense score is the semantic-relevance gate on top.
-        hybrid=False,
-    )
+    clears scope + floor — a session for an unknown agent injects nothing.
+
+    Best-effort: boot must NEVER 500. Any retrieval OperationalError (e.g. the
+    sqlite-vec KNN ceiling on a large store, a locked/backup db) degrades to an
+    empty pack instead of taking the whole fleet's Active-Memory boot down."""
+    try:
+        results = searcher.search(
+            (q or BOOT_QUERY)[:BOOT_Q_MAX],
+            limit=k,
+            source_ids=["trovex"],
+            kind="record",
+            # owner tags are stored lower-cased; normalise the query so a mixed-case
+            # agent (e.g. "COO") recalls its own records instead of nothing.
+            tags=[f"owner/{agent.lower()}"],
+            # Dense-only: `floor` is an absolute cosine-similarity threshold (~0.62).
+            # The flagship search now fuses BM25+dense via RRF, whose scores are ~an
+            # order of magnitude smaller — using it here would floor every record out
+            # and return empty recall. Scope (owner+record) is what yields precision
+            # here; the dense score is the semantic-relevance gate on top.
+            hybrid=False,
+        )
+    except sqlite3.OperationalError:
+        return {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
     results = [r for r in results if r.score >= floor]
     if not results:
         return {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}

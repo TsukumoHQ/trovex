@@ -13,6 +13,7 @@ backed by the same sqlite-vec DB the rest of trovex uses.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -100,31 +101,60 @@ class SqliteStore:
         now = time.time()
         tokens_est = len(content) // 4
         size = len(content.encode("utf-8"))
+        content_hash = hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
 
         with self._lock:
-            existing = self.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()
+            existing = self.db.execute(
+                "SELECT id, content_hash FROM docs WHERE ext_id = ?", (ext_id,)
+            ).fetchone()
 
             if existing:
                 doc_id = existing["id"]
-                # Non-clobber: snapshot the current content before overwriting it,
-                # so a bad save is always recoverable (the vague2 loss class).
-                self._snapshot_version_locked(doc_id, now)
+                # Incremental: an overwrite with byte-identical content is a no-op
+                # for the expensive + snapshot-polluting work — skip the version
+                # snapshot, the doc re-embed, the re-chunk, and dup-detection. Only
+                # the cheap metadata (title/kind/tags/mtime) is refreshed, so a
+                # tag-only or title-only update still lands.
+                content_unchanged = bool(existing["content_hash"]) and (
+                    existing["content_hash"] == content_hash
+                )
+                if not content_unchanged:
+                    # Non-clobber: snapshot the current content before overwriting
+                    # it, so a bad save is always recoverable (the vague2 loss class).
+                    self._snapshot_version_locked(doc_id, now)
                 self.db.execute(
-                    """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
+                    """UPDATE docs SET content=?, content_hash=?, title=?, kind=?, tokens_est=?,
                            size_bytes=?, mtime=?, last_indexed=?, author_agent=?
                        WHERE id=?""",
-                    (content, title, kind, tokens_est, size, now, now, author, doc_id),
+                    (
+                        content,
+                        content_hash,
+                        title,
+                        kind,
+                        tokens_est,
+                        size,
+                        now,
+                        now,
+                        author,
+                        doc_id,
+                    ),
                 )
+                if content_unchanged:
+                    upsert_docs_fts(self.db, doc_id, title, content)  # title may have moved
+                    self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
+                    self.db.commit()
+                    return ext_id
             else:
                 cur = self.db.execute(
                     """INSERT INTO docs
                            (source_id, path, absolute_path, content_hash, size_bytes,
                             tokens_est, mtime, first_indexed, last_indexed, title,
                             author_agent, content, ext_id, kind)
-                       VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         TROVEX_SOURCE_ID,
                         ext_id,
+                        content_hash,
                         size,
                         tokens_est,
                         now,
@@ -419,6 +449,7 @@ class SqliteStore:
                 mtime = float(it.get("mtime") or now)
                 size = len(content.encode("utf-8"))
                 tok = len(content) // 4
+                content_hash = hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
                 existing = self.db.execute(
                     "SELECT id FROM docs WHERE ext_id = ?", (ext_id,)
                 ).fetchone()
@@ -428,9 +459,9 @@ class SqliteStore:
                     # silently lose the prior body either (parity with put()).
                     self._snapshot_version_locked(doc_id, now)
                     self.db.execute(
-                        """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
+                        """UPDATE docs SET content=?, content_hash=?, title=?, kind=?, tokens_est=?,
                                size_bytes=?, mtime=?, last_indexed=? WHERE id=?""",
-                        (content, title, kind, tok, size, mtime, now, doc_id),
+                        (content, content_hash, title, kind, tok, size, mtime, now, doc_id),
                     )
                 else:
                     cur = self.db.execute(
@@ -438,10 +469,11 @@ class SqliteStore:
                                (source_id, path, absolute_path, content_hash,
                                 size_bytes, tokens_est, mtime, first_indexed,
                                 last_indexed, title, content, ext_id, kind)
-                           VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             TROVEX_SOURCE_ID,
                             ext_id,
+                            content_hash,
                             size,
                             tok,
                             mtime,
@@ -480,24 +512,66 @@ class SqliteStore:
         return ext_ids
 
     def _insert_chunks(self, doc_id: int, content: str, title: str) -> list[tuple[int, str]]:
-        """(Re)chunk a doc into the chunks table; return (chunk_id, embed_text)."""
-        for c in self.db.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
-            self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (c["id"],))
-            self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (c["id"],))
-        self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
-        pairs: list[tuple[int, str]] = []
+        """(Re)chunk a doc; return (chunk_id, embed_text) for chunks that NEED
+        embedding — i.e. only the new/changed ones.
+
+        Content-addressed (Merkle) incremental: each new chunk is keyed by the
+        sha256 of its embed_text (title + heading + text — the full embedding
+        input). A new chunk whose hash already exists among the doc's current
+        chunks reuses that chunk's row + embedding + FTS unchanged (only its
+        position is refreshed), so an edit to one section re-embeds one chunk,
+        not the whole doc. Chunks whose hash is no longer present are deleted.
+
+        Correctness: the hash covers everything that feeds the embedding, so any
+        genuine change to a chunk's text, heading, or the doc title changes its
+        hash and forces a re-embed — an unchanged embedding is never served for
+        changed content."""
+        existing = self.db.execute(
+            "SELECT id, content_hash FROM chunks WHERE doc_id = ? ORDER BY id", (doc_id,)
+        ).fetchall()
+        # Pool of reusable rows by hash. Legacy rows (hash '') are never reusable,
+        # so the first rewrite after the migration re-embeds + stamps them.
+        reusable: dict[str, list[int]] = {}
+        for row in existing:
+            h = row["content_hash"]
+            if h:
+                reusable.setdefault(h, []).append(row["id"])
+
+        to_embed: list[tuple[int, str]] = []
+        kept: set[int] = set()
         for ch in chunk_markdown(content):
-            cur = self.db.execute(
-                """INSERT INTO chunks (doc_id, chunk_index, heading_path, content, tokens_est)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (doc_id, ch.index, " > ".join(ch.heading_path), ch.text, ch.tokens_est),
-            )
-            self.db.execute(
-                "INSERT INTO chunks_fts(content, chunk_id) VALUES (?, ?)",
-                (ch.text, cur.lastrowid),
-            )
-            pairs.append((cur.lastrowid, ch.embed_text(title)))
-        return pairs
+            embed_text = ch.embed_text(title)
+            h = hashlib.sha256(embed_text.encode("utf-8", errors="replace")).hexdigest()
+            heading = " > ".join(ch.heading_path)
+            pool = reusable.get(h)
+            if pool:
+                # Unchanged chunk: reuse its embedding + FTS. Only the position
+                # (chunk_index) can differ — hash equality proves text/heading are
+                # identical. Refresh index so ordering stays correct after edits.
+                cid = pool.pop()
+                kept.add(cid)
+                self.db.execute("UPDATE chunks SET chunk_index = ? WHERE id = ?", (ch.index, cid))
+            else:
+                cur = self.db.execute(
+                    """INSERT INTO chunks
+                           (doc_id, chunk_index, heading_path, content, tokens_est, content_hash)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (doc_id, ch.index, heading, ch.text, ch.tokens_est, h),
+                )
+                cid = cur.lastrowid
+                self.db.execute(
+                    "INSERT INTO chunks_fts(content, chunk_id) VALUES (?, ?)", (ch.text, cid)
+                )
+                kept.add(cid)
+                to_embed.append((cid, embed_text))
+
+        # Drop chunks whose content is gone (removed sections or changed-out text).
+        for row in existing:
+            if row["id"] not in kept:
+                self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (row["id"],))
+                self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (row["id"],))
+                self.db.execute("DELETE FROM chunks WHERE id = ?", (row["id"],))
+        return to_embed
 
     def _embed_chunks(self, pairs: list[tuple[int, str]]) -> None:
         """Batch-embed chunk texts (prefix-fused) into vec_chunks."""

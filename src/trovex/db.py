@@ -60,6 +60,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_embed_dim(conn, embed_dim)
     _migrate_add_trovex_store_columns(conn)
     _migrate_add_query_session(conn)
+    _migrate_add_chunk_hash(conn)
     _init_schema(conn, embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
@@ -286,6 +287,27 @@ def _migrate_add_trovex_store_columns(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_add_chunk_hash(conn: sqlite3.Connection) -> None:
+    """Add chunks.content_hash to an existing store (additive).
+
+    Enables content-addressed incremental re-embed: a chunk whose hash is
+    unchanged on a doc rewrite reuses its embedding. Nullable-safe default '' so
+    pre-migration chunks read as non-reusable and get re-embedded + stamped on
+    the next rewrite of their doc. Skip if the table doesn't exist yet —
+    _init_schema creates it with the column.
+    """
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chunks'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(chunks)")}
+    if "content_hash" not in cols:
+        conn.execute("ALTER TABLE chunks ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(doc_id, content_hash)")
+        conn.commit()
+
+
 def _migrate_add_query_session(conn: sqlite3.Connection) -> None:
     """Add mcp_queries.session_id to an existing query log (additive).
 
@@ -410,8 +432,15 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             chunk_index INTEGER NOT NULL,
             heading_path TEXT,
             content TEXT NOT NULL,
-            tokens_est INTEGER NOT NULL DEFAULT 0
+            tokens_est INTEGER NOT NULL DEFAULT 0,
+            -- Merkle/content-addressed incremental re-embed: sha256 of the chunk's
+            -- embed_text (title + heading + text — everything that feeds the
+            -- embedding). On a doc rewrite, a chunk whose hash is unchanged keeps
+            -- its existing embedding instead of being re-embedded. Legacy rows have
+            -- '' → treated as non-reusable, so the first rewrite re-embeds + stamps.
+            content_hash TEXT NOT NULL DEFAULT ''
         );
+        CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(doc_id, content_hash);
         CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(doc_id);
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
             embedding float[{embed_dim}] distance_metric=cosine

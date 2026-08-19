@@ -160,23 +160,35 @@ def detect_duplicate_for(db: sqlite3.Connection, settings: Settings, doc_id: int
     nearest non-record neighbour is within the cosine threshold, the OLDER of the
     two becomes a duplicate of the newer. Returns the id marked duplicate, or None.
     """
-    row = db.execute("SELECT id, mtime, kind, status FROM docs WHERE id = ?", (doc_id,)).fetchone()
-    if not row or row["kind"] == "record" or row["status"] not in ("canonical", "plan"):
-        return None
+    row = db.execute(
+        "SELECT id, mtime, kind, status, source_id FROM docs WHERE id = ?", (doc_id,)
+    ).fetchone()
+    if not row or settings.is_ephemeral_kind(row["kind"]) or row["status"] not in (
+        "canonical",
+        "plan",
+    ):
+        return None  # ephemeral kinds are their own events — never auto-flag them
     emb = db.execute("SELECT embedding FROM vec_docs WHERE rowid = ?", (doc_id,)).fetchone()
     if not emb:
         return None
-    threshold = settings.dup_cosine_threshold
+    threshold = settings.dup_threshold_for(row["kind"])
+    # Compare LIKE-WITH-LIKE: only same-source, same-kind, canonical/plan neighbours
+    # are dup candidates, so a cross-kind coincidence never flags (and hides) a doc.
+    # k is applied before the WHERE class filter → widen so a same-kind neighbour
+    # isn't squeezed out by nearer other-kind docs.
+    kind_clause = "d.kind IS NULL" if row["kind"] is None else "d.kind = :kind"
     neighbours = db.execute(
-        """SELECT v.rowid, v.distance, d.mtime, d.kind, d.status
-           FROM vec_docs v JOIN docs d ON d.id = v.rowid
-           WHERE v.embedding MATCH ? AND k = 3 ORDER BY v.distance""",
-        (emb["embedding"],),
+        f"""SELECT v.rowid, v.distance, d.mtime
+            FROM vec_docs v JOIN docs d ON d.id = v.rowid
+            WHERE v.embedding MATCH :emb AND k = 20
+              AND d.source_id = :source_id
+              AND {kind_clause}
+              AND d.status IN ('canonical', 'plan')
+            ORDER BY v.distance""",
+        {"emb": emb["embedding"], "source_id": row["source_id"], "kind": row["kind"]},
     ).fetchall()
     for nb in neighbours:
-        if nb["rowid"] == doc_id or nb["kind"] == "record":
-            continue
-        if nb["status"] not in ("canonical", "plan"):
+        if nb["rowid"] == doc_id:
             continue
         if 1.0 - nb["distance"] / 2 < threshold:
             break  # neighbours sorted by distance asc → none closer remain

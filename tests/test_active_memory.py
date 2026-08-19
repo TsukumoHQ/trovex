@@ -116,26 +116,59 @@ def test_scope_ranks_by_score_within_filter(settings, store):
 
 def test_near_dup_guard_blocks_canonical_create_but_skips_records(settings, store):
     """The write-time dedup guard (store.check_duplicate) backs trovex_write's
-    block-and-point on CREATE. It fires for a near-copy of a CANONICAL non-record doc,
-    is silent for a genuinely distinct doc, and is SKIPPED for records — because an
-    owner's current-state is a deterministic upsert, not a near-duplicate to block."""
+    block-and-point on CREATE. It fires for a near-copy of a CANONICAL non-record doc
+    OF THE SAME KIND, is silent for a genuinely distinct doc, and is SKIPPED for
+    ephemeral kinds — because an owner's current-state is a deterministic upsert,
+    not a near-duplicate to block. The caller passes the incoming doc's kind so the
+    guard compares like-with-like."""
     canonical = store.put(
         "# Auth runbook\n\njwt token signature validation rotate keys on incident",
         kind="reference",
     )
 
-    # A near-copy of the canonical reference → guard points at the original.
-    hit = store.check_duplicate("jwt token signature validation rotate keys on incident", title="Auth")
+    # A near-copy of the canonical reference, SAME kind → guard points at the original.
+    hit = store.check_duplicate(
+        "jwt token signature validation rotate keys on incident", title="Auth", kind="reference"
+    )
     assert hit is not None
     assert hit["ext_id"] == canonical
     assert hit["similarity"] >= store.settings.dup_cosine_threshold
 
-    # A clearly different doc → no block.
-    assert store.check_duplicate("stripe invoice webhook billing reconciliation flow") is None
+    # A clearly different doc (same kind) → no block.
+    assert (
+        store.check_duplicate("stripe invoice webhook billing reconciliation flow", kind="reference")
+        is None
+    )
 
-    # A record neighbour must NOT block (records are upsert-by-owner, not dup bloat).
+    # An ephemeral-kind driver must NOT block (records are upsert-by-owner, not bloat).
     store.put("# cmo state\n\nmoonshot launch metrics current state", kind="record", tags=["owner/cmo"])
-    assert store.check_duplicate("moonshot launch metrics current state") is None
+    assert store.check_duplicate("moonshot launch metrics current state", kind="record") is None
+
+
+def test_dedup_is_namespaced_by_kind_no_cross_kind_false_positive(settings, store):
+    """Regression (aa08ffaa): a governance audit was blocked as ~92% similar to a
+    stale checkpoint. Dedup must compare WITHIN a (source_id, kind) class, so a
+    near-identical body in a DIFFERENT kind never blocks — while a genuine
+    same-kind near-copy still does."""
+    topic = "quarterly access review rotate keys audit findings remediation"
+    # An ephemeral checkpoint on the same topic — must never be a dedup neighbour.
+    store.put(f"# Checkpoint\n\n{topic}", kind="checkpoint")
+
+    # A governance doc with a near-identical body but a DIFFERENT kind → NOT blocked
+    # (cross-kind), even though its vector is ~identical to the checkpoint's.
+    assert store.check_duplicate(f"# Audit\n\n{topic}", title="Audit", kind="governance") is None
+
+    # A genuine same-kind near-copy of an existing canonical governance doc → BLOCKED.
+    gov = store.put(f"# Audit\n\n{topic}", kind="governance")
+    hit = store.check_duplicate(f"# Audit copy\n\n{topic}", title="Audit", kind="governance")
+    assert hit is not None and hit["ext_id"] == gov
+
+    # And the auto-flagger is namespaced too: the checkpoint was never demoted to a
+    # duplicate of the governance doc (a cross-kind false flag would HIDE it).
+    cp_status = store.db.execute(
+        "SELECT status FROM docs WHERE kind = 'checkpoint'"
+    ).fetchone()["status"]
+    assert cp_status != "duplicate"
 
 
 # --- OUTAGE regression: sqlite-vec 4096 KNN ceiling ------------------------

@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .state import get_state
-from .store import TROVEX_SOURCE_ID, extract_section, replace_section
+from .store import TROVEX_SOURCE_ID, _extract_title, extract_section, replace_section
 from .tokens import count_tokens as _count_tokens
 
 log = logging.getLogger("trovex.mcp")
@@ -398,7 +398,15 @@ def trovex_write(
     # if this near-duplicates an existing canonical — stops the 'one topic, N near-copies'
     # bloat at the source (the store was 43% dupes). Updates + force bypass it.
     if not doc_id and not force:
-        dup = state.store.check_duplicate(content)
+        # Probe title-fused (the store fuses _extract_title(content) into the doc
+        # vector) and scoped to this doc's kind, so the block only fires against a
+        # genuine same-kind near-copy — not a cross-kind coincidence.
+        dup = state.store.check_duplicate(
+            content,
+            title=_extract_title(content),
+            kind=kind or None,
+            source_id=TROVEX_SOURCE_ID,
+        )
         if dup:
             pct = round(dup["similarity"] * 100)
             return (

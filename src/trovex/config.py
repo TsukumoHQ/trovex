@@ -133,6 +133,16 @@ class Settings(BaseSettings):
     # Status heuristics
     stale_age_days: int = 90
     dup_cosine_threshold: float = 0.90
+    # Per-kind overrides for the near-duplicate cosine threshold. Dedup compares
+    # like-with-like (same source_id + kind); some kinds want a stricter/looser
+    # bar than the global default. env: TROVEX_DUP_COSINE_THRESHOLD_BY_KIND as JSON.
+    dup_cosine_threshold_by_kind: dict[str, float] = {}
+    # Ephemeral kinds are NOT deduped — each is its own event/snapshot, not a
+    # near-copy to collapse. Excluded BOTH as drivers (an incoming ephemeral doc
+    # is never blocked) AND as neighbours (never the thing an incoming doc is
+    # blocked against). This is what stops a governance audit being flagged ~92%
+    # similar to a stale checkpoint.
+    dup_ephemeral_kinds: list[str] = ["record", "checkpoint", "resume"]
     plan_path_patterns: list[str] = [
         r"PLAN[_\-]",
         r"_PLAN\.md$",
@@ -164,6 +174,17 @@ class Settings(BaseSettings):
 
     # Ranking weights
     freshness_half_life_days: float = 90.0
+
+    def is_ephemeral_kind(self, kind: str | None) -> bool:
+        """A kind that must never take part in dedup (as driver or neighbour)."""
+        return kind in self.dup_ephemeral_kinds
+
+    def dup_threshold_for(self, kind: str | None) -> float:
+        """Near-duplicate cosine threshold for this kind (per-kind override, else
+        the global default)."""
+        if kind is None:
+            return self.dup_cosine_threshold
+        return self.dup_cosine_threshold_by_kind.get(kind, self.dup_cosine_threshold)
 
     def resolved_embed_dim(self) -> int:
         """Return the dim matching embed_model, fall back to declared embed_dim."""

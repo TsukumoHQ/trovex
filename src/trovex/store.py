@@ -215,30 +215,51 @@ class SqliteStore:
             self.db.commit()
         return cur.rowcount > 0
 
-    def check_duplicate(self, content: str, title: str | None = None) -> dict | None:
+    def check_duplicate(
+        self,
+        content: str,
+        title: str | None = None,
+        kind: str | None = None,
+        source_id: str = "trovex",
+    ) -> dict | None:
         """Pre-insert near-duplicate check for the interactive write path.
 
-        Embeds `content` TRANSIENTLY (no insert) and returns the nearest existing
-        CANONICAL doc within the cosine threshold — so trovex_write can block-and-point
-        ('this duplicates <id> — update it or pass force') instead of creating another
-        near-copy (43% of the store was such bloat). Returns {ext_id, title, similarity}
-        or None. Mirrors detect_duplicate_for's threshold; never raises into the caller.
+        Embeds `title` + `content` TRANSIENTLY (no insert) — title-fused, so the
+        probe vector matches how docs are stored — and returns the nearest existing
+        CANONICAL/plan doc IN THE SAME (source_id, kind) CLASS within the cosine
+        threshold, so trovex_write can block-and-point ('this duplicates <id> —
+        update it or pass force') instead of creating another near-copy (43% of the
+        store was such bloat). Returns {ext_id, title, similarity} or None.
+
+        Compares LIKE-WITH-LIKE: only same-source, same-kind, non-ephemeral
+        neighbours are candidates, so a governance audit is never blocked against a
+        stale checkpoint. Ephemeral kinds (record/checkpoint/resume) are their own
+        events — an ephemeral driver is never blocked at all. Never raises into the
+        caller: a guard failure must not block a legit write.
         """
+        if self.settings.is_ephemeral_kind(kind):
+            return None  # ephemeral kinds are not deduped (driver-side exclusion)
         try:
             text = f"{title or ''}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
             emb = next(iter(self.embedder.embed([text])))
             qv = sqlite_vec.serialize_float32(emb.tolist())
-            threshold = self.settings.dup_cosine_threshold
+            threshold = self.settings.dup_threshold_for(kind)
+            # k is applied by sqlite-vec BEFORE the WHERE class filter, so a pool of
+            # 3 could be all wrong-kind neighbours and miss a real same-kind dup.
+            # Widen the probe, then keep the nearest same-(source,kind) canonical.
+            kind_clause = "d.kind IS NULL" if kind is None else "d.kind = :kind"
             with self._lock:
                 neighbours = self.db.execute(
-                    """SELECT v.rowid, v.distance, d.ext_id, d.title, d.kind, d.status
-                       FROM vec_docs v JOIN docs d ON d.id = v.rowid
-                       WHERE v.embedding MATCH ? AND k = 3 ORDER BY v.distance""",
-                    (qv,),
+                    f"""SELECT v.distance, d.ext_id, d.title, d.status
+                        FROM vec_docs v JOIN docs d ON d.id = v.rowid
+                        WHERE v.embedding MATCH :qv AND k = 20
+                          AND d.source_id = :source_id
+                          AND {kind_clause}
+                          AND d.status IN ('canonical', 'plan')
+                        ORDER BY v.distance""",
+                    {"qv": qv, "source_id": source_id, "kind": kind},
                 ).fetchall()
             for nb in neighbours:
-                if nb["kind"] == "record" or nb["status"] not in ("canonical", "plan"):
-                    continue
                 similarity = 1.0 - nb["distance"] / 2
                 if similarity < threshold:
                     break  # neighbours sorted by distance asc → none closer remain

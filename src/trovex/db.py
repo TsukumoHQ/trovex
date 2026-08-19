@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from pathlib import Path
 
@@ -5,6 +6,24 @@ import sqlite_vec
 
 # Backslash is the escape char we declare with `ESCAPE '\'` on LIKE clauses.
 LIKE_ESCAPE_CHAR = "\\"
+
+# Kinds that are their OWN event/snapshot and never take part in SSOT collapse —
+# kept in sync with Settings.dup_ephemeral_kinds (config.py). Duplicated here as a
+# literal because db.py is the schema leaf and must not import config.
+EPHEMERAL_KINDS = ("record", "checkpoint", "resume")
+_EPHEMERAL_SQL = "(" + ", ".join(f"'{k}'" for k in EPHEMERAL_KINDS) + ")"
+
+
+def canonical_topic_slug(title: str | None) -> str | None:
+    """Topic slug for the SSOT invariant: one live canonical per (workspace, topic).
+
+    Lower-cased, non-alphanumeric runs collapsed to '-', trimmed. Returns None for
+    an empty/blank title so an untitled doc never collides on the empty slug (a
+    NULL canonical_topic is exempt from the partial unique index)."""
+    if not title:
+        return None
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    return slug or None
 
 
 def like_escape(s: str) -> str:
@@ -62,6 +81,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_add_query_session(conn)
     _migrate_add_chunk_hash(conn)
     _migrate_add_lifecycle(conn)
+    _migrate_add_canonical_topic(conn)  # AFTER lifecycle: supersede sets lifecycle='archived'
     _init_schema(conn, embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
@@ -352,6 +372,69 @@ def _migrate_add_query_session(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _migrate_add_canonical_topic(conn: sqlite3.Connection) -> None:
+    """Add docs.canonical_topic + enforce SSOT (one live canonical per topic).
+
+    canonical_topic is set ONLY for trovex-OWNED (source_id='trovex') non-ephemeral
+    docs — file-backed code docs stay NULL, so two repos' READMEs never collide on
+    the same slug. Backfills existing rows, then DE-DUPES the same-title canonical
+    pairs that already exist (keep the newest, downgrade the rest to superseded +
+    archived) BEFORE creating the partial unique index — otherwise the index build
+    would fail on the pre-existing collision. Idempotent: skips once the column
+    exists. _init_schema creates the column + index on a fresh store.
+    """
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='docs'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    if "canonical_topic" in cols:
+        return
+    conn.execute("ALTER TABLE docs ADD COLUMN canonical_topic TEXT")
+    # Backfill trovex-owned non-ephemeral docs (Python-side: the slug rules match
+    # the live write path exactly).
+    rows = conn.execute(
+        f"""SELECT id, title FROM docs
+            WHERE source_id = 'trovex' AND (kind IS NULL OR kind NOT IN {_EPHEMERAL_SQL})"""
+    ).fetchall()
+    for r in rows:
+        slug = canonical_topic_slug(r["title"])
+        if slug:
+            conn.execute("UPDATE docs SET canonical_topic = ? WHERE id = ?", (slug, r["id"]))
+    # De-dupe existing canonical collisions: per (workspace_id, canonical_topic),
+    # keep the newest canonical, downgrade the rest to superseded + archived.
+    groups = conn.execute(
+        f"""SELECT workspace_id, canonical_topic
+            FROM docs
+            WHERE status = 'canonical' AND canonical_topic IS NOT NULL
+              AND (kind IS NULL OR kind NOT IN {_EPHEMERAL_SQL})
+            GROUP BY workspace_id, canonical_topic
+            HAVING COUNT(*) > 1"""
+    ).fetchall()
+    for g in groups:
+        ids = [
+            row["id"]
+            for row in conn.execute(
+                """SELECT id FROM docs
+                   WHERE status = 'canonical' AND workspace_id = ? AND canonical_topic = ?
+                   ORDER BY mtime DESC, id DESC""",
+                (g["workspace_id"], g["canonical_topic"]),
+            )
+        ]
+        for stale_id in ids[1:]:  # keep ids[0] (newest) canonical, supersede the rest
+            conn.execute(
+                "UPDATE docs SET status = 'superseded', lifecycle = 'archived' WHERE id = ?",
+                (stale_id,),
+            )
+    conn.execute(
+        """CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_canonical_topic
+           ON docs(workspace_id, canonical_topic)
+           WHERE status = 'canonical' AND canonical_topic IS NOT NULL"""
+    )
+    conn.commit()
+
+
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
     conn.executescript(
         f"""
@@ -383,6 +466,10 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             -- 'pending_delete' = queued for removal (a grace window, hidden
             -- from retrieval). Everything defaults to 'active'.
             lifecycle TEXT NOT NULL DEFAULT 'active',
+            -- SSOT: topic slug (slug of title) for trovex-owned non-ephemeral docs;
+            -- NULL for file-backed + ephemeral docs. The partial unique index below
+            -- enforces one LIVE canonical per (workspace, topic).
+            canonical_topic TEXT,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
@@ -391,6 +478,12 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         CREATE INDEX IF NOT EXISTS idx_docs_source ON docs(workspace_id, source_id);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_ext_id
             ON docs(ext_id) WHERE ext_id IS NOT NULL;
+        -- One live canonical per topic (canonical_topic is NULL for file/ephemeral
+        -- docs, and NULLs never collide in a unique index, so only trovex-owned
+        -- non-ephemeral canonicals are constrained).
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_canonical_topic
+            ON docs(workspace_id, canonical_topic)
+            WHERE status = 'canonical' AND canonical_topic IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS index_runs (
             id INTEGER PRIMARY KEY,

@@ -194,9 +194,12 @@ def test_batch_detect_duplicates_is_namespaced_by_kind(settings, store):
     ).fetchone()["status"] != "duplicate"
 
     # But a genuine SAME-kind near-copy still gets collapsed (write-path + batch
-    # agree): one of the pair ends up 'duplicate', not both left canonical.
-    a = store.put("# Runbook\n\ndeploy rollback canonical procedure notes", kind="reference")
-    b = store.put("# Runbook\n\ndeploy rollback canonical procedure notes", kind="reference")
+    # agree): one of the pair ends up 'duplicate', not both left canonical. DISTINCT
+    # titles → distinct canonical_topic (no SSOT collision), but near-identical
+    # bodies → high cosine, so the batch still pairs them.
+    body = "deploy rollback runbook incident response mitigation steps canonical procedure notes"
+    a = store.put(f"# Deploy rollback runbook alpha\n\n{body}", kind="reference")
+    b = store.put(f"# Deploy rollback runbook beta\n\n{body}", kind="reference")
     compute_status(store.db, store.settings)
     statuses = sorted(
         row["status"]
@@ -395,3 +398,79 @@ def test_duplicate_status_excluded_from_default_pool(settings, store):
     # not a scope/recall miss.
     opted_in = {r.path for r in searcher.search(query, limit=10, include_duplicates=True)}
     assert older in opted_in
+
+
+# --- SSOT: one live canonical per topic (schema-enforced) -------------------
+
+
+def test_second_canonical_for_a_topic_is_refused_or_supersedes(settings, store):
+    """SSOT (e0fd2625): a CREATE that would fork a second live canonical for a topic
+    is REFUSED (TopicCollisionError) unless force=True, which atomically SUPERSEDES the
+    prior canon so exactly one live canonical per topic survives."""
+    from trovex.store import TopicCollisionError
+
+    first = store.put("# Auth guide\n\noriginal body about jwt rotation", kind="reference")
+
+    # Same title/topic, DIFFERENT body (embedding dedup wouldn't catch it) → refused.
+    with pytest.raises(TopicCollisionError) as ei:
+        store.put("# Auth guide\n\ncompletely different content here", kind="reference")
+    assert ei.value.ext_id == first
+
+    # force=True supersedes the prior canon and installs the new one.
+    second = store.put(
+        "# Auth guide\n\ncompletely different content here", kind="reference", force=True
+    )
+    rows = {
+        r["ext_id"]: (r["status"], r["lifecycle"])
+        for r in store.db.execute(
+            "SELECT ext_id, status, lifecycle FROM docs WHERE ext_id IN (?, ?)", (first, second)
+        )
+    }
+    assert rows[first] == ("superseded", "archived")  # prior canon stepped down
+    assert rows[second][0] == "canonical"
+    # Exactly one live canonical carries the topic slug now.
+    live = store.db.execute(
+        "SELECT COUNT(*) AS c FROM docs WHERE canonical_topic = 'auth-guide' AND status = 'canonical'"
+    ).fetchone()["c"]
+    assert live == 1
+
+    # Ephemeral kinds carry no topic and never collide — two same-title records OK.
+    store.put("# Standup\n\nmonday state", kind="record")
+    store.put("# Standup\n\ntuesday state", kind="record")  # no TopicCollisionError raised
+
+
+def test_migration_backfills_and_dedupes_canonical_pair(settings, store):
+    """The migration backfills canonical_topic and DE-DUPES the same-title canonical
+    pairs that already exist (keep newest, supersede the rest) BEFORE building the
+    partial unique index — so an already-forked store converges to SSOT on open."""
+    import sqlite3
+
+    from trovex.db import _migrate_add_canonical_topic
+
+    # Simulate a PRE-migration store: no canonical_topic column, no unique index.
+    store.db.execute("DROP INDEX IF EXISTS idx_docs_canonical_topic")
+    store.db.execute("ALTER TABLE docs DROP COLUMN canonical_topic")
+    store.db.commit()
+    # Two same-title canonical trovex docs coexist (the pre-SSOT bug), older first.
+    for i, mt in enumerate((100.0, 200.0)):
+        store.db.execute(
+            """INSERT INTO docs
+                 (source_id, path, absolute_path, content_hash, size_bytes, tokens_est,
+                  mtime, first_indexed, last_indexed, title, status, ext_id, kind)
+               VALUES ('trovex', ?, ?, ?, 10, 3, ?, ?, ?, 'Auth Guide', 'canonical', ?, 'reference')""",
+            (f"p{i}", f"/p{i}", f"h{i}", mt, mt, mt, f"ext{i}"),
+        )
+    store.db.commit()
+
+    _migrate_add_canonical_topic(store.db)
+
+    rows = {
+        r["ext_id"]: (r["status"], r["canonical_topic"])
+        for r in store.db.execute("SELECT ext_id, status, canonical_topic FROM docs")
+    }
+    assert rows["ext1"][0] == "canonical"  # newest (mtime 200) kept
+    assert rows["ext0"][0] == "superseded"  # older stepped down
+    assert rows["ext1"][1] == "auth-guide"  # slug backfilled
+    # The rebuilt unique index now refuses a second live canonical for the topic.
+    with pytest.raises(sqlite3.IntegrityError):
+        store.db.execute("UPDATE docs SET status = 'canonical' WHERE ext_id = 'ext0'")

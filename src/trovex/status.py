@@ -170,10 +170,11 @@ def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
 def detect_duplicate_for(db: sqlite3.Connection, settings: Settings, doc_id: int) -> int | None:
     """Single-doc duplicate check for the live write path (store.put).
 
-    The batch _detect_duplicates() ran only from the retired indexer; this is its
-    one-doc equivalent so trovex_write flags near-dups as they land. If the doc's
-    nearest non-record neighbour is within the cosine threshold, the OLDER of the
-    two becomes a duplicate of the newer. Returns the id marked duplicate, or None.
+    The one-doc equivalent of the batch _detect_duplicates() (which still runs on
+    every reindex / fs-watch via compute_status); this fires on trovex_write so
+    near-dups are flagged as they land. If the doc's nearest same-(source, kind)
+    neighbour is within the cosine threshold, the OLDER of the two becomes a
+    duplicate of the newer. Returns the id marked duplicate, or None.
     """
     row = db.execute(
         "SELECT id, mtime, kind, status, source_id FROM docs WHERE id = ?", (doc_id,)

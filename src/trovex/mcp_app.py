@@ -15,7 +15,13 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .state import get_state
-from .store import TROVEX_SOURCE_ID, _extract_title, extract_section, replace_section
+from .store import (
+    TROVEX_SOURCE_ID,
+    TopicCollisionError,
+    _extract_title,
+    extract_section,
+    replace_section,
+)
 from .tokens import count_tokens as _count_tokens
 
 log = logging.getLogger("trovex.mcp")
@@ -418,12 +424,22 @@ def trovex_write(
     taglist = _as_taglist(tags)
     if ticket.strip():
         taglist.append(f"ticket/{ticket.strip()}")
-    return state.store.put(
-        content,
-        kind=kind or None,
-        ext_id=doc_id or None,
-        tags=taglist or None,
-    )
+    try:
+        return state.store.put(
+            content,
+            kind=kind or None,
+            ext_id=doc_id or None,
+            tags=taglist or None,
+            force=force,
+        )
+    except TopicCollisionError as c:
+        # Schema-enforced SSOT: a second live canonical for this topic. Point at the
+        # existing one (a title-collision the embedding dedup above didn't catch).
+        return (
+            f'⚠ Not stored — a canonical doc for this topic already exists: {c.ext_id} '
+            f'("{c.title}"). One canonical doc per topic: UPDATE it — call trovex_write '
+            f'again with doc_id="{c.ext_id}". Pass force=true to supersede it with this one.'
+        )
 
 
 @mcp.tool()

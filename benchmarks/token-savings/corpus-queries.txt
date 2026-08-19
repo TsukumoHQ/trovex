@@ -1,7 +1,8 @@
 # Fixed query set for the PINNED benchmark corpus (benchmarks/token-savings/corpus/).
 # One doc-lookup question per line; '#' lines ignored. Do NOT edit these two files
-# independently — the published number in result.json is (corpus + queries + model).
-# Re-running `run.py --fixed` against this pair reproduces result.json exactly.
+# independently — the published number in src/trovex/_benchmark.json is
+# (corpus + queries + model). Re-running `run.py --fixed` against this pair
+# reproduces src/trovex/_benchmark.json exactly.
 
 how do I install acme notes
 set the data directory and listen port

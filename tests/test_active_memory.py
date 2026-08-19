@@ -414,6 +414,64 @@ def test_boot_never_returns_cold_tier_but_explicit_source_reaches_it(settings, s
     assert any(h.path == "code/hot.md" for h in cold), "explicit source query didn't reach cold"
 
 
+def test_agent_artifact_globs_ignored_anywhere_in_basename(settings):
+    """P2c AC: the fleet's per-agent scratch .md (resume/checkpoint/lessons) must
+    never enter the index. The globs match the token ANYWHERE in the basename, so
+    `trovex-backend-resume.md` and `2026-checkpoint.md` are caught — not only names
+    that START with the token (the earlier prefix globs let those through)."""
+    from trovex.indexer import _is_ignored
+
+    globs = settings.default_ignore_globs
+    for name in (
+        "resume.md",
+        "trovex-backend-resume.md",
+        "2026-checkpoint.md",
+        "sprint-lessons.md",
+        ".niwa-decision.md",
+        "docs/agent-resume.md",
+    ):
+        assert _is_ignored(name, globs), f"{name} should be ignored"
+    # A legit doc that merely mentions a topic is NOT swept.
+    for name in ("architecture.md", "deploy-guide.md", "api.md"):
+        assert not _is_ignored(name, globs), f"{name} should NOT be ignored"
+
+
+def test_store_only_kind_is_bm25_findable_but_not_in_knn(settings, store):
+    """P2c AC: a store-only kind lands in FTS (BM25-findable) but creates NO
+    vec_docs/vec_chunks row — zero KNN pressure. A normal kind still embeds."""
+    store.settings.store_only_kinds = ["reference"]
+
+    body = "kubernetes ingress controller tls termination reference material"
+    archived = store.put(f"# Ingress reference\n\n{body}", kind="reference")
+    normal = store.put(f"# Ingress howto\n\n{body} howto steps", kind="doc")
+
+    aid = store.db.execute("SELECT id FROM docs WHERE ext_id = ?", (archived,)).fetchone()["id"]
+    nid = store.db.execute("SELECT id FROM docs WHERE ext_id = ?", (normal,)).fetchone()["id"]
+
+    # Store-only doc: no vectors at all.
+    assert store.db.execute("SELECT COUNT(*) c FROM vec_docs WHERE rowid = ?", (aid,)).fetchone()["c"] == 0
+    assert (
+        store.db.execute(
+            "SELECT COUNT(*) c FROM vec_chunks WHERE rowid IN (SELECT id FROM chunks WHERE doc_id = ?)",
+            (aid,),
+        ).fetchone()["c"]
+        == 0
+    )
+    # Normal doc DID embed.
+    assert store.db.execute("SELECT COUNT(*) c FROM vec_docs WHERE rowid = ?", (nid,)).fetchone()["c"] == 1
+
+    # But the store-only doc is still chunk-indexed for BM25 (keyword-findable).
+    assert store.db.execute(
+        "SELECT COUNT(*) c FROM chunks WHERE doc_id = ?", (aid,)
+    ).fetchone()["c"] >= 1
+    searcher = Searcher(settings, embedder=store.embedder)
+    hits = searcher.search("kubernetes ingress tls reference", limit=10, source_ids=["trovex"])
+    assert archived in [
+        store.db.execute("SELECT ext_id FROM docs WHERE path = ?", (h.path,)).fetchone()["ext_id"]
+        for h in hits
+    ], "store-only doc not found via BM25"
+
+
 # --- status='duplicate' excluded from the default retrieval pool -----------
 
 

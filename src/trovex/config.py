@@ -135,12 +135,13 @@ class Settings(BaseSettings):
     # file-indexed corpus past the sqlite-vec KNN ceiling; they must never enter the
     # store. Matched by basename or path the same way .trovexignore globs are.
     default_ignore_globs: list[str] = [
-        "resume*.md",
-        "*.resume.md",
-        "checkpoint*.md",
-        "*.checkpoint.md",
-        "lessons*.md",
-        "*.lessons.md",
+        # Match the token ANYWHERE in the basename (fnmatch), so per-agent files
+        # like `trovex-backend-resume.md` or `2026-checkpoint.md` are caught, not
+        # only names that START with the token (the earlier prefix globs missed
+        # the bulk of the fleet's artifacts).
+        "*resume*.md",
+        "*checkpoint*.md",
+        "*lessons*.md",
         ".niwa-decision.md",
     ]
 
@@ -157,6 +158,12 @@ class Settings(BaseSettings):
     # blocked against). This is what stops a governance audit being flagged ~92%
     # similar to a stale checkpoint.
     dup_ephemeral_kinds: list[str] = ["record", "checkpoint", "resume"]
+    # Store-only kinds: written to the FTS/BM25 index (docs_fts + chunks_fts) but
+    # NOT embedded — no vec_docs/vec_chunks row, so they add ZERO KNN pressure. For
+    # archival/reference material a caller wants keyword-findable but out of the
+    # semantic recall pool (structurally bounds corpus growth). Opt-in + tunable
+    # (env TROVEX_STORE_ONLY_KINDS as JSON); empty = every kind embeds as before.
+    store_only_kinds: list[str] = []
     plan_path_patterns: list[str] = [
         r"PLAN[_\-]",
         r"_PLAN\.md$",
@@ -192,6 +199,11 @@ class Settings(BaseSettings):
     def is_ephemeral_kind(self, kind: str | None) -> bool:
         """A kind that must never take part in dedup (as driver or neighbour)."""
         return kind in self.dup_ephemeral_kinds
+
+    def is_store_only_kind(self, kind: str | None) -> bool:
+        """A kind stored for BM25 only — no embedding, no vec0 row, no KNN
+        footprint. FTS still finds it; the semantic recall pool never sees it."""
+        return kind in self.store_only_kinds
 
     def dup_threshold_for(self, kind: str | None) -> float:
         """Near-duplicate cosine threshold for this kind (per-kind override, else

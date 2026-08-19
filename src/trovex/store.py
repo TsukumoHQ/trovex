@@ -263,19 +263,38 @@ class SqliteStore:
                 doc_id = cur.lastrowid
 
             upsert_docs_fts(self.db, doc_id, title, content)
-            self._embed(doc_id, content, title)
-            self._embed_chunks(self._insert_chunks(doc_id, content, title))
+            # Store-only lane (P2c): chunk + FTS-index for BM25, but SKIP both vec
+            # inserts so the doc adds zero KNN pressure. chunks_fts is still
+            # populated (chunk-level BM25 works); only vec_docs/vec_chunks are
+            # withheld. Everything else embeds as before.
+            store_only = self.settings.is_store_only_kind(kind)
+            chunks_to_embed = self._insert_chunks(doc_id, content, title)
+            if not store_only:
+                self._embed(doc_id, content, title)
+                self._embed_chunks(chunks_to_embed)
+            else:
+                # Authoritative: a store-only write guarantees NO vectors for this
+                # doc, even if it previously embedded under a different kind.
+                self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
+                self.db.execute(
+                    "DELETE FROM vec_chunks WHERE rowid IN "
+                    "(SELECT id FROM chunks WHERE doc_id = ?)",
+                    (doc_id,),
+                )
             self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
             self.db.commit()
             # Flag near-duplicates on the live write path too (the batch pass in
             # compute_status still runs on reindex/fs-watch, but a trovex_write must
-            # not wait for one). Best-effort — never let it block a write.
-            try:
-                from .status import detect_duplicate_for
+            # not wait for one). Best-effort — never let it block a write. Skipped
+            # for store-only docs: with no embedding there's no vector to compare,
+            # and they're deliberately outside the dedup/recall pool.
+            if not store_only:
+                try:
+                    from .status import detect_duplicate_for
 
-                detect_duplicate_for(self.db, self.settings, doc_id)
-            except Exception:
-                pass
+                    detect_duplicate_for(self.db, self.settings, doc_id)
+                except Exception:
+                    pass
         return ext_id
 
     def set_lifecycle(self, ext_id: str, state: str) -> bool:

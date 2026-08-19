@@ -32,13 +32,20 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     # that always sent the original name is unaffected.
     "trovex": {"props": {"q", "summary", "source", "query"}, "required": set()},
     "trovex_search": {"props": {"query", "k", "kind", "tags", "source", "q"}, "required": set()},
-    "trovex_read": {"props": {"query", "doc_id", "section", "full", "q"}, "required": set()},
+    # trovex_read gained `versions`/`version_id` (both optional) for the non-clobber
+    # history: list prior snapshots or read one. Additive — existing readers unaffected.
+    "trovex_read": {
+        "props": {"query", "doc_id", "section", "full", "q", "versions", "version_id"},
+        "required": set(),
+    },
     "trovex_write": {
         "props": {"content", "kind", "doc_id", "tags", "ticket", "force", "section"},
         "required": {"content"},
     },
     "trovex_tag": {"props": {"doc_id", "add", "remove"}, "required": {"doc_id"}},
     "trovex_delete": {"props": {"doc_id"}, "required": {"doc_id"}},
+    # Roll a doc back to a prior version (the undo for a bad overwrite); write-gated.
+    "trovex_restore": {"props": {"doc_id", "version_id"}, "required": {"doc_id", "version_id"}},
 }
 
 
@@ -51,7 +58,7 @@ def _params(name: str):
 
 
 def test_tool_set_is_exactly_the_contract():
-    """Exactly these six tools — no more (an unpinned new tool), no fewer (a removed
+    """Exactly these tools — no more (an unpinned new tool), no fewer (a removed
     tool every client still calls)."""
     assert set(_tools()) == set(CONTRACT)
 

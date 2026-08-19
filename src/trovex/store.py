@@ -106,15 +106,9 @@ class SqliteStore:
 
             if existing:
                 doc_id = existing["id"]
-                # Snapshot the current content before overwriting it (undo-able).
-                old = self.db.execute(
-                    "SELECT content, title FROM docs WHERE id = ?", (doc_id,)
-                ).fetchone()
-                if old and old["content"] is not None:
-                    self.db.execute(
-                        "INSERT INTO doc_versions(doc_id, content, title, ts) VALUES (?, ?, ?, ?)",
-                        (doc_id, old["content"], old["title"], now),
-                    )
+                # Non-clobber: snapshot the current content before overwriting it,
+                # so a bad save is always recoverable (the vague2 loss class).
+                self._snapshot_version_locked(doc_id, now)
                 self.db.execute(
                     """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
                            size_bytes=?, mtime=?, last_indexed=?, author_agent=?
@@ -338,6 +332,9 @@ class SqliteStore:
                 ).fetchone()
                 if existing:
                     doc_id = existing["id"]
+                    # Non-clobber: bulk import over an existing doc must not
+                    # silently lose the prior body either (parity with put()).
+                    self._snapshot_version_locked(doc_id, now)
                     self.db.execute(
                         """UPDATE docs SET content=?, title=?, kind=?, tokens_est=?,
                                size_bytes=?, mtime=?, last_indexed=? WHERE id=?""",
@@ -605,6 +602,32 @@ class SqliteStore:
             self.db.execute("DELETE FROM collections WHERE name = ?", (name,))
             self.db.commit()
 
+    def _snapshot_version_locked(self, doc_id: int, ts: float) -> None:
+        """Snapshot a doc's CURRENT content into doc_versions, then prune to the
+        configured cap. Caller holds ``_lock``; does NOT commit. A doc with no
+        stored content (never happens for owned docs) is a no-op."""
+        old = self.db.execute(
+            "SELECT content, title FROM docs WHERE id = ?", (doc_id,)
+        ).fetchone()
+        if not old or old["content"] is None:
+            return
+        self.db.execute(
+            "INSERT INTO doc_versions(doc_id, content, title, ts) VALUES (?, ?, ?, ?)",
+            (doc_id, old["content"], old["title"], ts),
+        )
+        cap = getattr(self.settings, "doc_version_cap", 0)
+        if cap and cap > 0:
+            # Keep the newest `cap` snapshots; drop the rest. Bounds unbounded
+            # growth for a doc saved thousands of times.
+            self.db.execute(
+                """DELETE FROM doc_versions
+                   WHERE doc_id = ? AND id NOT IN (
+                       SELECT id FROM doc_versions WHERE doc_id = ?
+                       ORDER BY ts DESC, id DESC LIMIT ?
+                   )""",
+                (doc_id, doc_id, cap),
+            )
+
     def list_versions(self, ext_id: str) -> list[dict]:
         """Previous content snapshots of a doc (newest first)."""
         return [
@@ -612,21 +635,36 @@ class SqliteStore:
             for r in self.db.execute(
                 """SELECT v.id, v.title, v.ts, LENGTH(v.content) AS size
                FROM doc_versions v JOIN docs d ON d.id = v.doc_id
-               WHERE d.ext_id = ? ORDER BY v.ts DESC""",
+               WHERE d.ext_id = ? ORDER BY v.ts DESC, v.id DESC""",
                 (ext_id,),
             )
         ]
 
-    def restore_version(self, ext_id: str, version_id: int) -> bool:
-        """Restore a previous version — put() snapshots the current one first."""
+    def get_version(self, ext_id: str, version_id: int) -> str | None:
+        """The stored content of one prior version, or None if absent."""
         row = self.db.execute(
             """SELECT v.content FROM doc_versions v JOIN docs d ON d.id = v.doc_id
                WHERE d.ext_id = ? AND v.id = ?""",
             (ext_id, version_id),
         ).fetchone()
-        if not row:
+        return row["content"] if row else None
+
+    def restore_version(self, ext_id: str, version_id: int) -> bool:
+        """Roll a doc back to a prior version's content.
+
+        put() snapshots the CURRENT content first, so a restore is itself
+        undo-able. The doc's identity (kind + tags) is preserved — restoring old
+        CONTENT must not silently wipe the doc's kind/owner tags (the bare-put
+        bug); only the body reverts.
+        """
+        content = self.get_version(ext_id, version_id)
+        if content is None:
             return False
-        self.put(row["content"], ext_id=ext_id)
+        cur = self.get(ext_id)
+        kind = cur.kind if cur else None
+        # Reuse the live tags minus the kind/ facet (put re-adds it from `kind`).
+        tags = [t for t in cur.tags if not t.startswith("kind/")] if cur else None
+        self.put(content, ext_id=ext_id, kind=kind, tags=tags)
         return True
 
     def _embed(self, doc_id: int, content: str, title: str) -> None:

@@ -445,7 +445,13 @@ def trovex_tag(
 
 @mcp.tool()
 def trovex_read(
-    query: str = "", doc_id: str = "", section: str = "", full: bool = False, q: str = ""
+    query: str = "",
+    doc_id: str = "",
+    section: str = "",
+    full: bool = False,
+    q: str = "",
+    versions: bool = False,
+    version_id: int = 0,
 ) -> str:
     """Read a trovex-owned doc — by default returns the most relevant *passage*.
 
@@ -459,6 +465,12 @@ def trovex_read(
         section: With doc_id, return only that heading's section.
         full: With query, return the whole best-matching doc instead of a passage.
         q: Alias for `query`.
+        versions: With doc_id, list the doc's prior content snapshots (newest
+            first) as `version_id · when · size · title` — every overwrite keeps
+            the previous body, so a bad save is recoverable. Restore one with
+            trovex_restore(doc_id, version_id), or read one via version_id below.
+        version_id: With doc_id, return the stored CONTENT of that prior version
+            (from the `versions` listing) instead of the current doc.
     """
     state = get_state()
     query = (query or q).strip()
@@ -468,6 +480,28 @@ def trovex_read(
         doc = state.store.get(resolved) if resolved else None
         if doc is None:
             return "(not found)"
+        if versions:
+            vs = state.store.list_versions(resolved)
+            if not vs:
+                return "(no prior versions)"
+            import datetime as _dt
+
+            lines = [f"{len(vs)} prior version(s) of {resolved} (newest first):"]
+            for v in vs:
+                when = _dt.datetime.fromtimestamp(v["ts"], tz=_dt.timezone.utc).strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+                lines.append(
+                    f"- version_id={v['id']} · {when}Z · ~{v['size']}b · {v['title'] or '(untitled)'}"
+                )
+            lines.append(
+                f'Read one: trovex_read(doc_id="{resolved}", version_id=<id>). '
+                f'Restore: trovex_restore(doc_id="{resolved}", version_id=<id>).'
+            )
+            return "\n".join(lines)
+        if version_id:
+            content = state.store.get_version(resolved, version_id)
+            return content if content is not None else f"(version {version_id} not found)"
         if section:
             sec = extract_section(doc.content, section)
             return sec if sec is not None else f"(section '{section}' not found)"
@@ -589,6 +623,31 @@ def trovex_delete(doc_id: str) -> str:
         return _DENY
     state = get_state()
     return "deleted" if state.store.delete(doc_id) else "(not found)"
+
+
+@mcp.tool()
+def trovex_restore(doc_id: str, version_id: int) -> str:
+    """Roll a doc back to a prior version — the undo for a bad overwrite.
+
+    Every trovex_write over an existing doc snapshots the previous body, so a
+    save that clobbered the wrong content is recoverable. List versions with
+    trovex_read(doc_id, versions=true); pass the version_id here to restore it.
+    The restore itself snapshots the current content first, so it too is undo-able,
+    and the doc's kind + tags are preserved (only the body reverts).
+
+    Args:
+        doc_id: Opaque id of the doc to roll back (full or a unique short prefix).
+        version_id: The version_id from the trovex_read(versions=true) listing.
+    """
+    if not _authorized():
+        return _DENY
+    state = get_state()
+    resolved = state.store.resolve_ext_id(doc_id)
+    if not resolved:
+        return "(not found)"
+    if state.store.restore_version(resolved, version_id):
+        return f"restored {resolved} to version {version_id}"
+    return f"(version {version_id} not found for {resolved})"
 
 
 # ---------------------------------------------------------------------------

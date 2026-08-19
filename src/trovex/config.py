@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     # than this are purged at startup. <= 0 disables purging (keep everything).
     query_retention_days: int = 90
 
+    # Doc-version history depth (env TROVEX_DOC_VERSION_CAP): how many prior
+    # content snapshots an owned doc keeps. Each overwrite snapshots the previous
+    # body (non-clobber, degrade-not-delete), so a bad save is recoverable via
+    # trovex_read(versions=True)/trovex_restore. Oldest snapshots beyond the cap
+    # are pruned to bound growth. <= 0 keeps unlimited history.
+    doc_version_cap: int = 50
+
     # Multi-source: file at sources_config_path takes precedence; otherwise
     # falls back to a single source built from project_root.
     sources_config_path: Path = Path.home() / ".trovex-data" / "sources.yaml"

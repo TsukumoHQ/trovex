@@ -567,10 +567,13 @@ def trovex_search(
     q: str = "",
     include_archived: bool = False,
 ) -> str:
-    """Search the store — returns the top K relevant *passages* (not whole docs).
+    """Search the store — returns the top K relevant *citations* (not dumps).
 
     The RAG entry point: chunk-level retrieval with metadata filters. Each result
-    is a passage with its heading breadcrumb + source doc id.
+    is a compact anchored citation — heading breadcrumb + source doc id over a
+    short snippet — followed by one 'climb the ladder' affordance. It's a pointer
+    list to triage from, not the full text: read the one span you want with
+    trovex_read (query→passage/full, or doc_id+section for the exact cited span).
 
     Args:
         query: Natural-language query. The alias `q` is also accepted (the
@@ -606,7 +609,13 @@ def trovex_search(
         tags=_as_taglist(tags) or None,
         include_archived=include_archived,
     )
-    out = "\n\n———\n\n".join(_fmt_passage(h) for h in hits) if hits else "(no results)"
+    if hits:
+        # Citations, not dumps: k compact anchored snippets + one ladder-climb
+        # affordance, instead of k full sections concatenated. The agent reads the
+        # one span it wants via trovex_read rather than paying for every section.
+        out = "\n\n———\n\n".join(_fmt_citation(h) for h in hits) + f"\n\n{_SEARCH_LADDER_HINT}"
+    else:
+        out = "(no results)"
     saved = _log_retrieval(state, query, hits, out, t0)
     return _with_inline(state.searcher.db, out, saved)
 
@@ -632,6 +641,23 @@ def _extract_words(text: str, words: int = 50) -> str:
     parts = stripped.split()
     head = " ".join(parts[:words])
     return f"{head}…" if len(parts) > words else head
+
+
+_SEARCH_LADDER_HINT = (
+    "Climb the ladder for one result: "
+    'trovex_read(query="…") for its best passage, tier="full" for the whole doc; '
+    'or trovex_read(doc_id="<id>", section="<heading>") for that exact cited span.'
+)
+
+
+def _fmt_citation(h: dict, words: int = 28) -> str:
+    """One terse, anchored search hit: the citation (heading breadcrumb + doc-id)
+    over a short ~`words`-word snippet — a pointer to CLIMB, not a dump of the
+    whole section. The breadcrumb + trovex:<id> is the stable anchor; the exact
+    span is trovex_read(doc_id, section=<heading>)."""
+    bc = _breadcrumb(h)
+    snippet = _extract_words(h.get("content", ""), words)
+    return f"{bc}  — trovex:{h['ext_id']}\n{snippet}"
 
 
 def _fmt_card(h: dict) -> str:

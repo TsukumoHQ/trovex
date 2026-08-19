@@ -121,14 +121,39 @@ def test_identical_reput_also_unarchives(store):
 
 
 def test_active_doc_found_despite_archived_neighbours(store, settings):
-    # A cluster of near-identical archived docs + one active doc on the topic.
-    for i in range(8):
+    # Regression for the widen-retry guard: the always-on lifecycle filter can
+    # squeeze an *unfiltered* query out of the first-pass KNN pool, and the retry
+    # must still fire (old guard `filtered and total>pool` never fired without a
+    # kind/tags/source scope, so an archived-heavy pool starved the query).
+    #
+    # NON-VACUOUS by construction: every archived dup carries ALL four query
+    # terms (reverse/proxy/tls/nginx), the one active doc carries only two
+    # (reverse/proxy). Under BagEmbedder cosine, the active doc is therefore
+    # STRICTLY farther from the query than every archived dup, so it is NOT in the
+    # first-pass top-25 — the pre-filter pool is 100% archived, the lifecycle
+    # filter empties it, and ONLY the widen-retry over the whole index recovers
+    # the active doc. (Earlier revisions gave the active doc the same query-term
+    # profile as the dups; its lighter noise gave it a *higher* cosine, so it sat
+    # in the first-pass pool and the test passed even when the retry never ran.)
+    #
+    # hybrid=False isolates the dense widen-retry: BM25 is not an alternate
+    # recovery route, so a regression in the retry guard fails this test outright.
+    N = 30  # > pool (limit*5 = 25): first-pass top-25 is all-archived
+    for i in range(N):
         e = store.put(
-            f"# Doc {i}\n\n## Reverse proxy\n\ntls nginx proxy notes {i}\n", kind="record"
+            f"# Proxy notes\n\n## Reverse proxy\n\nreverse proxy tls nginx entry {i}\n",
+            kind="record",
         )
         store.set_lifecycle(e, "archived")
-    active = store.put("# Live\n\n## Reverse proxy\n\ntls nginx proxy live doc\n", kind="record")
+    # Two query terms only (reverse, proxy) — no tls/nginx — so it ranks below
+    # every archived dup and is squeezed out of the first-pass pool.
+    active = store.put(
+        "# Live entry\n\n## Reverse proxy overview\n\nreverse proxy summary only\n",
+        kind="record",
+    )
     searcher = Searcher(settings, embedder=BagEmbedder())
-    results = searcher.search("reverse proxy tls nginx", limit=5)
+    # Dense-only, unfiltered: the pre-filter pool (25) is entirely archived, so
+    # the first pass returns empty and only the widen-retry surfaces the active doc.
+    results = searcher.search("reverse proxy tls nginx", limit=5, hybrid=False)
     exts = {r.path for r in results}
-    assert active in exts  # the active doc surfaces, not squeezed out by archived
+    assert active in exts  # recovered by the widen-retry, not squeezed out

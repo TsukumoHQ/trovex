@@ -439,6 +439,31 @@ def test_second_canonical_for_a_topic_is_refused_or_supersedes(settings, store):
     store.put("# Standup\n\ntuesday state", kind="record")  # no TopicCollisionError raised
 
 
+def test_update_rename_into_existing_topic_raises_topiccollision(settings, store):
+    """SSOT UPDATE-path guard (e0fd2625 review r1): renaming a live canonical's
+    title so its slug lands on ANOTHER live canonical's topic must raise
+    TopicCollisionError — a clean, actionable block — not the raw sqlite
+    IntegrityError from the unique index that an agent write can't recover from."""
+    from trovex.store import TopicCollisionError
+
+    a = store.put("# Alpha guide\n\nbody about alpha", kind="reference")  # topic alpha-guide
+    b = store.put("# Beta guide\n\nbody about beta", kind="reference")  # topic beta-guide
+
+    # Rename b's title onto alpha-guide → collides with a's live canonical.
+    with pytest.raises(TopicCollisionError) as ei:
+        store.put("# Alpha guide\n\nbody about beta, renamed", ext_id=b, kind="reference")
+    assert ei.value.ext_id == a
+
+    # force=True supersedes a and lets b take the topic.
+    store.put("# Alpha guide\n\nbody about beta, renamed", ext_id=b, kind="reference", force=True)
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (a,)).fetchone()[
+        "status"
+    ] == "superseded"
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (b,)).fetchone()[
+        "status"
+    ] == "canonical"
+
+
 def test_migration_backfills_and_dedupes_canonical_pair(settings, store):
     """The migration backfills canonical_topic and DE-DUPES the same-title canonical
     pairs that already exist (keep newest, supersede the rest) BEFORE building the

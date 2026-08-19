@@ -138,11 +138,31 @@ class SqliteStore:
 
         with self._lock:
             existing = self.db.execute(
-                "SELECT id, content_hash, title FROM docs WHERE ext_id = ?", (ext_id,)
+                "SELECT id, content_hash, title, status FROM docs WHERE ext_id = ?", (ext_id,)
             ).fetchone()
 
             if existing:
                 doc_id = existing["id"]
+                # SSOT on the UPDATE path too: renaming a live canonical's title so
+                # its slug lands on ANOTHER live canonical's topic would trip the
+                # partial unique index with a raw IntegrityError the agent can't act
+                # on. Mirror the CREATE guard: block-and-point, or supersede on force.
+                if topic is not None and existing["status"] == "canonical":
+                    prior = self.db.execute(
+                        """SELECT id, ext_id, title FROM docs
+                           WHERE workspace_id = 'default' AND canonical_topic = ?
+                             AND status = 'canonical' AND id != ?
+                           LIMIT 1""",
+                        (topic, doc_id),
+                    ).fetchone()
+                    if prior is not None:
+                        if not force:
+                            raise TopicCollisionError(prior["ext_id"], prior["title"])
+                        self.db.execute(
+                            "UPDATE docs SET status = 'superseded', lifecycle = 'archived' "
+                            "WHERE id = ?",
+                            (prior["id"],),
+                        )
                 # Incremental: an overwrite whose content AND title are both
                 # byte-identical is a no-op for the expensive + snapshot-polluting
                 # work — skip the version snapshot, the doc re-embed, the re-chunk,

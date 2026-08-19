@@ -836,13 +836,18 @@ class SqliteStore:
         if not query.strip():
             return []
         # Partitioned chunk KNN (P2a): scan the target source's shard, pre-filtering
-        # lifecycle/status/kind on the vec0 metadata columns. Default → the SSOT
-        # ('trovex') partition. Tags are post-filtered (not a vec0 column), so a
-        # tag-scoped query scans the whole bounded partition; else a small k. k tops
-        # out at vec0's hard limit (4096) — no clamp/widen, partitions are bounded.
+        # lifecycle/status/kind on the vec0 metadata columns. No source = the
+        # all-sources contract → scan EVERY partition (not just the SSOT, which
+        # would silently drop dense hits from file-backed sources). Tags are
+        # post-filtered (not a vec0 column), so a tag-scoped query scans the whole
+        # bounded partition; else a small k. k tops out at vec0's hard limit (4096)
+        # — no clamp/widen, partitions are bounded.
         qemb = next(iter(self.embedder.embed([query])))
         qblob = sqlite_vec.serialize_float32(qemb.tolist())
-        targets = [source] if source else [TROVEX_SOURCE_ID]
+        targets = [source] if source else (
+            [r["source_id"] for r in self.db.execute("SELECT DISTINCT source_id FROM docs")]
+            or [TROVEX_SOURCE_ID]
+        )
         k = 4096 if tags else max(limit * 6, 50)
         pool = k  # BM25 side reuses this candidate budget
         # vec0 pushes '=', '!=' and 'IN' into the KNN, but NOT 'NOT IN' (it would

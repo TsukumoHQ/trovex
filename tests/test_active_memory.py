@@ -325,6 +325,52 @@ def test_archived_heavy_partition_does_not_squeeze_live_recall(settings, store):
     assert any(h.path == "arch/999.md" for h in hits)
 
 
+def test_unpinned_search_scans_all_partitions_not_just_trovex(settings, store):
+    """Round-2 review regression: source='*' and an unpinned connection resolve to
+    source_ids=None = the documented 'search the whole store' contract. P2a's KNN
+    fell back to ['trovex'] for None, silently dropping ALL dense hits from
+    file-backed partitions (a dense-only query returned nothing). None must scan
+    EVERY partition and merge by distance.
+
+    Seed a doc that matches the query only in a file-backed 'code' partition (the
+    'trovex' partition holds an unrelated doc), then a dense-only unpinned search
+    must still recall the 'code' doc."""
+    import sqlite_vec
+
+    q = "kubernetes ingress controller tls termination"
+    match_blob = sqlite_vec.serialize_float32(next(iter(store.embedder.embed([q]))).tolist())
+    other_blob = sqlite_vec.serialize_float32(
+        next(iter(store.embedder.embed(["quarterly budget spreadsheet finance"]))).tolist()
+    )
+    now = 1_600_000_000.0
+
+    def _seed(source_id, path, blob):
+        store.db.execute(
+            """INSERT INTO docs
+                 (source_id, path, absolute_path, content_hash, size_bytes, tokens_est,
+                  mtime, first_indexed, last_indexed, title, lifecycle)
+               VALUES (?, ?, ?, ?, 10, 3, ?, ?, ?, ?, 'active')""",
+            (source_id, path, f"/{path}", f"h-{path}", now, now, now, path),
+        )
+        rid = store.db.execute("SELECT id FROM docs WHERE path = ?", (path,)).fetchone()["id"]
+        store.db.execute(
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
+            "VALUES (?, ?, ?, 'doc', 'active', 'canonical')",
+            (rid, source_id, blob),
+        )
+
+    _seed("code", "code/ingress.md", match_blob)  # file-backed source, matches q
+    _seed("trovex", "trovex/unrelated.md", other_blob)  # SSOT, does NOT match q
+    store.db.commit()
+
+    searcher = Searcher(settings, embedder=store.embedder)
+    # Unpinned (source_ids=None), dense-only so BM25 can't mask a dropped dense hit.
+    hits = searcher.search(q, limit=5, source_ids=None, hybrid=False)
+    assert any(h.source_id == "code" for h in hits), (
+        "unpinned dense search saw only the trovex partition — file-source recall lost"
+    )
+
+
 # --- status='duplicate' excluded from the default retrieval pool -----------
 
 

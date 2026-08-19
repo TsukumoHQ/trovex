@@ -194,10 +194,18 @@ class Searcher:
         the 4096 ceiling (clamp + widen retry) is gone. kind/lifecycle/status are
         vec0 METADATA columns, pre-filtered INSIDE the KNN so no post-filter squeeze;
         tags are the one non-vec0 filter, so a tag-scoped query scans the whole
-        (bounded) partition. Default target = the SSOT ('trovex') partition."""
+        (bounded) partition.
+
+        source_ids scopes the shards. No source_ids = the all-sources contract
+        (source='*' or an unpinned connection = "search the whole store"), so
+        EVERY partition is scanned and merged by distance — NOT just the SSOT.
+        Falling back to ['trovex'] here would silently drop all dense hits from
+        file-backed sources. boot/flagship pass source_ids=['trovex'] explicitly."""
         query_emb = next(self.embedder.embed([query]))
         qblob = sqlite_vec.serialize_float32(query_emb.tolist())
-        targets = source_ids if source_ids else [RESERVED_SOURCE_ID]
+        targets = source_ids or [
+            r["source_id"] for r in self.db.execute("SELECT DISTINCT source_id FROM docs")
+        ] or [RESERVED_SOURCE_ID]
         # A tag filter is applied AFTER the KNN (tags aren't a vec0 column), so scan
         # the whole bounded partition; otherwise a small k suffices — every other
         # constraint pre-filters in the KNN.

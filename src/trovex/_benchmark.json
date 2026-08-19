@@ -1,0 +1,21 @@
+{
+  "corpus": "acme-notes (pinned fixture, benchmarks/token-savings/corpus/)",
+  "docs_indexed": 8,
+  "queries": 10,
+  "model": "BAAI/bge-small-en-v1.5",
+  "savings_pct": 59.6,
+  "median_ratio": 0.5924,
+  "pooled_ratio": 0.5964,
+  "baseline_tokens": 5297,
+  "trovex_tokens": 2138,
+  "total_saved": 3159,
+  "saved_usd": 0.007898,
+  "pricing": {
+    "model": "gpt-5.4",
+    "input_per_mtok": 2.5,
+    "source": "list price, 2026 (input rate)"
+  },
+  "methodology_url": "https://github.com/TsukumoHQ/trovex/blob/main/benchmarks/token-savings/METHODOLOGY.md",
+  "deterministic": true,
+  "ran_at": 1787148943
+}

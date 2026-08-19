@@ -43,6 +43,19 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_QUERIES = Path(__file__).with_name("queries.txt")
 
+# The PINNED corpus + query set behind the published number. `--fixed` runs this
+# pair, which is self-contained and version-controlled, so the savings figure is
+# reproducible independent of how the trovex repo itself drifts.
+FIXED_CORPUS = Path(__file__).with_name("corpus")
+FIXED_QUERIES = Path(__file__).with_name("corpus-queries.txt")
+# The committed proof lives INSIDE the package so it ships in the wheel and the
+# API (GET /api/savings/benchmark) can always serve it, even from an installed
+# dist where benchmarks/ isn't present.
+RESULT_JSON = REPO_ROOT / "src" / "trovex" / "_benchmark.json"
+METHODOLOGY_URL = (
+    "https://github.com/TsukumoHQ/trovex/blob/main/benchmarks/token-savings/METHODOLOGY.md"
+)
+
 
 def load_queries(path: Path) -> list[str]:
     out = []
@@ -55,17 +68,46 @@ def load_queries(path: Path) -> list[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="trovex token-savings benchmark")
-    ap.add_argument("--repo", type=Path, default=REPO_ROOT,
-                    help="repo of .md docs to index (default: this repo)")
-    ap.add_argument("--queries", type=Path, default=DEFAULT_QUERIES,
-                    help="newline-delimited query file (# comments allowed)")
-    ap.add_argument("--model", default="BAAI/bge-small-en-v1.5",
-                    help="embedder model (local fastembed by default)")
-    ap.add_argument("--limit", type=int, default=5,
-                    help="results per query (top-3 drive the savings model)")
-    ap.add_argument("--json", type=Path, default=None,
-                    help="write the full per-query result set as JSON")
+    ap.add_argument(
+        "--repo",
+        type=Path,
+        default=REPO_ROOT,
+        help="repo of .md docs to index (default: this repo)",
+    )
+    ap.add_argument(
+        "--queries",
+        type=Path,
+        default=DEFAULT_QUERIES,
+        help="newline-delimited query file (# comments allowed)",
+    )
+    ap.add_argument(
+        "--model",
+        default="BAAI/bge-small-en-v1.5",
+        help="embedder model (local fastembed by default)",
+    )
+    ap.add_argument(
+        "--limit", type=int, default=5, help="results per query (top-3 drive the savings model)"
+    )
+    ap.add_argument(
+        "--json", type=Path, default=None, help="write the full per-query result set as JSON"
+    )
+    ap.add_argument(
+        "--fixed",
+        action="store_true",
+        help="run the PINNED corpus + query set behind the published number, "
+        "and refresh result.json (the committed proof)",
+    )
     args = ap.parse_args()
+
+    # --fixed pins the corpus + queries so the published figure is reproducible
+    # regardless of how the trovex repo drifts. It also refreshes result.json.
+    write_result = False
+    if args.fixed:
+        if args.repo == REPO_ROOT:
+            args.repo = FIXED_CORPUS
+        if args.queries == DEFAULT_QUERIES:
+            args.queries = FIXED_QUERIES
+        write_result = True
 
     repo = args.repo.expanduser().resolve()
     if not repo.exists():
@@ -88,8 +130,11 @@ def main() -> int:
         from trovex.indexer import Indexer
         from trovex.search import Searcher
     except ImportError as e:
-        print(f"error: trovex not importable ({e}).\n"
-              f"Install it first:  pip install -e .  (from the repo root)", file=sys.stderr)
+        print(
+            f"error: trovex not importable ({e}).\n"
+            f"Install it first:  pip install -e .  (from the repo root)",
+            file=sys.stderr,
+        )
         return 2
 
     settings = Settings(data_dir=tmp, embed_model=args.model, embed_dim=model_dim(args.model))
@@ -112,16 +157,18 @@ def main() -> int:
         if not est:
             rows.append({"query": q, "results": 0, "skipped": "no results"})
             continue
-        rows.append({
-            "query": q,
-            "results": len(results),
-            "top_doc": results[0].path,
-            "would_have_read": est["would_have_read"],
-            "actual_read": est["actual_read"],
-            "response": est["response"],
-            "saved": est["saved"],
-            "ratio": round(est["ratio"], 4),
-        })
+        rows.append(
+            {
+                "query": q,
+                "results": len(results),
+                "top_doc": results[0].path,
+                "would_have_read": est["would_have_read"],
+                "actual_read": est["actual_read"],
+                "response": est["response"],
+                "saved": est["saved"],
+                "ratio": round(est["ratio"], 4),
+            }
+        )
 
     scored = [r for r in rows if "ratio" in r]
     if not scored:
@@ -131,27 +178,42 @@ def main() -> int:
     ratios = [r["ratio"] for r in scored]
     total_whr = sum(r["would_have_read"] for r in scored)
     total_saved = sum(r["saved"] for r in scored)
+    total_trovex = total_whr - total_saved  # what you DO pay with trovex (top1 + pointer)
     pooled = total_saved / total_whr if total_whr else 0.0
     median = statistics.median(ratios)
     mean = statistics.fmean(ratios)
 
+    try:
+        from trovex import pricing
+
+        saved_usd = round(pricing.usd(total_saved), 6)
+        price_model = pricing.price_model()
+        price_per_mtok = pricing.input_per_mtok()
+    except Exception:  # noqa: BLE001 — $ is a bonus; never fail the token benchmark on it
+        saved_usd, price_model, price_per_mtok = 0.0, "unknown", 0.0
+
     # ---- report -------------------------------------------------------------
     print()
     print(f"trovex token-savings benchmark  ·  repo={repo.name}  ·  model={args.model}")
-    print(f"corpus: {n_docs} docs indexed  ·  queries: {len(scored)}/{len(queries)} returned results")
+    print(
+        f"corpus: {n_docs} docs indexed  ·  queries: {len(scored)}/{len(queries)} returned results"
+    )
     print()
     qw = min(46, max(len(r["query"]) for r in scored))
     print(f"  {'query':<{qw}}  {'top3':>6}  {'top1':>6}  {'ptr':>4}  {'saved':>6}  {'ratio':>6}")
-    print(f"  {'-' * qw}  {'-'*6}  {'-'*6}  {'-'*4}  {'-'*6}  {'-'*6}")
+    print(f"  {'-' * qw}  {'-' * 6}  {'-' * 6}  {'-' * 4}  {'-' * 6}  {'-' * 6}")
     for r in scored:
-        qd = (r["query"][:qw - 1] + "…") if len(r["query"]) > qw else r["query"]
-        print(f"  {qd:<{qw}}  {r['would_have_read']:>6}  {r['actual_read']:>6}  "
-              f"{r['response']:>4}  {r['saved']:>6}  {r['ratio'] * 100:>5.0f}%")
+        qd = (r["query"][: qw - 1] + "…") if len(r["query"]) > qw else r["query"]
+        print(
+            f"  {qd:<{qw}}  {r['would_have_read']:>6}  {r['actual_read']:>6}  "
+            f"{r['response']:>4}  {r['saved']:>6}  {r['ratio'] * 100:>5.0f}%"
+        )
     print()
     print(f"  per-lookup savings (median) : {median * 100:.0f}%   ← headline")
     print(f"  per-lookup savings (mean)   : {mean * 100:.0f}%")
     print(f"  pooled (Σsaved / Σtop3)     : {pooled * 100:.0f}%")
-    print(f"  total tokens: would-read {total_whr:,} → saved {total_saved:,}")
+    print(f"  total tokens: would-read {total_whr:,} -> saved {total_saved:,}")
+    print(f"  $ saved: ${saved_usd:,.4f}  [{price_model} @ ${price_per_mtok:.2f}/1M input tok]")
     print()
 
     if args.json:
@@ -170,6 +232,36 @@ def main() -> int:
         }
         args.json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"wrote {args.json}", file=sys.stderr)
+
+    if write_result:
+        import time
+
+        # The committed proof the API (GET /api/savings/benchmark) serves. The
+        # numeric fields are deterministic (corpus + queries + model); `ran_at`
+        # is generation metadata only, NOT part of the reproducibility claim.
+        result = {
+            "corpus": "acme-notes (pinned fixture, benchmarks/token-savings/corpus/)",
+            "docs_indexed": n_docs,
+            "queries": len(scored),
+            "model": args.model,
+            "savings_pct": round(pooled * 100, 1),
+            "median_ratio": round(median, 4),
+            "pooled_ratio": round(pooled, 4),
+            "baseline_tokens": total_whr,
+            "trovex_tokens": total_trovex,
+            "total_saved": total_saved,
+            "saved_usd": saved_usd,
+            "pricing": {
+                "model": price_model,
+                "input_per_mtok": price_per_mtok,
+                "source": "list price, 2026 (input rate)",
+            },
+            "methodology_url": METHODOLOGY_URL,
+            "deterministic": True,
+            "ran_at": int(time.time()),
+        }
+        RESULT_JSON.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        print(f"wrote {RESULT_JSON}  (savings_pct={result['savings_pct']}%)", file=sys.stderr)
 
     return 0
 

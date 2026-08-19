@@ -1150,6 +1150,72 @@ def backup() -> None:
 
 
 @app.command()
+def savings(
+    days: int = typer.Option(0, help="Window in days (0 = lifetime)."),
+    agents: bool = typer.Option(True, "--agents/--no-agents", help="Show per-agent breakdown."),
+) -> None:
+    """Cumulative $-priced savings dashboard — tokens saved + what they cost.
+
+    Reads the live append-only query ledger (mcp_queries) and prices the tokens
+    an agent DIDN'T re-read at the reference input rate. The $ is a floor: it's
+    gated on measured routing precision (hit@1) when an eval is on record, raw
+    (routing unverified) otherwise — never inflated. Run `trovex eval` to gate
+    it. Run `python benchmarks/token-savings/run.py` for the reproducible
+    corpus benchmark behind the headline %.
+    """
+    from . import pricing
+    from . import savings as sv
+
+    settings = Settings()
+    db = open_db_for_read(settings)
+    since = 0.0 if days <= 0 else time.time() - days * 86400
+    window = "lifetime" if days <= 0 else f"last {days}d"
+    rec = sv.totals(db, since)
+
+    if not rec["queries"]:
+        console.print(f"[yellow]No queries recorded ({window}).[/yellow] Nothing to price yet.")
+        return
+
+    p = rec["pricing"]
+    saved_usd = rec.get("saved_usd_at_precision")
+    gated = saved_usd is not None
+    if not gated:
+        saved_usd = rec["saved_usd"]
+
+    console.print(f"[bold]trovex savings[/bold] [dim]· {window}[/dim]")
+    console.print(
+        f"  [bold green]~{rec['saved']:,}[/bold green] tokens saved "
+        f"[dim]across {rec['queries']} queries "
+        f"(would have read ~{rec['would_have_read']:,})[/dim]"
+    )
+    console.print(
+        f"  [bold green]≈ {pricing.fmt_usd(saved_usd)}[/bold green] "
+        f"[dim]@ {p['model']} ${p['input_per_mtok']:.2f}/1M input tok[/dim]"
+    )
+    if gated:
+        console.print(
+            f"  [dim]gated on measured routing precision hit@1={rec['precision']:.2f}[/dim]"
+        )
+    else:
+        console.print(f"  [yellow]⚠ raw figure — {rec['caveat']}[/yellow]")
+    console.print(f"  [dim]counted with {rec['tokenizer']}[/dim]")
+
+    if agents:
+        rows = sv.per_agent(db, since)
+        if rows:
+            console.print()
+            console.print(f"  {'agent':<22}  {'queries':>7}  {'saved tok':>10}  {'≈ $':>9}")
+            for r in rows:
+                r_usd = r.get("saved_usd_at_precision")
+                if r_usd is None:
+                    r_usd = r["saved_usd"]
+                console.print(
+                    f"  {(r['agent'] or '(unknown)')[:22]:<22}  {r['queries']:>7}  "
+                    f"{r['saved']:>10,}  {pricing.fmt_usd(r_usd):>9}"
+                )
+
+
+@app.command()
 def facet() -> None:
     """Promote organic folder tags into faceted tags (type/ owner/ domain/).
 

@@ -39,5 +39,13 @@ growth/launch/mcp-registry-kit.md
 growth/launch/wraith-mcp-registry-kit.md
 growth/launch/free-tool-directory-kit.md
 
+# Benchmark fixed corpus: a self-contained, pinned .md fixture set the
+# token-savings benchmark indexes into a throwaway index. Must stay real files
+# on disk (the benchmark reads them from disk); they are test fixtures, not docs.
+benchmarks/token-savings/corpus/**
+# Benchmark methodology + readme: published proof docs that ship as-is (the
+# receipt's methodology_url points at them); repo-readability, on disk.
+benchmarks/**/*.md
+
 # niwa gate control file (transient, per-worktree; not a doc)
 .niwa-decision.md

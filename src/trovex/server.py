@@ -1131,6 +1131,13 @@ def build_app() -> FastAPI:
         since = _now() - max(1, min(90, int(days))) * 86400
         return JSONResponse(savings_mod.per_session(state.searcher.db, since))
 
+    @app.get("/api/savings/benchmark")
+    async def api_savings_benchmark() -> JSONResponse:
+        """The committed, reproducible corpus-benchmark result (or null if the
+        benchmark hasn't been run into the package). Static proof behind the
+        headline savings %, distinct from the live per-user ledger above."""
+        return JSONResponse(savings_mod.benchmark_result())
+
     @app.get("/api/usage")
     async def api_usage(days: int = 7) -> JSONResponse:
         state = get_state()

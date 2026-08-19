@@ -56,6 +56,20 @@ def _saved(whr: int, topr: int, resp: int) -> int:
     return max(0, whr - topr - resp)
 
 
+def benchmark_result() -> dict | None:
+    """The committed corpus-benchmark result shipped in the package, or None if
+    the benchmark hasn't been run yet (`python benchmarks/token-savings/run.py
+    --fixed` writes it). Read-only; never raises."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).with_name("_benchmark.json")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 — missing/corrupt file → no published benchmark
+        return None
+
+
 def latest_precision(db) -> tuple[float | None, float | None]:
     """(hit@1, ts) of the newest persisted retrieval eval, or (None, None).
 
@@ -149,18 +163,23 @@ def _base_totals(db, since: float) -> dict:
 
 def totals(db, since: float) -> dict:
     """The full savings receipt for a window: base numbers + tokenizer + the
-    precision gate + the assumption/caveat copy. Used by /api/savings and the
-    /savings HTML page; lifetime = totals(db, 0)."""
+    precision gate + the $ figure + the assumption/caveat copy. Used by
+    /api/savings and the /savings HTML page; lifetime = totals(db, 0)."""
+    from . import pricing
     from .tokens import tokenizer_name
 
     base = _base_totals(db, since)
     precision, measured_at = latest_precision(db)
+    saved_at_prec = _at_precision(base["saved"], precision)
     base.update(
         {
             "tokenizer": tokenizer_name(),
             "precision": precision,
             "precision_measured_at": measured_at,
-            "saved_at_precision": _at_precision(base["saved"], precision),
+            "saved_at_precision": saved_at_prec,
+            "saved_usd": pricing.usd(base["saved"]),
+            "saved_usd_at_precision": pricing.usd_or_none(saved_at_prec),
+            "pricing": pricing.pricing_block(),
             "assumption": ASSUMPTION,
             "caveat": None if precision is not None else _CAVEAT_UNVERIFIED,
         }
@@ -170,6 +189,8 @@ def totals(db, since: float) -> dict:
 
 def per_agent(db, since: float) -> list[dict]:
     """Per-agent (X-TROVEX-User) rows with session counts + precision-gated saved."""
+    from . import pricing
+
     precision, _ = latest_precision(db)
     rows = db.execute(
         """SELECT user AS agent,
@@ -186,6 +207,7 @@ def per_agent(db, since: float) -> list[dict]:
     out = []
     for r in rows:
         saved = _saved(r["whr"], r["topr"], r["resp"])
+        saved_at_prec = _at_precision(saved, precision)
         out.append(
             {
                 "agent": r["agent"],
@@ -193,7 +215,9 @@ def per_agent(db, since: float) -> list[dict]:
                 "queries": r["queries"],
                 "would_have_read": r["whr"],
                 "saved": saved,
-                "saved_at_precision": _at_precision(saved, precision),
+                "saved_at_precision": saved_at_prec,
+                "saved_usd": pricing.usd(saved),
+                "saved_usd_at_precision": pricing.usd_or_none(saved_at_prec),
                 "ratio": saved / r["whr"] if r["whr"] else 0.0,
                 "last_seen": r["last_seen"],
             }
@@ -203,6 +227,8 @@ def per_agent(db, since: float) -> list[dict]:
 
 def per_session(db, since: float) -> list[dict]:
     """Per-session rows (session_id + the agent that owns it)."""
+    from . import pricing
+
     precision, _ = latest_precision(db)
     rows = db.execute(
         """SELECT session_id AS session,
@@ -219,6 +245,7 @@ def per_session(db, since: float) -> list[dict]:
     out = []
     for r in rows:
         saved = _saved(r["whr"], r["topr"], r["resp"])
+        saved_at_prec = _at_precision(saved, precision)
         out.append(
             {
                 "session": r["session"],
@@ -226,7 +253,9 @@ def per_session(db, since: float) -> list[dict]:
                 "queries": r["queries"],
                 "would_have_read": r["whr"],
                 "saved": saved,
-                "saved_at_precision": _at_precision(saved, precision),
+                "saved_at_precision": saved_at_prec,
+                "saved_usd": pricing.usd(saved),
+                "saved_usd_at_precision": pricing.usd_or_none(saved_at_prec),
                 "last_seen": r["last_seen"],
             }
         )
@@ -235,6 +264,7 @@ def per_session(db, since: float) -> list[dict]:
 
 def session_totals(db, session: str, since: float = 0.0) -> dict:
     """The receipt for one session (defaults to lifetime)."""
+    from . import pricing
     from .tokens import tokenizer_name
 
     r = db.execute(
@@ -249,6 +279,7 @@ def session_totals(db, session: str, since: float = 0.0) -> dict:
     ).fetchone()
     saved = _saved(r["whr"], r["topr"], r["resp"])
     precision, measured_at = latest_precision(db)
+    saved_at_prec = _at_precision(saved, precision)
     return {
         "session": session,
         "agent": r["agent"],
@@ -261,7 +292,10 @@ def session_totals(db, session: str, since: float = 0.0) -> dict:
         "tokenizer": tokenizer_name(),
         "precision": precision,
         "precision_measured_at": measured_at,
-        "saved_at_precision": _at_precision(saved, precision),
+        "saved_at_precision": saved_at_prec,
+        "saved_usd": pricing.usd(saved),
+        "saved_usd_at_precision": pricing.usd_or_none(saved_at_prec),
+        "pricing": pricing.pricing_block(),
         "assumption": ASSUMPTION,
         "caveat": None if precision is not None else _CAVEAT_UNVERIFIED,
     }
@@ -355,8 +389,20 @@ def _precision_line(rec: dict) -> str:
     )
 
 
+def _usd_line(rec: dict) -> str:
+    """The $ line: priced at the reference input rate, at measured precision when
+    we have it (never inflated), and always naming the model + rate."""
+    from . import pricing
+
+    p = rec["pricing"]
+    rate = f"{p['model']} @ ${p['input_per_mtok']:.2f}/1M input tok"
+    if rec.get("saved_usd_at_precision") is not None:
+        return f"- **≈ {pricing.fmt_usd(rec['saved_usd_at_precision'])} saved** at measured precision ({rate})"
+    return f"- **≈ {pricing.fmt_usd(rec['saved_usd'])} saved** (raw, routing unverified · {rate})"
+
+
 def render_receipt_md(db) -> str:
-    """`trovex://savings` — lifetime + last-7d savings, tokenizer, precision."""
+    """`trovex://savings` — lifetime + last-7d savings, tokenizer, precision, $."""
     import time
 
     life = totals(db, 0.0)
@@ -368,6 +414,7 @@ def render_receipt_md(db) -> str:
         f"{life['queries']} queries "
         f"(would have read ~{_fmt_tok(life['would_have_read'])}).",
         _precision_line(life),
+        _usd_line(life),
         f"- last 7 days: ~{_fmt_tok(week['saved'])} saved over {week['queries']} queries",
         f"- counted with `{life['tokenizer']}`",
         "",
@@ -389,6 +436,7 @@ def render_session_md(db, session: str) -> str:
         f"**~{_fmt_tok(rec['saved'])} tokens saved** across {rec['queries']} queries "
         f"(agent: {rec['agent']}).",
         _precision_line(rec),
+        _usd_line(rec),
         f"- would have read ~{_fmt_tok(rec['would_have_read'])}, "
         f"actually read ~{_fmt_tok(rec['actual_read'])}",
         f"- counted with `{rec['tokenizer']}`",

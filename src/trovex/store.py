@@ -38,6 +38,7 @@ from .db import (
     vec_docs_put,
     vec_sync_meta,
 )
+from .query_cache import embed_query_blob
 from .embedder import Embedder, embedder_from_settings
 
 TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
@@ -210,9 +211,21 @@ class SqliteStore:
                 if content_unchanged:
                     upsert_docs_fts(self.db, doc_id, title, content)  # title may have moved
                     self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
-                    # No re-embed on an identical rewrite, but lifecycle just reset to
-                    # 'active' (and kind may have changed) — sync vec0 metadata.
-                    vec_sync_meta(self.db, doc_id)
+                    if self.settings.is_store_only_kind(kind):
+                        # Flipped into the store-only lane on an otherwise no-op
+                        # rewrite: purge any existing vectors so the zero-KNN
+                        # guarantee holds. The fast-path used to return here with
+                        # the old vectors intact (review-af03da67 leak).
+                        self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
+                        self.db.execute(
+                            "DELETE FROM vec_chunks WHERE rowid IN "
+                            "(SELECT id FROM chunks WHERE doc_id = ?)",
+                            (doc_id,),
+                        )
+                    else:
+                        # No re-embed on an identical rewrite, but lifecycle just reset
+                        # to 'active' (and kind may have changed) — sync vec0 metadata.
+                        vec_sync_meta(self.db, doc_id)
                     self.db.commit()
                     return ext_id
             else:
@@ -861,8 +874,7 @@ class SqliteStore:
         # post-filtered (not a vec0 column), so a tag-scoped query scans the whole
         # bounded partition; else a small k. k tops out at vec0's hard limit (4096)
         # — no clamp/widen, partitions are bounded.
-        qemb = next(iter(self.embedder.embed([query])))
-        qblob = sqlite_vec.serialize_float32(qemb.tolist())
+        qblob = embed_query_blob(self.embedder, query)
         targets = [source] if source else (
             [r["source_id"] for r in self.db.execute("SELECT DISTINCT source_id FROM docs")]
             or [TROVEX_SOURCE_ID]

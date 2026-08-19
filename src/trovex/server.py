@@ -20,6 +20,7 @@ from fastapi.responses import (
 )
 from fastapi.templating import Jinja2Templates
 from slowapi import Limiter
+from starlette.concurrency import run_in_threadpool
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
@@ -733,8 +734,18 @@ def build_app() -> FastAPI:
                 return JSONResponse(
                     {"error": f"unknown source: {_redact(source)!r}"}, status_code=422
                 )
-        results = state.searcher.search(
-            q, limit=limit, kind=kind, tags=tag_list, source_ids=[source] if source else None
+        # Off the event loop: the sync search (ONNX query-embed on a cache miss +
+        # the sqlite KNN) runs in the threadpool so concurrent requests don't
+        # serialize head-of-line on the loop (T1). The sqlite conn is opened
+        # check_same_thread=False and writes are single-writer-locked, so a
+        # cross-thread read is safe.
+        results = await run_in_threadpool(
+            state.searcher.search,
+            q,
+            limit=limit,
+            kind=kind,
+            tags=tag_list,
+            source_ids=[source] if source else None,
         )
         return JSONResponse(
             [
@@ -770,7 +781,12 @@ def build_app() -> FastAPI:
         """Active-memory recall: the agent's own records as a ~80-token pointer
         pack (RFC 330e7d43, step 2). Read-only; empty when nothing clears
         scope (owner/<agent> + kind=record) + floor."""
-        return JSONResponse(boot_pointers(get_state().searcher, agent, k=k, floor=floor, q=q))
+        # Off the event loop (T1): boot embeds BOOT_QUERY (cached) then runs the
+        # sqlite KNN — both belong in the threadpool, not on the loop.
+        pack = await run_in_threadpool(
+            boot_pointers, get_state().searcher, agent, k=k, floor=floor, q=q
+        )
+        return JSONResponse(pack)
 
     @app.post("/api/capture")
     @write_limit

@@ -4,11 +4,10 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import sqlite_vec
-
 from .config import RESERVED_SOURCE_ID, Settings
 from .db import open_db
 from .embedder import Embedder, embedder_from_settings
+from .query_cache import embed_query_blob
 
 # vec0's hard API ceiling on a KNN `k`. With the partitioned index (P2a) each
 # source is its OWN bounded shard, so a query never needs a k anywhere near this —
@@ -201,8 +200,7 @@ class Searcher:
         EVERY partition is scanned and merged by distance — NOT just the SSOT.
         Falling back to ['trovex'] here would silently drop all dense hits from
         file-backed sources. boot/flagship pass source_ids=['trovex'] explicitly."""
-        query_emb = next(self.embedder.embed([query]))
-        qblob = sqlite_vec.serialize_float32(query_emb.tolist())
+        qblob = embed_query_blob(self.embedder, query)
         targets = source_ids or [
             r["source_id"] for r in self.db.execute("SELECT DISTINCT source_id FROM docs")
         ] or [RESERVED_SOURCE_ID]

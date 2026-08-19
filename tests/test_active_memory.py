@@ -472,6 +472,58 @@ def test_store_only_kind_is_bm25_findable_but_not_in_knn(settings, store):
     ], "store-only doc not found via BM25"
 
 
+def test_query_embed_is_lru_cached(settings, store):
+    """T1: a repeated query embeds ONCE — the LRU query cache turns the ONNX
+    forward pass into a dict hit. /api/boot re-embeds the same BOOT_QUERY every
+    session, so this collapses the boot/repeat-query latency curve."""
+    from trovex.query_cache import clear_query_cache
+
+    clear_query_cache()
+    base = store.embedder
+    calls = {"n": 0}
+
+    class Counting:
+        name = base.name
+        dim = base.dim
+
+        def embed(self, texts):
+            texts = list(texts)
+            calls["n"] += len(texts)
+            return base.embed(texts)
+
+    store.put("# doc\n\nzookeeper quorum election timeout tuning", kind="doc")
+    searcher = Searcher(settings, embedder=Counting())
+    q = "zookeeper quorum election timeout"
+    r1 = searcher.search(q, limit=5, source_ids=["trovex"])
+    r2 = searcher.search(q, limit=5, source_ids=["trovex"])  # cache hit
+    searcher.search(q, limit=5, source_ids=["trovex"])  # cache hit
+    assert calls["n"] == 1, f"query embedded {calls['n']}x, expected 1 (one cold miss)"
+    # No correctness change — cached blob yields identical results.
+    assert [h.path for h in r1] == [h.path for h in r2]
+
+
+def test_store_only_flip_purges_vectors_on_unchanged_rewrite(settings, store):
+    """review-af03da67 leak: re-putting an IDENTICAL doc (same content+title) but
+    flipped to a store-only kind hits the content_unchanged fast-path — which must
+    still purge the doc's vectors, else it stays in the KNN pool."""
+    body = "# note\n\nkafka consumer group rebalance sticky assignor"
+    ext = store.put(body, kind="doc")
+    did = store.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext,)).fetchone()["id"]
+    assert store.db.execute("SELECT COUNT(*) c FROM vec_docs WHERE rowid = ?", (did,)).fetchone()["c"] == 1
+
+    store.settings.store_only_kinds = ["reference"]
+    store.put(body, kind="reference", ext_id=ext)  # identical content+title, kind flips
+
+    assert store.db.execute("SELECT COUNT(*) c FROM vec_docs WHERE rowid = ?", (did,)).fetchone()["c"] == 0
+    assert (
+        store.db.execute(
+            "SELECT COUNT(*) c FROM vec_chunks WHERE rowid IN (SELECT id FROM chunks WHERE doc_id = ?)",
+            (did,),
+        ).fetchone()["c"]
+        == 0
+    )
+
+
 # --- status='duplicate' excluded from the default retrieval pool -----------
 
 

@@ -129,6 +129,20 @@ class Settings(BaseSettings):
         # Agent workspaces — full repo copies per agent, all duplicates
         "worktrees",
     ]
+    # Agent-artifact file globs the indexer ALWAYS excludes, enforced in code (not
+    # left to each repo's .trovexignore). These per-agent scratch files — resume /
+    # checkpoint / lessons snapshots, niwa decision blocks — are what bloated the
+    # file-indexed corpus past the sqlite-vec KNN ceiling; they must never enter the
+    # store. Matched by basename or path the same way .trovexignore globs are.
+    default_ignore_globs: list[str] = [
+        "resume*.md",
+        "*.resume.md",
+        "checkpoint*.md",
+        "*.checkpoint.md",
+        "lessons*.md",
+        "*.lessons.md",
+        ".niwa-decision.md",
+    ]
 
     # Status heuristics
     stale_age_days: int = 90

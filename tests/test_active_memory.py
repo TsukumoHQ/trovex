@@ -499,3 +499,86 @@ def test_migration_backfills_and_dedupes_canonical_pair(settings, store):
     # The rebuilt unique index now refuses a second live canonical for the topic.
     with pytest.raises(sqlite3.IntegrityError):
         store.db.execute("UPDATE docs SET status = 'canonical' WHERE ext_id = 'ext0'")
+
+
+# --- bc4d183d: bloat sweep + enforced agent-artifact ignores ---------------
+
+
+def test_sweep_bloat_tombstones_superseded_and_ages_owned_idempotent(settings, store):
+    """The sweep tombstone-DELETES superseded forks (so their vec_docs rows leave
+    the KNN corpus) and re-marks age-stale owned non-record docs — idempotently."""
+    import time as _time
+
+    # A superseded fork via the SSOT supersede path.
+    old = store.put("# Topic X\n\noriginal", kind="reference")
+    store.put("# Topic X\n\nreplacement body", kind="reference", force=True)
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (old,)).fetchone()[
+        "status"
+    ] == "superseded"
+
+    # An owned canonical older than stale_age_days, plus a fresh one and a record.
+    fresh = store.put("# Fresh doc\n\nrecent notes", kind="reference")
+    aged = store.put("# Aged doc\n\nancient notes", kind="reference")
+    rec = store.put("# Incident\n\nevent anchored", kind="record", tags=["owner/x"])
+    ancient = _time.time() - (settings.stale_age_days + 1) * 86400
+    store.db.execute(
+        "UPDATE docs SET mtime = ? WHERE ext_id IN (?, ?)", (ancient, aged, rec)
+    )
+    store.db.commit()
+
+    result = store.sweep_bloat()
+    assert result["superseded_deleted"] == 1
+    assert result["stale_marked"] == 1
+
+    # Superseded fork is gone from the corpus (and its vec row with it)...
+    assert store.db.execute("SELECT 1 FROM docs WHERE ext_id = ?", (old,)).fetchone() is None
+    assert store.db.execute("SELECT 1 FROM vec_docs WHERE rowid NOT IN (SELECT id FROM docs)").fetchone() is None
+    # ...but recoverable via the tombstone snapshot.
+    assert any(t["title"] == "Topic X" for t in store.list_tombstones())
+    # Aged owned canonical → stale; fresh stays canonical; the old RECORD is never aged.
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (aged,)).fetchone()[
+        "status"
+    ] == "stale"
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (fresh,)).fetchone()[
+        "status"
+    ] == "canonical"
+    assert store.db.execute("SELECT status FROM docs WHERE ext_id = ?", (rec,)).fetchone()[
+        "status"
+    ] == "canonical"
+
+    # Idempotent: a second run finds nothing to do.
+    assert store.sweep_bloat() == {"superseded_deleted": 0, "stale_marked": 0}
+
+
+def test_reindex_enforces_builtin_agent_artifact_ignores(tmp_path):
+    """The indexer ALWAYS excludes agent-artifact globs (resume/checkpoint/lessons)
+    even without a repo .trovexignore, and a re-index never re-adds them."""
+    from trovex.indexer import Indexer
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "normal.md").write_text("# Normal\n\nkeep this doc", encoding="utf-8")
+    (repo / "resume.md").write_text("# Resume\n\nagent scratch", encoding="utf-8")
+    (repo / "checkpoint-2.md").write_text("# Checkpoint\n\nscratch", encoding="utf-8")
+    (repo / "lessons.md").write_text("# Lessons\n\nscratch", encoding="utf-8")
+
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        project_root=repo,
+        embed_model="BAAI/bge-small-en-v1.5",
+        sources_config_path=tmp_path / "no-such-sources.yaml",
+    )
+    idx = Indexer(settings, embedder=BagEmbedder())
+
+    def _names():
+        return {
+            r["path"].rsplit("/", 1)[-1] for r in idx.db.execute("SELECT path FROM docs")
+        }
+
+    idx.reindex(root=repo)
+    names = _names()
+    assert "normal.md" in names
+    assert not ({"resume.md", "checkpoint-2.md", "lessons.md"} & names)
+
+    idx.reindex(root=repo)  # re-index must not re-add the ignored globs
+    assert not ({"resume.md", "checkpoint-2.md", "lessons.md"} & _names())

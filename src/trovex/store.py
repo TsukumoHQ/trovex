@@ -496,6 +496,43 @@ class SqliteStore:
                 (cap,),
             )
 
+    def sweep_bloat(self) -> dict:
+        """Deterministic, idempotent bloat sweep — corpus hygiene a reindex doesn't do.
+
+          • Superseded forks: a doc superseded by a newer canonical (SSOT) is dead
+            weight in the KNN candidate corpus. Tombstone-delete it (recoverable via
+            the doc_tombstones snapshot), which removes its vec_docs row so the corpus
+            actually SHRINKS — a lifecycle flag alone would leave the row counting
+            toward the sqlite-vec KNN ceiling.
+          • Age-stale owned docs: an owned (source='trovex') non-record canonical
+            older than stale_age_days is re-marked 'stale'. compute_status already
+            ages file-backed docs on every reindex; owned docs have no file on disk,
+            so the sweep owns their staleness. Records are event-anchored — never aged.
+
+        Idempotent: a second run finds no superseded docs and re-marks nothing new.
+        Returns {"superseded_deleted", "stale_marked"}.
+        """
+        with self._lock:
+            superseded = [
+                r["id"]
+                for r in self.db.execute(
+                    "SELECT id FROM docs WHERE status = 'superseded'"
+                ).fetchall()
+            ]
+            for doc_id in superseded:
+                self._tombstone_locked(doc_id)
+                self._delete_cascade_locked(doc_id)
+            cutoff = time.time() - self.settings.stale_age_days * 86400
+            stale = self.db.execute(
+                """UPDATE docs SET status = 'stale'
+                   WHERE source_id = ? AND status = 'canonical'
+                     AND (kind IS NULL OR kind != 'record')
+                     AND mtime < ?""",
+                (TROVEX_SOURCE_ID, cutoff),
+            )
+            self.db.commit()
+        return {"superseded_deleted": len(superseded), "stale_marked": stale.rowcount}
+
     def list_tombstones(self, limit: int = 100) -> list[dict]:
         """Deleted owned docs still recoverable (newest first)."""
         return [

@@ -849,6 +849,11 @@ def build_app() -> FastAPI:
         # root, load_sources() re-reads sources.yaml on every call, so a
         # source added after boot is picked up without a restart.
         stats = state.indexer.reindex()
+        # Scheduled corpus hygiene: the reindex already drops now-ignored
+        # agent-artifact files (built-in default_ignore_globs) and re-ages
+        # file-backed docs; the sweep additionally tombstones superseded forks and
+        # ages owned docs. Idempotent, so running it on every reindex is safe.
+        stats["sweep"] = state.store.sweep_bloat()
         return JSONResponse(stats)
 
     @app.get("/healthz", response_class=PlainTextResponse)

@@ -106,7 +106,10 @@ class Indexer:
         ignore = set(self.settings.ignore_dirs)
         max_size = self.settings.max_file_size_bytes
         root_resolved = root.resolve()
-        ignore_patterns = _load_ignore_patterns(root)
+        # Per-repo .trovexignore PLUS the built-in agent-artifact globs (enforced in
+        # code, so a repo without a .trovexignore still keeps resume/checkpoint/
+        # lessons scratch out of the store).
+        ignore_patterns = _load_ignore_patterns(root) + self.settings.default_ignore_globs
         for ext in ("md", "mdx", "markdown"):
             for p in root.rglob(f"*.{ext}"):
                 if self._accept(root, root_resolved, p, ignore, ignore_patterns, max_size):
@@ -340,7 +343,13 @@ class Indexer:
         # Per-source context, all in RESOLVED-path space so a macOS /private/var
         # event path matches a /var Source.root (and vice-versa).
         resolved_root = {s.id: _safe_resolve(s.root) for s in sources}
-        ctx = {s.id: (resolved_root[s.id], _load_ignore_patterns(s.root)) for s in sources}
+        ctx = {
+            s.id: (
+                resolved_root[s.id],
+                _load_ignore_patterns(s.root) + self.settings.default_ignore_globs,
+            )
+            for s in sources
+        }
         seen: set[tuple[str, str]] = set()
 
         for raw in paths:

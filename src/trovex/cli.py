@@ -106,6 +106,20 @@ def index(
 
 
 @app.command()
+def sweep() -> None:
+    """Idempotent corpus-hygiene sweep: tombstone superseded forks + age-stale owned
+    docs. Safe to run repeatedly (e.g. from cron); the reindex runs it too."""
+    from .store import SqliteStore
+
+    settings = Settings()
+    result = SqliteStore(settings).sweep_bloat()
+    console.print(
+        f"[green]Swept[/green] superseded_deleted={result['superseded_deleted']} "
+        f"stale_marked={result['stale_marked']}"
+    )
+
+
+@app.command()
 def watch(
     debounce: float = typer.Option(
         0.5, "--debounce", help="Seconds of quiet before a burst of changes is re-indexed."

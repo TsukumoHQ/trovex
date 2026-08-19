@@ -16,6 +16,14 @@ from .indexer import FRONTMATTER_RE
 PLAN_TITLE_RE = re.compile(r"^\s*(?:plan|todo|draft|wip|brouillon)\b", re.IGNORECASE)
 
 
+def _ephemeral_sql(settings: Settings) -> str:
+    """SQL IN-list of the ephemeral kinds, e.g. ('record', 'checkpoint'). The kinds
+    are config-controlled identifiers, not user input; each is validated as a bare
+    word and single-quotes are escaped defensively before interpolation."""
+    safe = [k.replace("'", "''") for k in settings.dup_ephemeral_kinds if re.fullmatch(r"\w+", k)]
+    return "(" + ", ".join(f"'{k}'" for k in safe) + ")" if safe else "('')"
+
+
 def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
     """Apply heuristics and update docs.status for all rows.
 
@@ -90,16 +98,20 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
 
 
 def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
-    """For each doc, find nearest neighbour. If cosine sim > threshold,
-    older doc becomes duplicate of newer."""
-    threshold = settings.dup_cosine_threshold
-    # Records are unique by definition (each incident/decision is its own event)
-    # — exclude them from dedup entirely, as drivers and as neighbours.
+    """For each doc, find its nearest SAME-(source_id, kind) neighbour. If cosine
+    sim > threshold, the older doc becomes a duplicate of the newer.
+
+    Namespaced like the live write path (store.check_duplicate /
+    detect_duplicate_for): compares LIKE-WITH-LIKE so a reindex/fs-watch never
+    demotes an owned canonical to a duplicate of an unrelated other-kind doc.
+    Ephemeral kinds (dup_ephemeral_kinds) are their own events — excluded as
+    drivers AND as neighbours."""
+    # Drivers: canonical/plan, non-ephemeral.
     rows = db.execute(
-        """SELECT d.id, d.mtime FROM docs d
-           WHERE d.status IN ('canonical', 'plan')
-             AND d.workspace_id = 'default'
-             AND (d.kind IS NULL OR d.kind != 'record')"""
+        f"""SELECT d.id, d.mtime, d.kind, d.source_id FROM docs d
+            WHERE d.status IN ('canonical', 'plan')
+              AND d.workspace_id = 'default'
+              AND (d.kind IS NULL OR d.kind NOT IN {_ephemeral_sql(settings)})"""
     ).fetchall()
     if len(rows) < 2:
         return 0
@@ -108,28 +120,31 @@ def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
     for row in rows:
         if row["id"] in dup_marked:
             continue
-        # Get this doc's embedding
         emb_row = db.execute(
             "SELECT embedding FROM vec_docs WHERE rowid = ?", (row["id"],)
         ).fetchone()
         if not emb_row:
             continue
 
-        # Find nearest neighbour (k=2 to skip self)
+        threshold = settings.dup_threshold_for(row["kind"])
+        # Same-(source, kind) neighbours only; k widened (applied before the WHERE
+        # class filter) so a same-kind neighbour isn't squeezed out by nearer
+        # other-kind docs.
+        kind_clause = "d.kind IS NULL" if row["kind"] is None else "d.kind = :kind"
         neighbours = db.execute(
-            """SELECT v.rowid, v.distance, d.mtime, d.kind
-               FROM vec_docs v
-               JOIN docs d ON d.id = v.rowid
-               WHERE v.embedding MATCH ? AND k = 3
-               ORDER BY v.distance""",
-            (emb_row["embedding"],),
+            f"""SELECT v.rowid, v.distance, d.mtime
+                FROM vec_docs v JOIN docs d ON d.id = v.rowid
+                WHERE v.embedding MATCH :emb AND k = 20
+                  AND d.source_id = :source_id
+                  AND {kind_clause}
+                  AND d.status IN ('canonical', 'plan')
+                ORDER BY v.distance""",
+            {"emb": emb_row["embedding"], "source_id": row["source_id"], "kind": row["kind"]},
         ).fetchall()
 
         for nb in neighbours:
             if nb["rowid"] == row["id"]:
                 continue
-            if nb["kind"] == "record":
-                continue  # never pair a record into a duplicate
             similarity = 1.0 - nb["distance"] / 2
             if similarity < threshold:
                 break  # neighbours are sorted by distance asc
@@ -160,23 +175,35 @@ def detect_duplicate_for(db: sqlite3.Connection, settings: Settings, doc_id: int
     nearest non-record neighbour is within the cosine threshold, the OLDER of the
     two becomes a duplicate of the newer. Returns the id marked duplicate, or None.
     """
-    row = db.execute("SELECT id, mtime, kind, status FROM docs WHERE id = ?", (doc_id,)).fetchone()
-    if not row or row["kind"] == "record" or row["status"] not in ("canonical", "plan"):
-        return None
+    row = db.execute(
+        "SELECT id, mtime, kind, status, source_id FROM docs WHERE id = ?", (doc_id,)
+    ).fetchone()
+    if not row or settings.is_ephemeral_kind(row["kind"]) or row["status"] not in (
+        "canonical",
+        "plan",
+    ):
+        return None  # ephemeral kinds are their own events — never auto-flag them
     emb = db.execute("SELECT embedding FROM vec_docs WHERE rowid = ?", (doc_id,)).fetchone()
     if not emb:
         return None
-    threshold = settings.dup_cosine_threshold
+    threshold = settings.dup_threshold_for(row["kind"])
+    # Compare LIKE-WITH-LIKE: only same-source, same-kind, canonical/plan neighbours
+    # are dup candidates, so a cross-kind coincidence never flags (and hides) a doc.
+    # k is applied before the WHERE class filter → widen so a same-kind neighbour
+    # isn't squeezed out by nearer other-kind docs.
+    kind_clause = "d.kind IS NULL" if row["kind"] is None else "d.kind = :kind"
     neighbours = db.execute(
-        """SELECT v.rowid, v.distance, d.mtime, d.kind, d.status
-           FROM vec_docs v JOIN docs d ON d.id = v.rowid
-           WHERE v.embedding MATCH ? AND k = 3 ORDER BY v.distance""",
-        (emb["embedding"],),
+        f"""SELECT v.rowid, v.distance, d.mtime
+            FROM vec_docs v JOIN docs d ON d.id = v.rowid
+            WHERE v.embedding MATCH :emb AND k = 20
+              AND d.source_id = :source_id
+              AND {kind_clause}
+              AND d.status IN ('canonical', 'plan')
+            ORDER BY v.distance""",
+        {"emb": emb["embedding"], "source_id": row["source_id"], "kind": row["kind"]},
     ).fetchall()
     for nb in neighbours:
-        if nb["rowid"] == doc_id or nb["kind"] == "record":
-            continue
-        if nb["status"] not in ("canonical", "plan"):
+        if nb["rowid"] == doc_id:
             continue
         if 1.0 - nb["distance"] / 2 < threshold:
             break  # neighbours sorted by distance asc → none closer remain

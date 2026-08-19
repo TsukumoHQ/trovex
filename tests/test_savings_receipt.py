@@ -296,3 +296,30 @@ def test_api_savings_lifetime_and_breakdowns(client):
     sessions = client.get("/api/savings/sessions").json()
     assert {s["session"] for s in sessions} == {"s1", "s2"}
     assert all("agent" in s and "saved" in s for s in sessions)
+
+
+def test_api_savings_carries_dollar_fields(client):
+    """The $ dimension is served alongside the token receipt (additive)."""
+    body = client.get("/api/savings/lifetime").json()
+    for key in ("saved_usd", "saved_usd_at_precision", "pricing"):
+        assert key in body
+    assert set(body["pricing"]) == {"model", "input_per_mtok", "source"}
+    # no eval seeded → precision unmeasured → $-at-precision is null, not inflated
+    assert body["saved_usd_at_precision"] is None
+    assert body["saved_usd"] >= 0
+
+
+def test_api_savings_benchmark_serves_committed_proof(client):
+    """GET /api/savings/benchmark wraps the committed benchmark result. When the
+    proof is present it must be a sane, non-inflated, deterministic payload; the
+    route must 200 regardless (null when the benchmark hasn't been run)."""
+    resp = client.get("/api/savings/benchmark")
+    assert resp.status_code == 200
+    body = resp.json()
+    if body is None:
+        return  # no committed proof in this tree — the null contract still holds
+    assert body["deterministic"] is True
+    assert 0 < body["savings_pct"] < 100
+    assert body["baseline_tokens"] > body["trovex_tokens"] > 0
+    assert body["saved_usd"] >= 0
+    assert body["pricing"]["model"]

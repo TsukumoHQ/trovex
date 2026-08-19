@@ -45,8 +45,9 @@ This is the exact code path the live dashboard uses (`Searcher.savings_estimate`
   outside state. Same corpus + same queries + same model ⇒ identical token
   numbers on every run.
 
-The generation timestamp (`ran_at` in `result.json`) is the only field that
-changes between runs; it is metadata, not part of the reproducibility claim.
+The generation timestamp (`ran_at` in `src/trovex/_benchmark.json`) is the only
+field that changes between runs; it is metadata, not part of the reproducibility
+claim.
 
 ## Running it
 
@@ -65,7 +66,7 @@ No API key and no network are required after the one-time model download.
 
 At the time of writing, the pinned corpus yields **~60% pooled savings**
 (median 59% per lookup) over 10 queries against 8 docs. Re-run `--fixed` to
-regenerate `result.json`; the numeric fields will match.
+regenerate `src/trovex/_benchmark.json`; the numeric fields will match.
 
 ## The live number vs this benchmark
 

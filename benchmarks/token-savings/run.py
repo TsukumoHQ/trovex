@@ -95,12 +95,12 @@ def main() -> int:
         "--fixed",
         action="store_true",
         help="run the PINNED corpus + query set behind the published number, "
-        "and refresh result.json (the committed proof)",
+        "and refresh src/trovex/_benchmark.json (the committed proof)",
     )
     args = ap.parse_args()
 
     # --fixed pins the corpus + queries so the published figure is reproducible
-    # regardless of how the trovex repo drifts. It also refreshes result.json.
+    # regardless of how the trovex repo drifts. It also refreshes _benchmark.json.
     write_result = False
     if args.fixed:
         if args.repo == REPO_ROOT:

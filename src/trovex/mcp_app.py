@@ -140,18 +140,28 @@ def _pinned_source() -> str:
 
 
 def _resolve_source(explicit: str = "") -> str | None:
-    """Which source_id to scope a query to, or None for the whole store.
+    """Which source_id to scope a query to; None only for the explicit all-sources
+    escape hatch.
 
     Precedence: an explicit tool argument beats the URL pin, so an agent can
-    reach across projects on purpose; `*` at either level means all sources.
-    Nothing set anywhere keeps the original behaviour — search everything.
+    reach across projects on purpose. Routing (P2b — precise default, broad
+    opt-in):
+      • `*` at either level → None = scan EVERY partition (the opt-in escape
+        hatch that reaches the cold file-indexed corpus).
+      • nothing set anywhere → the SSOT tier ('trovex'): the owned records +
+        canon. The default is deliberately PRECISE — a flagship query scans the
+        small ssot shard (tiny k, zero cross-source noise), not the whole store.
+        The cold corpus is opt-in via `*` or an explicit source id.
+      • an explicit/pinned source id → that partition.
 
     Raises ValueError on an unknown id. A typo'd .mcp.json would otherwise
     filter every result away and read as "trovex found nothing".
     """
     value = (explicit or "").strip() or _pinned_source()
-    if not value or value == ALL_SOURCES:
+    if value == ALL_SOURCES:
         return None
+    if not value:
+        return TROVEX_SOURCE_ID  # unpinned default = the SSOT tier (P2b)
     known = {s.id for s in get_state().settings.load_sources()} | {TROVEX_SOURCE_ID}
     if value not in known:
         raise ValueError(
@@ -174,8 +184,10 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
             alias `query` is also accepted (trovex_search/trovex_read use
             `query`) — pass either.
         summary: Include a 50-word extract per result. Default False.
-        source: Restrict to one source id (project). Defaults to whatever this
-            connection is pinned to; pass "*" to search every source.
+        source: Restrict to one source id (project). Defaults to the connection's
+            pin, or — unpinned — to your SSOT records (the precise default);
+            pass "*" to search every source including the cold file-indexed
+            corpus.
         query: Alias for `q` (accepted so a caller that learned `query` from the
             other tools doesn't misfire).
     """
@@ -606,8 +618,10 @@ def trovex_search(
         kind: Filter by kind (e.g. "record").
         tags: Tags to filter by, any-match — a list (e.g. ["owner/cto", "kind/record"])
             or a comma string ("owner/cto,kind/record").
-        source: Restrict to one source id (project). Defaults to whatever this
-            connection is pinned to; pass "*" to search every source.
+        source: Restrict to one source id (project). Defaults to the connection's
+            pin, or — unpinned — to your SSOT records (the precise default);
+            pass "*" to search every source including the cold file-indexed
+            corpus.
         q: Alias for `query`.
         include_archived: Also surface archived docs (hidden from retrieval by
             default). pending_delete docs are never returned.

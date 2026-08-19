@@ -170,10 +170,11 @@ def _scope(monkeypatch, *, pinned: str | None, explicit: str = ""):
     return mcp_app._resolve_source(explicit)
 
 
-def test_scope_defaults_to_whole_store(monkeypatch, two_projects):
-    """Nothing pinned, nothing passed → unchanged behaviour. This is what keeps
-    an existing user-global .mcp.json working exactly as before."""
-    assert _scope(monkeypatch, pinned=None) is None
+def test_scope_defaults_to_ssot(monkeypatch, two_projects):
+    """P2b: nothing pinned, nothing passed → the SSOT tier ('trovex'), NOT the
+    whole store. The flagship default is precise — it scans the owned-records
+    shard, not the cold file corpus. The cold corpus is opt-in via '*'."""
+    assert _scope(monkeypatch, pinned=None) == "trovex"
 
 
 def test_scope_uses_the_url_pin(monkeypatch, two_projects):

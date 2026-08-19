@@ -371,6 +371,49 @@ def test_unpinned_search_scans_all_partitions_not_just_trovex(settings, store):
     )
 
 
+def test_boot_never_returns_cold_tier_but_explicit_source_reaches_it(settings, store):
+    """P2b AC: boot scans ONLY the ssot ('trovex') tier — a cold file-indexed
+    artifact never leaks into an agent's boot pack even when it matches the boot
+    query — while an explicit source query still reaches the cold corpus.
+
+    (The unpinned-flagship-default→ssot routing lives in _resolve_source and is
+    covered in test_mcp_contract; this pins the boot + explicit-source ends.)"""
+    import sqlite_vec
+
+    # A cold 'code' artifact whose text matches the boot query verbatim — the
+    # strongest possible pull. Only tier scoping (not tags/score) can exclude it.
+    blob = sqlite_vec.serialize_float32(next(iter(store.embedder.embed([BOOT_QUERY]))).tolist())
+    now = 1_600_000_000.0
+    store.db.execute(
+        """INSERT INTO docs
+             (source_id, path, absolute_path, content_hash, size_bytes, tokens_est,
+              mtime, first_indexed, last_indexed, title, lifecycle)
+           VALUES ('code', 'code/hot.md', '/code/hot.md', 'h-hot', 10, 3, ?, ?, ?, 'hot', 'active')""",
+        (now, now, now),
+    )
+    rid = store.db.execute("SELECT id FROM docs WHERE path = 'code/hot.md'").fetchone()["id"]
+    store.db.execute(
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
+        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical')",
+        (rid, blob),
+    )
+    # One owner record in the ssot tier so boot has something legitimate to recall.
+    owner = store.put(f"# resume\n\n{BOOT_QUERY}", kind="record", tags=["owner/agentx"])
+    store.db.commit()
+
+    searcher = Searcher(settings, embedder=store.embedder)
+
+    # Boot is ssot-scoped → the cold artifact never appears; the owner record does.
+    pack = boot_pointers(searcher, "agentx")
+    ids = [p["id"] for p in pack["pointers"]]
+    assert rid not in ids, "boot leaked a cold-tier artifact (tier scoping failed)"
+    assert owner in ids
+
+    # But the cold corpus is reachable on purpose via an explicit source filter.
+    cold = searcher.search(BOOT_QUERY, limit=5, source_ids=["code"])
+    assert any(h.path == "code/hot.md" for h in cold), "explicit source query didn't reach cold"
+
+
 # --- status='duplicate' excluded from the default retrieval pool -----------
 
 

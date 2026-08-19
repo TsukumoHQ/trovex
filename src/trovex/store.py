@@ -274,22 +274,27 @@ class SqliteStore:
         ).fetchone()["c"]
 
     def delete(self, ext_id: str) -> bool:
-        """Remove a trovex-owned doc (row + its embedding) by ext_id. True if it existed."""
+        """Remove a trovex-owned doc (row + its embedding) by ext_id. True if it existed.
+
+        Non-destructive: an owned doc's body is tombstoned first, so a delete is
+        recoverable (restore_deleted / trovex_undelete)."""
         with self._lock:
             row = self.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()
             if not row:
                 return False
+            self._tombstone_locked(row["id"])
             self._delete_cascade_locked(row["id"])
             self.db.commit()
             return True
 
     def delete_by_id(self, doc_id: int) -> bool:
         """Remove a doc by its internal id (handles rows with a NULL ext_id, e.g.
-        agent/MCP-written docs). Same cascade as delete(). True if it existed."""
+        agent/MCP-written docs). Same cascade + tombstone as delete(). True if it existed."""
         with self._lock:
             row = self.db.execute("SELECT id FROM docs WHERE id = ?", (doc_id,)).fetchone()
             if not row:
                 return False
+            self._tombstone_locked(doc_id)
             self._delete_cascade_locked(doc_id)
             self.db.commit()
             return True
@@ -298,6 +303,93 @@ class SqliteStore:
         """Proper cascade delete by internal id — no orphan rows. Caller holds _lock
         and commits. See db.delete_doc_cascade for what gets removed."""
         delete_doc_cascade(self.db, doc_id)
+
+    def _tombstone_locked(self, doc_id: int) -> None:
+        """Snapshot an OWNED doc into doc_tombstones before it is deleted, then
+        prune to the cap. Caller holds ``_lock``; does NOT commit.
+
+        Only owned docs (content stored in-DB) are tombstoned — a file-backed doc
+        keeps its bytes on disk, so removing it from the index is not data loss.
+        The tombstone has no FK to docs, so it survives the cascade that follows.
+        """
+        row = self.db.execute(
+            "SELECT ext_id, title, content, kind, source_id FROM docs WHERE id = ?",
+            (doc_id,),
+        ).fetchone()
+        if not row or row["content"] is None:
+            return
+        tags = [
+            t["tag"]
+            for t in self.db.execute(
+                "SELECT tag FROM doc_tags WHERE doc_id = ?", (doc_id,)
+            ).fetchall()
+        ]
+        self.db.execute(
+            """INSERT INTO doc_tombstones
+                   (ext_id, title, content, kind, tags_json, source_id, deleted_ts)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                row["ext_id"],
+                row["title"],
+                row["content"],
+                row["kind"],
+                json.dumps(tags),
+                row["source_id"],
+                time.time(),
+            ),
+        )
+        cap = getattr(self.settings, "doc_tombstone_cap", 0)
+        if cap and cap > 0:
+            self.db.execute(
+                """DELETE FROM doc_tombstones
+                   WHERE id NOT IN (
+                       SELECT id FROM doc_tombstones ORDER BY deleted_ts DESC, id DESC LIMIT ?
+                   )""",
+                (cap,),
+            )
+
+    def list_tombstones(self, limit: int = 100) -> list[dict]:
+        """Deleted owned docs still recoverable (newest first)."""
+        return [
+            dict(r)
+            for r in self.db.execute(
+                """SELECT id, ext_id, title, kind, deleted_ts, LENGTH(content) AS size
+                   FROM doc_tombstones ORDER BY deleted_ts DESC, id DESC LIMIT ?""",
+                (limit,),
+            )
+        ]
+
+    def restore_deleted(self, *, ext_id: str | None = None, tombstone_id: int | None = None) -> str | None:
+        """Recreate a deleted doc from its tombstone; return the restored ext_id.
+
+        Pass a tombstone_id (from list_tombstones) for an exact pick, or an ext_id
+        to restore that doc's most recent tombstone. Returns None if no matching
+        tombstone. The restore recreates the doc via put() (so it re-embeds +
+        re-chunks + is versioned), preserving the original kind + tags, and clears
+        the consumed tombstone."""
+        if tombstone_id is not None:
+            row = self.db.execute(
+                "SELECT * FROM doc_tombstones WHERE id = ?", (tombstone_id,)
+            ).fetchone()
+        elif ext_id:
+            row = self.db.execute(
+                """SELECT * FROM doc_tombstones WHERE ext_id = ?
+                   ORDER BY deleted_ts DESC, id DESC LIMIT 1""",
+                (ext_id,),
+            ).fetchone()
+        else:
+            return None
+        if not row:
+            return None
+        tags = json.loads(row["tags_json"] or "[]")
+        tags = [t for t in tags if not t.startswith("kind/")]  # put re-adds the kind/ facet
+        restored = self.put(
+            row["content"], ext_id=row["ext_id"], kind=row["kind"], tags=tags or None
+        )
+        with self._lock:
+            self.db.execute("DELETE FROM doc_tombstones WHERE id = ?", (row["id"],))
+            self.db.commit()
+        return restored
 
     def put_batch(self, items: list[dict], *, embed_chunks: bool = False) -> list[str]:
         """Bulk insert/update + a single batched embed call. For migrations + import.

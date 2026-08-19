@@ -460,6 +460,24 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             ts REAL NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_doc_versions_doc ON doc_versions(doc_id, ts DESC);
+
+        -- Delete tombstones: a recoverable snapshot of an owned doc taken BEFORE
+        -- it is deleted. Deliberately has NO foreign key to docs — it must
+        -- OUTLIVE the doc row (doc_versions FK-cascades away with the doc, so it
+        -- can't serve this). Closes the delete arm of the vague2 silent-loss
+        -- class: a deleted owned doc is restorable, not vaporized.
+        CREATE TABLE IF NOT EXISTS doc_tombstones (
+            id INTEGER PRIMARY KEY,
+            ext_id TEXT,
+            title TEXT,
+            content TEXT NOT NULL,
+            kind TEXT,
+            tags_json TEXT,
+            source_id TEXT,
+            deleted_ts REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_tombstones_ts ON doc_tombstones(deleted_ts DESC);
+        CREATE INDEX IF NOT EXISTS idx_doc_tombstones_ext ON doc_tombstones(ext_id);
         """
     )
     conn.commit()

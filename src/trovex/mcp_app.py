@@ -650,6 +650,27 @@ def trovex_restore(doc_id: str, version_id: int) -> str:
     return f"(version {version_id} not found for {resolved})"
 
 
+@mcp.tool()
+def trovex_undelete(doc_id: str) -> str:
+    """Recover a DELETED doc — the undo for trovex_delete.
+
+    Deleting an owned doc snapshots its body to a tombstone first, so a delete is
+    recoverable. Pass the deleted doc's id (from the `trovex://deleted` resource)
+    to recreate it with its original kind + tags. Distinct from trovex_restore,
+    which rolls a still-EXISTING doc back to a prior version.
+
+    Args:
+        doc_id: The ext_id of the deleted doc (from `trovex://deleted`).
+    """
+    if not _authorized():
+        return _DENY
+    state = get_state()
+    restored = state.store.restore_deleted(ext_id=doc_id)
+    if restored:
+        return f"undeleted {restored}"
+    return f"(no recoverable tombstone for {doc_id})"
+
+
 # ---------------------------------------------------------------------------
 # MCP resources — the doc/topic catalog, exposed at connection time.
 #
@@ -742,6 +763,29 @@ def savings_for_session(session: str) -> str:
     from . import savings as _savings
 
     return _savings.render_session_md(get_state().searcher.db, session)
+
+
+@mcp.resource("trovex://deleted", name="deleted", mime_type="text/markdown")
+def deleted_docs() -> str:
+    """Deleted owned docs still recoverable from their tombstones (newest first).
+    Recover one with trovex_undelete(doc_id). Closes the delete arm of the
+    silent-loss class — a delete is undo-able, not permanent."""
+    import datetime as _dt
+
+    rows = get_state().store.list_tombstones()
+    if not rows:
+        return "# trovex deleted docs\n\n(no recoverable tombstones)"
+    lines = [f"# trovex deleted docs — {len(rows)} recoverable", ""]
+    for r in rows:
+        when = _dt.datetime.fromtimestamp(r["deleted_ts"], tz=_dt.timezone.utc).strftime(
+            "%Y-%m-%d %H:%M"
+        )
+        handle = r["ext_id"] or f"(tombstone {r['id']}, no ext_id)"
+        lines.append(
+            f"- {r['title'] or '(untitled)'} · ~{r['size']}b · deleted {when}Z · {handle}"
+        )
+    lines.append("\nRecover one: trovex_undelete(doc_id=<ext_id>).")
+    return "\n".join(lines)
 
 
 @mcp.resource("trovex://sources", name="sources", mime_type="text/markdown")

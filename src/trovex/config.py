@@ -73,6 +73,12 @@ class Settings(BaseSettings):
     # are pruned to bound growth. <= 0 keeps unlimited history.
     doc_version_cap: int = 50
 
+    # Delete-tombstone retention (env TROVEX_DOC_TOMBSTONE_CAP): deleting an owned
+    # doc snapshots its body to doc_tombstones first, so a delete is recoverable
+    # (trovex_undelete / trovex://deleted). Oldest tombstones beyond the cap are
+    # pruned. <= 0 keeps unlimited tombstones.
+    doc_tombstone_cap: int = 200
+
     # Multi-source: file at sources_config_path takes precedence; otherwise
     # falls back to a single source built from project_root.
     sources_config_path: Path = Path.home() / ".trovex-data" / "sources.yaml"

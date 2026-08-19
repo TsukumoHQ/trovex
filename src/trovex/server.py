@@ -664,6 +664,23 @@ def build_app() -> FastAPI:
         ok = get_state().store.restore_version(ext_id, version_id)
         return JSONResponse({"restored": ok}, status_code=200 if ok else 404)
 
+    @app.get("/api/tombstones")
+    async def api_tombstones() -> JSONResponse:
+        """Deleted owned docs still recoverable from their tombstones (read-only)."""
+        return JSONResponse(get_state().store.list_tombstones())
+
+    @app.post("/api/doc/{ext_id}/undelete")
+    @write_limit
+    async def api_doc_undelete(ext_id: str, request: Request) -> JSONResponse:
+        """Recover a deleted doc from its most recent tombstone (write-gated)."""
+        if not _write_authorized(request):
+            return _unauthorized()
+        restored = get_state().store.restore_deleted(ext_id=ext_id)
+        return JSONResponse(
+            {"undeleted": bool(restored), "ext_id": restored},
+            status_code=200 if restored else 404,
+        )
+
     @app.post("/api/doc/{ext_id}/tags")
     @write_limit
     async def api_doc_tags(ext_id: str, request: Request) -> JSONResponse:

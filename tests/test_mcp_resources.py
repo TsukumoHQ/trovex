@@ -31,6 +31,7 @@ TOOL_NAMES = {
     "trovex_search",
     "trovex_delete",
     "trovex_restore",
+    "trovex_undelete",
 }
 
 

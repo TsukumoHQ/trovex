@@ -46,6 +46,8 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     "trovex_delete": {"props": {"doc_id"}, "required": {"doc_id"}},
     # Roll a doc back to a prior version (the undo for a bad overwrite); write-gated.
     "trovex_restore": {"props": {"doc_id", "version_id"}, "required": {"doc_id", "version_id"}},
+    # Recover a DELETED doc from its tombstone (the undo for delete); write-gated.
+    "trovex_undelete": {"props": {"doc_id"}, "required": {"doc_id"}},
 }
 
 

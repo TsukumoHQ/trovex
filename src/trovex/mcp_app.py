@@ -450,21 +450,33 @@ def trovex_read(
     section: str = "",
     full: bool = False,
     q: str = "",
+    tier: str = "",
     versions: bool = False,
     version_id: int = 0,
 ) -> str:
     """Read a trovex-owned doc — by default returns the most relevant *passage*.
 
-    Token-minimal by design: a query returns the single best chunk (with its
-    heading breadcrumb), not the whole doc. Set full=true for the whole doc.
+    Graduated-access ladder (token-discipline by design): a query resolves at one
+    of three rungs, cheapest first. Start low, escalate ONLY on demonstrated need.
+
+        tier="card"     → tier 1: heading breadcrumb + a ~50-word extract (cheapest)
+        tier="passage"  → tier 2: the single best-matching section  (DEFAULT)
+        tier="full"     → tier 3: the whole best-matching doc         (most tokens)
+
+    Most lookups end at the card or passage; only escalate to full when the
+    passage is genuinely insufficient. `full=true` is kept as an alias for
+    tier="full" (back-compat). The default (no tier, no full) stays passage, so
+    nothing changes for existing callers.
 
     Args:
-        query: Natural-language query → the best-matching passage. The alias `q`
-            is also accepted (the `trovex` tool uses `q`) — pass either.
+        query: Natural-language query → resolved at the chosen `tier`. The alias
+            `q` is also accepted (the `trovex` tool uses `q`) — pass either.
         doc_id: Opaque id → that exact doc (whole, or just `section`).
         section: With doc_id, return only that heading's section.
-        full: With query, return the whole best-matching doc instead of a passage.
+        full: Alias for tier="full" — the whole best-matching doc.
         q: Alias for `query`.
+        tier: The access rung — "card", "passage" (default), or "full". With a
+            `doc_id`, tier is ignored (an exact read is already precise).
         versions: With doc_id, list the doc's prior content snapshots (newest
             first) as `version_id · when · size · title` — every overwrite keeps
             the previous body, so a bad save is recoverable. Restore one with
@@ -512,7 +524,15 @@ def trovex_read(
             "validation",
             "Provide a `query` (alias `q`) for the best passage, or a `doc_id` for an exact doc.",
         )
-    if full:
+    # Resolve the access-ladder rung. `full=true` is the legacy alias for "full".
+    rung = (tier or ("full" if full else "passage")).strip().lower()
+    if rung not in ("card", "passage", "full"):
+        return _err(
+            "unknown_tier",
+            "validation",
+            'tier must be "card", "passage", or "full" (the access ladder, cheapest first).',
+        )
+    if rung == "full":
         results = state.searcher.search(query, limit=1, source_ids=[TROVEX_SOURCE_ID])
         doc = state.store.get(results[0].path) if results else None
         return doc.content if doc else "(no results)"
@@ -520,9 +540,15 @@ def trovex_read(
     hits = state.store.search_chunks(query, limit=1)
     if hits:
         h = hits[0]
-        # small-to-big: match the chunk, return its full parent section.
-        section = state.store.section_text(h["doc_id"], h["heading_path"]) or h["content"]
-        out = _fmt_passage({**h, "content": section})
+        if rung == "card":
+            # Tier 1: breadcrumb + ~50-word extract of the matched chunk — no
+            # small-to-big expansion, so it's strictly cheaper than the passage.
+            out = _fmt_card(h)
+        else:
+            # Tier 2 (default): small-to-big — match the chunk, return its full
+            # parent section.
+            section = state.store.section_text(h["doc_id"], h["heading_path"]) or h["content"]
+            out = _fmt_passage({**h, "content": section})
     else:
         out = "(no results)"
     saved = _log_retrieval(state, query, hits, out, t0)
@@ -582,6 +608,37 @@ def trovex_search(
 def _fmt_passage(h: dict) -> str:
     bc = f"{h['title']} > {h['heading_path']}" if h.get("heading_path") else h["title"]
     return f"{bc}\n\n{h['content']}\n\n— trovex:{h['ext_id']}"
+
+
+def _breadcrumb(h: dict) -> str:
+    return f"{h['title']} > {h['heading_path']}" if h.get("heading_path") else h["title"]
+
+
+def _extract_words(text: str, words: int = 50) -> str:
+    """First ~`words` words of `text`, stripped of code fences + heading markers
+    and whitespace-collapsed — the summary-card extract. Adds an ellipsis when
+    it actually truncated."""
+    import re
+
+    stripped = re.sub(r"```[\s\S]*?```", "", text)
+    stripped = re.sub(r"^#+\s+", "", stripped, flags=re.MULTILINE)
+    stripped = re.sub(r"\s+", " ", stripped).strip()
+    parts = stripped.split()
+    head = " ".join(parts[:words])
+    return f"{head}…" if len(parts) > words else head
+
+
+def _fmt_card(h: dict) -> str:
+    """Tier-1 summary card: heading breadcrumb + a ~50-word extract + an escalation
+    hint. The cheapest rung of the access ladder — enough to decide whether to
+    escalate, not the whole passage."""
+    bc = _breadcrumb(h)
+    extract = _extract_words(h.get("content", ""))
+    return (
+        f"{bc}\n\n{extract}\n\n— trovex:{h['ext_id']} · card"
+        f' · escalate: trovex_read(query=…, tier="passage") for the full passage,'
+        f' tier="full" for the whole doc'
+    )
 
 
 def _log_retrieval(state, query: str, hits: list, response: str, t0: float) -> int:

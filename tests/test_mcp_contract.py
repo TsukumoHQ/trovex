@@ -34,8 +34,11 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     "trovex_search": {"props": {"query", "k", "kind", "tags", "source", "q"}, "required": set()},
     # trovex_read gained `versions`/`version_id` (both optional) for the non-clobber
     # history: list prior snapshots or read one. Additive — existing readers unaffected.
+    # It then gained `tier` (optional) for the graduated-access ladder
+    # (card→passage→full); default stays passage and `full=true` still maps to the
+    # full rung, so existing readers are unaffected.
     "trovex_read": {
-        "props": {"query", "doc_id", "section", "full", "q", "versions", "version_id"},
+        "props": {"query", "doc_id", "section", "full", "q", "tier", "versions", "version_id"},
         "required": set(),
     },
     "trovex_write": {

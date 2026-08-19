@@ -10,7 +10,15 @@
  */
 import { describe, expect, it } from 'vitest'
 import { type SavingsTotals, resolveHeadline, showAtPrecision } from '../src/receipt/api'
-import { humanTokens, money, pct, pricingNote, relativeTime, tokenizerLabel } from '../src/receipt/format'
+import {
+  hasDollarFigure,
+  humanTokens,
+  money,
+  pct,
+  pricingNote,
+  relativeTime,
+  tokenizerLabel,
+} from '../src/receipt/format'
 import { shareCardSvg } from '../src/receipt/shareCard'
 
 const base: SavingsTotals = {
@@ -125,6 +133,18 @@ describe('format', () => {
     expect(pricingNote({ model: 'gpt-4-class', input_per_mtok: 3, source: 'stated' })).toBe(
       'priced at $3.00/M input tokens · gpt-4-class (stated)',
     )
+  })
+
+  it('hasDollarFigure needs BOTH a finite saved_usd and a pricing block', () => {
+    const pricing = { input_per_mtok: 3 }
+    // A 200 payload missing either half (malformed committed JSON / partial
+    // deploy) must NOT render $ — the guard that keeps /receipt from blanking.
+    expect(hasDollarFigure({ saved_usd: 1.8, pricing })).toBe(true)
+    expect(hasDollarFigure({ saved_usd: 0, pricing })).toBe(true) // a real $0 is finite
+    expect(hasDollarFigure({ pricing })).toBe(false) // saved_usd absent
+    expect(hasDollarFigure({ saved_usd: Number.NaN, pricing })).toBe(false)
+    expect(hasDollarFigure({ saved_usd: 1.8, pricing: null })).toBe(false) // pricing absent
+    expect(hasDollarFigure({ saved_usd: 1.8 })).toBe(false)
   })
 })
 

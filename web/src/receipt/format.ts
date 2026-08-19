@@ -31,6 +31,20 @@ export function pricingNote(p: { model: string; input_per_mtok: number; source: 
   return `priced at ${rate} · ${p.model} (${p.source})`
 }
 
+/**
+ * The $ layer is strictly additive. A payload only shows dollars when it carries
+ * BOTH a finite `saved_usd` and a `pricing` block; otherwise the UI renders the
+ * token figure alone rather than fake a $0.00 or crash `pricingNote` on an
+ * undefined block. Shared by every $-rendering site so the guard can't drift —
+ * a 200 response with a malformed/partial committed JSON never blanks the page.
+ */
+export function hasDollarFigure(x: {
+  saved_usd?: number
+  pricing?: { input_per_mtok: number } | null
+}): boolean {
+  return Number.isFinite(x.saved_usd) && x.pricing != null
+}
+
 /** o200k_base → shown as-is; the "chars/4" fallback labelled as an approximation. */
 export function tokenizerLabel(tokenizer: string): string {
   const t = (tokenizer || '').trim()

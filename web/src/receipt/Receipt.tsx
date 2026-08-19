@@ -23,7 +23,7 @@ import {
   resolveHeadline,
   showAtPrecision,
 } from './api'
-import { humanTokens, money, pct, pricingNote, relativeTime, tokenizerLabel } from './format'
+import { hasDollarFigure, humanTokens, money, pct, pricingNote, relativeTime, tokenizerLabel } from './format'
 import { downloadShareCard } from './shareCard'
 
 const RANGES = [7, 30, 90] as const
@@ -141,7 +141,7 @@ export default function Receipt() {
 
 function LifetimeStrip({ t }: { t: SavingsTotals }) {
   const h = resolveHeadline(t)
-  const hasUsd = Number.isFinite(h.savedUsd) && t.pricing != null
+  const hasUsd = hasDollarFigure({ saved_usd: h.savedUsd, pricing: t.pricing })
   return (
     <p className="rc-lifetime mono">
       since day one:{' '}
@@ -188,7 +188,7 @@ function TotalsCard({ load, onRetry }: { load: Load<SavingsTotals>; onRetry: () 
   // The $ layer is additive: an older server (or one deployed before the $
   // fields land) has no saved_usd/pricing. Show tokens-only then, never a
   // fabricated "$0.00" — honesty rule #4, under-claim.
-  const hasUsd = Number.isFinite(h.savedUsd) && t.pricing != null
+  const hasUsd = hasDollarFigure({ saved_usd: h.savedUsd, pricing: t.pricing })
 
   return (
     <div className="rc-card">
@@ -337,6 +337,10 @@ function SessionsTable({ load, totals }: { load: Load<SessionRow[]>; totals: Loa
 
 function BenchmarkCard({ b }: { b: BenchmarkResult }) {
   const readPct = b.baseline_tokens > 0 ? Math.round((b.trovex_tokens / b.baseline_tokens) * 100) : 0
+  // Same additive-$ guard as TotalsCard: a 200 benchmark whose committed JSON is
+  // missing pricing/saved_usd (malformed result, partial deploy) must render the
+  // token figure alone, never crash on pricingNote(undefined) and blank /receipt.
+  const hasUsd = hasDollarFigure(b)
   return (
     <section className="rc-bench">
       <div className="rc-bench-head">
@@ -346,7 +350,7 @@ function BenchmarkCard({ b }: { b: BenchmarkResult }) {
       <div className="rc-bench-body">
         <div className="rc-bench-figure">
           <div className="rc-big mono">~{pct(b.savings_pct / 100)}%</div>
-          <div className="rc-big-usd mono">≈ {money(b.saved_usd)} saved</div>
+          {hasUsd && <div className="rc-big-usd mono">≈ {money(b.saved_usd)} saved</div>}
           <div className="rc-big-label">fewer tokens vs a full-dump baseline</div>
         </div>
         <p className="rc-bench-detail mono">
@@ -357,7 +361,7 @@ function BenchmarkCard({ b }: { b: BenchmarkResult }) {
         <p className="rc-bench-spread mono">
           per-query ratio: median ~{pct(b.median_ratio)}% · pooled ~{pct(b.pooled_ratio)}%
         </p>
-        <p className="rc-pricing mono">{pricingNote(b.pricing)}</p>
+        {hasUsd && <p className="rc-pricing mono">{pricingNote(b.pricing)}</p>}
       </div>
       <p className="rc-bench-foot">
         A fixed corpus + fixed query set, re-runnable to the same number: the savings figure is a
@@ -376,7 +380,7 @@ function BenchmarkCard({ b }: { b: BenchmarkResult }) {
 function ShareCard({ t }: { t: SavingsTotals }) {
   const [done, setDone] = useState<string>('')
   const h = resolveHeadline(t)
-  const hasUsd = Number.isFinite(h.savedUsd) && t.pricing != null
+  const hasUsd = hasDollarFigure({ saved_usd: h.savedUsd, pricing: t.pricing })
   const tokensLabel = humanTokens(h.saved)
   const moneyLabel = hasUsd ? money(h.savedUsd) : ''
   const pctVal = pct(t.ratio)

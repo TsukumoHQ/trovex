@@ -12,11 +12,17 @@ without changing this contract.
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 import time
 
 _WS = re.compile(r"\s+")
+
+# TTL bounds staleness if an invalidation is ever missed, and (with the row cap)
+# keeps the table from growing unbounded. Both tunable via env.
+_TTL_SEC = float(os.environ.get("TROVEX_QUERY_CACHE_TTL_SEC", "3600"))
+_MAX_ROWS = int(os.environ.get("TROVEX_QUERY_CACHE_MAX_ROWS", "2000"))
 
 
 def _norm(q: str) -> str:
@@ -42,18 +48,31 @@ def _ensure(db: sqlite3.Connection) -> None:
     )
 
 
-def corpus_version(db: sqlite3.Connection) -> str:
-    """Cheap version string; changes on any write (mtime bumps) or delete (count)."""
-    r = db.execute("SELECT COUNT(*) AS c, COALESCE(MAX(mtime), 0) AS m FROM docs").fetchone()
-    return f"{r['c']}:{r['m']}"
+def corpus_version(db: sqlite3.Connection, scope: str | None = None) -> str:
+    """Cheap version string; changes on any write (mtime bumps) or delete (count).
+
+    PER-SCOPE (T5): when `scope` is a source id, the version reflects ONLY that
+    source's docs, so a write to another source no longer voids this scope's cache
+    entries (the old global version invalidated the whole cache fleet-wide on any
+    write). `scope=None` (the source='*' all-sources query) keeps the global
+    version — any write there really can change the result."""
+    if scope is None:
+        r = db.execute("SELECT COUNT(*) AS c, COALESCE(MAX(mtime), 0) AS m FROM docs").fetchone()
+        return f"*:{r['c']}:{r['m']}"
+    r = db.execute(
+        "SELECT COUNT(*) AS c, COALESCE(MAX(mtime), 0) AS m FROM docs WHERE source_id = ?",
+        (scope,),
+    ).fetchone()
+    return f"{scope}:{r['c']}:{r['m']}"
 
 
 def get(db: sqlite3.Connection, q: str, summary: bool, version: str) -> dict | None:
     _ensure(db)
     row = db.execute(
         """SELECT output, n_results, whr, top_tokens, resp_tokens
-           FROM query_cache WHERE key = ? AND corpus_version = ?""",
-        (_key(q, summary), version),
+           FROM query_cache
+           WHERE key = ? AND corpus_version = ? AND created_at >= ?""",
+        (_key(q, summary), version, time.time() - _TTL_SEC),
     ).fetchone()
     return dict(row) if row else None
 
@@ -80,5 +99,13 @@ def put(
              top_tokens = excluded.top_tokens, resp_tokens = excluded.resp_tokens,
              created_at = excluded.created_at""",
         (_key(q, summary), version, output, n_results, whr, top_tokens, resp_tokens, time.time()),
+    )
+    # Row cap (T5): keep only the newest _MAX_ROWS entries so the cache table can't
+    # grow without bound. Cheap: only runs the delete when over the cap.
+    db.execute(
+        """DELETE FROM query_cache WHERE key NOT IN (
+               SELECT key FROM query_cache ORDER BY created_at DESC LIMIT ?
+           )""",
+        (_MAX_ROWS,),
     )
     db.commit()

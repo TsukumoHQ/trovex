@@ -129,12 +129,13 @@ def test_maybe_rerank_uses_local_when_no_key(monkeypatch):
 
     monkeypatch.setattr(rerank_local, "rerank", fake_local)
     try:
+        # >limit candidates so the rerank path runs (<=limit now skips, T4).
         cands = [_sr("a.md"), _sr("b.md")]
-        results, info = rerank.maybe_rerank("q", cands, limit=5)
+        results, info = rerank.maybe_rerank("q", cands, limit=1)
     finally:
         rerank.current_openai_key.reset(tok)
     assert called.get("yes") is True
-    assert [r.path for r in results] == ["b.md", "a.md"]
+    assert [r.path for r in results] == ["b.md"]  # reversed, top-1
     assert info is not None and info.model == "fake-local"
 
 
@@ -152,7 +153,9 @@ def test_maybe_rerank_llm_failure_falls_back_to_local(monkeypatch):
 
     monkeypatch.setattr(rerank_local, "rerank", fake_local)
     try:
-        rerank.maybe_rerank("q", [_sr("a.md")], limit=5)
+        # >limit candidates so rerank runs (<=limit skips, T4) and the LLM tier
+        # is reached — then its failure falls back to local.
+        rerank.maybe_rerank("q", [_sr("a.md"), _sr("b.md")], limit=1)
     finally:
         rerank.current_openai_key.reset(tok)
     assert fell_back.get("yes") is True

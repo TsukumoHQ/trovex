@@ -221,7 +221,7 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
     # Token metrics are replayed so usage/savings dashboards stay accurate.
     # The scope is part of the key: without it the first project to run a query
     # would serve its results to every other project asking the same thing.
-    ver = _qcache.corpus_version(db)
+    ver = _qcache.corpus_version(db, scope)  # per-scope: a write to another source keeps this hit (T5)
     cache_key = q if scope is None else f"{q}\x00source={scope}"
     cached = _qcache.get(db, cache_key, summary, ver)
     if cached is not None:
@@ -244,7 +244,28 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
     # Fetch a wider candidate pool when reranking is possible.
     candidates = state.searcher.search(q, limit=20, source_ids=[scope] if scope else None)
     pre_rerank_paths = [c.path for c in candidates]
-    results, rerank_info = maybe_rerank(q, candidates, limit=5)
+    # T4: feed the cross-encoder each candidate's body from the DB in ONE batched
+    # query (first chunk per doc), instead of re-reading ~20 files off disk per
+    # query. Owned docs have no file at all, so the disk read returned nothing for
+    # them; the DB path works for owned + file-backed alike.
+    rr_paths = [c.path for c in candidates[:20]]
+    content_by_path: dict[str, str] = {}
+    if rr_paths:
+        ph = ",".join("?" * len(rr_paths))
+        for row in db.execute(
+            f"""SELECT d.path AS path, c.content AS content
+                FROM docs d JOIN chunks c ON c.doc_id = d.id
+                WHERE d.path IN ({ph}) AND c.chunk_index = 0""",
+            rr_paths,
+        ):
+            content_by_path[row["path"]] = row["content"]
+
+    def _rr_text(cand):
+        head = (getattr(cand, "title", "") or getattr(cand, "path", "") or "").strip()
+        snip = (content_by_path.get(getattr(cand, "path", ""), "") or "")[:400]
+        return f"{head}. {snip}".strip() if snip else head
+
+    results, rerank_info = maybe_rerank(q, candidates, limit=5, text_fn=_rr_text)
 
     out = (
         state.searcher.format_with_summary(results)

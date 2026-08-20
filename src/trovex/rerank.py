@@ -53,6 +53,7 @@ def maybe_rerank(
     query: str,
     candidates: list[SearchResult],
     limit: int,
+    text_fn=None,
 ) -> tuple[list[SearchResult], RerankInfo | None]:
     """Return (results, rerank_info or None). Tiered:
 
@@ -63,8 +64,15 @@ def maybe_rerank(
 
     Always returns at least the original top-`limit` candidates so the caller
     can blindly use the result.
+
+    `text_fn(candidate) -> str` supplies the per-candidate document text for the
+    cross-encoder; the caller passes a DB-backed one so the reranker never
+    re-reads files off disk (T4).
     """
-    if not candidates:
+    # Nothing to reorder: with <= limit candidates every one is returned anyway,
+    # so a cross-encoder pass (O(candidates) model runs) can't change the result
+    # SET — skip it and save the latency (T4).
+    if len(candidates) <= limit:
         return candidates[:limit], None
 
     key = current_openai_key.get()
@@ -76,15 +84,15 @@ def maybe_rerank(
             log.warning("LLM rerank failed (%s); falling back to local", e.__class__.__name__)
 
     # Default key-free tier: the local cross-encoder.
-    return _local_rerank(query, candidates, limit)
+    return _local_rerank(query, candidates, limit, text_fn=text_fn)
 
 
 def _local_rerank(
-    query: str, candidates: list[SearchResult], limit: int
+    query: str, candidates: list[SearchResult], limit: int, text_fn=None
 ) -> tuple[list[SearchResult], RerankInfo | None]:
     from . import rerank_local
 
-    results, info = rerank_local.rerank(query, candidates, limit)
+    results, info = rerank_local.rerank(query, candidates, limit, text_fn=text_fn)
     if info is None:
         return results, None
     return results, RerankInfo(

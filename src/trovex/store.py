@@ -215,12 +215,19 @@ class SqliteStore:
                         # Flipped into the store-only lane on an otherwise no-op
                         # rewrite: purge any existing vectors so the zero-KNN
                         # guarantee holds. The fast-path used to return here with
-                        # the old vectors intact (review-af03da67 leak).
+                        # the old vectors intact (review-af03da67 leak). Also clear
+                        # content_hash so a later flip BACK to a searchable kind with
+                        # IDENTICAL content is seen as changed and RE-EMBEDS, instead
+                        # of hitting this fast-path and staying BM25-only forever
+                        # (review-6c02c654 leak).
                         self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
                         self.db.execute(
                             "DELETE FROM vec_chunks WHERE rowid IN "
                             "(SELECT id FROM chunks WHERE doc_id = ?)",
                             (doc_id,),
+                        )
+                        self.db.execute(
+                            "UPDATE docs SET content_hash = '' WHERE id = ?", (doc_id,)
                         )
                     else:
                         # No re-embed on an identical rewrite, but lifecycle just reset
@@ -287,13 +294,17 @@ class SqliteStore:
                 self._embed_chunks(chunks_to_embed)
             else:
                 # Authoritative: a store-only write guarantees NO vectors for this
-                # doc, even if it previously embedded under a different kind.
+                # doc, even if it previously embedded under a different kind. Clear
+                # content_hash too, so a later identical-content flip BACK to a
+                # searchable kind re-embeds instead of being swallowed by the
+                # content_unchanged fast-path (review-6c02c654 leak).
                 self.db.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
                 self.db.execute(
                     "DELETE FROM vec_chunks WHERE rowid IN "
                     "(SELECT id FROM chunks WHERE doc_id = ?)",
                     (doc_id,),
                 )
+                self.db.execute("UPDATE docs SET content_hash = '' WHERE id = ?", (doc_id,))
             self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
             self.db.commit()
             # Flag near-duplicates on the live write path too (the batch pass in
@@ -923,17 +934,43 @@ class SqliteStore:
         for rank, cid in enumerate(bm_ids):
             scores[cid] = scores.get(cid, 0.0) + 1.0 / (60 + rank)
         ranked = sorted(scores, key=lambda c: -scores[c])
+        if not ranked:
+            return []
 
-        tagset = set(tags or [])
-        out: list[dict] = []
-        for cid in ranked:
-            r = self.db.execute(
-                """SELECT c.doc_id, c.heading_path, c.content, c.tokens_est,
+        # T6: fetch every candidate chunk + its doc in ONE batched query (was N+1:
+        # a SELECT per ranked chunk). Batch the IN() to stay under sqlite's bound-
+        # variable cap.
+        _BATCH = 900
+        rows_by_cid: dict[int, sqlite3.Row] = {}
+        for i in range(0, len(ranked), _BATCH):
+            batch = ranked[i : i + _BATCH]
+            ph = ",".join("?" * len(batch))
+            for r in self.db.execute(
+                f"""SELECT c.id AS cid, c.doc_id, c.heading_path, c.content, c.tokens_est,
                           d.ext_id, d.title, d.kind, d.source_id, d.lifecycle,
                           d.tokens_est AS doc_tokens
-                   FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.id = ?""",
-                (cid,),
-            ).fetchone()
+                   FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.id IN ({ph})""",
+                batch,
+            ):
+                rows_by_cid[r["cid"]] = r
+
+        # T6: fetch tags for all candidate docs in ONE batched query (was a per-hit
+        # SELECT inside the loop).
+        tagset = set(tags or [])
+        tags_by_doc: dict[int, set[str]] = {}
+        if tagset:
+            doc_ids = list({r["doc_id"] for r in rows_by_cid.values()})
+            for i in range(0, len(doc_ids), _BATCH):
+                batch = doc_ids[i : i + _BATCH]
+                ph = ",".join("?" * len(batch))
+                for t in self.db.execute(
+                    f"SELECT doc_id, tag FROM doc_tags WHERE doc_id IN ({ph})", batch
+                ):
+                    tags_by_doc.setdefault(t["doc_id"], set()).add(t["tag"])
+
+        out: list[dict] = []
+        for cid in ranked:
+            r = rows_by_cid.get(cid)
             if not r:
                 continue
             lc = r["lifecycle"]
@@ -943,16 +980,10 @@ class SqliteStore:
                 continue
             if source and r["source_id"] != source:
                 continue
-            if tagset:
-                dtags = {
-                    t["tag"]
-                    for t in self.db.execute(
-                        "SELECT tag FROM doc_tags WHERE doc_id = ?", (r["doc_id"],)
-                    )
-                }
-                if not (tagset & dtags):
-                    continue
+            if tagset and not (tagset & tags_by_doc.get(r["doc_id"], set())):
+                continue
             hit = dict(r)
+            hit.pop("cid", None)  # internal join key — keep the output shape identical
             hit["score"] = scores[cid]
             out.append(hit)
             if len(out) >= limit:

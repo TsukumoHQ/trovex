@@ -89,8 +89,9 @@ class Searcher:
         filtered = bool(kind or tags or source_ids)
         pool = max(limit * 5, 50) if filtered else limit * 5
 
-        # Dense side — full metadata rows, already scoped + widen-retried (the
-        # proven path). row_by_id caches every row we touch, for both signals.
+        # Dense side — full metadata rows from the partitioned KNN (source_id
+        # shard, tiny bounded k; the old widen-retry is retired, T3). row_by_id
+        # caches every row we touch, for both signals.
         vec_rows = self._vector_rows(
             query, pool, source_ids, kind, tags, limit, include_archived, include_duplicates
         )

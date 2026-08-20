@@ -524,6 +524,78 @@ def test_store_only_flip_purges_vectors_on_unchanged_rewrite(settings, store):
     )
 
 
+def test_store_only_flip_back_re_embeds(settings, store):
+    """review-6c02c654 leak: the store-only purge must clear content_hash, so a
+    later flip BACK to a searchable kind with IDENTICAL content re-embeds instead
+    of being swallowed by the content_unchanged fast-path (permanent BM25-only)."""
+    store.settings.store_only_kinds = ["reference"]
+    body = "# spec\n\nraft leader election heartbeat randomized timeout"
+
+    ext = store.put(body, kind="doc")  # embedded
+    did = store.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext,)).fetchone()["id"]
+
+    def vcount():
+        return store.db.execute("SELECT COUNT(*) c FROM vec_docs WHERE rowid = ?", (did,)).fetchone()["c"]
+
+    assert vcount() == 1
+    store.put(body, kind="reference", ext_id=ext)  # flip to store-only (identical content)
+    assert vcount() == 0  # purged
+    store.put(body, kind="doc", ext_id=ext)  # flip BACK (identical content)
+    assert vcount() == 1, "flip-back to a searchable kind must re-embed (content_hash cleared)"
+
+
+def test_rerank_skips_when_candidates_le_limit():
+    """T4: with <= limit candidates every one is returned anyway, so the
+    cross-encoder pass is skipped — original order, no rerank info, no model load."""
+    from trovex.rerank import maybe_rerank
+    from trovex.search import SearchResult
+
+    cands = [
+        SearchResult(
+            path=f"p{i}", title=f"t{i}", distance=0.1, score=1.0, age_days=0.0,
+            status="canonical", size_bytes=1, tokens_est=1, absolute_path="", source_id="trovex",
+        )
+        for i in range(3)
+    ]
+    out, info = maybe_rerank("q", cands, limit=5)
+    assert out == cands  # untouched order
+    assert info is None  # rerank did not run
+
+
+def test_query_cache_is_per_scope_and_ttl(settings, store, monkeypatch):
+    """T5: a write to ANOTHER source no longer voids this scope's cached entry
+    (per-scope version), while a write to THIS source does; and a past-TTL entry
+    misses."""
+    from trovex import cache as qc
+
+    db = store.db
+    store.put("# a\n\ntrovex owned doc about caching", kind="doc")  # a 'trovex' doc
+    # Seed a cache entry versioned to the 'trovex' scope.
+    v = qc.corpus_version(db, "trovex")
+    qc.put(db, "cache q", False, v, "OUT", 1, 10, 3, 2)
+    assert qc.get(db, "cache q", False, v) is not None
+
+    # A write to a DIFFERENT source ('code') must NOT change the trovex version.
+    store.db.execute(
+        """INSERT INTO docs (source_id, path, absolute_path, content_hash, size_bytes,
+             tokens_est, mtime, first_indexed, last_indexed, title)
+           VALUES ('code', 'code/x.md', '/code/x.md', 'h', 1, 1, 9e9, 9e9, 9e9, 'x')"""
+    )
+    store.db.commit()
+    assert qc.corpus_version(db, "trovex") == v  # unaffected
+    assert qc.get(db, "cache q", False, v) is not None  # still a hit
+
+    # A write to THIS source bumps its version → the old entry is invalidated.
+    store.put("# b\n\nanother trovex owned doc", kind="doc")
+    assert qc.corpus_version(db, "trovex") != v
+
+    # TTL: with a zero window, even a fresh entry misses.
+    monkeypatch.setattr(qc, "_TTL_SEC", -1.0)
+    v2 = qc.corpus_version(db, "trovex")
+    qc.put(db, "ttl q", False, v2, "OUT", 1, 10, 3, 2)
+    assert qc.get(db, "ttl q", False, v2) is None
+
+
 # --- status='duplicate' excluded from the default retrieval pool -----------
 
 

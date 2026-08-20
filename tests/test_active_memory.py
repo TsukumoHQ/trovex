@@ -621,6 +621,125 @@ def test_capacity_report_flags_near_limit_and_counts_vectors_only(settings, stor
     assert "ceiling" in rep[0]["reason"]
 
 
+def test_importance_for_blends_status_pin_access():
+    """P3: importance = status base + pin boost + saturating access frequency."""
+    from trovex.retention import importance_for
+
+    assert importance_for("canonical", 0, 0) == 1.0
+    assert importance_for("duplicate", 0, 0) == 0.0
+    assert importance_for("canonical", 1, 0) == 2.0  # + pin boost
+    assert importance_for("plan", 0, 100) == 0.6 + 0.5  # access saturates at +0.5
+    assert importance_for("canonical", 0, 5) == round(1.0 + 0.5 * 0.5, 4)
+
+
+def test_recompute_importance_from_status_and_access(settings, store):
+    """P3: recompute_importance derives docs.importance from status/pinned + the
+    query-log hit counts, deterministically."""
+    ext = store.put("# hot\n\ncaching strategy write-through", kind="doc")
+    did = store.db.execute("SELECT id, path FROM docs WHERE ext_id = ?", (ext,)).fetchone()
+    # Log 3 query-result hits on this doc's path.
+    store.db.execute(
+        "INSERT INTO mcp_queries (ts, query) VALUES (1.0, 'q')"
+    )
+    qid = store.db.execute("SELECT id FROM mcp_queries LIMIT 1").fetchone()["id"]
+    for rank in range(3):
+        store.db.execute(
+            "INSERT INTO mcp_query_results (query_id, rank, path) VALUES (?, ?, ?)",
+            (qid, rank, did["path"]),
+        )
+    store.db.commit()
+
+    store.recompute_importance()
+    imp = store.db.execute("SELECT importance FROM docs WHERE id = ?", (did["id"],)).fetchone()[
+        "importance"
+    ]
+    assert imp == round(1.0 + 0.5 * (3 / 10), 4)  # canonical base + access(3/10)
+
+
+def test_importance_boosts_flagship_ranking(settings, store):
+    """P3: an old-but-important doc outranks a fresh trivial one in the flagship
+    hybrid ranking (importance multiplies the score; boot's dense path is untouched)."""
+    q = "distributed consensus quorum protocol"
+    important = store.put(f"# critical\n\n{q}", kind="doc")
+    trivial = store.put(f"# note\n\n{q}", kind="doc")
+    # Make the important doc OLD (worse freshness) but high-importance; trivial is
+    # fresh but low-importance. Importance must flip the order.
+    old = 1_000_000.0
+    store.db.execute(
+        "UPDATE docs SET importance = 3.0, mtime = ? WHERE ext_id = ?", (old, important)
+    )
+    store.db.execute("UPDATE docs SET importance = 0.0 WHERE ext_id = ?", (trivial,))
+    store.db.commit()
+
+    searcher = Searcher(settings, embedder=store.embedder)
+    hits = searcher.search(q, limit=5, source_ids=["trovex"])  # hybrid
+    assert hits[0].path == important, "high-importance old doc must outrank fresh trivia"
+
+
+def test_ttl_sweep_opt_in_ages_owned_docs_and_exempts_records_and_pinned(settings, store):
+    """P3: the TTL sweep is opt-in (no-op by default); when enabled it ages a
+    low-value old OWNED doc active→archived→pending_delete→hard-delete, while
+    owned records and pinned docs are never touched. Deterministic + idempotent."""
+    old = 1_000.0  # ancient mtime → past every age threshold
+
+    def _seed(kind, status, pinned=0):
+        ext = store.put(f"# {kind}-{status}\n\nbody about eviction {kind} {status}", kind=kind)
+        store.db.execute(
+            "UPDATE docs SET status = ?, mtime = ?, pinned = ? WHERE ext_id = ?",
+            (status, old, pinned, ext),
+        )
+        store.db.commit()
+        return ext
+
+    stale = _seed("doc", "stale")
+    record = _seed("record", "canonical")  # exempt by kind
+    pinned = _seed("reference", "stale", pinned=1)  # exempt by pin
+
+    def lc(ext):
+        return store.db.execute("SELECT lifecycle FROM docs WHERE ext_id = ?", (ext,)).fetchone()[
+            "lifecycle"
+        ]
+
+    # Default: opt-in OFF → nothing moves.
+    assert store.sweep_retention() == {
+        "archived": 0, "queued_delete": 0, "hard_deleted": 0, "importance_updated": 0
+    }
+    assert lc(stale) == "active"
+
+    # Enable → stale owned doc archives; record + pinned stay active.
+    store.settings.retention_sweep_enabled = True
+    s1 = store.sweep_retention()
+    assert s1["archived"] == 1
+    assert lc(stale) == "archived"
+    assert lc(record) == "active" and lc(pinned) == "active"
+
+    # Backdate the archived-at so it's past the pending window → queued for delete.
+    store.db.execute(
+        "UPDATE docs SET lifecycle_changed_at = 1.0 WHERE ext_id = ?", (stale,)
+    )
+    store.db.commit()
+    s2 = store.sweep_retention()
+    assert s2["queued_delete"] == 1
+    assert lc(stale) == "pending_delete"
+
+    # Enable hard-delete + backdate → tombstone + hard delete (recoverable).
+    store.settings.retention_hard_delete = True
+    store.db.execute("UPDATE docs SET lifecycle_changed_at = 1.0 WHERE ext_id = ?", (stale,))
+    store.db.commit()
+    s3 = store.sweep_retention()
+    assert s3["hard_deleted"] == 1
+    assert store.db.execute("SELECT 1 FROM docs WHERE ext_id = ?", (stale,)).fetchone() is None
+    assert (
+        store.db.execute("SELECT 1 FROM doc_tombstones WHERE ext_id = ?", (stale,)).fetchone()
+        is not None
+    )
+    # Idempotent: a second run with nothing newly past a boundary is a clean no-op.
+    s4 = store.sweep_retention()
+    assert s4["archived"] == 0 and s4["queued_delete"] == 0 and s4["hard_deleted"] == 0
+    # Records + pinned survived the whole sweep.
+    assert lc(record) == "active" and lc(pinned) == "active"
+
+
 # --- status='duplicate' excluded from the default retrieval pool -----------
 
 

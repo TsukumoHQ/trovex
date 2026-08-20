@@ -201,6 +201,21 @@ class Settings(BaseSettings):
 
     # Ranking weights
     freshness_half_life_days: float = 90.0
+    # Importance blend (P3 retention): a doc's importance (status + pinned +
+    # access frequency, recomputed by the retention sweep) multiplies the flagship
+    # hybrid score, so an old-but-critical doc outranks recent trivia. Weight 0 =
+    # off; importance itself defaults to 0 on every row until a recompute runs, so
+    # this is a no-op until retention is exercised.
+    importance_weight: float = 0.35
+    # TTL eviction (P3 retention): OPT-IN (default off = no eviction, zero behavior
+    # change). When on, the sweep ages low-value OWNED docs active→archived→
+    # pending_delete, then hard-deletes (tombstone, recoverable) only if
+    # retention_hard_delete is also on. Owned records + pinned are ALWAYS exempt.
+    retention_sweep_enabled: bool = False
+    retention_hard_delete: bool = False
+    archive_after_days: int = 180
+    pending_delete_after_days: int = 270  # days ARCHIVED before queuing for delete
+    hard_delete_grace_days: int = 30  # days in pending_delete before tombstone+delete
 
     def is_ephemeral_kind(self, kind: str | None) -> bool:
         """A kind that must never take part in dedup (as driver or neighbour)."""

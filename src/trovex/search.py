@@ -20,6 +20,14 @@ VEC0_MAX_K = 4096
 # store's hybrid retrieval (store.py) so both surfaces fuse identically.
 RRF_K0 = 60
 
+def _row_importance(r) -> float:
+    """A row's importance, 0.0 if the column isn't present (older row shape)."""
+    try:
+        return float(r["importance"] or 0.0)
+    except (IndexError, KeyError):
+        return 0.0
+
+
 STATUS_MARKER = {"canonical": "★", "plan": "◯", "stale": "✗", "duplicate": "⚠", "superseded": "⤺"}
 STATUS_WEIGHT = {"canonical": 1.0, "plan": 0.85, "stale": 0.5, "duplicate": 0.6, "superseded": 0.3}
 
@@ -137,19 +145,26 @@ class Searcher:
         if not rrf:
             return []
 
+        w_imp = self.settings.importance_weight
         results = []
         for did, fusion in rrf.items():
             r = row_by_id[did]
             age_days = max(0.0, (now - r["mtime"]) / 86400)
             freshness = 0.5 + 0.5 * (1.0 / (1.0 + age_days / half_life))
             status_w = STATUS_WEIGHT.get(r["status"], 1.0)
+            # Importance (P3): an old-but-critical doc (high status/pinned/access)
+            # outranks recent trivia. Multiplicative BOOST — importance defaults to
+            # 0 until a recompute runs, so imp_factor is 1.0 (no change) by default.
+            # Applied to the FLAGSHIP hybrid score only; the boot floor uses the
+            # dense path (hybrid=False), left on its absolute scale untouched.
+            imp_factor = 1.0 + w_imp * _row_importance(r)
             # Freshness/status weighting preserved — now multiplying the RRF
             # fusion score instead of the raw cosine similarity. This score is a
             # RANKING signal for the flagship surface, NOT an absolute-scale
             # gate; recall floors (boot) must use the dense path (hybrid=False).
             results.append(
                 self._build_result(
-                    r, dist_by_id.get(did, 2.0), fusion * freshness * status_w, age_days
+                    r, dist_by_id.get(did, 2.0), fusion * freshness * status_w * imp_factor, age_days
                 )
             )
         results.sort(key=lambda x: -x.score)
@@ -219,7 +234,7 @@ class Searcher:
             else "v.lifecycle != 'archived' AND v.lifecycle != 'pending_delete'"
         )
         sql = f"""SELECT d.id, d.path, d.title, d.mtime, d.status, d.size_bytes,
-                         d.tokens_est, d.absolute_path, d.source_id, v.distance
+                         d.tokens_est, d.absolute_path, d.source_id, d.importance, v.distance
                   FROM vec_docs v JOIN docs d ON d.id = v.rowid
                   WHERE v.embedding MATCH ? AND k = ? AND v.source_id = ?
                     AND {lifecycle_clause}"""
@@ -266,7 +281,7 @@ class Searcher:
     def _fetch_doc_row(self, doc_id: int):
         return self.db.execute(
             """SELECT id, path, title, mtime, status, size_bytes, tokens_est,
-                      absolute_path, source_id, kind, lifecycle FROM docs WHERE id = ?""",
+                      absolute_path, source_id, importance, kind, lifecycle FROM docs WHERE id = ?""",
             (doc_id,),
         ).fetchone()
 

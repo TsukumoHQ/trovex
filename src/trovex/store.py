@@ -38,6 +38,7 @@ from .db import (
     vec_docs_put,
     vec_sync_meta,
 )
+from . import retention
 from .query_cache import embed_query_blob
 from .embedder import Embedder, embedder_from_settings
 
@@ -330,7 +331,12 @@ class SqliteStore:
                 f"unknown lifecycle state {state!r}; valid: {', '.join(LIFECYCLE_STATES)}"
             )
         with self._lock:
-            cur = self.db.execute("UPDATE docs SET lifecycle = ? WHERE ext_id = ?", (state, ext_id))
+            # Stamp lifecycle_changed_at so the TTL sweep measures time-in-state
+            # from this manual transition too (P3 retention).
+            cur = self.db.execute(
+                "UPDATE docs SET lifecycle = ?, lifecycle_changed_at = ? WHERE ext_id = ?",
+                (state, time.time(), ext_id),
+            )
             row = self.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ext_id,)).fetchone()
             if row is not None:
                 vec_sync_meta(self.db, row["id"])  # keep vec0 lifecycle metadata in step
@@ -550,6 +556,87 @@ class SqliteStore:
                    )""",
                 (cap,),
             )
+
+    def set_pinned(self, ext_id: str, pinned: bool) -> bool:
+        """Pin/unpin a doc. A pinned doc is high-importance and EXEMPT from TTL
+        eviction. Returns True if the doc exists."""
+        with self._lock:
+            cur = self.db.execute(
+                "UPDATE docs SET pinned = ? WHERE ext_id = ?", (1 if pinned else 0, ext_id)
+            )
+            self.db.commit()
+        return cur.rowcount > 0
+
+    def recompute_importance(self) -> int:
+        """Recompute docs.importance (status + pinned + access frequency) across
+        the corpus. Deterministic + idempotent. Returns rows updated."""
+        with self._lock:
+            n = retention.recompute_importance(self.db)
+            self.db.commit()
+        return n
+
+    def sweep_retention(self) -> dict:
+        """Deterministic, idempotent TTL eviction (P3). OPT-IN
+        (settings.retention_sweep_enabled) — a no-op returning zeros when off, so
+        the default build has NO eviction behavior.
+
+        Ages LOW-VALUE OWNED docs by time-IN-STATE (lifecycle_changed_at):
+        active(stale/duplicate/superseded, old) → archived → pending_delete, then
+        (only if settings.retention_hard_delete) tombstone + hard-delete after the
+        grace window. Owned records and pinned docs are ALWAYS exempt, and a live
+        active canonical is never touched (only low-value statuses archive).
+        Recomputes importance first so ranking reflects the latest access counts.
+
+        Idempotent: a second run finds nothing newly past each age boundary (each
+        transition stamps lifecycle_changed_at, so time-in-state resets per stage)."""
+        stats = {"archived": 0, "queued_delete": 0, "hard_deleted": 0, "importance_updated": 0}
+        if not self.settings.retention_sweep_enabled:
+            return stats
+        now = time.time()
+        exempt = "kind = 'record' OR pinned = 1"  # never evict records or pinned
+        with self._lock:
+            stats["importance_updated"] = retention.recompute_importance(self.db)
+            # 1. active + low-value + old-by-content-age → archived.
+            archive_cut = now - self.settings.archive_after_days * 86400
+            r1 = self.db.execute(
+                f"""UPDATE docs SET lifecycle = 'archived', lifecycle_changed_at = ?
+                    WHERE source_id = ? AND lifecycle = 'active'
+                      AND status IN ('stale', 'duplicate', 'superseded')
+                      AND mtime < ? AND NOT ({exempt})""",
+                (now, TROVEX_SOURCE_ID, archive_cut),
+            )
+            stats["archived"] = r1.rowcount
+            # 2. archived long enough (time-IN-STATE) → pending_delete.
+            pend_cut = now - self.settings.pending_delete_after_days * 86400
+            r2 = self.db.execute(
+                f"""UPDATE docs SET lifecycle = 'pending_delete', lifecycle_changed_at = ?
+                    WHERE source_id = ? AND lifecycle = 'archived'
+                      AND lifecycle_changed_at > 0 AND lifecycle_changed_at < ?
+                      AND NOT ({exempt})""",
+                (now, TROVEX_SOURCE_ID, pend_cut),
+            )
+            stats["queued_delete"] = r2.rowcount
+            # 3. pending_delete past the grace window → tombstone + hard delete
+            #    (opt-in; recoverable via doc_tombstones).
+            if self.settings.retention_hard_delete:
+                grace_cut = now - self.settings.hard_delete_grace_days * 86400
+                doomed = [
+                    row["id"]
+                    for row in self.db.execute(
+                        f"""SELECT id FROM docs
+                            WHERE source_id = ? AND lifecycle = 'pending_delete'
+                              AND lifecycle_changed_at > 0 AND lifecycle_changed_at < ?
+                              AND NOT ({exempt})""",
+                        (TROVEX_SOURCE_ID, grace_cut),
+                    ).fetchall()
+                ]
+                for doc_id in doomed:
+                    self._tombstone_locked(doc_id)
+                    self._delete_cascade_locked(doc_id)
+                stats["hard_deleted"] = len(doomed)
+            reconcile_vec_meta(self.db)  # sync vec0 lifecycle for the transitioned docs
+            self.db.commit()
+        return stats
 
     def sweep_bloat(self) -> dict:
         """Deterministic, idempotent bloat sweep — corpus hygiene a reindex doesn't do.

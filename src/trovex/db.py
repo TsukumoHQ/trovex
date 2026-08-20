@@ -82,6 +82,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_add_chunk_hash(conn)
     _migrate_add_lifecycle(conn)
     _migrate_add_canonical_topic(conn)  # AFTER lifecycle: supersede sets lifecycle='archived'
+    _migrate_add_importance(conn)
     _init_schema(conn, embed_dim)
     # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
     # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
@@ -461,6 +462,29 @@ def _migrate_add_query_session(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _migrate_add_importance(conn: sqlite3.Connection) -> None:
+    """Add docs.importance + docs.pinned to an existing store (additive, P3).
+
+    importance is a derived ranking signal (status + pinned + access frequency),
+    recomputed by the retention sweep; pinned marks a doc exempt from TTL
+    eviction. Both default to 0 so existing rows rank exactly as before until the
+    first recompute. Skip if the table doesn't exist yet — _init_schema creates
+    the columns."""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='docs'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    if "importance" not in cols:
+        conn.execute("ALTER TABLE docs ADD COLUMN importance REAL NOT NULL DEFAULT 0")
+    if "pinned" not in cols:
+        conn.execute("ALTER TABLE docs ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
+    if "lifecycle_changed_at" not in cols:
+        conn.execute("ALTER TABLE docs ADD COLUMN lifecycle_changed_at REAL NOT NULL DEFAULT 0")
+    conn.commit()
+
+
 def _migrate_add_canonical_topic(conn: sqlite3.Connection) -> None:
     """Add docs.canonical_topic + enforce SSOT (one live canonical per topic).
 
@@ -632,6 +656,15 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             -- NULL for file-backed + ephemeral docs. The partial unique index below
             -- enforces one LIVE canonical per (workspace, topic).
             canonical_topic TEXT,
+            -- Retention/importance (P3): importance blends status + pinned +
+            -- access-frequency into the flagship ranking so an old-but-critical
+            -- doc outranks recent trivia; pinned marks a doc exempt from TTL
+            -- eviction (records are exempt by kind).
+            importance REAL NOT NULL DEFAULT 0,
+            pinned INTEGER NOT NULL DEFAULT 0,
+            -- When lifecycle last changed (epoch secs), so the TTL sweep can
+            -- measure time-IN-STATE for the grace windows. 0 = never transitioned.
+            lifecycle_changed_at REAL NOT NULL DEFAULT 0,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);

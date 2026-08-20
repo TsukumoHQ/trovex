@@ -164,6 +164,12 @@ class Settings(BaseSettings):
     # semantic recall pool (structurally bounds corpus growth). Opt-in + tunable
     # (env TROVEX_STORE_ONLY_KINDS as JSON); empty = every kind embeds as before.
     store_only_kinds: list[str] = []
+    # Per-partition index-strategy escape hatch (P3 headroom). A source_id listed
+    # here uses a usearch HNSW index instead of sqlite-vec brute force once a
+    # partition outgrows brute force (see capacity.py for the documented upgrade
+    # path). Default empty = sqlite-vec everywhere; offline-first preserved.
+    # env TROVEX_USEARCH_PARTITIONS (JSON list).
+    usearch_partitions: list[str] = []
     plan_path_patterns: list[str] = [
         r"PLAN[_\-]",
         r"_PLAN\.md$",

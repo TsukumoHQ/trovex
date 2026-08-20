@@ -596,6 +596,31 @@ def test_query_cache_is_per_scope_and_ttl(settings, store, monkeypatch):
     assert qc.get(db, "ttl q", False, v2) is None
 
 
+def test_capacity_report_flags_near_limit_and_counts_vectors_only(settings, store, monkeypatch):
+    """P3 headroom: capacity_report is silent with headroom and flags a partition
+    nearing the vec0 KNN ceiling. partition_counts reads the vec0 tables (the KNN
+    working set), so a store-only doc (no vector) adds zero KNN pressure."""
+    from trovex import capacity
+
+    for i in range(6):
+        store.put(f"# d{i}\n\ncaching and storage headroom body {i}", kind="doc")
+    # A store-only doc: FTS-indexed but no vector → must NOT count toward capacity.
+    store.settings.store_only_kinds = ["reference"]
+    store.put("# ref\n\narchival reference no vector", kind="reference")
+
+    counts = capacity.partition_counts(store.db)
+    assert counts["trovex"]["docs"] == 6, "store-only doc must not add a vec_docs row"
+
+    # Real (huge) limits → headroom → silent.
+    assert capacity.capacity_report(store.db) == []
+
+    # Lower the ceiling so the seeded chunks trip the warn threshold.
+    monkeypatch.setattr(capacity, "VEC0_K_CEILING", 5)
+    rep = capacity.capacity_report(store.db)
+    assert rep and rep[0]["source_id"] == "trovex"
+    assert "ceiling" in rep[0]["reason"]
+
+
 # --- status='duplicate' excluded from the default retrieval pool -----------
 
 

@@ -101,7 +101,8 @@ def put(
         (_key(q, summary), version, output, n_results, whr, top_tokens, resp_tokens, time.time()),
     )
     # Row cap (T5): keep only the newest _MAX_ROWS entries so the cache table can't
-    # grow without bound. Cheap: only runs the delete when over the cap.
+    # grow without bound. Runs on every put (deletes 0 rows while under the cap);
+    # the DELETE is cheap since the kept-set subquery is an indexed LIMIT.
     db.execute(
         """DELETE FROM query_cache WHERE key NOT IN (
                SELECT key FROM query_cache ORDER BY created_at DESC LIMIT ?

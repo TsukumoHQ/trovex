@@ -7,6 +7,7 @@ from pathlib import Path
 
 import sqlite_vec
 
+from . import capacity
 from .config import RESERVED_SOURCE_ID, Settings, Source
 from .db import delete_doc_cascade, open_db, upsert_docs_fts, vec_docs_put
 from .embedder import Embedder, embedder_from_settings
@@ -242,6 +243,10 @@ class Indexer:
             (time.time(), elapsed, added, updated, unchanged, removed),
         )
         self.db.commit()
+        # P3 headroom: warn if any partition is nearing the brute-force ceiling,
+        # so the usearch upgrade is prompted before it bites. Observability only —
+        # never changes indexing behavior. Report the count for callers/tests.
+        capacity_warnings = capacity.log_capacity_warnings(self.db)
         return {
             "added": added,
             "updated": updated,
@@ -250,6 +255,7 @@ class Indexer:
             "duration_sec": elapsed,
             "status": status_stats,
             "by_source": agg["by_source"],
+            "capacity_warnings": capacity_warnings,
         }
 
     def _upsert_doc(

@@ -594,6 +594,11 @@ class SqliteStore:
             return stats
         now = time.time()
         exempt = "kind = 'record' OR pinned = 1"  # never evict records or pinned
+        # Only LOW-VALUE docs walk the eviction chain. Gated at EVERY stage (not
+        # just step 1), so a MANUALLY-archived owned canonical (set_lifecycle) can
+        # never drift into pending_delete/hard-delete — a deliberate archive is a
+        # keep-hidden, not a delete-queue (least-surprise; task 281fac86).
+        low_value = "status IN ('stale', 'duplicate', 'superseded')"
         with self._lock:
             stats["importance_updated"] = retention.recompute_importance(self.db)
             # 1. active + low-value + old-by-content-age → archived.
@@ -601,23 +606,24 @@ class SqliteStore:
             r1 = self.db.execute(
                 f"""UPDATE docs SET lifecycle = 'archived', lifecycle_changed_at = ?
                     WHERE source_id = ? AND lifecycle = 'active'
-                      AND status IN ('stale', 'duplicate', 'superseded')
+                      AND {low_value}
                       AND mtime < ? AND NOT ({exempt})""",
                 (now, TROVEX_SOURCE_ID, archive_cut),
             )
             stats["archived"] = r1.rowcount
-            # 2. archived long enough (time-IN-STATE) → pending_delete.
+            # 2. archived long enough (time-IN-STATE) + still low-value → pending_delete.
             pend_cut = now - self.settings.pending_delete_after_days * 86400
             r2 = self.db.execute(
                 f"""UPDATE docs SET lifecycle = 'pending_delete', lifecycle_changed_at = ?
                     WHERE source_id = ? AND lifecycle = 'archived'
+                      AND {low_value}
                       AND lifecycle_changed_at > 0 AND lifecycle_changed_at < ?
                       AND NOT ({exempt})""",
                 (now, TROVEX_SOURCE_ID, pend_cut),
             )
             stats["queued_delete"] = r2.rowcount
-            # 3. pending_delete past the grace window → tombstone + hard delete
-            #    (opt-in; recoverable via doc_tombstones).
+            # 3. pending_delete past the grace window + still low-value → tombstone +
+            #    hard delete (opt-in; recoverable via doc_tombstones).
             if self.settings.retention_hard_delete:
                 grace_cut = now - self.settings.hard_delete_grace_days * 86400
                 doomed = [
@@ -625,6 +631,7 @@ class SqliteStore:
                     for row in self.db.execute(
                         f"""SELECT id FROM docs
                             WHERE source_id = ? AND lifecycle = 'pending_delete'
+                              AND {low_value}
                               AND lifecycle_changed_at > 0 AND lifecycle_changed_at < ?
                               AND NOT ({exempt})""",
                         (TROVEX_SOURCE_ID, grace_cut),

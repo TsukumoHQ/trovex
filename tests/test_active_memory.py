@@ -740,6 +740,30 @@ def test_ttl_sweep_opt_in_ages_owned_docs_and_exempts_records_and_pinned(setting
     assert lc(record) == "active" and lc(pinned) == "active"
 
 
+def test_manually_archived_canonical_never_evicted(settings, store):
+    """task 281fac86: only LOW-VALUE docs walk the full eviction chain. A
+    deliberately archived owned CANONICAL (via set_lifecycle) must never queue or
+    hard-delete, even past every window — a manual archive is keep-hidden, not a
+    delete-queue."""
+    store.settings.retention_sweep_enabled = True
+    store.settings.retention_hard_delete = True
+    ext = store.put("# keep\n\nimportant canonical decision body", kind="doc")
+    store.set_lifecycle(ext, "archived")  # deliberate archive; status stays canonical
+    # Backdate past every window so ONLY the status filter can save it.
+    store.db.execute(
+        "UPDATE docs SET lifecycle_changed_at = 1.0, mtime = 1.0 WHERE ext_id = ?", (ext,)
+    )
+    store.db.commit()
+
+    s = store.sweep_retention()
+    assert s["queued_delete"] == 0 and s["hard_deleted"] == 0
+    row = store.db.execute(
+        "SELECT lifecycle, status FROM docs WHERE ext_id = ?", (ext,)
+    ).fetchone()
+    assert row is not None, "a manually-archived canonical must not be hard-deleted"
+    assert row["lifecycle"] == "archived"  # stays archived, never progresses
+
+
 # --- status='duplicate' excluded from the default retrieval pool -----------
 
 

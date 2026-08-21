@@ -361,14 +361,30 @@ def _migrate_embed_dim(conn: sqlite3.Connection, embed_dim: int) -> None:
     # trovex_write crash with "Expected N dimensions" after an embedder
     # switch (found live). The chunk rows themselves are re-derived from doc
     # content, so they are dropped alongside their embeddings.
-    conn.execute("DROP TABLE IF EXISTS vec_docs")
-    conn.execute("DROP TABLE IF EXISTS vec_chunks")
-    # DROP, not DELETE: this runs before _init_schema, and a legacy db can
-    # carry vec_docs without the chunk tables. _init_schema recreates all.
-    conn.execute("DROP TABLE IF EXISTS chunks_fts")
-    conn.execute("DROP TABLE IF EXISTS chunks")
-    conn.execute("UPDATE docs SET content_hash = ''")
-    conn.commit()
+    #
+    # BEGIN IMMEDIATE makes the whole drop+clear sequence atomic: a process
+    # killed mid-sequence (crash, kickstart restart, machine sleep) used to
+    # leave vec_docs dropped but vec_chunks/chunks/chunks_fts intact (or vice
+    # versa) — a state _init_schema's CREATE IF NOT EXISTS never repairs on
+    # its own reliably, since a later boot's own guard (`if not row: return`
+    # above) treats the missing table as "nothing to migrate" and silently
+    # skips the rest forever, permanently wedging trovex_write on "no such
+    # table: vec_docs" (found live — task 743ad0d3). Now either the full
+    # sequence commits or none of it does; an interruption leaves the OLD
+    # tables untouched for a clean retry on the next boot.
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute("DROP TABLE IF EXISTS vec_docs")
+        conn.execute("DROP TABLE IF EXISTS vec_chunks")
+        # DROP, not DELETE: this runs before _init_schema, and a legacy db can
+        # carry vec_docs without the chunk tables. _init_schema recreates all.
+        conn.execute("DROP TABLE IF EXISTS chunks_fts")
+        conn.execute("DROP TABLE IF EXISTS chunks")
+        conn.execute("UPDATE docs SET content_hash = ''")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def _migrate_to_multi_source(conn: sqlite3.Connection) -> None:
@@ -624,57 +640,72 @@ def _migrate_partition_vec(conn: sqlite3.Connection, embed_dim: int) -> None:
     if "partition key" in (row["sql"] or ""):
         return  # already partitioned (fresh store or prior run)
 
-    # Snapshot old embeddings (plain temp tables survive until dropped / conn close).
-    conn.execute("CREATE TEMP TABLE _vd_old AS SELECT rowid AS rid, embedding AS emb FROM vec_docs")
-    has_chunks = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vec_chunks'"
-    ).fetchone()
-    if has_chunks:
+    # BEGIN IMMEDIATE: same reasoning as _migrate_embed_dim -- a process killed
+    # partway through this drop+recreate+reinsert sequence used to leave
+    # vec_docs gone while vec_chunks survived at its old schema (or vice
+    # versa), and the "if not row: return" guard above then treats that
+    # missing table as "already migrated / nothing to do" on every later
+    # boot, permanently wedging trovex_write on "no such table: vec_docs"
+    # (found live — task 743ad0d3). Atomic: either the whole rebuild commits
+    # or none of it does, so an interrupted run just retries cleanly.
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        # Snapshot old embeddings (plain temp tables survive until dropped / conn close).
         conn.execute(
-            "CREATE TEMP TABLE _vc_old AS SELECT rowid AS rid, embedding AS emb FROM vec_chunks"
+            "CREATE TEMP TABLE _vd_old AS SELECT rowid AS rid, embedding AS emb FROM vec_docs"
         )
-    conn.execute("DROP TABLE vec_docs")
-    conn.execute("DROP TABLE IF EXISTS vec_chunks")
-    # Recreate partitioned (keep in sync with _init_schema's vec0 DDL).
-    conn.executescript(
-        f"""
-        CREATE VIRTUAL TABLE vec_docs USING vec0(
-            source_id TEXT partition key,
-            embedding float[{embed_dim}] distance_metric=cosine,
-            kind TEXT, lifecycle TEXT, status TEXT
-        );
-        CREATE VIRTUAL TABLE vec_chunks USING vec0(
-            source_id TEXT partition key,
-            embedding float[{embed_dim}] distance_metric=cosine,
-            kind TEXT, lifecycle TEXT, status TEXT
-        );
-        """
-    )
-    # Re-insert docs (JOIN docs for partition + metadata; orphan embeddings dropped).
-    for r in conn.execute(
-        """SELECT o.rid, o.emb, d.source_id, COALESCE(d.kind, 'doc') AS kind,
-                  d.lifecycle, d.status
-           FROM _vd_old o JOIN docs d ON d.id = o.rid"""
-    ).fetchall():
-        conn.execute(
-            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (r["rid"], r["source_id"], r["emb"], r["kind"], r["lifecycle"], r["status"]),
+        has_chunks = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vec_chunks'"
+        ).fetchone()
+        if has_chunks:
+            conn.execute(
+                "CREATE TEMP TABLE _vc_old AS SELECT rowid AS rid, embedding AS emb FROM vec_chunks"
+            )
+        conn.execute("DROP TABLE vec_docs")
+        conn.execute("DROP TABLE IF EXISTS vec_chunks")
+        # Recreate partitioned (keep in sync with _init_schema's vec0 DDL).
+        conn.executescript(
+            f"""
+            CREATE VIRTUAL TABLE vec_docs USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT
+            );
+            CREATE VIRTUAL TABLE vec_chunks USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT
+            );
+            """
         )
-    if has_chunks:
+        # Re-insert docs (JOIN docs for partition + metadata; orphan embeddings dropped).
         for r in conn.execute(
             """SELECT o.rid, o.emb, d.source_id, COALESCE(d.kind, 'doc') AS kind,
                       d.lifecycle, d.status
-               FROM _vc_old o JOIN chunks c ON c.id = o.rid JOIN docs d ON d.id = c.doc_id"""
+               FROM _vd_old o JOIN docs d ON d.id = o.rid"""
         ).fetchall():
             conn.execute(
-                "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
+                "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 (r["rid"], r["source_id"], r["emb"], r["kind"], r["lifecycle"], r["status"]),
             )
-        conn.execute("DROP TABLE _vc_old")
-    conn.execute("DROP TABLE _vd_old")
-    conn.commit()
+        if has_chunks:
+            for r in conn.execute(
+                """SELECT o.rid, o.emb, d.source_id, COALESCE(d.kind, 'doc') AS kind,
+                          d.lifecycle, d.status
+                   FROM _vc_old o JOIN chunks c ON c.id = o.rid JOIN docs d ON d.id = c.doc_id"""
+            ).fetchall():
+                conn.execute(
+                    "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (r["rid"], r["source_id"], r["emb"], r["kind"], r["lifecycle"], r["status"]),
+                )
+            conn.execute("DROP TABLE _vc_old")
+        conn.execute("DROP TABLE _vd_old")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:

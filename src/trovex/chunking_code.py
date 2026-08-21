@@ -76,6 +76,21 @@ def _node_label(node) -> str | None:
     return f"{prefix} {text}" if prefix else text
 
 
+class _Frame:
+    """One level of the walk: the sibling list being merged, our position in
+    it, the implicit buffer's start byte, the breadcrumb path, and the byte
+    this level ends at."""
+
+    __slots__ = ("buf_start", "end", "i", "nodes", "path")
+
+    def __init__(self, nodes: list, buf_start: int, path: list[str], end: int) -> None:
+        self.nodes = nodes
+        self.i = 0
+        self.buf_start = buf_start
+        self.path = path
+        self.end = end
+
+
 def _merge_siblings(
     nodes: list,
     data: bytes,
@@ -85,38 +100,53 @@ def _merge_siblings(
     start: int,
     end: int,
 ) -> None:
-    def emit(a: int, b: int) -> None:
+    """Walk the sibling tree with an explicit stack, not Python call
+    recursion: generated or minified code can nest AST levels well past
+    sys.getrecursionlimit() (e.g. a long chained binary expression), and a
+    recursive walk would blow the stack (RecursionError) and abort the whole
+    file's chunking — this must never raise on parse trouble."""
+
+    def emit(a: int, b: int, emit_path: list[str]) -> None:
         if b <= a:
             return
         text = data[a:b].decode("utf-8", errors="replace")
         if text.strip():
             chunks.append(
-                Chunk(index=len(chunks), heading_path=list(path), text=text, tokens_est=_tokens(text))
+                Chunk(index=len(chunks), heading_path=list(emit_path), text=text, tokens_est=_tokens(text))
             )
 
-    buf_start = start
-    for node in nodes:
-        candidate = data[buf_start : node.end_byte].decode("utf-8", errors="replace")
+    stack = [_Frame(nodes, start, path, end)]
+    while stack:
+        frame = stack[-1]
+        if frame.i >= len(frame.nodes):
+            emit(frame.buf_start, frame.end, frame.path)
+            stack.pop()
+            continue
+
+        node = frame.nodes[frame.i]
+        candidate = data[frame.buf_start : node.end_byte].decode("utf-8", errors="replace")
         if _tokens(candidate) <= max_tokens:
+            frame.i += 1
             continue  # keep growing the implicit buffer through this node
-        emit(buf_start, node.start_byte)
-        buf_start = node.start_byte
+
+        emit(frame.buf_start, node.start_byte, frame.path)
+        frame.buf_start = node.start_byte
         solo = data[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
         if _tokens(solo) <= max_tokens:
+            frame.i += 1
             continue  # node alone fits; buffer restarts at this node's start
+
         label = _node_label(node)
-        sub_path = path + [label] if label else path
+        sub_path = frame.path + [label] if label else frame.path
+        frame.buf_start = node.end_byte
+        frame.i += 1
         if node.named_children:
-            _merge_siblings(
-                list(node.named_children), data, max_tokens, sub_path, chunks, node.start_byte, node.end_byte
-            )
+            stack.append(_Frame(list(node.named_children), node.start_byte, sub_path, node.end_byte))
         else:
             for piece in _split_to_size(solo, max_tokens):
                 chunks.append(
                     Chunk(index=len(chunks), heading_path=list(sub_path), text=piece, tokens_est=_tokens(piece))
                 )
-        buf_start = node.end_byte
-    emit(buf_start, end)
 
 
 def chunk_code(content: str, lang: str, max_tokens: int = DEFAULT_MAX_TOKENS) -> list[Chunk]:

@@ -78,3 +78,13 @@ def test_empty_file_yields_no_chunks():
 
 def test_whitespace_only_file_yields_no_chunks():
     assert chunk_code("\n\n   \n", "python") == []
+
+
+def test_deeply_nested_ast_does_not_blow_recursion():
+    # a chained binary expression nests one AST level per operand; deep
+    # enough to exceed sys.getrecursionlimit() if the walk recurses per level.
+    expr = " + ".join(str(i) for i in range(5000))
+    src = f"TOTAL = {expr}\n"
+    chunks = chunk_code(src, "python", max_tokens=50)
+    assert chunks
+    assert "".join(c.text for c in chunks).count("TOTAL") == 1

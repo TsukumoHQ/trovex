@@ -1,3 +1,4 @@
+import hashlib
 import re
 import sqlite3
 from pathlib import Path
@@ -181,6 +182,61 @@ def vec_chunks_put(conn: sqlite3.Connection, chunk_id: int, emb_blob: bytes) -> 
         "VALUES (?, ?, ?, ?, ?, ?)",
         (chunk_id, src, emb_blob, kind, lifecycle, status),
     )
+
+
+def sync_doc_chunks(
+    conn: sqlite3.Connection, doc_id: int, content: str, title: str, chunk_fn
+) -> list[tuple[int, str]]:
+    """(Re)chunk a doc via `chunk_fn(content) -> list[Chunk]`; return (chunk_id,
+    embed_text) for chunks that NEED embedding — i.e. only the new/changed ones.
+
+    Content-addressed (Merkle) incremental, chunker-agnostic: each new chunk is
+    keyed by the sha256 of its embed_text (title + heading/breadcrumb + text —
+    the full embedding input). A new chunk whose hash already exists among the
+    doc's current chunks reuses that chunk's row + embedding + FTS unchanged
+    (only its position is refreshed), so an edit to one section/symbol re-embeds
+    one chunk, not the whole doc. Chunks whose hash is no longer present are
+    deleted. Shared by SqliteStore (markdown, via chunk_markdown) and Indexer
+    (markdown + code, via chunk_markdown/chunk_code dispatch) — the sync
+    mechanism itself needs no per-chunker special-casing. Does NOT commit."""
+    existing = conn.execute(
+        "SELECT id, content_hash FROM chunks WHERE doc_id = ? ORDER BY id", (doc_id,)
+    ).fetchall()
+    reusable: dict[str, list[int]] = {}
+    for row in existing:
+        h = row["content_hash"]
+        if h:
+            reusable.setdefault(h, []).append(row["id"])
+
+    to_embed: list[tuple[int, str]] = []
+    kept: set[int] = set()
+    for ch in chunk_fn(content):
+        embed_text = ch.embed_text(title)
+        h = hashlib.sha256(embed_text.encode("utf-8", errors="replace")).hexdigest()
+        heading = " > ".join(ch.heading_path)
+        pool = reusable.get(h)
+        if pool:
+            cid = pool.pop()
+            kept.add(cid)
+            conn.execute("UPDATE chunks SET chunk_index = ? WHERE id = ?", (ch.index, cid))
+        else:
+            cur = conn.execute(
+                """INSERT INTO chunks
+                       (doc_id, chunk_index, heading_path, content, tokens_est, content_hash)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (doc_id, ch.index, heading, ch.text, ch.tokens_est, h),
+            )
+            cid = cur.lastrowid
+            conn.execute("INSERT INTO chunks_fts(content, chunk_id) VALUES (?, ?)", (ch.text, cid))
+            kept.add(cid)
+            to_embed.append((cid, embed_text))
+
+    for row in existing:
+        if row["id"] not in kept:
+            conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (row["id"],))
+            conn.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (row["id"],))
+            conn.execute("DELETE FROM chunks WHERE id = ?", (row["id"],))
+    return to_embed
 
 
 def vec_sync_meta(conn: sqlite3.Connection, doc_id: int) -> None:

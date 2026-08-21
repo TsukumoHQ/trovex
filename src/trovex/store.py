@@ -33,6 +33,7 @@ from .db import (
     like_escape,
     open_db,
     reconcile_vec_meta,
+    sync_doc_chunks,
     upsert_docs_fts,
     vec_chunks_put,
     vec_docs_put,
@@ -884,66 +885,11 @@ class SqliteStore:
         return ext_ids
 
     def _insert_chunks(self, doc_id: int, content: str, title: str) -> list[tuple[int, str]]:
-        """(Re)chunk a doc; return (chunk_id, embed_text) for chunks that NEED
-        embedding — i.e. only the new/changed ones.
-
-        Content-addressed (Merkle) incremental: each new chunk is keyed by the
-        sha256 of its embed_text (title + heading + text — the full embedding
-        input). A new chunk whose hash already exists among the doc's current
-        chunks reuses that chunk's row + embedding + FTS unchanged (only its
-        position is refreshed), so an edit to one section re-embeds one chunk,
-        not the whole doc. Chunks whose hash is no longer present are deleted.
-
-        Correctness: the hash covers everything that feeds the embedding, so any
-        genuine change to a chunk's text, heading, or the doc title changes its
-        hash and forces a re-embed — an unchanged embedding is never served for
-        changed content."""
-        existing = self.db.execute(
-            "SELECT id, content_hash FROM chunks WHERE doc_id = ? ORDER BY id", (doc_id,)
-        ).fetchall()
-        # Pool of reusable rows by hash. Legacy rows (hash '') are never reusable,
-        # so the first rewrite after the migration re-embeds + stamps them.
-        reusable: dict[str, list[int]] = {}
-        for row in existing:
-            h = row["content_hash"]
-            if h:
-                reusable.setdefault(h, []).append(row["id"])
-
-        to_embed: list[tuple[int, str]] = []
-        kept: set[int] = set()
-        for ch in chunk_markdown(content):
-            embed_text = ch.embed_text(title)
-            h = hashlib.sha256(embed_text.encode("utf-8", errors="replace")).hexdigest()
-            heading = " > ".join(ch.heading_path)
-            pool = reusable.get(h)
-            if pool:
-                # Unchanged chunk: reuse its embedding + FTS. Only the position
-                # (chunk_index) can differ — hash equality proves text/heading are
-                # identical. Refresh index so ordering stays correct after edits.
-                cid = pool.pop()
-                kept.add(cid)
-                self.db.execute("UPDATE chunks SET chunk_index = ? WHERE id = ?", (ch.index, cid))
-            else:
-                cur = self.db.execute(
-                    """INSERT INTO chunks
-                           (doc_id, chunk_index, heading_path, content, tokens_est, content_hash)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (doc_id, ch.index, heading, ch.text, ch.tokens_est, h),
-                )
-                cid = cur.lastrowid
-                self.db.execute(
-                    "INSERT INTO chunks_fts(content, chunk_id) VALUES (?, ?)", (ch.text, cid)
-                )
-                kept.add(cid)
-                to_embed.append((cid, embed_text))
-
-        # Drop chunks whose content is gone (removed sections or changed-out text).
-        for row in existing:
-            if row["id"] not in kept:
-                self.db.execute("DELETE FROM vec_chunks WHERE rowid = ?", (row["id"],))
-                self.db.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (row["id"],))
-                self.db.execute("DELETE FROM chunks WHERE id = ?", (row["id"],))
-        return to_embed
+        """(Re)chunk a trovex-owned doc with the markdown chunker. Thin wrapper
+        over db.sync_doc_chunks (the chunker-agnostic Merkle sync shared with
+        Indexer's code-chunking path) — see that docstring for the incremental
+        contract."""
+        return sync_doc_chunks(self.db, doc_id, content, title, chunk_markdown)
 
     def _embed_chunks(self, pairs: list[tuple[int, str]]) -> None:
         """Batch-embed chunk texts (prefix-fused) into vec_chunks."""

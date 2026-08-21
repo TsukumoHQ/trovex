@@ -8,9 +8,12 @@ from pathlib import Path
 import sqlite_vec
 
 from . import capacity
+from .chunking_code import CODE_EXTENSIONS, EXTENSION_LANGUAGES, chunk_code
 from .config import RESERVED_SOURCE_ID, Settings, Source
-from .db import delete_doc_cascade, open_db, upsert_docs_fts, vec_docs_put
+from .db import delete_doc_cascade, open_db, sync_doc_chunks, upsert_docs_fts, vec_chunks_put, vec_docs_put
 from .embedder import Embedder, embedder_from_settings
+
+MARKDOWN_EXTENSIONS = ("md", "mdx", "markdown")
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 TITLE_RE = re.compile(r"^\s*#\s+(.+)$", re.MULTILINE)
@@ -77,7 +80,8 @@ class Indexer:
         """Whether `path` is an indexable doc under `root`. The single predicate
         behind both the full scan() and the fs-watch path re-index, so a watched
         file is accepted/rejected on EXACTLY the same rules a full index uses."""
-        if path.suffix.lower().lstrip(".") not in ("md", "mdx", "markdown"):
+        ext = path.suffix.lower().lstrip(".")
+        if ext not in MARKDOWN_EXTENSIONS and ext not in CODE_EXTENSIONS:
             return False
         try:
             rel = path.relative_to(root)
@@ -111,7 +115,7 @@ class Indexer:
         # code, so a repo without a .trovexignore still keeps resume/checkpoint/
         # lessons scratch out of the store).
         ignore_patterns = _load_ignore_patterns(root) + self.settings.default_ignore_globs
-        for ext in ("md", "mdx", "markdown"):
+        for ext in (*MARKDOWN_EXTENSIONS, *CODE_EXTENSIONS):
             for p in root.rglob(f"*.{ext}"):
                 if self._accept(root, root_resolved, p, ignore, ignore_patterns, max_size):
                     yield p
@@ -131,6 +135,7 @@ class Indexer:
         start = time.time()
         agg = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0, "by_source": []}
         embed_batch: list[tuple[int, str]] = []
+        chunk_embed_batch: list[tuple[int, str]] = []
 
         for source in sources:
             sr = source.root
@@ -190,7 +195,15 @@ class Indexer:
 
                 if (
                     self._upsert_doc(
-                        source, path, rel_path, stat, content, content_hash, existing, embed_batch
+                        source,
+                        path,
+                        rel_path,
+                        stat,
+                        content,
+                        content_hash,
+                        existing,
+                        embed_batch,
+                        chunk_embed_batch,
                     )
                     == "updated"
                 ):
@@ -226,6 +239,8 @@ class Indexer:
 
         if embed_batch:
             self._flush_embeddings(embed_batch)
+        if chunk_embed_batch:
+            self._flush_chunk_embeddings(chunk_embed_batch)
         added = agg["added"]
         updated = agg["updated"]
         unchanged = agg["unchanged"]
@@ -268,12 +283,24 @@ class Indexer:
         content_hash: str,
         existing,
         embed_batch: list[tuple[int, str]],
+        chunk_embed_batch: list[tuple[int, str]],
     ) -> str:
         """Insert-or-update one doc row and queue its embedding. Returns "added"
         or "updated". Shared by the full reindex() and the fs-watch reindex_paths()
-        so both write a doc identically."""
-        title = self._extract_title(content, path.name)
-        author = self._extract_author(content)
+        so both write a doc identically.
+
+        Code files (CODE_EXTENSIONS) additionally get chunk-level indexing via
+        the cAST chunker (chunk_code), through the same Merkle sync markdown
+        uses (db.sync_doc_chunks) — so an unchanged symbol never re-embeds.
+        Markdown files are NOT retroactively chunked here (scope containment:
+        this wiring is new only for the code path; turning it on for the
+        existing markdown corpus is a separate, explicitly-costed decision)."""
+        ext = path.suffix.lower().lstrip(".")
+        # Code files have no markdown H1/frontmatter — extracting via TITLE_RE
+        # would false-positive on a leading "# comment" line, so title is
+        # always the filename for a code extension.
+        title = path.name if ext in CODE_EXTENSIONS else self._extract_title(content, path.name)
+        author = self._extract_author(content) if ext not in CODE_EXTENSIONS else None
         from .tokens import count_tokens
 
         tokens_est = count_tokens(content)
@@ -326,6 +353,15 @@ class Indexer:
         if len(embed_batch) >= 32:
             self._flush_embeddings(embed_batch)
             embed_batch.clear()
+
+        if ext in CODE_EXTENSIONS:
+            lang = EXTENSION_LANGUAGES[ext]
+            chunk_embed_batch.extend(
+                sync_doc_chunks(self.db, doc_id, content, title, lambda c, lang=lang: chunk_code(c, lang))
+            )
+            if len(chunk_embed_batch) >= 32:
+                self._flush_chunk_embeddings(chunk_embed_batch)
+                chunk_embed_batch.clear()
         return action
 
     def reindex_paths(self, paths, sources: list[Source] | None = None) -> dict:
@@ -344,6 +380,7 @@ class Indexer:
         start = time.time()
         counts = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0}
         embed_batch: list[tuple[int, str]] = []
+        chunk_embed_batch: list[tuple[int, str]] = []
         max_size = self.settings.max_file_size_bytes
         ignore_dirs = set(self.settings.ignore_dirs)
         # Per-source context, all in RESOLVED-path space so a macOS /private/var
@@ -411,12 +448,22 @@ class Indexer:
 
             counts[
                 self._upsert_doc(
-                    owner, p_real, rel_path, stat, content, content_hash, existing, embed_batch
+                    owner,
+                    p_real,
+                    rel_path,
+                    stat,
+                    content,
+                    content_hash,
+                    existing,
+                    embed_batch,
+                    chunk_embed_batch,
                 )
             ] += 1
 
         if embed_batch:
             self._flush_embeddings(embed_batch)
+        if chunk_embed_batch:
+            self._flush_chunk_embeddings(chunk_embed_batch)
 
         from .status import compute_status
 
@@ -444,6 +491,13 @@ class Indexer:
         embeddings = list(self.embedder.embed(texts))
         for doc_id, emb in zip(ids, embeddings, strict=True):
             vec_docs_put(self.db, doc_id, sqlite_vec.serialize_float32(emb.tolist()))
+
+    def _flush_chunk_embeddings(self, batch: list[tuple[int, str]]) -> None:
+        ids = [chunk_id for chunk_id, _ in batch]
+        texts = [text for _, text in batch]
+        embeddings = list(self.embedder.embed(texts))
+        for chunk_id, emb in zip(ids, embeddings, strict=True):
+            vec_chunks_put(self.db, chunk_id, sqlite_vec.serialize_float32(emb.tolist()))
 
     @staticmethod
     def _embed_text(content: str, title: str) -> str:

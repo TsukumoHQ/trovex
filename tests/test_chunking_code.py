@@ -88,3 +88,29 @@ def test_deeply_nested_ast_does_not_blow_recursion():
     chunks = chunk_code(src, "python", max_tokens=50)
     assert chunks
     assert "".join(c.text for c in chunks).count("TOTAL") == 1
+
+
+def test_top_level_buffers_get_distinct_heading_paths():
+    # two top-level statements, each forced into its own buffer by a tiny
+    # budget; neither has an enclosing def/class, so both would get the SAME
+    # empty heading_path unless each is tagged with its own line-range --
+    # store.section_text's small-to-big join would otherwise glue unrelated
+    # top-level chunks back into one giant "section".
+    src = "x = 1\ny = 2\n"
+    chunks = chunk_code(src, "python", max_tokens=1)
+    assert len(chunks) >= 2
+    paths = [tuple(c.heading_path) for c in chunks]
+    assert all(p for p in paths)  # never empty
+    assert len(paths) == len(set(paths))  # every chunk's path is unique
+
+
+def test_chunk_explosion_falls_back_to_flat_split():
+    # a single giant expression with no real symbol structure recurses into
+    # thousands of near-useless micro-chunks under a tiny budget; past the
+    # cap, chunk_code must fall back to a flat split instead of exploding.
+    expr = " + ".join(str(i) for i in range(5000))
+    src = f"TOTAL = {expr}\n"
+    chunks = chunk_code(src, "python", max_tokens=1)
+    assert 0 < len(chunks) <= 300
+    paths = [tuple(c.heading_path) for c in chunks]
+    assert len(paths) == len(set(paths))  # the fallback also keeps paths unique

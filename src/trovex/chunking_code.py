@@ -33,6 +33,12 @@ EXTENSION_LANGUAGES: dict[str, str] = {
 
 CODE_EXTENSIONS = frozenset(EXTENSION_LANGUAGES)
 
+# Generated/minified code with no real symbol structure (e.g. one giant chained
+# expression) can blow the AST walk up to thousands of near-useless
+# micro-chunks; past this many chunks for one file, fall back to a flat
+# line-window split instead.
+_MAX_CHUNKS_PER_FILE = 300
+
 # Definition-like node types get a short kind prefix in the breadcrumb so
 # "class Bar" reads distinctly from a bare identifier; anything else falls
 # back to its bare name.
@@ -65,6 +71,27 @@ def _tokens(text: str) -> int:
     from .tokens import count_tokens
 
     return count_tokens(text)
+
+
+def _line_range(data: bytes, a: int, b: int) -> str:
+    """1-indexed line:column label for a byte span with no symbol breadcrumb
+    (module-level top scope, or nested inside an unnamed node like a bare
+    expression statement). Without this, every such chunk shares the same
+    empty heading_path and store.section_text's small-to-big join glues them
+    ALL back into one giant "section" — a 396-token chunk expanding to the
+    whole file's worth of unrelated top-level statements.
+
+    Column (not just line) matters: minified code is characteristically ONE
+    giant line, so a line-only label would collapse every chunk in the file
+    back onto the same "L1" and reintroduce the exact bug this exists to
+    fix. `a` (the chunk's start byte) is strictly increasing across the
+    whole walk — buffers are non-overlapping, emitted in byte order — so
+    line:column is always unique."""
+    line_start = data.rfind(b"\n", 0, a) + 1  # -1 -> 0 when there's no prior newline
+    line = data.count(b"\n", 0, a) + 1
+    col = a - line_start + 1
+    end_line = data.count(b"\n", 0, max(b - 1, a)) + 1
+    return f"L{line}:{col}" if line == end_line else f"L{line}:{col}-L{end_line}"
 
 
 def _node_label(node) -> str | None:
@@ -111,8 +138,9 @@ def _merge_siblings(
             return
         text = data[a:b].decode("utf-8", errors="replace")
         if text.strip():
+            out_path = list(emit_path) if emit_path else [_line_range(data, a, b)]
             chunks.append(
-                Chunk(index=len(chunks), heading_path=list(emit_path), text=text, tokens_est=_tokens(text))
+                Chunk(index=len(chunks), heading_path=out_path, text=text, tokens_est=_tokens(text))
             )
 
     stack = [_Frame(nodes, start, path, end)]
@@ -142,11 +170,35 @@ def _merge_siblings(
         frame.i += 1
         if node.named_children:
             stack.append(_Frame(list(node.named_children), node.start_byte, sub_path, node.end_byte))
-        else:
+        elif sub_path:
+            # Labeled node (e.g. one oversized function/class body): every
+            # piece keeps the SAME breadcrumb on purpose, so section_text's
+            # small-to-big join reconstructs the whole symbol from its parts.
             for piece in _split_to_size(solo, max_tokens):
                 chunks.append(
                     Chunk(index=len(chunks), heading_path=list(sub_path), text=piece, tokens_est=_tokens(piece))
                 )
+        else:
+            # No symbol breadcrumb at all (e.g. a bare top-level expression
+            # statement) -- each piece needs its OWN path, not a shared empty
+            # one, or section_text glues unrelated pieces back together.
+            offset = node.start_byte
+            for piece in _split_to_size(solo, max_tokens):
+                # Not clamped to node.end_byte: _split_to_size strips/rejoins
+                # text so cumulative piece length only approximates the real
+                # span, and clamping risks two pieces landing on the same
+                # offset at the boundary — offset must stay strictly
+                # increasing (piece is always non-empty) for uniqueness.
+                end = offset + len(piece.encode("utf-8"))
+                chunks.append(
+                    Chunk(
+                        index=len(chunks),
+                        heading_path=[_line_range(data, offset, end)],
+                        text=piece,
+                        tokens_est=_tokens(piece),
+                    )
+                )
+                offset = end
 
 
 def chunk_code(content: str, lang: str, max_tokens: int = DEFAULT_MAX_TOKENS) -> list[Chunk]:
@@ -162,4 +214,31 @@ def chunk_code(content: str, lang: str, max_tokens: int = DEFAULT_MAX_TOKENS) ->
     tree = parser.parse(data)
     chunks: list[Chunk] = []
     _merge_siblings(list(tree.root_node.named_children), data, max_tokens, [], chunks, 0, len(data))
+    if len(chunks) > _MAX_CHUNKS_PER_FILE:
+        return _flat_line_split(content, max_tokens)
     return chunks
+
+
+def _flat_line_split(content: str, max_tokens: int) -> list[Chunk]:
+    """Fallback for a degenerate AST (generated/minified code with no real
+    symbol structure) that would otherwise explode into thousands of
+    micro-chunks: a flat paragraph/line-window split, each piece its own
+    distinct section so section_text never glues unrelated pieces together.
+
+    Column (not just line), same reasoning as `_line_range`: minified code is
+    characteristically one giant line, so a line-only label would collapse
+    every piece back onto "L1" and reintroduce the union bug this exists to
+    fix. `offset` is strictly increasing across pieces, so line:column is
+    always unique even when every piece shares line 1."""
+    out: list[Chunk] = []
+    offset = 0
+    for i, piece in enumerate(_split_to_size(content, max_tokens)):
+        end = offset + len(piece)  # not clamped to len(content) -- see _line_range's leaf-split note
+        line_start = content.rfind("\n", 0, offset) + 1
+        start_line = content.count("\n", 0, offset) + 1
+        col = offset - line_start + 1
+        end_line = content.count("\n", 0, max(end - 1, offset)) + 1
+        label = f"L{start_line}:{col}" if start_line == end_line else f"L{start_line}:{col}-L{end_line}"
+        out.append(Chunk(index=i, heading_path=[label], text=piece, tokens_est=_tokens(piece)))
+        offset = end
+    return out

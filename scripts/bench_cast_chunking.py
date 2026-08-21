@@ -48,10 +48,7 @@ QUERIES = [
 def _chunk_file(path: Path, use_cast: bool) -> list[tuple[str, str, str]]:
     """Returns (file, breadcrumb, embed_text) triples for one file."""
     content = path.read_text(encoding="utf-8", errors="replace")
-    if use_cast:
-        chunks = chunk_code(content, "python")
-    else:
-        chunks = chunk_markdown(content)
+    chunks = chunk_code(content, "python") if use_cast else chunk_markdown(content)
     out = []
     for ch in chunks:
         bc = " > ".join(ch.heading_path) or path.name
@@ -83,12 +80,14 @@ def run() -> None:
         hits_at_1 = 0
         hits_at_5 = 0
         for query, target_file, target_symbol in QUERIES:
-            qvec = np.array(list(embedder.embed([query]))[0], dtype=np.float32)
+            qvec = np.array(next(iter(embedder.embed([query]))), dtype=np.float32)
             qn = np.linalg.norm(qvec) or 1.0
             qvec = qvec / qn
             top5 = _cosine_topk(qvec, mat, 5)
 
-            def is_correct(i: int) -> bool:
+            def is_correct(
+                i: int, triples=triples, target_file=target_file, target_symbol=target_symbol
+            ) -> bool:
                 fname, _bc, text = triples[i]
                 return fname == target_file and target_symbol in text
 

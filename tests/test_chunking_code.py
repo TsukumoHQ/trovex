@@ -114,3 +114,75 @@ def test_chunk_explosion_falls_back_to_flat_split():
     assert 0 < len(chunks) <= 300
     paths = [tuple(c.heading_path) for c in chunks]
     assert len(paths) == len(set(paths))  # the fallback also keeps paths unique
+
+
+_BYTE_COMPLETE_SOURCES = {
+    "python": (
+        "import os\n\n\n"
+        "def foo():\n    return 1\n\n\n"
+        "class Bar:\n    def baz(self):\n        return 2\n"
+        "    def qux(self):\n        return 3\n"
+    ),
+    "go": (
+        "package main\n\n"
+        "import \"fmt\"\n\n"
+        "func Foo() {\n\tfmt.Println(\"foo\")\n}\n\n"
+        "type Bar struct {\n\tX int\n}\n"
+    ),
+    "rust": (
+        "struct Bar {\n    x: i32,\n}\n\n"
+        "impl Bar {\n"
+        "    fn baz(&self) -> i32 {\n        self.x\n    }\n"
+        "    fn qux(&self) -> i32 {\n        self.x + 1\n    }\n"
+        "}\n"
+    ),
+    "typescript": (
+        "class Bar {\n"
+        "  baz(): number {\n    return 1;\n  }\n"
+        "  qux(): number {\n    return 2;\n  }\n"
+        "}\n\n"
+        "interface Quux {\n  x: number;\n}\n"
+    ),
+}
+
+
+def _normalize(text: str) -> str:
+    # _split_to_size strips/rejoins paragraphs, so exact whitespace isn't
+    # preserved across a leaf split -- normalize it out to compare content.
+    return "".join(text.split())
+
+
+def test_byte_complete_no_loss_no_dup_across_langs_and_budgets():
+    # the reviewer's manual matrix check (9299f37d), locked in as a
+    # regression test: every non-whitespace byte of the source shows up in
+    # exactly one chunk, for every v1 language across a tiny/medium/large
+    # budget spread -- nothing lost between merged siblings, nothing
+    # duplicated by an overlapping split.
+    for lang, src in _BYTE_COMPLETE_SOURCES.items():
+        for max_tokens in (1, 5, 450):
+            chunks = chunk_code(src, lang, max_tokens=max_tokens)
+            reconstructed = _normalize("".join(c.text for c in chunks))
+            assert reconstructed == _normalize(src), (lang, max_tokens)
+
+
+def test_ratchet_distinguishes_sibling_symbols_even_when_each_recurses():
+    # the iterative stack-walk visits sibling symbols one frame at a time;
+    # a regression that let position leak between frames (e.g. reusing a
+    # stale buf_start, or popping a frame before it's drained) would show up
+    # as one symbol's pieces bleeding into its neighbor's heading_path or
+    # text. Both functions here are oversized enough to recurse and split
+    # into multiple same-path pieces each (the by-design behavior in
+    # _merge_siblings' labeled-node branch) -- the invariant under test is
+    # that the two symbols' pieces never cross.
+    src = (
+        "def foo():\n    a = 1\n    b = 2\n    c = 3\n    return a + b + c\n\n\n"
+        "def bar():\n    x = 10\n    y = 20\n    z = 30\n    return x + y + z\n"
+    )
+    chunks = chunk_code(src, "python", max_tokens=5)
+    labels = {tuple(c.heading_path) for c in chunks}
+    assert labels == {("def foo",), ("def bar",)}
+
+    foo_text = "".join(c.text for c in chunks if c.heading_path == ["def foo"])
+    bar_text = "".join(c.text for c in chunks if c.heading_path == ["def bar"])
+    assert "a + b + c" in foo_text and "x" not in foo_text
+    assert "x + y + z" in bar_text and "a " not in bar_text

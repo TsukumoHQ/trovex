@@ -174,6 +174,13 @@ def _merge_siblings(
             # Labeled node (e.g. one oversized function/class body): every
             # piece keeps the SAME breadcrumb on purpose, so section_text's
             # small-to-big join reconstructs the whole symbol from its parts.
+            # This is the ONLY source of duplicate heading_paths chunk_code
+            # ever produces (an oversized node's own recursed frame, above,
+            # hits the identical case via its own multiple buf_start emits
+            # sharing frame.path) -- intra-symbol duplication is BY DESIGN,
+            # not a regression; see test_ratchet_distinguishes_sibling_symbols
+            # for the invariant that actually matters: distinct symbols never
+            # share a path.
             for piece in _split_to_size(solo, max_tokens):
                 chunks.append(
                     Chunk(index=len(chunks), heading_path=list(sub_path), text=piece, tokens_est=_tokens(piece))

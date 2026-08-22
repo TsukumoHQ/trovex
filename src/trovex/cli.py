@@ -389,6 +389,14 @@ def _load_queries(path: Path | None) -> list[str]:
         return []
 
 
+def _default_eval_path(name: str) -> Path | None:
+    """Package-relative default for a bundled benchmarks/token-savings/ file — only resolves
+    inside a source checkout (an installed wheel doesn't ship benchmarks/); caller must fall
+    back to requiring an explicit --cases/--baseline in that case."""
+    candidate = Path(__file__).resolve().parent.parent.parent / "benchmarks" / "token-savings" / name
+    return candidate if candidate.exists() else None
+
+
 def _load_labels(path: Path) -> list:
     """Ground-truth for --retrieval: `query<TAB>expected-path[,path2,...]` per line.
 
@@ -595,6 +603,121 @@ def bench(
                         query_source=f"{len(qs)} queries (token-accounting MODEL — add --eval for the answer-quality A/B)",
                     )
                 )
+
+
+@app.command(name="eval-harness")
+def eval_harness_cmd(
+    repo: Path = typer.Argument(..., help="Repo/dir with .md docs to evaluate."),
+    cases: Path | None = typer.Option(
+        None, "--cases", help="cases.jsonl (default: the bundled benchmarks/token-savings set)."
+    ),
+    baseline: Path | None = typer.Option(
+        None, "--baseline", help="Baseline thresholds JSON (default: eval-baseline.json next to --cases)."
+    ),
+    budget_usd: float | None = typer.Option(
+        None, "--budget-usd", help="Cap LLM judge spend; stops issuing NEW judge calls past this."
+    ),
+    resume: Path | None = typer.Option(
+        None, "--resume", help="Resume/append log of already-judged cases — never re-spends on a re-run."
+    ),
+    gate: bool = typer.Option(
+        False, "--gate", help="Exit non-zero when the run misses the --baseline thresholds."
+    ),
+    retrieval_only: bool = typer.Option(
+        False,
+        "--retrieval-only",
+        help="Score retrieval quality only (hit@k/MRR/recall@k) — no LLM, no OPENAI_API_KEY "
+        "needed, CI-safe. The full blind rubric pass is a separate, key-gated run.",
+    ),
+    rerank: bool = typer.Option(
+        False, "--rerank", help="Apply the local cross-encoder rerank before scoring retrieval."
+    ),
+    k: int = typer.Option(5, "--k", help="Top-k candidate window for retrieval scoring."),
+    model: str = typer.Option(
+        "gpt-5.4-mini", "--model", help="LLM for the blind rubric judge (also the answerer)."
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Blind-judged eval harness — retrieval quality (hit@k/MRR/recall@k, always free) plus a
+    weighted rubric score (correctness35/autonomy25/actionability20/safety10/concision10,
+    needs OPENAI_API_KEY) over a versioned `cases.jsonl` set. `--gate` fails the process when
+    the run misses the `--baseline` thresholds; `--retrieval-only` skips the LLM half entirely
+    (the CI-safe half of this command — see `make eval`)."""
+    import json as _json
+    import os
+    import tempfile
+
+    from .embedder import embedder_from_settings
+    from .eval_harness import format_harness_report, gate as gate_fn, gate_retrieval_only, load_cases, run_harness
+
+    cases_path = cases or _default_eval_path("cases.jsonl")
+    if cases_path is None or not cases_path.exists():
+        console.print("[red]No cases file.[/red] Pass --cases FILE (none bundled here — not a source checkout).")
+        raise typer.Exit(1)
+    baseline_path = baseline or (cases_path.parent / "eval-baseline.json")
+    if not baseline_path.exists():
+        console.print(f"[red]No baseline file at {baseline_path}.[/red] Pass --baseline FILE.")
+        raise typer.Exit(1)
+
+    loaded = load_cases(cases_path)
+    if not loaded:
+        console.print(f"[red]No cases in {cases_path}.[/red]")
+        raise typer.Exit(1)
+    baseline_obj = _json.loads(baseline_path.read_text(encoding="utf-8"))
+
+    key = None if retrieval_only else os.environ.get("OPENAI_API_KEY")
+    if not retrieval_only and not key:
+        console.print(
+            "[red]trovex eval-harness needs OPENAI_API_KEY in your environment[/red] "
+            "(or pass --retrieval-only to skip the LLM rubric half)."
+        )
+        raise typer.Exit(1)
+
+    with tempfile.TemporaryDirectory() as td:
+        settings = Settings(data_dir=Path(td), sources_config_path=Path(td) / "none.yaml")
+        emb = embedder_from_settings(settings)
+        stats_ = Indexer(settings, embedder=emb).reindex(root=repo.resolve())
+        if not stats_.get("added"):
+            console.print(f"[yellow]No .md indexed under {repo}.[/yellow]")
+            raise typer.Exit(1)
+        searcher = Searcher(settings, embedder=emb)
+
+        if retrieval_only:
+            report = run_harness(loaded, searcher, k=k, rerank=rerank, retrieval_only=True)
+        else:
+            from openai import OpenAI
+
+            from .eval_llm import make_answer_fn, make_content_fn
+            from .eval_rubric import make_blind_rubric_judge_fn
+
+            client = OpenAI(api_key=key, timeout=60.0)
+            report = run_harness(
+                loaded,
+                searcher,
+                answer_fn=make_answer_fn(client, model),
+                judge_fn=make_blind_rubric_judge_fn(client, model),
+                content_fn=make_content_fn(),
+                k=k,
+                rerank=rerank,
+                budget_usd=budget_usd,
+                resume_path=resume,
+            )
+
+    if json_out:
+        print(_bench_json(report))
+    else:
+        console.print(
+            f"[bold]eval harness[/bold] · {len(loaded)} cases on {repo.name}"
+            f"{' · reranked' if rerank else ''}{' · retrieval-only' if retrieval_only else f' · {model}'}\n"
+            f"{format_harness_report(report)}"
+        )
+
+    if gate:
+        ok, reason = gate_retrieval_only(report, baseline_obj) if retrieval_only else gate_fn(report, baseline_obj)
+        if not ok:
+            console.print(f"[red]GATE FAIL: {reason}[/red]")
+            raise typer.Exit(1)
+        console.print("[green]GATE PASS[/green]")
 
 
 @app.command()

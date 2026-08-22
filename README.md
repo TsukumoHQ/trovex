@@ -147,6 +147,26 @@ correctly. Full method and our own numbers are at [trovex.dev/measure](https://t
 Already running trovex through the md-guard hook? `trovex measure` compares your real `.md`
 token consumption before and after, from the hook's baseline log.
 
+### Dev notes: the claims eval harness
+
+`bench --eval` above answers "does trovex still get the right answer" per-query, one arm vs
+the other. `trovex eval-harness` (`src/trovex/eval_harness.py`) is the release-gate version of
+that idea: a versioned `cases.jsonl` set, retrieval quality (hit@k/MRR/recall@k, free) plus a
+weighted rubric score (correctness35/autonomy25/actionability20/safety10/concision10, blind —
+the judge never sees which config produced an answer), a `$` budget cap, and resumability.
+
+```bash
+make eval                                                          # retrieval-only, no key, CI-safe
+uv run trovex eval-harness . --gate --budget-usd 1.0 --resume run.jsonl   # full rubric pass, needs OPENAI_API_KEY
+```
+
+`--retrieval-only` (what `make eval` runs) never calls an LLM — it gates purely on hit@1
+against `benchmarks/token-savings/eval-baseline.json`. The full rubric pass needs a key, so
+it's a manual/CI-secret-gated run, not part of `make test`. The bundled `cases.jsonl` (47
+cases) and `eval-baseline.json` thresholds are versioned in `benchmarks/token-savings/` — the
+baseline is a placeholder until it's been run once for real and the numbers copied in
+deliberately (the file is never auto-overwritten by a run).
+
 ## MCP tools
 
 - `trovex(q)`: route a question to the right on-disk `.md` and get back `path:line` pointers

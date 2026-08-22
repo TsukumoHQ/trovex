@@ -1,0 +1,5 @@
+{
+  "_comment": "Release gate thresholds for `trovex eval --gate` / `make eval`. Regenerate by running a real eval pass and copying its numbers here deliberately — never auto-overwritten by a run.",
+  "min_hit_at_1": 0.5,
+  "min_weighted": 60
+}

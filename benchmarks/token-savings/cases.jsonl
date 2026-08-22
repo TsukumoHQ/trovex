@@ -1,0 +1,63 @@
+# Versioned case set for `trovex eval` (src/trovex/eval_harness.py), scored against the
+# PINNED corpus in corpus/ (the same fictional "Acme Notes API" docs the token-savings
+# benchmark uses) so the eval stays reproducible and dependency-free like that benchmark.
+#
+# category taxonomy (this harness's C1-C8, matching eval_bench.CATEGORIES):
+#   C1 exact-terminology lookup, single unambiguous doc
+#   C2 paraphrase of a C1-style question (different words, same doc)
+#   C3 cross-cutting question spanning >1 doc
+#   C4 a specific config/env-var/flag lookup
+#   C5 procedural "how do I do X" (a step sequence)
+#   C6 miss-case — NOT answerable from the corpus at all (in_corpus=false, correct answer
+#      is to abstain, expected_docs is empty on purpose)
+#   C7 ambiguous phrasing that could plausibly route to the wrong doc (a loss-prone trap)
+#   C8 terse/adversarial phrasing of an otherwise in-corpus question
+#
+# `#`-prefixed lines and blank lines are ignored by the loader.
+{"query": "how do I create an api token", "category": "C1", "expected_docs": ["authentication.md"]}
+{"query": "how do I revoke a token", "category": "C1", "expected_docs": ["authentication.md"]}
+{"query": "what happens to the cache when a note is edited", "category": "C1", "expected_docs": ["caching.md"]}
+{"query": "what environment variable sets the data directory", "category": "C1", "expected_docs": ["configuration.md"]}
+{"query": "what database does it use", "category": "C1", "expected_docs": ["database.md"]}
+{"query": "how do I run it under systemd", "category": "C1", "expected_docs": ["deployment.md"]}
+{"query": "does acme notes send my data anywhere", "category": "C1", "expected_docs": ["faq.md"]}
+{"query": "what are the install requirements", "category": "C1", "expected_docs": ["install.md"]}
+{"query": "steps to generate a new bearer token", "category": "C2", "expected_docs": ["authentication.md"]}
+{"query": "undo or disable an existing token", "category": "C2", "expected_docs": ["authentication.md"]}
+{"query": "when does a cached search result get cleared", "category": "C2", "expected_docs": ["caching.md"]}
+{"query": "which port does the server listen on by default", "category": "C2", "expected_docs": ["configuration.md"]}
+{"query": "are deleted notes really removed from the database right away", "category": "C2", "expected_docs": ["database.md"]}
+{"query": "recommended way to keep the service running in production", "category": "C2", "expected_docs": ["deployment.md"]}
+{"query": "can I use this fully offline without a key", "category": "C2", "expected_docs": ["faq.md"]}
+{"query": "install it straight from pypi", "category": "C2", "expected_docs": ["install.md"]}
+{"query": "how does exposing the service on 0.0.0.0 change what reads require a token", "category": "C3", "expected_docs": ["authentication.md", "configuration.md"]}
+{"query": "what happens to existing data when I switch the embedding model", "category": "C3", "expected_docs": ["configuration.md", "database.md"]}
+{"query": "how do backups relate to the sqlite database file", "category": "C3", "expected_docs": ["deployment.md", "database.md"]}
+{"query": "does the query cache change what I'd measure for search latency", "category": "C3", "expected_docs": ["caching.md", "search.md"]}
+{"query": "what should I do about my data after moving to a new machine", "category": "C3", "expected_docs": ["deployment.md", "faq.md"]}
+{"query": "how do I change the log level", "category": "C4", "expected_docs": ["configuration.md"]}
+{"query": "what setting caps how large a note can be before indexing", "category": "C4", "expected_docs": ["configuration.md"]}
+{"query": "how do I turn off the query cache", "category": "C4", "expected_docs": ["caching.md"]}
+{"query": "how do I bind the service to all network interfaces", "category": "C4", "expected_docs": ["configuration.md"]}
+{"query": "which settings take effect without a restart", "category": "C4", "expected_docs": ["configuration.md"]}
+{"query": "how do I point it at a custom data directory", "category": "C4", "expected_docs": ["configuration.md"]}
+{"query": "walk me through installing from source", "category": "C5", "expected_docs": ["install.md"]}
+{"query": "what's the first command to run after installing", "category": "C5", "expected_docs": ["install.md"]}
+{"query": "how do I put the service behind a reverse proxy", "category": "C5", "expected_docs": ["deployment.md"]}
+{"query": "how do I back up and restore the data directory", "category": "C5", "expected_docs": ["deployment.md"]}
+{"query": "how do I reclaim disk space after deleting notes", "category": "C5", "expected_docs": ["database.md"]}
+{"query": "what do I do if the database fails its integrity check on start", "category": "C5", "expected_docs": ["database.md"]}
+{"query": "how do I set up single sign-on with Okta", "category": "C6", "in_corpus": false, "expected_docs": []}
+{"query": "what's the pricing for the hosted plan", "category": "C6", "in_corpus": false, "expected_docs": []}
+{"query": "how do I export notes to Notion", "category": "C6", "in_corpus": false, "expected_docs": []}
+{"query": "does it support multi-tenant organizations", "category": "C6", "in_corpus": false, "expected_docs": []}
+{"query": "what's the maximum number of concurrent users supported", "category": "C6", "in_corpus": false, "expected_docs": []}
+{"query": "how do I configure email notifications for new notes", "category": "C6", "in_corpus": false, "expected_docs": []}
+{"query": "why would the exact same search return faster the second time", "category": "C7", "expected_docs": ["caching.md"]}
+{"query": "how does adding a tag filter change the ranking order", "category": "C7", "expected_docs": ["search.md"]}
+{"query": "if I change the embed model does my old data still work", "category": "C7", "expected_docs": ["configuration.md"]}
+{"query": "is a revoked token rejected right away or only on the next request", "category": "C7", "expected_docs": ["authentication.md"]}
+{"query": "notes big how much max size", "category": "C8", "expected_docs": ["faq.md"]}
+{"query": "acme notes offline?? need api key??", "category": "C8", "expected_docs": ["faq.md"]}
+{"query": "tok create cmd", "category": "C8", "expected_docs": ["authentication.md"]}
+{"query": "db corrupt wat do", "category": "C8", "expected_docs": ["database.md"]}

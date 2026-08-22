@@ -1,12 +1,21 @@
 import hashlib
+import logging
 import re
 import sqlite3
 from pathlib import Path
 
 import sqlite_vec
 
+log = logging.getLogger("trovex.db")
+
 # Backslash is the escape char we declare with `ESCAPE '\'` on LIKE clauses.
 LIKE_ESCAPE_CHAR = "\\"
+
+# A WAL past this size means checkpointing isn't keeping up (normally sqlite
+# auto-checkpoints around 1000 pages / ~4MB) — most often because a stranded
+# open transaction is blocking it. Force one and warn so it shows up in logs
+# instead of silently growing until a write finally hits "database is locked".
+WAL_WARN_BYTES = 10 * 1024 * 1024
 
 # Kinds that are their OWN event/snapshot and never take part in SSOT collapse —
 # kept in sync with Settings.dup_ephemeral_kinds (config.py). Duplicated here as a
@@ -91,6 +100,31 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
     return conn
+
+
+def checkpoint_if_wal_large(conn: sqlite3.Connection, db_path: Path) -> None:
+    """Force a WAL checkpoint if trovex.db-wal has grown past WAL_WARN_BYTES.
+
+    Called after every store write COMMIT as a backstop: if a checkpoint isn't
+    keeping the WAL down (e.g. a long-running reader, or the WAL has grown
+    because writes were piling up before this call existed), this notices and
+    forces one instead of letting it grow unbounded toward "database is locked".
+
+    Best-effort only, by design: the caller's write already committed before
+    this runs, so nothing here may ever propagate — an unexpected exception
+    (a permissions error on stat(), a busy/corrupt-adjacent checkpoint) must
+    not turn an already-successful write into a reported failure."""
+    try:
+        wal_path = db_path.with_name(db_path.name + "-wal")
+        size = wal_path.stat().st_size
+        if size <= WAL_WARN_BYTES:
+            return
+        log.warning("trovex.db WAL at %d bytes (> %d), forcing checkpoint", size, WAL_WARN_BYTES)
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except OSError:
+        pass
+    except sqlite3.Error as e:
+        log.warning("wal checkpoint deferred: %s", e)
 
 
 def upsert_docs_fts(conn: sqlite3.Connection, doc_id: int, title: str, body: str) -> None:

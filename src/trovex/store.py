@@ -30,6 +30,7 @@ from .chunking import chunk_markdown
 from .config import RESERVED_SOURCE_ID, Settings
 from .db import (
     canonical_topic_slug,
+    checkpoint_if_wal_large,
     delete_doc_cascade,
     like_escape,
     open_db,
@@ -63,22 +64,40 @@ def _is_locked_error(exc: sqlite3.OperationalError) -> bool:
 
 
 def _retry_on_locked(fn):
-    """Retry a Store write method on SQLITE_BUSY, rolling back the failed
-    transaction first so the retry starts clean instead of piling onto an
-    already-aborted one."""
+    """Transaction discipline + SQLITE_BUSY retry for a Store write method.
+
+    Two jobs:
+    1. ANY exception the wrapped method raises (embed failure, a client
+       disconnect, a genuine bug — not just SQLITE_BUSY) rolls back first,
+       so the connection's implicit transaction never survives past the
+       call that opened it. Without this, sqlite3 leaves the transaction
+       open on an uncaught exception, and the NEXT write silently piles
+       onto it instead of starting fresh — writes accumulate but never
+       flush, and the WAL can't checkpoint past the stranded txn (the
+       "wedged, restart to unwedge" failure mode).
+    2. SQLITE_BUSY/locked specifically is retried (after the rollback)
+       instead of surfaced, since it's expected transient cross-process
+       contention, not a real failure.
+    """
 
     @functools.wraps(fn)
     def wrapper(self, *args, **kwargs):
         delay = _LOCKED_RETRY_BASE_DELAY
         for attempt in range(_LOCKED_RETRY_ATTEMPTS):
             try:
-                return fn(self, *args, **kwargs)
+                result = fn(self, *args, **kwargs)
             except sqlite3.OperationalError as e:
+                self.db.rollback()
                 if not _is_locked_error(e) or attempt == _LOCKED_RETRY_ATTEMPTS - 1:
                     raise
-                self.db.rollback()
                 time.sleep(delay)
                 delay *= 2
+                continue
+            except BaseException:
+                self.db.rollback()
+                raise
+            checkpoint_if_wal_large(self.db, self.settings.data_dir / "trovex.db")
+            return result
 
     return wrapper
 
@@ -361,6 +380,7 @@ class SqliteStore:
                     pass
         return ext_id
 
+    @_retry_on_locked
     def set_lifecycle(self, ext_id: str, state: str) -> bool:
         """Move a doc to a curation lifecycle state (reversible). Returns True if
         the doc exists, False if no doc has that ext_id. Raises ValueError on an
@@ -536,6 +556,7 @@ class SqliteStore:
             self.db.commit()
             return True
 
+    @_retry_on_locked
     def delete_by_id(self, doc_id: int) -> bool:
         """Remove a doc by its internal id (handles rows with a NULL ext_id, e.g.
         agent/MCP-written docs). Same cascade + tombstone as delete(). True if it existed."""
@@ -597,6 +618,7 @@ class SqliteStore:
                 (cap,),
             )
 
+    @_retry_on_locked
     def set_pinned(self, ext_id: str, pinned: bool) -> bool:
         """Pin/unpin a doc. A pinned doc is high-importance and EXEMPT from TTL
         eviction. Returns True if the doc exists."""
@@ -607,6 +629,7 @@ class SqliteStore:
             self.db.commit()
         return cur.rowcount > 0
 
+    @_retry_on_locked
     def recompute_importance(self) -> int:
         """Recompute docs.importance (status + pinned + access frequency) across
         the corpus. Deterministic + idempotent. Returns rows updated."""
@@ -615,6 +638,7 @@ class SqliteStore:
             self.db.commit()
         return n
 
+    @_retry_on_locked
     def sweep_retention(self) -> dict:
         """Deterministic, idempotent TTL eviction (P3). OPT-IN
         (settings.retention_sweep_enabled) — a no-op returning zeros when off, so
@@ -685,6 +709,7 @@ class SqliteStore:
             self.db.commit()
         return stats
 
+    @_retry_on_locked
     def sweep_bloat(self) -> dict:
         """Deterministic, idempotent bloat sweep — corpus hygiene a reindex doesn't do.
 
@@ -805,6 +830,7 @@ class SqliteStore:
             )
         ]
 
+    @_retry_on_locked
     def restore_deleted(self, *, ext_id: str | None = None, tombstone_id: int | None = None) -> str | None:
         """Recreate a deleted doc from its tombstone; return the restored ext_id.
 
@@ -837,6 +863,7 @@ class SqliteStore:
             self.db.commit()
         return restored
 
+    @_retry_on_locked
     def put_batch(self, items: list[dict], *, embed_chunks: bool = False) -> list[str]:
         """Bulk insert/update + a single batched embed call. For migrations + import.
 
@@ -1088,6 +1115,7 @@ class SqliteStore:
                     (doc_id, tag),
                 )
 
+    @_retry_on_locked
     def set_tags(
         self, ext_id: str, add: list[str] | None = None, remove: list[str] | None = None
     ) -> list[str]:
@@ -1149,6 +1177,7 @@ class SqliteStore:
                 other.append((tag, c))
         return facets, other[:other_limit]
 
+    @_retry_on_locked
     def create_collection(self, name: str, filter_dict: dict) -> None:
         """A collection = a named saved filter (kind/tag/source)."""
         with self._lock:
@@ -1171,6 +1200,7 @@ class SqliteStore:
         ).fetchone()
         return json.loads(r["filter_json"] or "{}") if r else None
 
+    @_retry_on_locked
     def delete_collection(self, name: str) -> None:
         with self._lock:
             self.db.execute("DELETE FROM collections WHERE name = ?", (name,))

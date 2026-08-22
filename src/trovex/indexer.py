@@ -1,4 +1,5 @@
 import fnmatch
+import functools
 import hashlib
 import re
 import time
@@ -10,7 +11,15 @@ import sqlite_vec
 from . import capacity
 from .chunking_code import CODE_EXTENSIONS, EXTENSION_LANGUAGES, chunk_code
 from .config import RESERVED_SOURCE_ID, Settings, Source
-from .db import delete_doc_cascade, open_db, sync_doc_chunks, upsert_docs_fts, vec_chunks_put, vec_docs_put
+from .db import (
+    checkpoint_if_wal_large,
+    delete_doc_cascade,
+    open_db,
+    sync_doc_chunks,
+    upsert_docs_fts,
+    vec_chunks_put,
+    vec_docs_put,
+)
 from .embedder import Embedder, embedder_from_settings
 
 MARKDOWN_EXTENSIONS = ("md", "mdx", "markdown")
@@ -60,6 +69,28 @@ def _is_ignored(rel_posix: str, patterns: list[str]) -> bool:
         if any(fnmatch.fnmatch(c, pat) or fnmatch.fnmatch(c, p) for c in candidates):
             return True
     return False
+
+
+def _rollback_on_error(fn):
+    """A reindex pass builds up a large multi-statement write, committed only at
+    the very end — any exception along the way (e.g. compute_status's
+    IntegrityError on a canonical_topic collision) otherwise leaves that
+    transaction open on the shared connection with nothing to ever commit or
+    roll it back: the next write silently piles onto it instead of starting
+    clean, and the WAL can't checkpoint past it. Same wedge class as an
+    unhandled request exception in Store's write methods (store._retry_on_locked)."""
+
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        try:
+            result = fn(self, *args, **kwargs)
+        except BaseException:
+            self.db.rollback()
+            raise
+        checkpoint_if_wal_large(self.db, self.settings.data_dir / "trovex.db")
+        return result
+
+    return wrapper
 
 
 class Indexer:
@@ -120,6 +151,7 @@ class Indexer:
                 if self._accept(root, root_resolved, p, ignore, ignore_patterns, max_size):
                     yield p
 
+    @_rollback_on_error
     def reindex(self, root: Path | None = None, sources: list[Source] | None = None) -> dict:
         """Index all configured sources, or a single root for back-compat."""
         if sources is None:
@@ -364,6 +396,7 @@ class Indexer:
                 chunk_embed_batch.clear()
         return action
 
+    @_rollback_on_error
     def reindex_paths(self, paths, sources: list[Source] | None = None) -> dict:
         """Re-index a KNOWN set of changed/added/removed paths (from fs-watch events),
         touching only those docs — the rest of the store is left untouched.

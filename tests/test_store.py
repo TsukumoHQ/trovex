@@ -10,6 +10,7 @@ import hashlib
 import re
 import sqlite3
 import time
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -448,6 +449,7 @@ def test_retry_on_locked_retries_then_succeeds(monkeypatch):
 
     class _Fake:
         db = type("_DB", (), {"rollback": lambda self: None})()
+        settings = type("_S", (), {"data_dir": Path("/nonexistent-trovex-test-dir")})()
 
         def rollback_tracking(self):
             calls["rollbacks"] += 1

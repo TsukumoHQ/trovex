@@ -40,7 +40,48 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
     # superseded. Resetting it to canonical would (a) trip the partial unique index
     # (two live canonicals per topic → IntegrityError, crashing the reindex) and
     # (b) hide it from sweep_bloat's fork tombstoning. Leave it untouched here.
-    db.execute("UPDATE docs SET status = 'canonical', dup_of_id = NULL WHERE status != 'superseded'")
+    #
+    # That guard alone isn't enough: excluding 'superseded' still lets 2+
+    # NON-superseded rows (e.g. one previously 'stale'/'plan', one 'canonical')
+    # share a canonical_topic — a blanket promote-to-canonical hits the SAME
+    # unique index the moment SQLite processes the second colliding row, raising
+    # IntegrityError mid-UPDATE (observed live 2026-08-22, via api_reindex). The
+    # later duplicate-detection pass below is what's SUPPOSED to resolve topic
+    # collisions, but it never gets a chance to run. Resolve collisions FIRST:
+    # per (workspace_id, canonical_topic) group, keep one winner (prefer the row
+    # already 'canonical'; else most-recently-modified, ties by highest id) and
+    # demote every other member to 'duplicate' pointing at it, so the blanket
+    # UPDATE below never sees two canonical_topic peers eligible for 'canonical'
+    # at once.
+    collisions = db.execute(
+        """SELECT d.id AS loser_id, (
+               SELECT w.id FROM docs w
+               WHERE w.workspace_id = d.workspace_id
+                 AND w.canonical_topic = d.canonical_topic
+                 AND w.status != 'superseded'
+               ORDER BY (w.status = 'canonical') DESC, w.mtime DESC, w.id DESC
+               LIMIT 1
+           ) AS winner_id
+           FROM docs d
+           WHERE d.status != 'superseded' AND d.canonical_topic IS NOT NULL"""
+    ).fetchall()
+    loser_ids = [row["loser_id"] for row in collisions if row["loser_id"] != row["winner_id"]]
+    for loser_id, winner_id in (
+        (row["loser_id"], row["winner_id"]) for row in collisions if row["loser_id"] != row["winner_id"]
+    ):
+        db.execute(
+            "UPDATE docs SET status = 'duplicate', dup_of_id = ? WHERE id = ?",
+            (winner_id, loser_id),
+        )
+    if loser_ids:
+        placeholders = ",".join("?" * len(loser_ids))
+        db.execute(
+            f"UPDATE docs SET status = 'canonical', dup_of_id = NULL "
+            f"WHERE status != 'superseded' AND id NOT IN ({placeholders})",
+            loser_ids,
+        )
+    else:
+        db.execute("UPDATE docs SET status = 'canonical', dup_of_id = NULL WHERE status != 'superseded'")
 
     plan_re = re.compile("|".join(settings.plan_path_patterns))
     now = time.time()

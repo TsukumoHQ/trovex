@@ -3,6 +3,8 @@
 Single tool, minimal output by design — see project README for rationale.
 """
 
+import asyncio
+import functools
 import json
 import logging
 import os
@@ -13,6 +15,7 @@ from importlib.metadata import version as _pkg_version
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.concurrency import run_in_threadpool
 
 from .state import get_state
 from .store import (
@@ -117,6 +120,48 @@ mcp = FastMCP(
 # own version for serverInfo.version. Set it directly so clients see trovex's version.
 mcp._mcp_server.version = _version_string()
 
+# Wedge-class-2 (2026-08-22 prod outage): every tool handler below is a plain
+# `def`, so the mcp SDK calls it directly on the single asyncio event loop
+# (fn_is_async is computed once at registration — see func_metadata.py). A
+# stuck sync call anywhere in the handler (a network embed/rerank call with no
+# timeout, e.g. rerank_local's lazy fastembed model fetch, or a contended
+# threading.Lock) freezes the WHOLE server, including unrelated /api/boot GETs
+# sharing this loop (server.py mounts the MCP app into the same FastAPI app).
+#
+# `_off_loop` registers an async twin with FastMCP that runs the real (sync)
+# handler in the threadpool with a hard wall-clock budget, so a stuck call
+# times out instead of wedging the loop — while leaving the module-level name
+# bound to the original sync function, so direct/test callers (`mcp_app.trovex_write(...)`)
+# keep working unchanged. `functools.wraps` preserves the signature/docstring
+# FastMCP's schema builder reads (`inspect.signature(..., eval_str=True)`
+# follows `__wrapped__`), so the registered tool's schema is unaffected.
+#
+# The threadpool has no way to cancel a genuinely stuck sync call — on timeout
+# the caller gets an error back immediately, but the orphaned thread keeps
+# running in the background until it finishes on its own. That's the same
+# trade-off already accepted for /api/boot's own run_in_threadpool use.
+TOOL_TIMEOUT_SEC = float(os.environ.get("TROVEX_TOOL_TIMEOUT_SEC", "30"))
+
+
+def _off_loop(fn):
+    @functools.wraps(fn)
+    async def dispatched(*args, **kwargs):
+        try:
+            return await asyncio.wait_for(
+                run_in_threadpool(fn, *args, **kwargs), timeout=TOOL_TIMEOUT_SEC
+            )
+        except TimeoutError:
+            return _err(
+                "tool_timeout",
+                "transient",
+                f"{fn.__name__} exceeded {TOOL_TIMEOUT_SEC}s and was aborted; the "
+                "underlying call may still be running in the background.",
+                retryable=True,
+            )
+
+    mcp.add_tool(dispatched)
+    return fn
+
 
 ALL_SOURCES = "*"
 
@@ -171,7 +216,7 @@ def _resolve_source(explicit: str = "") -> str | None:
     return value
 
 
-@mcp.tool()
+@_off_loop
 def trovex(q: str = "", summary: bool = False, source: str = "", query: str = "") -> str:
     """Find canonical docs for a query.
 
@@ -353,7 +398,7 @@ def _as_taglist(v) -> list[str]:
     return [str(t).strip() for t in v if str(t).strip()]
 
 
-@mcp.tool()
+@_off_loop
 def trovex_write(
     content: str,
     kind: str = "",
@@ -475,7 +520,7 @@ def trovex_write(
         )
 
 
-@mcp.tool()
+@_off_loop
 def trovex_tag(
     doc_id: str,
     add: list[str] | str | None = None,
@@ -500,7 +545,7 @@ def trovex_tag(
     return ", ".join(tags) if tags else "(no tags)"
 
 
-@mcp.tool()
+@_off_loop
 def trovex_read(
     query: str = "",
     doc_id: str = "",
@@ -614,7 +659,7 @@ def trovex_read(
     return _with_inline(state.searcher.db, out, saved)
 
 
-@mcp.tool()
+@_off_loop
 def trovex_search(
     query: str = "",
     k: int = 5,
@@ -758,7 +803,7 @@ def _log_retrieval(state, query: str, hits: list, response: str, t0: float) -> i
         return 0
 
 
-@mcp.tool()
+@_off_loop
 def trovex_delete(doc_id: str) -> str:
     """Delete a trovex-owned doc by id.
 
@@ -774,7 +819,7 @@ def trovex_delete(doc_id: str) -> str:
     return "deleted" if state.store.delete(doc_id) else "(not found)"
 
 
-@mcp.tool()
+@_off_loop
 def trovex_archive(doc_id: str, restore: bool = False) -> str:
     """Archive a trovex-owned doc — a reversible alternative to deleting it.
 
@@ -798,7 +843,7 @@ def trovex_archive(doc_id: str, restore: bool = False) -> str:
     return f"{'restored' if restore else 'archived'} {resolved}"
 
 
-@mcp.tool()
+@_off_loop
 def trovex_restore(doc_id: str, version_id: int) -> str:
     """Roll a doc back to a prior version — the undo for a bad overwrite.
 
@@ -823,7 +868,7 @@ def trovex_restore(doc_id: str, version_id: int) -> str:
     return f"(version {version_id} not found for {resolved})"
 
 
-@mcp.tool()
+@_off_loop
 def trovex_undelete(doc_id: str) -> str:
     """Recover a DELETED doc — the undo for trovex_delete.
 

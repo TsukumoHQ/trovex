@@ -13,6 +13,7 @@ backed by the same sqlite-vec DB the rest of trovex uses.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import re
@@ -44,6 +45,42 @@ from .query_cache import embed_query_blob
 from .embedder import Embedder, embedder_from_settings
 
 TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
+
+# Outer safety net for cross-PROCESS write contention (separate `trovex serve`
+# / CLI processes each hold their own sqlite3 connection to the same file —
+# the in-process self._lock above only serializes writers WITHIN one process).
+# open_db already sets busy_timeout=30000, so sqlite itself waits up to 30s
+# before raising "database is locked"; this retries a few more times on top,
+# for the rarer case even that isn't enough (observed live: 5 fleet agents
+# hitting trovex_write near-simultaneously on boot).
+_LOCKED_RETRY_ATTEMPTS = 3
+_LOCKED_RETRY_BASE_DELAY = 0.2  # seconds; doubles each retry
+
+
+def _is_locked_error(exc: sqlite3.OperationalError) -> bool:
+    msg = str(exc).lower()
+    return "locked" in msg or "busy" in msg
+
+
+def _retry_on_locked(fn):
+    """Retry a Store write method on SQLITE_BUSY, rolling back the failed
+    transaction first so the retry starts clean instead of piling onto an
+    already-aborted one."""
+
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        delay = _LOCKED_RETRY_BASE_DELAY
+        for attempt in range(_LOCKED_RETRY_ATTEMPTS):
+            try:
+                return fn(self, *args, **kwargs)
+            except sqlite3.OperationalError as e:
+                if not _is_locked_error(e) or attempt == _LOCKED_RETRY_ATTEMPTS - 1:
+                    raise
+                self.db.rollback()
+                time.sleep(delay)
+                delay *= 2
+
+    return wrapper
 
 
 class TopicCollisionError(Exception):
@@ -117,6 +154,7 @@ class SqliteStore:
         # worker threads, and put() is a multi-statement insert+embed+commit.
         self._lock = threading.Lock()
 
+    @_retry_on_locked
     def put(
         self,
         content: str,
@@ -483,6 +521,7 @@ class SqliteStore:
             f"SELECT COUNT(*) AS c FROM docs WHERE {' AND '.join(where)}", params
         ).fetchone()["c"]
 
+    @_retry_on_locked
     def delete(self, ext_id: str) -> bool:
         """Remove a trovex-owned doc (row + its embedding) by ext_id. True if it existed.
 

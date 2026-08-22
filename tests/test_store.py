@@ -8,6 +8,7 @@ from __future__ import annotations
 import concurrent.futures
 import hashlib
 import re
+import sqlite3
 import time
 
 import numpy as np
@@ -411,6 +412,103 @@ def test_concurrent_puts_are_serialized(store):
     assert len(set(ids)) == 20
     assert len(store.list_docs()) == 20
     assert store.get("id-7").content == "# Doc 7\n\nbody 7"
+
+
+def test_concurrent_puts_across_separate_connections_do_not_raise_locked(settings):
+    """Cross-PROCESS repro (task 2f3539eb): each Store here gets its OWN sqlite
+    connection to the SAME db file — unlike test_concurrent_puts_are_serialized,
+    this bypasses the in-process self._lock entirely, so it's the real shape of
+    the fleet incident (5 separate `trovex serve`/CLI processes writing the same
+    store.db near-simultaneously, which raised 'database is locked' 3x running
+    before giving up). WAL + busy_timeout + the outer retry-on-locked wrapper
+    together must let all of them land without a caller-visible error."""
+    stores = [SqliteStore(settings, embedder=BagEmbedder()) for _ in range(6)]
+
+    def write(i):
+        return stores[i].put(f"# Doc {i}\n\nbody {i}", ext_id=f"cross-conn-{i}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        ids = list(ex.map(write, range(6)))
+
+    assert len(set(ids)) == 6
+    assert len(stores[0].list_docs()) == 6  # all 6 landed, visible from any connection
+
+
+def test_retry_on_locked_retries_then_succeeds(monkeypatch):
+    """The outer retry wrapper itself, unit-tested against a fake target (real
+    sqlite3.Connection methods aren't monkeypatchable, so this isolates the
+    wrapper's own retry/rollback/backoff logic): a transient 'database is
+    locked' on the first call must be retried (after a rollback) rather than
+    surfaced to the caller, as long as it clears within _LOCKED_RETRY_ATTEMPTS."""
+    from trovex import store as store_mod
+
+    monkeypatch.setattr(store_mod.time, "sleep", lambda _s: None)  # don't actually wait in tests
+
+    calls = {"n": 0, "rollbacks": 0}
+
+    class _Fake:
+        db = type("_DB", (), {"rollback": lambda self: None})()
+
+        def rollback_tracking(self):
+            calls["rollbacks"] += 1
+
+        @store_mod._retry_on_locked
+        def go(self):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise sqlite3.OperationalError("database is locked")
+            return "ok"
+
+    fake = _Fake()
+    fake.db.rollback = fake.rollback_tracking
+
+    assert fake.go() == "ok"
+    assert calls["n"] == 3  # failed twice, succeeded on the 3rd attempt
+    assert calls["rollbacks"] == 2  # rolled back before each retry
+
+
+def test_retry_on_locked_gives_up_after_max_attempts(monkeypatch):
+    """A lock that never clears must surface the OperationalError to the caller
+    after _LOCKED_RETRY_ATTEMPTS, not retry forever."""
+    from trovex import store as store_mod
+
+    monkeypatch.setattr(store_mod.time, "sleep", lambda _s: None)
+
+    calls = {"n": 0}
+
+    class _Fake:
+        db = type("_DB", (), {"rollback": lambda self: None})()
+
+        @store_mod._retry_on_locked
+        def go(self):
+            calls["n"] += 1
+            raise sqlite3.OperationalError("database is locked")
+
+    with pytest.raises(sqlite3.OperationalError):
+        _Fake().go()
+    assert calls["n"] == store_mod._LOCKED_RETRY_ATTEMPTS
+
+
+def test_retry_on_locked_does_not_retry_other_operational_errors(monkeypatch):
+    """Only lock/busy contention is retried — an unrelated OperationalError (e.g.
+    a genuine schema bug) must fail immediately, not be masked by 3 retries."""
+    from trovex import store as store_mod
+
+    monkeypatch.setattr(store_mod.time, "sleep", lambda _s: None)
+
+    calls = {"n": 0}
+
+    class _Fake:
+        db = type("_DB", (), {"rollback": lambda self: None})()
+
+        @store_mod._retry_on_locked
+        def go(self):
+            calls["n"] += 1
+            raise sqlite3.OperationalError("no such table: docs")
+
+    with pytest.raises(sqlite3.OperationalError):
+        _Fake().go()
+    assert calls["n"] == 1  # no retry on a non-lock error
 
 
 def test_delete_cascades_tags_and_versions(store):

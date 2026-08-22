@@ -77,6 +77,16 @@ def test_open_db_reports_missing_extension_support(tmp_path, monkeypatch):
 # transaction so an interruption always leaves the OLD tables untouched.
 
 
+def test_open_db_enables_wal_and_busy_timeout(tmp_path):
+    """Concurrency baseline (task 2f3539eb): multiple processes/agents writing
+    the same store must not immediately raise "database is locked" — WAL lets
+    readers and the writer coexist, busy_timeout makes a transient writer-vs-
+    writer contention wait instead of erroring."""
+    conn = db.open_db(tmp_path / "store.db", embed_dim=8)
+    assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+    assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 30000
+
+
 def test_partition_migration_on_fresh_store_is_noop(tmp_path):
     conn = db.open_db(tmp_path / "fresh.db", embed_dim=8)
     row = conn.execute("SELECT sql FROM sqlite_master WHERE name = 'vec_docs'").fetchone()

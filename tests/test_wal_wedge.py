@@ -156,6 +156,35 @@ def test_checkpoint_if_wal_large_forces_checkpoint(store, monkeypatch):
     assert any("wal_checkpoint" in c for c in calls)
 
 
+def test_checkpoint_if_wal_large_uses_passive_not_truncate(store, monkeypatch):
+    """TRUNCATE needs exclusive access and busy-waits up to busy_timeout on the
+    shared write connection when a reader is active — under concurrent read
+    traffic that reliably wedged writes/searches to the 30s busy_timeout (prod
+    2026-08-31, task 7768dbe6). PASSIVE never blocks; pin it so it can't regress."""
+    calls = []
+    real_db = store.db
+
+    class _RecordingDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, sql, *a, **kw):
+            calls.append(sql)
+            if "wal_checkpoint" in sql:
+                return None
+            return real_db.execute(sql, *a, **kw)
+
+    class _FakeStat:
+        st_size = 11 * 1024 * 1024  # over WAL_WARN_BYTES
+
+    db_path = store.settings.data_dir / "trovex.db"
+    monkeypatch.setattr(type(db_path.with_name("x")), "stat", lambda self: _FakeStat())
+
+    checkpoint_if_wal_large(_RecordingDB(), db_path)
+    checkpoint_calls = [c for c in calls if "wal_checkpoint" in c]
+    assert checkpoint_calls == ["PRAGMA wal_checkpoint(PASSIVE)"]
+
+
 def test_checkpoint_if_wal_large_noop_below_threshold(store):
     # No .db-wal file exists at all under a fresh tmp_path in some environments,
     # or it's tiny — either way this must not raise or touch the connection.

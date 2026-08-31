@@ -113,14 +113,25 @@ def checkpoint_if_wal_large(conn: sqlite3.Connection, db_path: Path) -> None:
     Best-effort only, by design: the caller's write already committed before
     this runs, so nothing here may ever propagate — an unexpected exception
     (a permissions error on stat(), a busy/corrupt-adjacent checkpoint) must
-    not turn an already-successful write into a reported failure."""
+    not turn an already-successful write into a reported failure.
+
+    PASSIVE, not TRUNCATE: TRUNCATE needs exclusive access (no reader on any
+    older WAL frame) and will busy-wait up to busy_timeout on THIS connection
+    — the shared write connection — if it can't get it, wedging every write
+    queued behind it. Under concurrent read traffic there's almost always an
+    in-flight reader, so TRUNCATE reliably starved out to the 30s busy_timeout
+    (prod 2026-08-31, task 7768dbe6: trovex_write/search both stalled to the
+    exact 30000ms busy_timeout). PASSIVE checkpoints as many frames as it can
+    without waiting on anyone and returns immediately either way — it may
+    leave the WAL only partially truncated under sustained load, but it never
+    blocks the write path."""
     try:
         wal_path = db_path.with_name(db_path.name + "-wal")
         size = wal_path.stat().st_size
         if size <= WAL_WARN_BYTES:
             return
         log.warning("trovex.db WAL at %d bytes (> %d), forcing checkpoint", size, WAL_WARN_BYTES)
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
     except OSError:
         pass
     except sqlite3.Error as e:

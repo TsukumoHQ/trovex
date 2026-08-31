@@ -83,10 +83,11 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
         )
     else:
         db.execute("UPDATE docs SET status = 'canonical', dup_of_id = NULL WHERE status != 'superseded'")
-    # Release the write lock here: collision resolution is a complete, self-
-    # contained unit (every row it touched got its final status+dup_of_id in the
-    # same UPDATE), so committing now never leaves a doc half-updated. Without
-    # this, the lock stays held across the whole Pass 1 file-I/O scan below.
+    # Release the write lock here: everything above (collision resolution AND
+    # the blanket canonicalize UPDATE) is a complete, self-contained unit —
+    # every row touched got its final status+dup_of_id in the same UPDATE, so
+    # committing now never leaves a doc half-updated. Without this, the lock
+    # stays held across the whole Pass 1 file-I/O scan below.
     db.commit()
 
     plan_re = re.compile("|".join(settings.plan_path_patterns))

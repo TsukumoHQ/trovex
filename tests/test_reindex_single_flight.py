@@ -230,12 +230,17 @@ def test_concurrent_write_stays_fast_during_compute_status(tmp_path, monkeypatch
     def _run_compute_status():
         result["stats"] = status_mod.compute_status(indexer.db, settings)
 
+    # Open the writer's connection (open_db's migrations run their own write
+    # statements against the same file) BEFORE the slow pass starts — opening
+    # it mid-pass would itself block on the held lock and silently absorb the
+    # wait this test exists to measure, passing even on pre-fix code.
+    writer_store = SqliteStore(settings, embedder=embedder)
+
     thread = threading.Thread(target=_run_compute_status)
     t0 = time.perf_counter()
     thread.start()
     assert mid_pass.wait(timeout=5.0), "compute_status never reached the mid-pass marker"
 
-    writer_store = SqliteStore(settings, embedder=embedder)
     write_t0 = time.perf_counter()
     writer_store.put("# Concurrent probe\n\nmust not wait out the whole pass", tags=["probe"])
     write_elapsed = time.perf_counter() - write_t0

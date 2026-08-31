@@ -161,6 +161,39 @@ def _off_loop(fn):
     return fn
 
 
+def _off_loop_resource(uri: str, **resource_kwargs):
+    """Resource analogue of `_off_loop` (wedge class 3, 2026-08-31 — same
+    off-loop dispatch, applied to `@mcp.resource` instead of `@mcp.tool`: the
+    mcp SDK's FunctionResource.read / ResourceTemplate.create_resource both
+    already handle an async `fn` (they check `inspect.iscoroutine` on its
+    result before awaiting — see mcp/server/fastmcp/resources/types.py and
+    templates.py), so an async twin registers the same way for concrete AND
+    templated (`{param}`) resources with no other change needed.
+
+    Unlike `_off_loop`, a timeout degrades to a plain markdown string, not
+    the CCAR `_err()` JSON shape — every handler here has mime_type
+    text/markdown and callers read the body as prose, matching how
+    `/api/boot` degrades to boot_pointers' own empty-pack contract instead of
+    surfacing an error (see server.py's api_boot)."""
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        async def dispatched(*args, **kwargs):
+            try:
+                return await offload.off_loop(fn, *args, timeout=TOOL_TIMEOUT_SEC, **kwargs)
+            except TimeoutError:
+                return (
+                    f"# {fn.__name__}\n\n"
+                    f"(temporarily unavailable — retrieval exceeded {TOOL_TIMEOUT_SEC}s "
+                    "under load; retry shortly.)"
+                )
+
+        mcp.resource(uri, **resource_kwargs)(dispatched)
+        return fn
+
+    return decorator
+
+
 ALL_SOURCES = "*"
 
 
@@ -963,7 +996,7 @@ def _render_doc_line(row, now: float) -> str:
     )
 
 
-@mcp.resource("trovex://savings", name="savings", mime_type="text/markdown")
+@_off_loop_resource("trovex://savings", name="savings", mime_type="text/markdown")
 def savings_receipt() -> str:
     """The token-savings receipt — lifetime + last-7d tokens saved, the tokenizer
     used, and the measured routing precision the number is gated on. trovex's
@@ -974,7 +1007,7 @@ def savings_receipt() -> str:
     return _savings.render_receipt_md(get_state().searcher.db)
 
 
-@mcp.resource("trovex://savings/{session}", name="session-savings", mime_type="text/markdown")
+@_off_loop_resource("trovex://savings/{session}", name="session-savings", mime_type="text/markdown")
 def savings_for_session(session: str) -> str:
     """One session's savings receipt. `session` is an Mcp-Session-Id (or an
     X-TROVEX-Session value) seen in the query log."""
@@ -983,7 +1016,7 @@ def savings_for_session(session: str) -> str:
     return _savings.render_session_md(get_state().searcher.db, session)
 
 
-@mcp.resource("trovex://deleted", name="deleted", mime_type="text/markdown")
+@_off_loop_resource("trovex://deleted", name="deleted", mime_type="text/markdown")
 def deleted_docs() -> str:
     """Deleted owned docs still recoverable from their tombstones (newest first).
     Recover one with trovex_undelete(doc_id). Closes the delete arm of the
@@ -1004,7 +1037,7 @@ def deleted_docs() -> str:
     return "\n".join(lines)
 
 
-@mcp.resource("trovex://sources", name="sources", mime_type="text/markdown")
+@_off_loop_resource("trovex://sources", name="sources", mime_type="text/markdown")
 def catalog_sources() -> str:
     """The configured sources (projects) and their doc counts — the top of the
     territory. Read `trovex://catalog/{source}` for one source's doc listing."""
@@ -1029,7 +1062,7 @@ def catalog_sources() -> str:
     return "\n".join(lines)
 
 
-@mcp.resource("trovex://catalog", name="catalog", mime_type="text/markdown")
+@_off_loop_resource("trovex://catalog", name="catalog", mime_type="text/markdown")
 def catalog_index() -> str:
     """The canonical doc/topic index across every source — what trovex can
     answer, available at connect time so an agent needn't call a search tool to
@@ -1054,7 +1087,7 @@ def catalog_index() -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
-@mcp.resource("trovex://catalog/{source}", name="source-catalog", mime_type="text/markdown")
+@_off_loop_resource("trovex://catalog/{source}", name="source-catalog", mime_type="text/markdown")
 def catalog_for_source(source: str) -> str:
     """One source's full canonical doc listing (capped). `source` is a source id
     from `trovex://sources` (e.g. "trovex" for owned records, "code")."""

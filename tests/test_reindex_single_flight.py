@@ -197,7 +197,12 @@ def test_concurrent_write_stays_fast_during_compute_status(tmp_path, monkeypatch
     src_root.mkdir()
     n_docs = 30
     for i in range(n_docs):
-        (src_root / f"doc{i}.md").write_text(f"# Doc {i}\n\nbody text {i}\n")
+        # Every 3rd doc's filename matches settings.plan_path_patterns ("DRAFT"),
+        # so Pass 1 actually performs a status UPDATE on it — otherwise every row
+        # is a no-op and the periodic in-loop db.commit() (status.py ~148-149)
+        # would never be exercised by this test at all.
+        name = f"docDRAFT{i}.md" if i % 3 == 0 else f"doc{i}.md"
+        (src_root / name).write_text(f"# Doc {i}\n\nbody text {i}\n")
 
     settings = Settings(
         data_dir=tmp_path / "data",

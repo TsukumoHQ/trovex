@@ -1,0 +1,182 @@
+"""Reindex single-flight guard + reader-stays-responsive fix (085f1d69, fast-follow
+to eda6f60e).
+
+Root cause: /api/reindex ran state.indexer.reindex() INLINE on the event loop
+(no run_in_threadpool) with no concurrency guard, and indexer.reindex() held ONE
+write transaction open for the entire corpus scan, committing only at the very
+end. Reproduced on prod: firing /api/reindex twice concurrently serialized
+readers and grew the WAL 5.8M -> 10M, clearing only with a manual kickstart —
+not the ClientDisconnect wedge (that's fixed by eda6f60e), a distinct stall
+class.
+
+Fix:
+  - api_reindex takes a non-blocking threading.Lock (state.reindex_lock) — a 2nd
+    concurrent call gets 409 instead of piling onto the first.
+  - indexer.reindex() and store.sweep_bloat() now run via run_in_threadpool, off
+    the event loop, so /api/boot and friends stay responsive during a reindex.
+  - indexer.reindex() commits + checkpoints every REINDEX_COMMIT_BATCH docs
+    instead of holding one txn open for the whole run, bounding WAL growth.
+
+Hermetic: BagEmbedder, no network, no real model download.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import re
+import threading
+import time
+
+import numpy as np
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from trovex import indexer as indexer_mod
+from trovex import state as state_mod
+from trovex.config import Settings, Source
+from trovex.indexer import Indexer
+from trovex.search import Searcher
+from trovex.server import build_app
+from trovex.state import AppState
+from trovex.store import SqliteStore
+
+DIM = 384
+
+
+class BagEmbedder:
+    name = "bag"
+    dim = DIM
+
+    def embed(self, texts):
+        for t in texts:
+            v = np.zeros(DIM, dtype=np.float32)
+            for tok in re.findall(r"[a-z0-9]+", t.lower()):
+                idx = int.from_bytes(hashlib.md5(tok.encode()).digest()[:4], "little")
+                v[idx % DIM] += 1.0
+            norm = float(np.linalg.norm(v)) or 1.0
+            yield v / norm
+
+
+def _stats() -> dict:
+    return {
+        "added": 0,
+        "updated": 0,
+        "unchanged": 0,
+        "removed": 0,
+        "duration_sec": 0.0,
+        "status": {},
+        "by_source": [],
+        "capacity_warnings": [],
+    }
+
+
+@pytest.fixture
+def app_state(tmp_path):
+    settings = Settings(
+        data_dir=tmp_path,
+        embed_model="BAAI/bge-small-en-v1.5",  # dim 384, matches BagEmbedder
+        sources_config_path=tmp_path / "no-such-sources.yaml",
+    )
+    embedder = BagEmbedder()
+    store = SqliteStore(settings, embedder=embedder)
+    store.put("# Auth flow\n\njwt token signature validation", tags=["owner/alpha"])
+    searcher = Searcher(settings, embedder=embedder)
+    indexer = Indexer(settings, embedder=embedder)
+    state = AppState(
+        settings=settings,
+        embedder=embedder,
+        searcher=searcher,
+        indexer=indexer,
+        store=store,
+    )
+    state_mod._state = state
+    try:
+        yield state
+    finally:
+        state_mod.reset_state()
+
+
+@pytest.fixture
+def client(app_state):
+    transport = ASGITransport(app=build_app())
+    return AsyncClient(transport=transport, base_url="http://test")
+
+
+async def test_second_concurrent_reindex_is_refused(client, app_state, monkeypatch):
+    started = threading.Event()  # set from the threadpool worker, not the loop
+
+    def _slow_reindex(*args, **kwargs):
+        started.set()
+        time.sleep(0.3)
+        return _stats()
+
+    monkeypatch.setattr(app_state.indexer, "reindex", _slow_reindex)
+
+    r1_task = asyncio.create_task(client.post("/api/reindex"))
+    while not started.is_set():
+        await asyncio.sleep(0.01)
+    r2 = await client.post("/api/reindex")
+    r1 = await r1_task
+
+    assert r1.status_code == 200
+    assert r2.status_code == 409
+    assert not app_state.reindex_lock.locked(), "lock must be released after the call finishes"
+
+
+async def test_boot_stays_responsive_during_reindex(client, app_state, monkeypatch):
+    def _slow_reindex(*args, **kwargs):
+        time.sleep(0.5)
+        return _stats()
+
+    monkeypatch.setattr(app_state.indexer, "reindex", _slow_reindex)
+
+    async def boot_call():
+        t0 = time.perf_counter()
+        r = await client.get("/api/boot", params={"agent": "alpha"})
+        return r, time.perf_counter() - t0
+
+    reindex_resp, (boot_resp, boot_elapsed) = await asyncio.gather(
+        client.post("/api/reindex"), boot_call()
+    )
+
+    assert reindex_resp.status_code == 200
+    assert boot_resp.status_code == 200
+    assert boot_elapsed < 2.0, "boot must not wait out the in-flight reindex"
+
+
+def test_reindex_commits_in_bounded_batches(tmp_path, monkeypatch):
+    """A large reindex must commit periodically, not hold one txn open for the
+    whole corpus — otherwise the WAL grows unbounded for the run's full
+    duration (the actual prod symptom)."""
+    monkeypatch.setattr(indexer_mod, "REINDEX_COMMIT_BATCH", 3)
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    for i in range(7):
+        (src_root / f"doc{i}.md").write_text(f"# Doc {i}\n\nbody text {i}\n")
+
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        embed_model="BAAI/bge-small-en-v1.5",
+        sources_config_path=tmp_path / "no-such-sources.yaml",
+    )
+    embedder = BagEmbedder()
+    indexer = Indexer(settings, embedder=embedder)
+
+    commit_calls = 0
+    real_commit_progress = indexer._commit_progress
+
+    def _counting_commit_progress(embed_batch, chunk_embed_batch):
+        nonlocal commit_calls
+        commit_calls += 1
+        return real_commit_progress(embed_batch, chunk_embed_batch)
+
+    monkeypatch.setattr(indexer, "_commit_progress", _counting_commit_progress)
+
+    stats = indexer.reindex(sources=[Source(id="t", label="t", root=src_root)])
+
+    assert stats["added"] == 7
+    # 7 docs / batch-of-3 => 2 mid-run commits via _commit_progress (the final
+    # commit at reindex()'s tail is separate, not counted here).
+    assert commit_calls >= 2, f"expected periodic commits mid-reindex, got {commit_calls}"

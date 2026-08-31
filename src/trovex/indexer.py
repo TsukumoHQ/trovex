@@ -30,6 +30,16 @@ AGENT_FRONTMATTER_KEYS = ("agent", "author", "generator", "created_by")
 
 TROVEXIGNORE = ".trovexignore"
 
+# reindex() used to hold ONE write transaction open for the entire corpus scan,
+# committing only at the very end — so the WAL grew unbounded for the whole run
+# (observed on prod: 5.8M -> 10M during a full re-embed) and a concurrent reader
+# had to wait out the whole thing. Commit + checkpoint every N processed docs
+# instead, so the WAL stays bounded and any reader on the same connection-pool
+# sees regular checkpoint opportunities. Tradeoff: a failure mid-reindex now only
+# rolls back work since the last checkpoint, not the entire run — accepted for a
+# long-running admin operation (085f1d69).
+REINDEX_COMMIT_BATCH = 200
+
 
 def _load_ignore_patterns(root: Path) -> list[str]:
     """Read glob patterns from <root>/.trovexignore (gitignore-ish: one per line,
@@ -168,6 +178,7 @@ class Indexer:
         agg = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0, "by_source": []}
         embed_batch: list[tuple[int, str]] = []
         chunk_embed_batch: list[tuple[int, str]] = []
+        since_commit = 0
 
         for source in sources:
             sr = source.root
@@ -242,6 +253,11 @@ class Indexer:
                     s_updated += 1
                 else:
                     s_added += 1
+
+                since_commit += 1
+                if since_commit >= REINDEX_COMMIT_BATCH:
+                    self._commit_progress(embed_batch, chunk_embed_batch)
+                    since_commit = 0
 
             # Cleanup this source's removed docs. The bulk map already holds the
             # row ids, so a vanished file is a dict-key diff — no re-query.
@@ -517,6 +533,21 @@ class Indexer:
         self.db.commit()
         counts["duration_sec"] = elapsed
         return counts
+
+    def _commit_progress(
+        self, embed_batch: list[tuple[int, str]], chunk_embed_batch: list[tuple[int, str]]
+    ) -> None:
+        """Flush pending embeddings + commit + checkpoint mid-reindex (see
+        REINDEX_COMMIT_BATCH). Embeddings flush first so a doc row committed here
+        is never left un-embedded."""
+        if embed_batch:
+            self._flush_embeddings(embed_batch)
+            embed_batch.clear()
+        if chunk_embed_batch:
+            self._flush_chunk_embeddings(chunk_embed_batch)
+            chunk_embed_batch.clear()
+        self.db.commit()
+        checkpoint_if_wal_large(self.db, self.settings.data_dir / "trovex.db")
 
     def _flush_embeddings(self, batch: list[tuple[int, str]]) -> None:
         ids = [doc_id for doc_id, _ in batch]

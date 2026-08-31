@@ -1,3 +1,4 @@
 # Tech-debt backlog — auto-collected by the niwa scribe
 
 - [LEGACY_OPPORTUNITY]: store.py::_insert_chunks previously duplicated Merkle-hash chunk-sync logic inline (MCP-write-path only). Now delegates to the shared db.sync_doc_chunks — any future chunker (e.g. a markdown-chunker upgrade) can reuse the same sync path without re-deriving hash-reuse/cascade-prune semantics.
+- [LEGACY_OPPORTUNITY]: MCP resource handlers (`resources.py`-equivalent `@mcp.resource(...)` functions in `mcp_app.py`) remain plain sync `def`s dispatched directly by FastMCP, same as tools were before 33ca98a — not off-loaded by this fix either (pre-existing follow-up, memory key `trovex-serve-resources-sync-followup`). They're DB-read-only (no embed call), so lower risk than the routes fixed here, but the same class of bug in miniature if a resource handler's DB read ever blocks on a contended write.

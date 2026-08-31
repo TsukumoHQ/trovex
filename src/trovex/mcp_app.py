@@ -3,7 +3,6 @@
 Single tool, minimal output by design — see project README for rationale.
 """
 
-import asyncio
 import functools
 import json
 import logging
@@ -15,8 +14,8 @@ from importlib.metadata import version as _pkg_version
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from starlette.concurrency import run_in_threadpool
 
+from . import offload
 from .state import get_state
 from .store import (
     TROVEX_SOURCE_ID,
@@ -120,36 +119,35 @@ mcp = FastMCP(
 # own version for serverInfo.version. Set it directly so clients see trovex's version.
 mcp._mcp_server.version = _version_string()
 
-# Wedge-class-2 (2026-08-22 prod outage): every tool handler below is a plain
-# `def`, so the mcp SDK calls it directly on the single asyncio event loop
-# (fn_is_async is computed once at registration — see func_metadata.py). A
-# stuck sync call anywhere in the handler (a network embed/rerank call with no
-# timeout, e.g. rerank_local's lazy fastembed model fetch, or a contended
-# threading.Lock) freezes the WHOLE server, including unrelated /api/boot GETs
-# sharing this loop (server.py mounts the MCP app into the same FastAPI app).
+# Wedge-class-2 (2026-08-22 prod outage, RECURRED 2026-08-31 despite this fix —
+# see offload.py's module docstring for the recurrence root cause): every tool
+# handler below is a plain `def`, so the mcp SDK calls it directly on the
+# single asyncio event loop (fn_is_async is computed once at registration —
+# see func_metadata.py). A stuck sync call anywhere in the handler (a network
+# embed/rerank call with no timeout, e.g. rerank_local's lazy fastembed model
+# fetch, or a contended threading.Lock) freezes the WHOLE server, including
+# unrelated /api/boot GETs sharing this loop (server.py mounts the MCP app
+# into the same FastAPI app).
 #
 # `_off_loop` registers an async twin with FastMCP that runs the real (sync)
-# handler in the threadpool with a hard wall-clock budget, so a stuck call
-# times out instead of wedging the loop — while leaving the module-level name
-# bound to the original sync function, so direct/test callers (`mcp_app.trovex_write(...)`)
-# keep working unchanged. `functools.wraps` preserves the signature/docstring
-# FastMCP's schema builder reads (`inspect.signature(..., eval_str=True)`
-# follows `__wrapped__`), so the registered tool's schema is unaffected.
-#
-# The threadpool has no way to cancel a genuinely stuck sync call — on timeout
-# the caller gets an error back immediately, but the orphaned thread keeps
-# running in the background until it finishes on its own. That's the same
-# trade-off already accepted for /api/boot's own run_in_threadpool use.
-TOOL_TIMEOUT_SEC = float(os.environ.get("TROVEX_TOOL_TIMEOUT_SEC", "30"))
+# handler via `offload.off_loop` (dedicated bounded pool + wall-clock budget,
+# shared with every other blocking call in the app — see offload.py) so a
+# stuck call times out instead of wedging the loop — while leaving the
+# module-level name bound to the original sync function, so direct/test
+# callers (`mcp_app.trovex_write(...)`) keep working unchanged.
+# `functools.wraps` preserves the signature/docstring FastMCP's schema
+# builder reads (`inspect.signature(..., eval_str=True)` follows
+# `__wrapped__`), so the registered tool's schema is unaffected.
+TOOL_TIMEOUT_SEC = offload.TOOL_TIMEOUT_SEC
 
 
 def _off_loop(fn):
     @functools.wraps(fn)
     async def dispatched(*args, **kwargs):
         try:
-            return await asyncio.wait_for(
-                run_in_threadpool(fn, *args, **kwargs), timeout=TOOL_TIMEOUT_SEC
-            )
+            # TOOL_TIMEOUT_SEC read here (not passed as a default arg) so tests
+            # can monkeypatch this module's copy per-test.
+            return await offload.off_loop(fn, *args, timeout=TOOL_TIMEOUT_SEC, **kwargs)
         except TimeoutError:
             return _err(
                 "tool_timeout",
@@ -266,7 +264,9 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
     # Token metrics are replayed so usage/savings dashboards stay accurate.
     # The scope is part of the key: without it the first project to run a query
     # would serve its results to every other project asking the same thing.
-    ver = _qcache.corpus_version(db, scope)  # per-scope: a write to another source keeps this hit (T5)
+    ver = _qcache.corpus_version(
+        db, scope
+    )  # per-scope: a write to another source keeps this hit (T5)
     cache_key = q if scope is None else f"{q}\x00source={scope}"
     cached = _qcache.get(db, cache_key, summary, ver)
     if cached is not None:
@@ -514,7 +514,7 @@ def trovex_write(
         # Schema-enforced SSOT: a second live canonical for this topic. Point at the
         # existing one (a title-collision the embedding dedup above didn't catch).
         return (
-            f'⚠ Not stored — a canonical doc for this topic already exists: {c.ext_id} '
+            f"⚠ Not stored — a canonical doc for this topic already exists: {c.ext_id} "
             f'("{c.title}"). One canonical doc per topic: UPDATE it — call trovex_write '
             f'again with doc_id="{c.ext_id}". Pass force=true to supersede it with this one.'
         )
@@ -999,9 +999,7 @@ def deleted_docs() -> str:
             "%Y-%m-%d %H:%M"
         )
         handle = r["ext_id"] or f"(tombstone {r['id']}, no ext_id)"
-        lines.append(
-            f"- {r['title'] or '(untitled)'} · ~{r['size']}b · deleted {when}Z · {handle}"
-        )
+        lines.append(f"- {r['title'] or '(untitled)'} · ~{r['size']}b · deleted {when}Z · {handle}")
     lines.append("\nRecover one: trovex_undelete(doc_id=<ext_id>).")
     return "\n".join(lines)
 

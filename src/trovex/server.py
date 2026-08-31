@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -20,11 +21,11 @@ from fastapi.responses import (
 )
 from fastapi.templating import Jinja2Templates
 from slowapi import Limiter
-from starlette.concurrency import run_in_threadpool
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from . import insights as insights_mod
+from . import offload
 from . import savings as savings_mod
 from .boot import boot_pointers
 from .capture import capture_state
@@ -118,6 +119,19 @@ async def _read_json(request: Request) -> tuple[dict | None, JSONResponse | None
     if not isinstance(body, dict):
         return None, JSONResponse({"error": "expected a JSON object"}, status_code=400)
     return body, None
+
+
+async def _offloaded(fn, *args, **kwargs) -> tuple[Any, JSONResponse | None]:
+    """Run a store/indexer call via offload.off_loop, returning (result, None)
+    or (None, 504-response) on timeout — the uniform wedge-class-2 error shape
+    for every write route below, instead of letting a bounded-but-still-an-
+    error TimeoutError surface as a bare unhandled 500."""
+    try:
+        return await offload.off_loop(fn, *args, **kwargs), None
+    except TimeoutError:
+        return None, JSONResponse(
+            {"error": f"{getattr(fn, '__name__', 'call')} timed out"}, status_code=504
+        )
 
 
 def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
@@ -233,8 +247,17 @@ async def lifespan(app: FastAPI):
             log.info("purged %d query-log rows past retention", deleted)
     except Exception:  # noqa: BLE001 — retention must never block startup
         log.debug("query-log retention purge failed", exc_info=True)
-    async with mcp.session_manager.run():
-        yield
+    # Wedge-class-2 self-heal (see offload.py): every off_loop caller now runs
+    # on the same bounded pool, so if it's ever fully saturated by orphaned
+    # (past-deadline) calls for TROVEX_WATCHDOG_SATURATION_SEC, restart rather
+    # than stay wedged indefinitely — automates the manual `launchctl kickstart`
+    # mitigation. Cancelled on shutdown along with everything else in `async with`.
+    watchdog_task = asyncio.create_task(offload.run_watchdog())
+    try:
+        async with mcp.session_manager.run():
+            yield
+    finally:
+        watchdog_task.cancel()
 
 
 _AVATAR_PALETTE = [
@@ -548,7 +571,11 @@ def build_app() -> FastAPI:
         """Delete a trovex-owned doc. Updates go through trovex_write (same id)."""
         if not _write_authorized(request):
             return _unauthorized()
-        ok = get_state().store.delete(ext_id)
+        # Off the loop (wedge class 2): store.delete retries on SQLITE_BUSY with
+        # a real time.sleep backoff — inline, that backoff runs on the loop.
+        ok, timeout_resp = await _offloaded(get_state().store.delete, ext_id)
+        if timeout_resp:
+            return timeout_resp
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
 
     @app.get("/store", response_class=HTMLResponse)
@@ -630,7 +657,10 @@ def build_app() -> FastAPI:
         if not name:
             return JSONResponse({"error": "name required"}, status_code=400)
         flt = {k: v for k, v in (("tag", body.get("tag")), ("kind", body.get("kind"))) if v}
-        get_state().store.create_collection(name, flt)
+        # Off the loop (wedge class 2): retry-on-locked backoff, see api_doc_delete.
+        _, timeout_resp = await _offloaded(get_state().store.create_collection, name, flt)
+        if timeout_resp:
+            return timeout_resp
         return JSONResponse({"ok": True, "name": name, "filter": flt})
 
     @app.delete("/api/collections/{name}")
@@ -638,7 +668,9 @@ def build_app() -> FastAPI:
     async def api_collection_delete(name: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
             return _unauthorized()
-        get_state().store.delete_collection(name)
+        _, timeout_resp = await _offloaded(get_state().store.delete_collection, name)
+        if timeout_resp:
+            return timeout_resp
         return JSONResponse({"deleted": True})
 
     @app.get("/api/doc/{ext_id}/versions")
@@ -662,7 +694,11 @@ def build_app() -> FastAPI:
             version_id = int(raw)
         except (TypeError, ValueError):
             return JSONResponse({"error": "version_id must be an integer"}, status_code=400)
-        ok = get_state().store.restore_version(ext_id, version_id)
+        # Off the loop (wedge class 2): restore_version re-embeds via put() —
+        # onnxruntime inference, the exact class of call that wedged the loop.
+        ok, timeout_resp = await _offloaded(get_state().store.restore_version, ext_id, version_id)
+        if timeout_resp:
+            return timeout_resp
         return JSONResponse({"restored": ok}, status_code=200 if ok else 404)
 
     @app.get("/api/tombstones")
@@ -676,7 +712,11 @@ def build_app() -> FastAPI:
         """Recover a deleted doc from its most recent tombstone (write-gated)."""
         if not _write_authorized(request):
             return _unauthorized()
-        restored = get_state().store.restore_deleted(ext_id=ext_id)
+        # Off the loop (wedge class 2): restore_deleted re-embeds via put() —
+        # same class of call that wedged the loop (see offload.py).
+        restored, timeout_resp = await _offloaded(get_state().store.restore_deleted, ext_id=ext_id)
+        if timeout_resp:
+            return timeout_resp
         return JSONResponse(
             {"undeleted": bool(restored), "ext_id": restored},
             status_code=200 if restored else 404,
@@ -690,11 +730,15 @@ def build_app() -> FastAPI:
         body, err = await _read_json(request)
         if err:
             return err
-        tags = get_state().store.set_tags(
+        # Off the loop (wedge class 2): retry-on-locked backoff, see api_doc_delete.
+        tags, timeout_resp = await _offloaded(
+            get_state().store.set_tags,
             ext_id,
             add=[t.strip() for t in (body.get("add") or "").split(",") if t.strip()],
             remove=[t.strip() for t in (body.get("remove") or "").split(",") if t.strip()],
         )
+        if timeout_resp:
+            return timeout_resp
         return JSONResponse({"tags": tags})
 
     # ── JSON API ─────────────────────────────────────────────────────
@@ -735,11 +779,11 @@ def build_app() -> FastAPI:
                     {"error": f"unknown source: {_redact(source)!r}"}, status_code=422
                 )
         # Off the event loop: the sync search (ONNX query-embed on a cache miss +
-        # the sqlite KNN) runs in the threadpool so concurrent requests don't
-        # serialize head-of-line on the loop (T1). The sqlite conn is opened
-        # check_same_thread=False and writes are single-writer-locked, so a
-        # cross-thread read is safe.
-        results = await run_in_threadpool(
+        # the sqlite KNN) runs on the dedicated bounded offload pool (offload.py)
+        # so concurrent requests don't serialize head-of-line on the loop (T1).
+        # The sqlite conn is opened check_same_thread=False and writes are
+        # single-writer-locked, so a cross-thread read is safe.
+        results, timeout_resp = await _offloaded(
             state.searcher.search,
             q,
             limit=limit,
@@ -747,6 +791,8 @@ def build_app() -> FastAPI:
             tags=tag_list,
             source_ids=[source] if source else None,
         )
+        if timeout_resp:
+            return timeout_resp
         return JSONResponse(
             [
                 {
@@ -782,10 +828,16 @@ def build_app() -> FastAPI:
         pack (RFC 330e7d43, step 2). Read-only; empty when nothing clears
         scope (owner/<agent> + kind=record) + floor."""
         # Off the event loop (T1): boot embeds BOOT_QUERY (cached) then runs the
-        # sqlite KNN — both belong in the threadpool, not on the loop.
-        pack = await run_in_threadpool(
-            boot_pointers, get_state().searcher, agent, k=k, floor=floor, q=q
-        )
+        # sqlite KNN — both belong on the offload pool, not on the loop. Boot
+        # must NEVER 500 (boot_pointers' own contract) — a timeout degrades to
+        # the same empty pack boot_pointers itself returns on a retrieval error,
+        # rather than surfacing as an error to the prompt hook.
+        try:
+            pack = await offload.off_loop(
+                boot_pointers, get_state().searcher, agent, k=k, floor=floor, q=q
+            )
+        except TimeoutError:
+            pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
         return JSONResponse(pack)
 
     @app.post("/api/capture")
@@ -802,15 +854,25 @@ def build_app() -> FastAPI:
         agent = (body.get("agent") or "").strip()
         if not agent:
             return JSONResponse({"captured": False, "reason": "no agent"}, status_code=400)
-        return JSONResponse(
-            capture_state(
+        # Wedge-class-2 recurrence (2026-08-31, live `sample` dump — see offload.py):
+        # this call chain (capture_state -> store.put -> embedder.embed) ran
+        # INLINE here, straight on the event loop — the ONE route 33ca98a's
+        # off-loop fix missed. embedder.embed is onnxruntime inference (CPU-bound,
+        # spins its own worker threads), and the transcript-distil fallback path
+        # additionally makes a blocking OpenAI network call (up to 20s). Off the
+        # loop like every other write path now.
+        try:
+            result = await offload.off_loop(
+                capture_state,
                 get_state().store,
                 agent,
                 body.get("summary") or "",
                 transcript=body.get("transcript") or "",
                 reason=(body.get("reason") or "postcompact"),
             )
-        )
+        except TimeoutError:
+            return JSONResponse({"captured": False, "reason": "capture timed out"}, status_code=504)
+        return JSONResponse(result)
 
     @app.get("/api/map")
     async def api_map(canonical_only: bool = True) -> JSONResponse:
@@ -859,18 +921,32 @@ def build_app() -> FastAPI:
         if not _write_authorized(request):
             return _unauthorized()
         state = get_state()
-        # No explicit root: an explicit root forces the single-source
-        # fallback and silently skips every configured source (found live —
-        # a freshly added source never indexed over HTTP). Bonus: with no
-        # root, load_sources() re-reads sources.yaml on every call, so a
-        # source added after boot is picked up without a restart.
-        stats = state.indexer.reindex()
-        # Scheduled corpus hygiene. reindex (compute_status) already drops
-        # now-ignored agent-artifact files and re-ages docs, and it now LEAVES
-        # 'superseded' docs untouched (SSOT-managed), so they survive for the sweep
-        # to tombstone superseded forks + collapse ephemeral-owner forks here.
-        # Idempotent, so running it on every reindex is safe.
-        stats["sweep"] = state.store.sweep_bloat()
+        # Single-flight (085f1d69): two concurrent /api/reindex calls piled onto
+        # the same long write transaction and stalled prod for minutes. Reject
+        # the 2nd instead of serializing it behind the 1st — non-blocking
+        # acquire, so this check itself never touches the event loop.
+        if not state.reindex_lock.acquire(blocking=False):
+            return JSONResponse({"error": "reindex already in progress"}, status_code=409)
+        try:
+            # Off the event loop (same T1 class as boot/search, and wedge class 2):
+            # a full reindex can run minutes; inline it would block /api/boot and
+            # every other request the whole time. No timeout bound (unlike other
+            # off_loop callers) — reindex is legitimately long-running, and the
+            # single-flight lock above already rules out unbounded pile-up.
+            # No explicit root: an explicit root forces the single-source
+            # fallback and silently skips every configured source (found live —
+            # a freshly added source never indexed over HTTP). Bonus: with no
+            # root, load_sources() re-reads sources.yaml on every call, so a
+            # source added after boot is picked up without a restart.
+            stats = await offload.off_loop(state.indexer.reindex, timeout=None)
+            # Scheduled corpus hygiene. reindex (compute_status) already drops
+            # now-ignored agent-artifact files and re-ages docs, and it now LEAVES
+            # 'superseded' docs untouched (SSOT-managed), so they survive for the sweep
+            # to tombstone superseded forks + collapse ephemeral-owner forks here.
+            # Idempotent, so running it on every reindex is safe.
+            stats["sweep"] = await offload.off_loop(state.store.sweep_bloat, timeout=None)
+        finally:
+            state.reindex_lock.release()
         return JSONResponse(stats)
 
     @app.get("/healthz", response_class=PlainTextResponse)

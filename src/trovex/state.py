@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
 from typing import Any
 
 from .config import Settings
@@ -22,6 +23,11 @@ class AppState:
     searcher: Searcher
     indexer: Indexer
     store: SqliteStore
+    # Single-flight guard for /api/reindex (085f1d69): a 2nd concurrent reindex
+    # piling onto the same long-running write is what turned a slow reindex into
+    # a multi-minute reader stall on prod. Non-blocking acquire only — the route
+    # rejects instead of queuing.
+    reindex_lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 _state: AppState | None = None

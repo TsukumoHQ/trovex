@@ -10,6 +10,7 @@ import re
 import sqlite3
 import time
 
+from . import indexer as indexer_mod
 from .config import Settings
 from .db import reconcile_vec_meta, vec_sync_meta
 from .indexer import FRONTMATTER_RE
@@ -82,6 +83,11 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
         )
     else:
         db.execute("UPDATE docs SET status = 'canonical', dup_of_id = NULL WHERE status != 'superseded'")
+    # Release the write lock here: collision resolution is a complete, self-
+    # contained unit (every row it touched got its final status+dup_of_id in the
+    # same UPDATE), so committing now never leaves a doc half-updated. Without
+    # this, the lock stays held across the whole Pass 1 file-I/O scan below.
+    db.commit()
 
     plan_re = re.compile("|".join(settings.plan_path_patterns))
     now = time.time()
@@ -95,7 +101,7 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
     ).fetchall()
 
     plan_count = stale_count = 0
-    for row in rows:
+    for i, row in enumerate(rows):
         doc_id = row["id"]
         path = row["path"]
         new_status = None
@@ -134,6 +140,14 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
             elif new_status == "stale":
                 stale_count += 1
 
+        # Bounded batches: each row's status change is already a single atomic
+        # UPDATE, so a commit here never splits one doc's fields — it only
+        # shortens how long the write lock is held, letting a concurrent
+        # trovex_write through between batches instead of behind the whole scan.
+        if (i + 1) % indexer_mod.REINDEX_COMMIT_BATCH == 0:
+            db.commit()
+    db.commit()
+
     # Pass 2: duplicate detection (pairwise, only for canonical+plan docs)
     dup_count = _detect_duplicates(db, settings)
 
@@ -169,7 +183,7 @@ def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
         return 0
 
     dup_marked: set[int] = set()
-    for row in rows:
+    for i, row in enumerate(rows):
         if row["id"] in dup_marked:
             continue
         emb_row = db.execute(
@@ -215,6 +229,11 @@ def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
             )
             dup_marked.add(older_id)
             break  # one duplicate marking per doc
+
+        # Same bounded-batch rationale as Pass 1: each marking is one atomic
+        # UPDATE, so committing here is always doc-level consistent.
+        if (i + 1) % indexer_mod.REINDEX_COMMIT_BATCH == 0:
+            db.commit()
 
     return len(dup_marked)
 

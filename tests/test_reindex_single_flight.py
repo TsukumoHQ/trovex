@@ -34,6 +34,7 @@ from httpx import ASGITransport, AsyncClient
 
 from trovex import indexer as indexer_mod
 from trovex import state as state_mod
+from trovex import status as status_mod
 from trovex.config import Settings, Source
 from trovex.indexer import Indexer
 from trovex.search import Searcher
@@ -180,3 +181,72 @@ def test_reindex_commits_in_bounded_batches(tmp_path, monkeypatch):
     # 7 docs / batch-of-3 => 2 mid-run commits via _commit_progress (the final
     # commit at reindex()'s tail is separate, not counted here).
     assert commit_calls >= 2, f"expected periodic commits mid-reindex, got {commit_calls}"
+
+
+def test_concurrent_write_stays_fast_during_compute_status(tmp_path, monkeypatch):
+    """compute_status's Pass 1 (status.py) must commit periodically, not hold
+    the write lock for its whole file-I/O scan — the write-cost P2 root cause:
+    compute_status ran as one uncommitted full-corpus txn (~5510 docs prod),
+    blocking store.put()'s busy_timeout/_retry_on_locked. A concurrent write on
+    a SEPARATE connection to the same db file (WAL, same as a live server's
+    store.db vs indexer.db split) must complete in well under the full pass
+    duration, not wait it out."""
+    monkeypatch.setattr(indexer_mod, "REINDEX_COMMIT_BATCH", 3)
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    n_docs = 30
+    for i in range(n_docs):
+        (src_root / f"doc{i}.md").write_text(f"# Doc {i}\n\nbody text {i}\n")
+
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        embed_model="BAAI/bge-small-en-v1.5",
+        sources_config_path=tmp_path / "no-such-sources.yaml",
+    )
+    embedder = BagEmbedder()
+    indexer = Indexer(settings, embedder=embedder)
+    indexer.reindex(sources=[Source(id="t", label="t", root=src_root)])
+
+    # Slow Pass 1's per-doc file reads so the pass takes long enough to make
+    # lock-release timing measurable, and signal once it's clearly mid-flight
+    # (past the first REINDEX_COMMIT_BATCH commit).
+    real_read_head = status_mod._read_head
+    calls = 0
+    mid_pass = threading.Event()
+
+    def _slow_read_head(path, n):
+        nonlocal calls
+        calls += 1
+        if calls == 8:
+            mid_pass.set()
+        time.sleep(0.05)
+        return real_read_head(path, n)
+
+    monkeypatch.setattr(status_mod, "_read_head", _slow_read_head)
+
+    result: dict = {}
+
+    def _run_compute_status():
+        result["stats"] = status_mod.compute_status(indexer.db, settings)
+
+    thread = threading.Thread(target=_run_compute_status)
+    t0 = time.perf_counter()
+    thread.start()
+    assert mid_pass.wait(timeout=5.0), "compute_status never reached the mid-pass marker"
+
+    writer_store = SqliteStore(settings, embedder=embedder)
+    write_t0 = time.perf_counter()
+    writer_store.put("# Concurrent probe\n\nmust not wait out the whole pass", tags=["probe"])
+    write_elapsed = time.perf_counter() - write_t0
+
+    thread.join(timeout=10.0)
+    total_elapsed = time.perf_counter() - t0
+
+    assert not thread.is_alive(), "compute_status thread did not finish"
+    assert "stats" in result
+    assert total_elapsed > 1.0, "pass wasn't actually slow enough to be a measurable test"
+    assert write_elapsed < 1.0, (
+        f"concurrent write waited {write_elapsed:.2f}s (pass took {total_elapsed:.2f}s total) "
+        "— compute_status must release the write lock between batches"
+    )

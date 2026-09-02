@@ -1037,3 +1037,63 @@ def test_sweep_collapses_numeric_suffix_ephemeral_owner_forks(settings, store):
 
     # Idempotent: nothing left to collapse.
     assert store.sweep_bloat()["ephemeral_owners_collapsed"] == 0
+
+
+def test_sweep_bloat_releases_lock_between_batches(settings, store, monkeypatch):
+    """The write-wedge fix: sweep_bloat must NOT hold self._lock across the whole
+    tombstone loop (that starved every concurrent put()/check_duplicate for the
+    sweep's length even with the sqlite writer lock free). It tombstones a snapshot
+    in _SWEEP_LOCK_BATCH chunks, taking + releasing the lock per chunk. Proven by
+    counting lock acquisitions: with a tiny batch and several superseded forks the
+    tombstone pass must re-acquire once per chunk, not hold once for all of them."""
+    from trovex import store as store_module
+
+    monkeypatch.setattr(store_module, "_SWEEP_LOCK_BATCH", 2)
+
+    # Five superseded forks on distinct topics (each supersede archives the prior).
+    olds = []
+    for i in range(5):
+        olds.append(store.put(f"# Topic B{i}\n\noriginal", kind="reference"))
+        store.put(f"# Topic B{i}\n\nreplacement", kind="reference", force=True)
+    assert (
+        store.db.execute("SELECT count(*) c FROM docs WHERE status = 'superseded'").fetchone()["c"]
+        == 5
+    )
+
+    class _CountingLock:
+        """Counts every acquisition — via the ``with`` context AND the direct
+        ``acquire()`` the reconcile phase uses — so a single long hold vs. many
+        short ones is distinguishable."""
+
+        def __init__(self, inner):
+            self._inner = inner
+            self.acquires = 0
+
+        def acquire(self, *a, **k):
+            self.acquires += 1
+            return self._inner.acquire(*a, **k)
+
+        def release(self):
+            return self._inner.release()
+
+        def __enter__(self):
+            self.acquires += 1
+            return self._inner.__enter__()
+
+        def __exit__(self, *exc):
+            return self._inner.__exit__(*exc)
+
+    counting = _CountingLock(store._lock)
+    store._lock = counting
+
+    result = store.sweep_bloat()
+
+    # All five tombstoned, and the tombstone pass alone took the lock ceil(5/2)=3
+    # times — proof it released between chunks rather than holding once. Plus the
+    # snapshot/stale/collapse/reconcile short holds, so the total is higher still;
+    # a single whole-sweep hold would be ~1.
+    assert result["superseded_deleted"] == 5
+    assert counting.acquires >= 3 + 3
+    assert store.db.execute(
+        "SELECT count(*) c FROM docs WHERE status = 'superseded'"
+    ).fetchone()["c"] == 0

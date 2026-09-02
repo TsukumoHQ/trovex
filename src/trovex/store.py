@@ -57,6 +57,15 @@ TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
 _LOCKED_RETRY_ATTEMPTS = 3
 _LOCKED_RETRY_BASE_DELAY = 0.2  # seconds; doubles each retry
 
+# sweep_bloat tombstones a SNAPSHOT of doomed doc ids in chunks this size,
+# releasing self._lock (and committing) between chunks. The whole sweep runs
+# after EVERY reindex (server.py api_reindex), and holding _lock across the
+# full loop starves every concurrent put()/check_duplicate for the sweep's
+# duration even though the sqlite writer lock is free — the in-process wedge
+# behind the write-path 30s timeouts. Batching bounds the lock hold to one
+# chunk of cascade-deletes so a waiting writer interleaves between chunks.
+_SWEEP_LOCK_BATCH = 200
+
 
 def _is_locked_error(exc: sqlite3.OperationalError) -> bool:
     msg = str(exc).lower()
@@ -705,8 +714,11 @@ class SqliteStore:
                     self._tombstone_locked(doc_id)
                     self._delete_cascade_locked(doc_id)
                 stats["hard_deleted"] = len(doomed)
-            reconcile_vec_meta(self.db)  # sync vec0 lifecycle for the transitioned docs
             self.db.commit()
+        # Sync vec0 lifecycle for the transitioned docs OUTSIDE the hold above,
+        # batched so the per-row resync releases _lock between chunks (same
+        # in-process-wedge class as sweep_bloat, though retention is opt-in).
+        self._reconcile_vec_meta_batched()
         return stats
 
     @_retry_on_locked
@@ -729,7 +741,18 @@ class SqliteStore:
         Idempotent: a second run finds no superseded docs, re-marks nothing new, and
         collapses no owners. Returns {"superseded_deleted", "stale_marked",
         "ephemeral_owners_collapsed"}.
+
+        Lock discipline: each phase takes ``_lock`` in short bursts (a snapshot
+        read, then chunked tombstoning that commits and releases between chunks)
+        rather than one hold spanning the whole sweep — that hold blocked every
+        put()/check_duplicate for the sweep's length (the in-process write wedge).
+        Releasing mid-sweep means a snapshotted id can be gone by the time we
+        reach it; both tombstone helpers no-op on a missing row, so a racing
+        delete is harmless. New superseded/fork docs created mid-sweep aren't in
+        our snapshot — the next reindex's sweep catches them (idempotency intact).
         """
+        # 1. Snapshot superseded-fork ids, then tombstone them in chunks that
+        #    release _lock between commits.
         with self._lock:
             superseded = [
                 r["id"]
@@ -737,9 +760,10 @@ class SqliteStore:
                     "SELECT id FROM docs WHERE status = 'superseded'"
                 ).fetchall()
             ]
-            for doc_id in superseded:
-                self._tombstone_locked(doc_id)
-                self._delete_cascade_locked(doc_id)
+        superseded_deleted = self._tombstone_ids_batched(superseded)
+
+        # 2. Age-stale owned canonicals — one fast bulk UPDATE, its own short hold.
+        with self._lock:
             cutoff = time.time() - self.settings.stale_age_days * 86400
             stale = self.db.execute(
                 """UPDATE docs SET status = 'stale'
@@ -748,32 +772,86 @@ class SqliteStore:
                      AND mtime < ?""",
                 (TROVEX_SOURCE_ID, cutoff),
             )
-            collapsed = self._collapse_ephemeral_owners_locked()
-            reconcile_vec_meta(self.db)  # sync vec0 status for the age-stale'd docs
+            stale_marked = stale.rowcount
             self.db.commit()
+
+        # 3. Collapse ephemeral-owner forks: compute victims under a short hold,
+        #    then tombstone them in the same chunked, lock-releasing pass.
+        with self._lock:
+            victims = self._ephemeral_owner_victims_locked()
+        collapsed = self._tombstone_ids_batched(victims)
+
+        # 4. Re-sync vec0 metadata for the docs phase 2 just marked stale — a bulk
+        #    UPDATE, so this can be thousands of rows (live: 4538). Batched so the
+        #    per-row resync releases _lock between chunks, not one hold (the
+        #    residual in-process write wedge after the tombstone loop was batched).
+        self._reconcile_vec_meta_batched()
+
         return {
-            "superseded_deleted": len(superseded),
-            "stale_marked": stale.rowcount,
+            "superseded_deleted": superseded_deleted,
+            "stale_marked": stale_marked,
             "ephemeral_owners_collapsed": collapsed,
         }
 
+    def _reconcile_vec_meta_batched(self) -> int:
+        """Run ``reconcile_vec_meta``, committing + RELEASING ``_lock`` every
+        ``_SWEEP_LOCK_BATCH`` synced rows so a concurrent put()/check_duplicate
+        isn't blocked across the full per-row resync. Live: a sweep's bulk
+        stale/lifecycle UPDATE left 4538 mismatched vec rows; syncing them
+        one-by-one under a single hold wedged put() >2s even with the sqlite
+        writer lock free. Returns the count synced."""
+        self._lock.acquire()
+        try:
+            def _flush() -> None:
+                self.db.commit()
+                self._lock.release()  # hand the lock to a waiting writer...
+                # ...and actually YIELD so it gets scheduled: releasing and
+                # re-acquiring in the same thread otherwise wins the lock back
+                # before the OS wakes the blocked waiter, starving it anyway.
+                time.sleep(0.001)
+                self._lock.acquire()  # then resume the resync
+            synced = reconcile_vec_meta(
+                self.db, on_batch=_flush, batch_size=_SWEEP_LOCK_BATCH
+            )
+            self.db.commit()
+        finally:
+            self._lock.release()
+        return synced
+
+    def _tombstone_ids_batched(self, doc_ids: list[int]) -> int:
+        """Tombstone-delete a SNAPSHOT of doc ids in ``_SWEEP_LOCK_BATCH`` chunks,
+        acquiring ``_lock`` and committing per chunk so it is RELEASED between
+        chunks — a concurrent writer isn't starved for the whole sweep. An id
+        already deleted by a racing writer is a safe no-op (``_tombstone_locked``
+        skips a missing row; the cascade DELETE matches nothing). Returns the
+        count of ids processed (parity with the pre-batch ``len(...)`` return)."""
+        for start in range(0, len(doc_ids), _SWEEP_LOCK_BATCH):
+            chunk = doc_ids[start : start + _SWEEP_LOCK_BATCH]
+            with self._lock:
+                for doc_id in chunk:
+                    self._tombstone_locked(doc_id)
+                    self._delete_cascade_locked(doc_id)
+                self.db.commit()
+        return len(doc_ids)
+
     _OWNER_SUFFIX_RE = re.compile(r"^owner/(?P<base>.+)-(?P<n>\d+)$")
 
-    def _collapse_ephemeral_owners_locked(self) -> int:
-        """Tombstone the numeric-suffix owner-record forks a respawned agent leaves.
+    def _ephemeral_owner_victims_locked(self) -> list[int]:
+        """Find (don't delete) the numeric-suffix owner-record forks a respawned
+        agent leaves — the caller tombstones them via ``_tombstone_ids_batched``.
 
         A respawn tags its records owner/<name>-<N> (e.g. owner/dev-60, owner/dev-61)
         instead of the canonical owner/<name>. Per group <name>:
-          • if a NON-suffixed owner/<name> record exists → tombstone every
+          • if a NON-suffixed owner/<name> record exists → collapse every
             owner/<name>-<N> (the unsuffixed one is the canonical owner);
-          • else → keep the HIGHEST N (the most recent respawn) and tombstone the
+          • else → keep the HIGHEST N (the most recent respawn) and collapse the
             lower ones.
-        Tombstone = the store's reversible delete (doc_tombstones snapshot + cascade),
-        so it stays recoverable and consistent with the superseded pass; deleting the
-        row also drops it from the KNN corpus. Idempotent: once collapsed, a re-run
-        finds each group with ≤1 member and does nothing. Caller holds ``_lock`` and
-        commits.
-        """
+        Collapse = the store's reversible tombstone-delete (doc_tombstones snapshot +
+        cascade), so it stays recoverable and consistent with the superseded pass;
+        deleting the row also drops it from the KNN corpus. Idempotent: once
+        collapsed, a re-run finds each group with ≤1 member and returns nothing.
+        Read-only + fast; caller holds ``_lock`` for the read. Returns the victim
+        doc ids, sorted."""
         # One owner tag per record is the norm, but a record could carry several;
         # map each owner tag → the doc ids that wear it.
         rows = self.db.execute(
@@ -814,10 +892,7 @@ class SqliteStore:
                 keepers |= g["suffixed"][max(g["suffixed"])]
         victims -= keepers
 
-        for doc_id in sorted(victims):
-            self._tombstone_locked(doc_id)
-            self._delete_cascade_locked(doc_id)
-        return len(victims)
+        return sorted(victims)
 
     def list_tombstones(self, limit: int = 100) -> list[dict]:
         """Deleted owned docs still recoverable (newest first)."""

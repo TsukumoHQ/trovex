@@ -2,6 +2,7 @@ import hashlib
 import logging
 import re
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 import sqlite_vec
@@ -303,20 +304,39 @@ def vec_sync_meta(conn: sqlite3.Connection, doc_id: int) -> None:
         )
 
 
-def reconcile_vec_meta(conn: sqlite3.Connection) -> int:
+def reconcile_vec_meta(
+    conn: sqlite3.Connection,
+    *,
+    on_batch: Callable[[], None] | None = None,
+    batch_size: int = 200,
+) -> int:
     """Sync vec0 metadata to docs for every row whose kind/lifecycle/status DRIFTED
     (e.g. after compute_status' bulk status rewrite). Only touches genuinely-changed
     rows — cheap when most are unchanged. vec0 forbids a correlated bulk UPDATE
     (partition-key restriction), so it re-syncs the mismatches one rowid at a time.
-    Returns the count synced. Does NOT commit."""
+    Returns the count synced. Does NOT commit.
+
+    ``on_batch``, when given, is called after every ``batch_size`` synced rows.
+    The per-row loop can be long — a sweep's bulk stale/lifecycle UPDATE can
+    leave thousands of mismatched rows (live: 4538 after one sweep_bloat) — and
+    a caller holding a lock across the whole loop starves concurrent writers.
+    The store passes a callback that commits and briefly RELEASES its writer
+    lock so a concurrent put() isn't blocked for the full resync (the residual
+    in-process write wedge). ``on_batch`` never fires for the final partial
+    batch — the caller commits that. The ``mismatched`` set is materialized up
+    front, so releasing the lock between batches can't invalidate the loop and a
+    row deleted by a racing writer mid-loop is a safe no-op (vec_sync_meta skips
+    a missing doc)."""
     mismatched = conn.execute(
         """SELECT d.id FROM docs d JOIN vec_docs v ON v.rowid = d.id
            WHERE v.kind != COALESCE(d.kind, 'doc')
               OR v.lifecycle != d.lifecycle
               OR v.status != d.status"""
     ).fetchall()
-    for r in mismatched:
+    for i, r in enumerate(mismatched, 1):
         vec_sync_meta(conn, r["id"])
+        if on_batch is not None and i % batch_size == 0:
+            on_batch()
     return len(mismatched)
 
 

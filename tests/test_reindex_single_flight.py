@@ -32,15 +32,17 @@ import numpy as np
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from trovex import db as db_mod
 from trovex import indexer as indexer_mod
 from trovex import state as state_mod
 from trovex import status as status_mod
+from trovex import store as store_mod
 from trovex.config import Settings, Source
 from trovex.indexer import Indexer
 from trovex.search import Searcher
 from trovex.server import build_app
 from trovex.state import AppState
-from trovex.store import SqliteStore
+from trovex.store import TROVEX_SOURCE_ID, SqliteStore
 
 DIM = 384
 
@@ -350,4 +352,91 @@ def test_concurrent_write_stays_fast_during_low_change_ratio_scan(tmp_path, monk
     assert write_elapsed < 1.0, (
         f"concurrent write waited {write_elapsed:.2f}s (scan took {total_elapsed:.2f}s total) "
         "— reindex must release the write lock on elapsed time, not just change count"
+    )
+
+
+def test_concurrent_put_stays_fast_during_sweep_bloat_reconcile(tmp_path, monkeypatch):
+    """Task a9850600 (prod P1, 2026-09-02): after the reindex write-txn fix, the
+    sqlite writer lock was FREE (BEGIN IMMEDIATE <1s) yet trovex_write STILL
+    timed out at 30s while reads stayed fast — the wedge moved IN-PROCESS.
+    store.sweep_bloat() runs after EVERY reindex and its phase-4
+    reconcile_vec_meta re-synced the docs the sweep's bulk stale-UPDATE just
+    marked (live: 4538 mismatched rows) one-by-one under a SINGLE self._lock
+    hold — starving every concurrent put()/check_duplicate for the whole
+    resync even though the DB lock was available. The reconcile must release
+    _lock between batches, proven here: a put() on the SAME store (sharing
+    _lock) issued mid-reconcile must NOT wait out the full per-row pass."""
+    monkeypatch.setattr(store_mod, "_SWEEP_LOCK_BATCH", 5)
+
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        embed_model="BAAI/bge-small-en-v1.5",
+        sources_config_path=tmp_path / "no-such-sources.yaml",
+    )
+    embedder = BagEmbedder()
+    store = SqliteStore(settings, embedder=embedder)
+
+    # Owned canonicals aged past stale_age_days, so sweep_bloat phase 2 marks
+    # every one 'stale' — each then has a vec_docs row whose status still reads
+    # 'canonical', i.e. a mismatch phase-4 reconcile must resync.
+    # Distinct vocabulary per doc so the near-duplicate guard doesn't flag any
+    # 'duplicate' (which would exclude it from the canonical-only stale UPDATE).
+    words = [
+        "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel",
+        "india", "juliet", "kilo", "lima", "mike", "november", "oscar", "papa",
+        "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiskey",
+        "xray", "yankee", "zulu", "aurora", "borealis", "cascade", "dynamo",
+        "ember", "fathom", "gossamer", "halcyon", "ionic", "juniper", "krypton",
+        "lattice", "meridian", "nebula",
+    ]
+    n_docs = 40
+    for i in range(n_docs):
+        store.put(f"# {words[i].title()} note {i}\n\n{words[i]} topic body {i}", kind="reference")
+    ancient = time.time() - (settings.stale_age_days + 1) * 86400
+    store.db.execute(
+        "UPDATE docs SET mtime = ? WHERE source_id = ?", (ancient, TROVEX_SOURCE_ID)
+    )
+    store.db.commit()
+
+    # Slow each per-row vec resync and signal once reconcile is clearly
+    # mid-flight, so the full pass is long enough to measure a lock-release.
+    real_sync = db_mod.vec_sync_meta
+    calls = 0
+    mid_reconcile = threading.Event()
+
+    def _slow_sync(conn, doc_id):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            mid_reconcile.set()
+        time.sleep(0.05)
+        return real_sync(conn, doc_id)
+
+    monkeypatch.setattr(db_mod, "vec_sync_meta", _slow_sync)
+
+    result: dict = {}
+
+    def _run_sweep():
+        result["stats"] = store.sweep_bloat()
+
+    thread = threading.Thread(target=_run_sweep)
+    t0 = time.perf_counter()
+    thread.start()
+    assert mid_reconcile.wait(timeout=5.0), "sweep never reached the mid-reconcile marker"
+
+    write_t0 = time.perf_counter()
+    store.put("# Concurrent probe\n\nmust not wait out the whole reconcile", kind="reference")
+    write_elapsed = time.perf_counter() - write_t0
+
+    thread.join(timeout=10.0)
+    total_elapsed = time.perf_counter() - t0
+
+    assert not thread.is_alive(), "sweep_bloat thread did not finish"
+    assert result["stats"]["stale_marked"] == n_docs  # the bulk UPDATE that made the mismatches
+    # 40 rows * 0.05s = ~2s full resync; batched release every 5 rows lets the
+    # probe put through in ~one batch gap. Pre-fix (one hold) it waited ~2s.
+    assert total_elapsed > 1.0, "reconcile wasn't slow enough to be a measurable test"
+    assert write_elapsed < 1.0, (
+        f"concurrent put waited {write_elapsed:.2f}s (reconcile took {total_elapsed:.2f}s total) "
+        "— sweep_bloat reconcile must release _lock between batches"
     )

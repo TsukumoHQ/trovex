@@ -1,6 +1,7 @@
 import fnmatch
 import functools
 import hashlib
+import os
 import re
 import time
 from collections.abc import Iterator
@@ -103,6 +104,36 @@ def _rollback_on_error(fn):
     return wrapper
 
 
+def _walk_files(root: Path, ignore_dirs: set[str]) -> Iterator[Path]:
+    """Single recursive descent that PRUNES an ignore_dirs-listed directory name
+    before ever entering it — unlike the old `for ext in EXTS: root.rglob(...)`
+    scan, which called rglob once per extension (one full independent tree walk
+    each) and had no way to skip a directory during any of those walks, only to
+    filter its already-yielded matches afterward in _accept(). On a source with
+    a large ignored subtree (task 3771564e, prod: 49 agent .worktrees / ~58k
+    files across 3 repos) that meant every reindex still paid the FULL
+    directory-syscall cost of walking all of it, over and over per extension,
+    even though ignore_dirs correctly excluded the resulting files — the WAL/
+    write-wedge fix (the .worktrees ignore_dirs entry) only closes the loop
+    together with this pruning; either alone leaves the slow walk in place.
+
+    follow_symlinks=False on the directory check matches Path.rglob's existing
+    behavior on this codebase's Python (verified: it does not descend into a
+    symlinked subdirectory either) — not a behavior change, just not walking
+    ignored directories AT ALL instead of filtering their contents after."""
+    try:
+        entries = list(os.scandir(root))
+    except OSError:
+        return
+    for entry in entries:
+        if entry.is_dir(follow_symlinks=False):
+            if entry.name in ignore_dirs:
+                continue
+            yield from _walk_files(Path(entry.path), ignore_dirs)
+        elif entry.is_file(follow_symlinks=True):
+            yield Path(entry.path)
+
+
 class Indexer:
     def __init__(self, settings: Settings, embedder: Embedder | None = None):
         self.settings = settings
@@ -156,10 +187,9 @@ class Indexer:
         # code, so a repo without a .trovexignore still keeps resume/checkpoint/
         # lessons scratch out of the store).
         ignore_patterns = _load_ignore_patterns(root) + self.settings.default_ignore_globs
-        for ext in (*MARKDOWN_EXTENSIONS, *CODE_EXTENSIONS):
-            for p in root.rglob(f"*.{ext}"):
-                if self._accept(root, root_resolved, p, ignore, ignore_patterns, max_size):
-                    yield p
+        for p in _walk_files(root, ignore):
+            if self._accept(root, root_resolved, p, ignore, ignore_patterns, max_size):
+                yield p
 
     @_rollback_on_error
     def reindex(self, root: Path | None = None, sources: list[Source] | None = None) -> dict:

@@ -126,8 +126,15 @@ class Settings(BaseSettings):
         "site-packages",
         ".idea",
         ".vscode",
-        # Agent workspaces — full repo copies per agent, all duplicates
+        # Agent workspaces — full repo copies per agent, all duplicates. The
+        # niwa eng-worktree-per-PR convention always uses the dot-prefixed
+        # name (`.worktrees/`, confirmed live: trovex/tsukumo/agent-relay all
+        # use it) — the bare "worktrees" never matched a real directory, so
+        # every fleet worktree (49 across 3 repos, ~58k files, live 2026-09-02)
+        # was being walked on every reindex instead of skipped. Keep both:
+        # the bare form costs nothing and guards a differently-named setup.
         "worktrees",
+        ".worktrees",
     ]
     # Agent-artifact file globs the indexer ALWAYS excludes, enforced in code (not
     # left to each repo's .trovexignore). These per-agent scratch files — resume /

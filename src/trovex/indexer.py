@@ -41,6 +41,19 @@ TROVEXIGNORE = ".trovexignore"
 # long-running admin operation (085f1d69).
 REINDEX_COMMIT_BATCH = 200
 
+# CHANGE-count batching alone (above) has a gap: it only advances on an actual
+# add/update, so a run with many unchanged docs and few real changes (task
+# 3771564e, prod: 25 added against 11160 unchanged) can scan the ENTIRE
+# corpus — stat() + read_text() + sha256 per doc, still real per-doc work even
+# on the fast mtime path's early exit — between two commits, without ever
+# reaching REINDEX_COMMIT_BATCH. That leaves one open transaction for the
+# whole 200-600s+ pass, holding the shared db file's single-writer lock the
+# entire time (confirmed live: trovex_write timed out at 30s against a lone
+# in-progress reindex, no other writer). Time-based flushing closes that gap
+# regardless of the change/unchanged ratio — checked every path, so it also
+# fires while walking a long unchanged run, not only after a write.
+REINDEX_COMMIT_INTERVAL_SEC = 1.0
+
 
 def _load_ignore_patterns(root: Path) -> list[str]:
     """Read glob patterns from <root>/.trovexignore (gitignore-ish: one per line,
@@ -209,6 +222,7 @@ class Indexer:
         embed_batch: list[tuple[int, str]] = []
         chunk_embed_batch: list[tuple[int, str]] = []
         since_commit = 0
+        last_commit_at = time.monotonic()
 
         for source in sources:
             sr = source.root
@@ -230,6 +244,17 @@ class Indexer:
             }
 
             for path in self.scan(sr):
+                # Time-based flush, checked on EVERY path (including ones about
+                # to hit the unchanged fast-path continue below) — the gap
+                # REINDEX_COMMIT_BATCH alone leaves. Only fires if a write is
+                # actually pending (since_commit > 0); scanning with nothing
+                # committed yet has no open transaction to release.
+                if since_commit > 0 and (
+                    time.monotonic() - last_commit_at >= REINDEX_COMMIT_INTERVAL_SEC
+                ):
+                    self._commit_progress(embed_batch, chunk_embed_batch)
+                    since_commit = 0
+                    last_commit_at = time.monotonic()
                 try:
                     stat = path.stat()
                 except OSError:
@@ -263,6 +288,11 @@ class Indexer:
                         "UPDATE docs SET mtime=?, last_indexed=? WHERE id=?",
                         (stat.st_mtime, time.time(), existing["id"]),
                     )
+                    # A real write (opens/extends the transaction) even though
+                    # nothing needs re-embedding — must count toward the
+                    # time-based flush guard above, or a run with many of
+                    # these and no _upsert_doc call never trips it.
+                    since_commit += 1
                     s_unchanged += 1
                     continue
 
@@ -288,6 +318,7 @@ class Indexer:
                 if since_commit >= REINDEX_COMMIT_BATCH:
                     self._commit_progress(embed_batch, chunk_embed_batch)
                     since_commit = 0
+                    last_commit_at = time.monotonic()
 
             # Cleanup this source's removed docs. The bulk map already holds the
             # row ids, so a vanished file is a dict-key diff — no re-query.
@@ -299,6 +330,13 @@ class Indexer:
                     # reindex that saw a file disappear.
                     delete_doc_cascade(self.db, row["id"])
                     s_removed += 1
+                    since_commit += 1
+                    if since_commit >= REINDEX_COMMIT_BATCH or (
+                        time.monotonic() - last_commit_at >= REINDEX_COMMIT_INTERVAL_SEC
+                    ):
+                        self._commit_progress(embed_batch, chunk_embed_batch)
+                        since_commit = 0
+                        last_commit_at = time.monotonic()
 
             agg["added"] += s_added
             agg["updated"] += s_updated

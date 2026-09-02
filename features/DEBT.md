@@ -5,3 +5,4 @@
 - [LEGACY_OPPORTUNITY]: Bounded-batch commits mean a failure mid-reindex now only rolls back work since the last periodic commit, not the entire run — accepted tradeoff for a long-running admin op, and it also shrinks the blast radius of the known `compute_status` IntegrityError partial-state issue (task 085f1d69 AC #5) since less uncommitted work is at risk per failure.
 - Left as a [LEGACY_OPPORTUNITY] if a similarly slow scan recurs from a
 - trigger (58k needlessly-scanned files); left as a [LEGACY_OPPORTUNITY] if
+- with a small, easily-reviewed diff. Left as a [LEGACY_OPPORTUNITY] if the

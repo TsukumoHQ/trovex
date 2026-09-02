@@ -260,3 +260,94 @@ def test_concurrent_write_stays_fast_during_compute_status(tmp_path, monkeypatch
         f"concurrent write waited {write_elapsed:.2f}s (pass took {total_elapsed:.2f}s total) "
         "— compute_status must release the write lock between batches"
     )
+
+
+def test_concurrent_write_stays_fast_during_low_change_ratio_scan(tmp_path, monkeypatch):
+    """Task 3771564e (prod P1, 2026-09-02): REINDEX_COMMIT_BATCH is a
+    CHANGE-count threshold — it only advances on a real add/update, so a run
+    with few real changes relative to many unchanged docs (prod: 25 added vs
+    11160 unchanged, well under the 200-doc batch) never reaches it. The
+    whole scan stayed one open transaction for its full wall-clock duration
+    however long the unchanged docs took to walk (confirmed live: a lone
+    in-progress reindex, no other writer, still made trovex_write time out at
+    30s). REINDEX_COMMIT_INTERVAL_SEC must flush on elapsed time regardless
+    of the change/unchanged ratio, checked on every scanned path (not only
+    ones that write) so it also fires mid-run-of-unchanged-docs."""
+    monkeypatch.setattr(indexer_mod, "REINDEX_COMMIT_INTERVAL_SEC", 0.3)
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    n_docs = 40
+    for i in range(n_docs):
+        (src_root / f"doc{i}.md").write_text(f"# Doc {i}\n\nbody text {i}\n")
+
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        embed_model="BAAI/bge-small-en-v1.5",
+        sources_config_path=tmp_path / "no-such-sources.yaml",
+    )
+    embedder = BagEmbedder()
+    indexer = Indexer(settings, embedder=embedder)
+    # Seed: first pass makes every doc "existing" with a stable mtime.
+    indexer.reindex(sources=[Source(id="t", label="t", root=src_root)])
+
+    # Half the docs get real new content (real writes, since_commit-worthy);
+    # the rest keep their seeded mtime (the fast-path "unchanged" branch).
+    # Spread real changes through the set (not just one) so REGARDLESS of
+    # scan order, since_commit is already > 0 well before the test's
+    # mid-scan marker — otherwise an unlucky order could scan every
+    # unchanged doc first and never actually exercise the time-based flush.
+    # Total changes (20) stays well under REINDEX_COMMIT_BATCH (200), so the
+    # existing count-based path provably never fires on its own here.
+    for i in range(0, n_docs, 2):
+        (src_root / f"doc{i}.md").write_text(f"# Doc {i} UPDATED\n\nnew body {i}\n")
+
+    # Slow _accept — called for EVERY scanned path (changed or not) — so
+    # walking 40 mostly-quick files takes long enough to make lock-release
+    # timing measurable. Same technique as the compute_status test above
+    # (_slow_read_head), scoped to one method, no real I/O slowdown needed.
+    real_accept = Indexer._accept
+    calls = 0
+    mid_scan = threading.Event()
+
+    def _slow_accept(self, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 10:
+            mid_scan.set()
+        time.sleep(0.05)
+        return real_accept(self, *args, **kwargs)
+
+    monkeypatch.setattr(Indexer, "_accept", _slow_accept)
+
+    result: dict = {}
+
+    def _run_reindex():
+        result["stats"] = indexer.reindex(sources=[Source(id="t", label="t", root=src_root)])
+
+    # Open the writer's connection BEFORE the slow scan starts — opening it
+    # mid-scan would itself block on a held lock and silently absorb the
+    # wait this test exists to measure, passing even on pre-fix code.
+    writer_store = SqliteStore(settings, embedder=embedder)
+
+    thread = threading.Thread(target=_run_reindex)
+    t0 = time.perf_counter()
+    thread.start()
+    assert mid_scan.wait(timeout=5.0), "scan never reached the mid-scan marker"
+
+    write_t0 = time.perf_counter()
+    writer_store.put("# Concurrent probe\n\nmust not wait out the whole scan", tags=["probe"])
+    write_elapsed = time.perf_counter() - write_t0
+
+    thread.join(timeout=10.0)
+    total_elapsed = time.perf_counter() - t0
+
+    assert not thread.is_alive(), "reindex thread did not finish"
+    assert "stats" in result
+    assert result["stats"]["added"] == 0
+    assert result["stats"]["updated"] == 20
+    assert total_elapsed > 1.0, "scan wasn't actually slow enough to be a measurable test"
+    assert write_elapsed < 1.0, (
+        f"concurrent write waited {write_elapsed:.2f}s (scan took {total_elapsed:.2f}s total) "
+        "— reindex must release the write lock on elapsed time, not just change count"
+    )

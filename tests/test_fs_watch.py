@@ -129,6 +129,30 @@ def test_reindex_paths_no_op_when_bytes_unchanged(settings, source):
     assert (stats["updated"], stats["added"], stats["unchanged"]) == (0, 0, 1)
 
 
+def test_reindex_paths_skip_leaves_status_phase_ms_zero(settings, source, monkeypatch):
+    """Regression (found in review-7595a3ee round 2): reindex_paths() captured
+    _status_t0 OUTSIDE the if/elif that guards compute_status, so the elapsed-time
+    += ran even when neither branch executed, polluting phase_ms['status'] with
+    microseconds on a skipped run. An event that didn't change bytes must leave
+    phase_ms['status'] exactly 0.0 and never call compute_status."""
+    import trovex.status as status_mod
+
+    idx = _indexer(settings)
+    idx.reindex(sources=[source])
+
+    spy_calls: list = []
+    monkeypatch.setattr(
+        status_mod,
+        "compute_status",
+        lambda *a, **k: spy_calls.append(k.get("touched_doc_ids")) or {},
+    )
+
+    stats = idx.reindex_paths([source.root / "a.md"], sources=[source])  # bytes unchanged
+
+    assert spy_calls == []
+    assert stats["phase_ms"]["status"] == 0.0
+
+
 def test_reindex_paths_ignores_paths_outside_sources(settings, source, tmp_path):
     idx = _indexer(settings)
     idx.reindex(sources=[source])

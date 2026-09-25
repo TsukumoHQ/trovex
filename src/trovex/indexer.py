@@ -668,13 +668,15 @@ class Indexer:
 
         from .status import compute_status
 
-        _status_t0 = time.monotonic()
         if counts["removed"] > 0:
+            _status_t0 = time.monotonic()
             compute_status(self.db, self.settings)
+            self._phase_ms["status"] += (time.monotonic() - _status_t0) * 1000
         elif self._touched_ids:
+            _status_t0 = time.monotonic()
             compute_status(self.db, self.settings, touched_doc_ids=self._touched_ids)
-        # else: nothing added/updated/removed — skip entirely.
-        self._phase_ms["status"] += (time.monotonic() - _status_t0) * 1000
+            self._phase_ms["status"] += (time.monotonic() - _status_t0) * 1000
+        # else: nothing added/updated/removed — skip entirely, phase_ms['status'] stays 0.
         elapsed = time.time() - start
         wall_ms = elapsed * 1000
         docs_total = counts["added"] + counts["updated"] + counts["unchanged"]

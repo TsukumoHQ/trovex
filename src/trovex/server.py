@@ -214,13 +214,36 @@ def _unauthorized() -> JSONResponse:
 
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
+_NON_LOOPBACK_BIND_MSG = (
+    "write-token bootstrap is disabled while trovex serve is bound to a non-loopback "
+    "interface — read the token from <data_dir>/.write_token instead (or set "
+    "TROVEX_WRITE_TOKEN)"
+)
+
 
 def _is_loopback(request: Request) -> bool:
-    """True when the request originates from the same machine. Used to bootstrap
-    the local browser UI with the auto-generated write token without exposing it
-    to remote clients."""
+    """True when the TRANSPORT PEER address is the same machine. Never consults
+    X-Forwarded-For or any other header — a header is attacker-controlled input,
+    the peer address is not. Used to bootstrap the local browser UI with the
+    auto-generated write token without exposing it to remote clients."""
     client = request.client
     return bool(client and client.host in _LOOPBACK_HOSTS)
+
+
+def _server_bound_loopback() -> bool:
+    """True when TROVEX_HOST (the interface trovex serve was launched on — see
+    cli._run_server) is itself a loopback address.
+
+    Defense in depth (strix vuln-0001): a non-loopback bind (TROVEX_HOST=0.0.0.0,
+    the fleet-host / dokan-container case) can have traffic that genuinely
+    originated off-machine but still arrives with request.client.host == 127.0.0.1
+    — macOS Docker Desktop's vpnkit terminates a container's connection to
+    host.docker.internal locally and re-establishes it, so the host-side peer
+    address is legitimately loopback even though the true origin was a container.
+    _is_loopback's peer check can't tell those apart, so when the server itself
+    isn't loopback-bound the write-token bootstrap route must not answer AT ALL,
+    regardless of peer — same-machine tooling reads <data_dir>/.write_token instead."""
+    return get_state().settings.host in _LOOPBACK_HOSTS
 
 
 def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1021,7 +1044,10 @@ def build_app() -> FastAPI:
         """Hand the auto-generated write token to a SAME-MACHINE browser so the
         local UI can issue writes without the operator copying it by hand. Refused
         for non-loopback clients, so a network-exposed instance never leaks it.
-        Returns no token when writes are open (TROVEX_ALLOW_UNAUTH_WRITES)."""
+        Returns no token when writes are open (TROVEX_ALLOW_UNAUTH_WRITES). Disabled
+        outright on a non-loopback bind — see _server_bound_loopback."""
+        if not _server_bound_loopback():
+            return JSONResponse({"error": _NON_LOOPBACK_BIND_MSG}, status_code=403)
         if not _is_loopback(request):
             return _unauthorized()
         return JSONResponse({"token": get_state().settings.write_token})

@@ -1,3 +1,4 @@
+import os
 import time
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
@@ -214,6 +215,13 @@ def _run_server(host: str, port: int) -> None:
             "this port sees your query text. Use 127.0.0.1 (default) or front it with an "
             "authenticated proxy for shared/remote use.[/yellow]"
         )
+    # `serve --host` is a CLI flag, not env (see the fleet launcher's comment on why),
+    # so it never reaches Settings() on its own. Mirror it into TROVEX_HOST before
+    # build_app() constructs the process-wide Settings singleton (get_state()) — the
+    # write-token bootstrap route (server.py) needs the REAL bind host, not just the
+    # request's peer address, to defend against a non-loopback bind whose traffic can
+    # legitimately present as a loopback peer (Docker Desktop vpnkit, strix vuln-0001).
+    os.environ["TROVEX_HOST"] = host
     uvicorn.run(build_app(), host=host, port=port)
 
 

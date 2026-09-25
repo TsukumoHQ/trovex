@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -329,6 +330,87 @@ def test_write_token_endpoint_refuses_non_loopback(tmp_path):
     try:
         client = TestClient(build_app())
         assert client.get("/api/write-token").status_code == 403
+    finally:
+        state_mod.reset_state()
+
+
+# ── strix vuln-0001: loopback guard is peer-only, never header-driven ──
+#
+# strix's own report says the guard "checks X-Forwarded-For ... and fails
+# open when absent" — that mechanism was never in this code (grep -rin
+# 'forwarded-for' src/ tests/ has always been empty; _is_loopback has checked
+# only request.client.host since its introduction). What strix actually hit:
+# macOS Docker Desktop's vpnkit presents a container's traffic to
+# host.docker.internal with a host-side peer address of 127.0.0.1, even
+# though the true origin is off-machine — a bind-awareness gap, not a header
+# one. These tests pin (1) XFF is provably never consulted, peer decides
+# alone, and (2) the defense-in-depth: a non-loopback bind disables the
+# route outright regardless of peer.
+
+
+def test_write_token_loopback_peer_succeeds_when_loopback_bound(tmp_path):
+    """Baseline, both bindings covered: the default loopback bind (TROVEX_HOST
+    unset → '127.0.0.1') answers a genuine loopback peer exactly as before."""
+    settings = _make_settings(tmp_path)
+    settings.write_token = settings.resolve_write_token()
+    _inject_state(settings)
+    try:
+        client = TestClient(build_app(), client=("127.0.0.1", 12345))
+        resp = client.get("/api/write-token")
+        assert resp.status_code == 200
+        assert resp.json()["token"] == settings.write_token
+    finally:
+        state_mod.reset_state()
+
+
+def test_write_token_ignores_forwarded_for_header(tmp_path):
+    """A loopback peer is judged on the peer alone — a spoofed X-Forwarded-For
+    (claiming a remote address, or claiming loopback) changes nothing either
+    way, because the guard never reads the header at all."""
+    settings = _make_settings(tmp_path)
+    settings.write_token = settings.resolve_write_token()
+    _inject_state(settings)
+    try:
+        client = TestClient(build_app(), client=("127.0.0.1", 12345))
+        spoofed_remote = client.get("/api/write-token", headers={"x-forwarded-for": "8.8.8.8"})
+        spoofed_loopback = client.get("/api/write-token", headers={"x-forwarded-for": "127.0.0.1"})
+        # Both answer exactly like the no-header case (real peer is loopback):
+        # the header carried zero weight.
+        assert spoofed_remote.status_code == spoofed_loopback.status_code == 200
+    finally:
+        state_mod.reset_state()
+
+
+def test_server_py_never_reads_forwarded_for_header():
+    """Source guard: server.py must never gain an X-Forwarded-For dependency.
+    A header is attacker-controlled input; the transport peer address is not
+    — regressing this reintroduces exactly the mechanism strix's report
+    (incorrectly) attributed to vuln-0001. Matches an actual header LOOKUP
+    (request.headers.get("...forwarded...") / headers["...forwarded..."]),
+    not prose that merely mentions the header name (e.g. this file's own
+    docstrings, which explain that it is deliberately never consulted)."""
+    import trovex.server as server_mod
+
+    src = Path(server_mod.__file__).read_text(encoding="utf-8")
+    header_lookup = re.compile(r"""headers\s*(\.get\(|\[)\s*["'][^"']*forwarded""", re.IGNORECASE)
+    match = header_lookup.search(src)
+    assert match is None, f"server.py reads a forwarded-* header: {match.group(0)!r}"
+
+
+def test_write_token_disabled_on_non_loopback_bind_even_for_loopback_peer(tmp_path):
+    """Defense in depth: when trovex serve is bound to a non-loopback interface
+    (TROVEX_HOST=0.0.0.0, the fleet/dokan-container case), the bootstrap route
+    is disabled outright — even a request whose peer genuinely reads
+    127.0.0.1 (the Docker-Desktop-vpnkit case) is refused. Same-machine
+    tooling reads <data_dir>/.write_token instead."""
+    settings = _make_settings(tmp_path, host="0.0.0.0")
+    settings.write_token = settings.resolve_write_token()
+    _inject_state(settings)
+    try:
+        client = TestClient(build_app(), client=("127.0.0.1", 12345))
+        resp = client.get("/api/write-token")
+        assert resp.status_code == 403
+        assert ".write_token" in resp.json()["error"]
     finally:
         state_mod.reset_state()
 

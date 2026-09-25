@@ -209,9 +209,16 @@ def test_unchanged_corpus_reembeds_nothing_and_is_fast(settings, source_root):
     assert stats2["wall_ms"] < 2000
 
 
-def test_full_reindex_reembeds_every_doc(settings, source_root):
-    """task 67ebd68c AC: full=True bypasses both fast paths and re-embeds the
-    whole corpus even though nothing changed."""
+def test_full_reindex_revisits_every_doc(settings, source_root):
+    """task 67ebd68c AC: full=True bypasses both fast paths — every doc's row
+    is rewritten (unchanged==0) even though nothing actually changed.
+
+    task cbb8e8fb added embed_cache: since the text is byte-identical to the
+    first run's and the model (CountingEmbedder.name == "bag") didn't change,
+    the vector is served from cache rather than recomputed — that's the cache
+    doing its job, not full=True failing to force anything. Re-embedding
+    that's genuinely necessary (a real model change) is covered by
+    test_full_reindex_misses_cache_on_model_change below."""
     _write(source_root, "a.md", "# Alpha\n\nalpha content", mtime=1000)
     _write(source_root, "b.md", "# Bravo\n\nbravo content", mtime=1000)
     _reindex(settings, source_root, CountingEmbedder())
@@ -220,7 +227,26 @@ def test_full_reindex_reembeds_every_doc(settings, source_root):
     stats2 = Indexer(settings, embedder=second).reindex(sources=_src(source_root), full=True)
     assert stats2["unchanged"] == 0
     assert stats2["updated"] == 2
-    assert len(second.embedded) == 2
+    assert second.embedded == []  # served from embed_cache — same model, same text
+    assert stats2["embed_cache_hits"] == 2
+    assert stats2["embed_cache_misses"] == 0
+
+
+def test_full_reindex_misses_cache_on_model_change(settings, source_root):
+    """A different embed_model is a genuine cache miss — full=True with a new
+    model must actually call the new embedder, not silently reuse the old
+    model's vectors."""
+    _write(source_root, "a.md", "# Alpha\n\nalpha content", mtime=1000)
+    _reindex(settings, source_root, CountingEmbedder())
+
+    class OtherModelEmbedder(CountingEmbedder):
+        name = "bag-v2"
+
+    second = OtherModelEmbedder()
+    stats2 = Indexer(settings, embedder=second).reindex(sources=_src(source_root), full=True)
+    assert len(second.embedded) == 1
+    assert stats2["embed_cache_misses"] == 1
+    assert stats2["embed_cache_hits"] == 0
 
 
 def test_index_runs_records_docs_changed_total_wall_ms(settings, source_root):

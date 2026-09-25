@@ -1,21 +1,22 @@
 import fnmatch
 import functools
 import hashlib
+import json
 import os
 import re
 import time
 from collections.abc import Iterator
 from pathlib import Path
 
-import sqlite_vec
-
 from . import capacity
-from .chunking_code import CODE_EXTENSIONS, EXTENSION_LANGUAGES, chunk_code
+from .chunking_code import CHUNKER_VERSION, CODE_EXTENSIONS, EXTENSION_LANGUAGES, chunk_code
 from .config import RESERVED_SOURCE_ID, Settings, Source
 from .db import (
+    DOC_EMBED_NS,
     checkpoint_if_wal_large,
     delete_doc_cascade,
     open_db,
+    resolve_embedding_blobs,
     sync_doc_chunks,
     upsert_docs_fts,
     vec_chunks_put,
@@ -152,6 +153,13 @@ class Indexer:
         self.settings = settings
         self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim())
         self.embedder = embedder or embedder_from_settings(settings)
+        # Per-run phase/cache counters (task cbb8e8fb). Reset at the top of
+        # reindex()/reindex_paths() — _upsert_doc and _flush_*embeddings, called
+        # from inside those, accumulate into them. The single-flight reindex_lock
+        # (server.py) already rules out two runs on one Indexer overlapping.
+        self._phase_ms: dict[str, float] = {"chunk": 0.0, "embed": 0.0, "write": 0.0, "status": 0.0}
+        self._embed_cache_hits = 0
+        self._embed_cache_misses = 0
 
     def _accept(
         self,
@@ -225,6 +233,9 @@ class Indexer:
         sources = [s for s in sources if s.id != RESERVED_SOURCE_ID]
 
         start = time.time()
+        self._phase_ms = {"chunk": 0.0, "embed": 0.0, "write": 0.0, "status": 0.0}
+        self._embed_cache_hits = 0
+        self._embed_cache_misses = 0
         agg = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0, "by_source": []}
         embed_batch: list[tuple[int, str]] = []
         chunk_embed_batch: list[tuple[int, str]] = []
@@ -372,7 +383,9 @@ class Indexer:
         # Recompute status (plan / stale / duplicate / canonical) after indexing
         from .status import compute_status
 
+        _status_t0 = time.monotonic()
         status_stats = compute_status(self.db, self.settings)
+        self._phase_ms["status"] += (time.monotonic() - _status_t0) * 1000
 
         elapsed = time.time() - start
         wall_ms = elapsed * 1000
@@ -382,12 +395,31 @@ class Indexer:
         # work did this run do" the incremental fast paths are meant to shrink.
         docs_total = added + updated + unchanged
         docs_changed = added + updated + removed
+        # "scan" isn't separately timed (stat/read/hash is interleaved with
+        # writes inside the same per-path loop) — it's the residual: whatever
+        # of the run's wall time isn't chunk/embed/write/status.
+        phase_ms = dict(self._phase_ms)
+        phase_ms["scan"] = max(0.0, wall_ms - sum(self._phase_ms.values()))
         self.db.execute(
             """INSERT INTO index_runs
                (ts, duration_sec, added, updated, unchanged, removed,
-                docs_changed, docs_total, wall_ms)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (time.time(), elapsed, added, updated, unchanged, removed, docs_changed, docs_total, wall_ms),
+                docs_changed, docs_total, wall_ms, phase_ms,
+                embed_cache_hits, embed_cache_misses)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                time.time(),
+                elapsed,
+                added,
+                updated,
+                unchanged,
+                removed,
+                docs_changed,
+                docs_total,
+                wall_ms,
+                json.dumps(phase_ms),
+                self._embed_cache_hits,
+                self._embed_cache_misses,
+            ),
         )
         self.db.commit()
         # P3 headroom: warn if any partition is nearing the brute-force ceiling,
@@ -401,6 +433,9 @@ class Indexer:
             "removed": removed,
             "duration_sec": elapsed,
             "wall_ms": wall_ms,
+            "phase_ms": phase_ms,
+            "embed_cache_hits": self._embed_cache_hits,
+            "embed_cache_misses": self._embed_cache_misses,
             "docs_total": docs_total,
             "docs_changed": docs_changed,
             "status": status_stats,
@@ -440,6 +475,7 @@ class Indexer:
 
         tokens_est = count_tokens(content)
         now = time.time()
+        _write_t0 = time.monotonic()
         if existing:
             self.db.execute(
                 """UPDATE docs SET content_hash=?, size_bytes=?, tokens_est=?,
@@ -484,6 +520,7 @@ class Indexer:
 
         # Doc-level BM25 side of the hybrid doc-router search.
         upsert_docs_fts(self.db, doc_id, title, content)
+        self._phase_ms["write"] += (time.monotonic() - _write_t0) * 1000
         embed_batch.append((doc_id, self._embed_text(content, title)))
         if len(embed_batch) >= 32:
             self._flush_embeddings(embed_batch)
@@ -491,9 +528,10 @@ class Indexer:
 
         if ext in CODE_EXTENSIONS:
             lang = EXTENSION_LANGUAGES[ext]
-            chunk_embed_batch.extend(
-                sync_doc_chunks(self.db, doc_id, content, title, lambda c, lang=lang: chunk_code(c, lang))
-            )
+            _chunk_t0 = time.monotonic()
+            new_chunks = sync_doc_chunks(self.db, doc_id, content, title, lambda c, lang=lang: chunk_code(c, lang))
+            self._phase_ms["chunk"] += (time.monotonic() - _chunk_t0) * 1000
+            chunk_embed_batch.extend(new_chunks)
             if len(chunk_embed_batch) >= 32:
                 self._flush_chunk_embeddings(chunk_embed_batch)
                 chunk_embed_batch.clear()
@@ -514,6 +552,9 @@ class Indexer:
         sources = [s for s in sources if s.id != RESERVED_SOURCE_ID and s.root.exists()]
 
         start = time.time()
+        self._phase_ms = {"chunk": 0.0, "embed": 0.0, "write": 0.0, "status": 0.0}
+        self._embed_cache_hits = 0
+        self._embed_cache_misses = 0
         counts = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0}
         embed_batch: list[tuple[int, str]] = []
         chunk_embed_batch: list[tuple[int, str]] = []
@@ -603,16 +644,21 @@ class Indexer:
 
         from .status import compute_status
 
+        _status_t0 = time.monotonic()
         compute_status(self.db, self.settings)
+        self._phase_ms["status"] += (time.monotonic() - _status_t0) * 1000
         elapsed = time.time() - start
         wall_ms = elapsed * 1000
         docs_total = counts["added"] + counts["updated"] + counts["unchanged"]
         docs_changed = counts["added"] + counts["updated"] + counts["removed"]
+        phase_ms = dict(self._phase_ms)
+        phase_ms["scan"] = max(0.0, wall_ms - sum(self._phase_ms.values()))
         self.db.execute(
             """INSERT INTO index_runs
                (ts, duration_sec, added, updated, unchanged, removed,
-                docs_changed, docs_total, wall_ms)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                docs_changed, docs_total, wall_ms, phase_ms,
+                embed_cache_hits, embed_cache_misses)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 time.time(),
                 elapsed,
@@ -623,6 +669,9 @@ class Indexer:
                 docs_changed,
                 docs_total,
                 wall_ms,
+                json.dumps(phase_ms),
+                self._embed_cache_hits,
+                self._embed_cache_misses,
             ),
         )
         self.db.commit()
@@ -630,6 +679,9 @@ class Indexer:
         counts["wall_ms"] = wall_ms
         counts["docs_total"] = docs_total
         counts["docs_changed"] = docs_changed
+        counts["phase_ms"] = phase_ms
+        counts["embed_cache_hits"] = self._embed_cache_hits
+        counts["embed_cache_misses"] = self._embed_cache_misses
         return counts
 
     def _commit_progress(
@@ -647,19 +699,42 @@ class Indexer:
         self.db.commit()
         checkpoint_if_wal_large(self.db, self.settings.data_dir / "trovex.db")
 
+    def _embed_texts_cached(self, texts: list[str], chunker_version: str) -> list[bytes]:
+        """Resolve `texts` to serialized sqlite-vec blobs via the shared
+        embed_cache path (db.resolve_embedding_blobs) — commits any pending
+        transaction before calling the embedder on a miss, so no transaction
+        is open while the (CPU-bound, can run seconds to minutes) model runs.
+        Tracks this run's embed-phase wall time and cache hit/miss counts."""
+        t0 = time.monotonic()
+        blobs, hits, misses = resolve_embedding_blobs(
+            self.db, self.embedder, texts, self.embedder.name, chunker_version
+        )
+        self._phase_ms["embed"] += (time.monotonic() - t0) * 1000
+        self._embed_cache_hits += hits
+        self._embed_cache_misses += misses
+        return blobs
+
     def _flush_embeddings(self, batch: list[tuple[int, str]]) -> None:
+        if not batch:
+            return
         ids = [doc_id for doc_id, _ in batch]
         texts = [text for _, text in batch]
-        embeddings = list(self.embedder.embed(texts))
-        for doc_id, emb in zip(ids, embeddings, strict=True):
-            vec_docs_put(self.db, doc_id, sqlite_vec.serialize_float32(emb.tolist()))
+        blobs = self._embed_texts_cached(texts, DOC_EMBED_NS)
+        t0 = time.monotonic()
+        for doc_id, blob in zip(ids, blobs, strict=True):
+            vec_docs_put(self.db, doc_id, blob)
+        self._phase_ms["write"] += (time.monotonic() - t0) * 1000
 
     def _flush_chunk_embeddings(self, batch: list[tuple[int, str]]) -> None:
+        if not batch:
+            return
         ids = [chunk_id for chunk_id, _ in batch]
         texts = [text for _, text in batch]
-        embeddings = list(self.embedder.embed(texts))
-        for chunk_id, emb in zip(ids, embeddings, strict=True):
-            vec_chunks_put(self.db, chunk_id, sqlite_vec.serialize_float32(emb.tolist()))
+        blobs = self._embed_texts_cached(texts, CHUNKER_VERSION)
+        t0 = time.monotonic()
+        for chunk_id, blob in zip(ids, blobs, strict=True):
+            vec_chunks_put(self.db, chunk_id, blob)
+        self._phase_ms["write"] += (time.monotonic() - t0) * 1000
 
     @staticmethod
     def _embed_text(content: str, title: str) -> str:

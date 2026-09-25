@@ -20,6 +20,12 @@ from functools import cache
 
 from .chunking import DEFAULT_MAX_TOKENS, Chunk, _split_to_size
 
+# Cache-busting key for embed_cache (db.embed_cache_get_many/put_many): bump
+# this when chunk_code's splitting logic changes so a stale cached embedding
+# (computed from an old chunk boundary that no longer matches) is never reused
+# under a hash that could coincidentally collide.
+CHUNKER_VERSION = "1"
+
 # Extension -> tree-sitter-language-pack grammar name. v1 languages picked to
 # match what the fleet actually indexes (trovex/yoru = Python, WRAI.TH/agentd
 # = Go/Rust, dashboards = TS/TSX) — see design doc for 9299f37d.

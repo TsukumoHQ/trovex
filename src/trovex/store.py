@@ -29,12 +29,15 @@ import sqlite_vec
 from .chunking import chunk_markdown
 from .config import RESERVED_SOURCE_ID, Settings
 from .db import (
+    DOC_EMBED_NS,
+    MARKDOWN_CHUNK_EMBED_NS,
     canonical_topic_slug,
     checkpoint_if_wal_large,
     delete_doc_cascade,
     like_escape,
     open_db,
     reconcile_vec_meta,
+    resolve_embedding_blobs,
     sync_doc_chunks,
     upsert_docs_fts,
     vec_chunks_put,
@@ -1016,9 +1019,12 @@ class SqliteStore:
                 if embed_chunks:
                     chunk_pairs.extend(self._insert_chunks(doc_id, content, title))
 
-            embeddings = list(self.embedder.embed([t for _, t in to_embed]))
-            for (doc_id, _), emb in zip(to_embed, embeddings, strict=True):
-                vec_docs_put(self.db, doc_id, sqlite_vec.serialize_float32(emb.tolist()))
+            blobs, _, _ = resolve_embedding_blobs(
+                self.db, self.embedder, [t for _, t in to_embed], self.embedder.name,
+                DOC_EMBED_NS, commit_before_embed=False,
+            )
+            for (doc_id, _), blob in zip(to_embed, blobs, strict=True):
+                vec_docs_put(self.db, doc_id, blob)
             for doc_id, tags in tag_jobs:
                 self._set_tags(doc_id, tags)
             self._embed_chunks(chunk_pairs)
@@ -1033,12 +1039,21 @@ class SqliteStore:
         return sync_doc_chunks(self.db, doc_id, content, title, chunk_markdown)
 
     def _embed_chunks(self, pairs: list[tuple[int, str]]) -> None:
-        """Batch-embed chunk texts (prefix-fused) into vec_chunks."""
+        """Batch-embed chunk texts (prefix-fused) into vec_chunks. Via
+        embed_cache (task cbb8e8fb): an identical chunk (a duplicate doc, an
+        unchanged chunk re-synced) skips the model call. commit_before_embed
+        =False — put() is one atomic doc write end-to-end; see
+        db.resolve_embedding_blobs for why store.py doesn't take the
+        transaction-narrowing half of that fix."""
         if not pairs:
             return
-        embs = list(self.embedder.embed([t for _, t in pairs]))
-        for (cid, _), emb in zip(pairs, embs, strict=True):
-            vec_chunks_put(self.db, cid, sqlite_vec.serialize_float32(emb.tolist()))
+        texts = [t for _, t in pairs]
+        blobs, _, _ = resolve_embedding_blobs(
+            self.db, self.embedder, texts, self.embedder.name,
+            MARKDOWN_CHUNK_EMBED_NS, commit_before_embed=False,
+        )
+        for (cid, _), blob in zip(pairs, blobs, strict=True):
+            vec_chunks_put(self.db, cid, blob)
 
     def search_chunks(
         self,
@@ -1347,9 +1362,16 @@ class SqliteStore:
         return True
 
     def _embed(self, doc_id: int, content: str, title: str) -> None:
+        """Via embed_cache (task cbb8e8fb) — same text format as
+        Indexer._embed_text, so a file-indexed doc and a trovex-owned doc
+        with identical (title, content) SHARE a cache entry. commit_before_
+        embed=False: see _embed_chunks / db.resolve_embedding_blobs."""
         text = f"{title}\n\n{FRONTMATTER_RE.sub('', content)}"[:8000]
-        emb = next(iter(self.embedder.embed([text])))
-        vec_docs_put(self.db, doc_id, sqlite_vec.serialize_float32(emb.tolist()))
+        blobs, _, _ = resolve_embedding_blobs(
+            self.db, self.embedder, [text], self.embedder.name, DOC_EMBED_NS,
+            commit_before_embed=False,
+        )
+        vec_docs_put(self.db, doc_id, blobs[0])
 
 
 def _row_to_doc(row: sqlite3.Row) -> StoredDoc:

@@ -2,6 +2,7 @@ import hashlib
 import logging
 import re
 import sqlite3
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -229,6 +230,115 @@ def vec_chunks_put(conn: sqlite3.Connection, chunk_id: int, emb_blob: bytes) -> 
         "VALUES (?, ?, ?, ?, ?, ?)",
         (chunk_id, src, emb_blob, kind, lifecycle, status),
     )
+
+
+def embed_cache_get_many(
+    conn: sqlite3.Connection, text_hashes: list[str], embed_model: str, chunker_version: str
+) -> dict[str, bytes]:
+    """Batch-lookup cached embeddings for `text_hashes` under (embed_model,
+    chunker_version). Returns only the hits, as {text_hash: serialized_blob} —
+    ready to write straight into vec_docs/vec_chunks. Read-only."""
+    if not text_hashes:
+        return {}
+    placeholders = ",".join("?" * len(text_hashes))
+    rows = conn.execute(
+        f"""SELECT text_hash, embedding FROM embed_cache
+            WHERE text_hash IN ({placeholders})
+              AND embed_model = ? AND chunker_version = ?""",
+        (*text_hashes, embed_model, chunker_version),
+    ).fetchall()
+    return {r["text_hash"]: r["embedding"] for r in rows}
+
+
+def embed_cache_put_many(
+    conn: sqlite3.Connection,
+    rows: list[tuple[str, str, str, bytes, float]],
+) -> None:
+    """Batch-insert freshly computed embeddings, each row a
+    (text_hash, embed_model, chunker_version, embedding_blob, created_at) tuple.
+    INSERT OR REPLACE: a rare hash collision across two different real texts
+    would only mean one of them re-embeds on its next miss, never a wrong
+    vector served silently. Does NOT commit."""
+    if not rows:
+        return
+    conn.executemany(
+        """INSERT OR REPLACE INTO embed_cache
+           (text_hash, embed_model, chunker_version, embedding, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        rows,
+    )
+
+
+# embed_cache chunker_version sentinels for non-chunked embeddings — there's
+# no chunker involved, but the cache's primary key needs a value in that
+# column, and a fixed sentinel per embedding KIND keeps doc-level (both the
+# file-indexed and the trovex-owned store paths — same content, same model,
+# same vector, so they deliberately SHARE this one) and markdown-chunk
+# entries from ever colliding with each other or with cAST code-chunk
+# entries (chunking_code.CHUNKER_VERSION) under the same text_hash.
+DOC_EMBED_NS = "doc"
+MARKDOWN_CHUNK_EMBED_NS = "md-chunk-1"
+
+
+def resolve_embedding_blobs(
+    conn: sqlite3.Connection,
+    embedder,
+    texts: list[str],
+    embed_model: str,
+    chunker_version: str,
+    *,
+    commit_before_embed: bool = True,
+) -> tuple[list[bytes], int, int]:
+    """Resolve `texts` to serialized sqlite-vec blobs via embed_cache, calling
+    the embedder only for what's missing. Shared by Indexer (reindex/fs-watch)
+    and SqliteStore (trovex_write) — both had the same bug (task cbb8e8fb):
+    the ONNX model call is CPU-bound and can run seconds to minutes, and
+    calling it while `conn` has an open transaction holds the WAL writer slot
+    for the whole duration, starving every other writer on the shared db file.
+
+    commit_before_embed=True (Indexer's case) commits `conn` before calling
+    embedder.embed() on a miss, so no transaction is open while the model
+    runs — the caller must have nothing pending it needs atomic with the row
+    writes that follow this call (Indexer's periodic-commit design already
+    accepts that: a crash mid-run only loses work since the last checkpoint).
+    commit_before_embed=False (SqliteStore's case) skips that commit: a single
+    trovex_write is one atomic doc write end-to-end, and committing mid-flow
+    would let a crash between the commit and the final vector write leave a
+    doc row with content but no vector — silently unsearchable. The embed
+    cache still helps there (a hit skips the model call outright); the
+    transaction-narrowing half of the fix is store.py's own to do later,
+    without breaking that atomicity (task cbb8e8fb follow-up).
+
+    Deduplicates WITHIN `texts` too, not just against the persisted table:
+    two identical texts in one call (a duplicate doc, a rename) share one
+    embed() call even though neither was cached yet when this call started.
+
+    Returns (blobs in the SAME order as `texts`, cache hits, cache misses).
+    """
+    if not texts:
+        return [], 0, 0
+    hashes = [hashlib.sha256(t.encode("utf-8", errors="replace")).hexdigest() for t in texts]
+    resolved = embed_cache_get_many(conn, hashes, embed_model, chunker_version)
+    miss_order: list[str] = []  # first-seen order of hashes with no vector yet
+    hash_to_text: dict[str, str] = {}
+    for h, t in zip(hashes, texts, strict=True):
+        if h not in resolved and h not in hash_to_text:
+            miss_order.append(h)
+        hash_to_text.setdefault(h, t)
+    hits = len(hashes) - len(miss_order)
+    misses = len(miss_order)
+    if miss_order:
+        if commit_before_embed:
+            conn.commit()  # no transaction open while the model runs
+        fresh = list(embedder.embed([hash_to_text[h] for h in miss_order]))
+        new_rows = []
+        now = time.time()
+        for h, emb in zip(miss_order, fresh, strict=True):
+            blob = sqlite_vec.serialize_float32(emb.tolist())
+            resolved[h] = blob
+            new_rows.append((h, embed_model, chunker_version, blob, now))
+        embed_cache_put_many(conn, new_rows)
+    return [resolved[h] for h in hashes], hits, misses
 
 
 def sync_doc_chunks(
@@ -638,6 +748,11 @@ def _migrate_add_index_run_metrics(conn: sqlite3.Connection) -> None:
         ("docs_changed", "INTEGER NOT NULL DEFAULT 0"),
         ("docs_total", "INTEGER NOT NULL DEFAULT 0"),
         ("wall_ms", "REAL NOT NULL DEFAULT 0"),
+        # task cbb8e8fb: per-phase cost breakdown + embed-cache effectiveness,
+        # so a slow run's dominant phase is visible without re-profiling live.
+        ("phase_ms", "TEXT NOT NULL DEFAULT '{}'"),
+        ("embed_cache_hits", "INTEGER NOT NULL DEFAULT 0"),
+        ("embed_cache_misses", "INTEGER NOT NULL DEFAULT 0"),
     ):
         if col not in cols:
             conn.execute(
@@ -868,7 +983,28 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             added INTEGER, updated INTEGER, unchanged INTEGER, removed INTEGER,
             docs_changed INTEGER NOT NULL DEFAULT 0,
             docs_total INTEGER NOT NULL DEFAULT 0,
-            wall_ms REAL NOT NULL DEFAULT 0
+            wall_ms REAL NOT NULL DEFAULT 0,
+            phase_ms TEXT NOT NULL DEFAULT '{{}}',
+            embed_cache_hits INTEGER NOT NULL DEFAULT 0,
+            embed_cache_misses INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- Cross-doc/cross-run embedding cache (task cbb8e8fb): identical text
+        -- (a rename, a duplicate paragraph, an unchanged doc re-embedded by a
+        -- full=true rebuild) reuses its vector instead of paying the ONNX model
+        -- again. Keyed by the exact embedded text's hash (not docs.content_hash
+        -- — that excludes the title prefix _embed_text adds), the model id (a
+        -- model swap must never serve another model's vectors), and the chunker
+        -- version (chunk_code's boundaries changing invalidates old chunk-text
+        -- hashes' cached vectors). embedding is the sqlite-vec serialized blob,
+        -- ready to write straight into vec_docs/vec_chunks on a hit.
+        CREATE TABLE IF NOT EXISTS embed_cache (
+            text_hash TEXT NOT NULL,
+            embed_model TEXT NOT NULL,
+            chunker_version TEXT NOT NULL,
+            embedding BLOB NOT NULL,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (text_hash, embed_model, chunker_version)
         );
 
         CREATE TABLE IF NOT EXISTS mcp_queries (

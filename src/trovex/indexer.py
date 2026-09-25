@@ -160,6 +160,7 @@ class Indexer:
         self._phase_ms: dict[str, float] = {"chunk": 0.0, "embed": 0.0, "write": 0.0, "status": 0.0}
         self._embed_cache_hits = 0
         self._embed_cache_misses = 0
+        self._touched_ids: list[int] = []
 
     def _accept(
         self,
@@ -236,6 +237,7 @@ class Indexer:
         self._phase_ms = {"chunk": 0.0, "embed": 0.0, "write": 0.0, "status": 0.0}
         self._embed_cache_hits = 0
         self._embed_cache_misses = 0
+        self._touched_ids = []
         agg = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0, "by_source": []}
         embed_batch: list[tuple[int, str]] = []
         chunk_embed_batch: list[tuple[int, str]] = []
@@ -380,12 +382,28 @@ class Indexer:
         unchanged = agg["unchanged"]
         removed = agg["removed"]
 
-        # Recompute status (plan / stale / duplicate / canonical) after indexing
+        # Recompute status (plan / stale / duplicate / canonical) after indexing.
+        # task 7595a3ee: compute_status was 88.9% of a full reindex's wall time
+        # on the prod store (profiled: 5321/5987ms of a full recompute) because
+        # it unconditionally re-derived every non-superseded doc, every run.
+        #   - removed > 0: a removed doc's canonical_topic may now have no live
+        #     canonical, or a promotable stale/duplicate sibling — the
+        #     incremental path can't prove either way, so fall back to a full
+        #     recompute (touched_doc_ids=None).
+        #   - nothing added/updated and nothing removed: status can't have
+        #     changed for anyone either — skip the call entirely (status_ms 0).
+        #   - otherwise: incremental, scoped to this run's touched doc ids.
         from .status import compute_status
 
-        _status_t0 = time.monotonic()
-        status_stats = compute_status(self.db, self.settings)
-        self._phase_ms["status"] += (time.monotonic() - _status_t0) * 1000
+        if not self._touched_ids and removed == 0:
+            status_stats = {"plan": 0, "stale": 0, "duplicate": 0, "canonical": 0}
+        else:
+            _status_t0 = time.monotonic()
+            if removed > 0:
+                status_stats = compute_status(self.db, self.settings)
+            else:
+                status_stats = compute_status(self.db, self.settings, touched_doc_ids=self._touched_ids)
+            self._phase_ms["status"] += (time.monotonic() - _status_t0) * 1000
 
         elapsed = time.time() - start
         wall_ms = elapsed * 1000
@@ -518,6 +536,11 @@ class Indexer:
             doc_id = cur.lastrowid
             action = "added"
 
+        # Feeds compute_status's incremental path (task 7595a3ee): only docs
+        # actually added/updated this run need their plan/stale/duplicate
+        # status re-derived.
+        self._touched_ids.append(doc_id)
+
         # Doc-level BM25 side of the hybrid doc-router search.
         upsert_docs_fts(self.db, doc_id, title, content)
         self._phase_ms["write"] += (time.monotonic() - _write_t0) * 1000
@@ -555,6 +578,7 @@ class Indexer:
         self._phase_ms = {"chunk": 0.0, "embed": 0.0, "write": 0.0, "status": 0.0}
         self._embed_cache_hits = 0
         self._embed_cache_misses = 0
+        self._touched_ids = []
         counts = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0}
         embed_batch: list[tuple[int, str]] = []
         chunk_embed_batch: list[tuple[int, str]] = []
@@ -645,7 +669,11 @@ class Indexer:
         from .status import compute_status
 
         _status_t0 = time.monotonic()
-        compute_status(self.db, self.settings)
+        if counts["removed"] > 0:
+            compute_status(self.db, self.settings)
+        elif self._touched_ids:
+            compute_status(self.db, self.settings, touched_doc_ids=self._touched_ids)
+        # else: nothing added/updated/removed — skip entirely.
         self._phase_ms["status"] += (time.monotonic() - _status_t0) * 1000
         elapsed = time.time() - start
         wall_ms = elapsed * 1000

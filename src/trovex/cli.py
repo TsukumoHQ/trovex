@@ -1004,6 +1004,33 @@ def import_(
 
 
 @app.command()
+def status() -> None:
+    """Force a FULL status recompute (plan/stale/duplicate/canonical) over the
+    whole corpus, not just touched docs.
+
+    `trovex index`'s reindex already does this incrementally, scoped to the
+    docs it actually added/updated (task 7595a3ee — a full recompute was
+    88.9% of a reindex's wall time). That scoping can't see two gaps: a doc
+    ageing into staleness with no edit, or the aftermath of a doc REMOVED
+    outside of `trovex index` (e.g. a manual file delete under a watched
+    source that hasn't triggered a reindex yet). Run this after a bulk
+    external edit/delete, or on a schedule, to close both."""
+    from .status import compute_status
+
+    settings = Settings()
+    indexer = Indexer(settings)
+    console.print("[bold]Recomputing status[/bold] (full corpus)…")
+    t0 = time.time()
+    result = compute_status(indexer.db, settings)
+    elapsed = time.time() - t0
+    console.print(
+        f"[green]Done in {elapsed:.1f}s[/green]  "
+        f"plan={result['plan']} stale={result['stale']} "
+        f"duplicate={result['duplicate']} canonical={result['canonical']}"
+    )
+
+
+@app.command()
 def onboard() -> None:
     """Guided first run: pick a folder, preview the dated docs, import, start serving.
 

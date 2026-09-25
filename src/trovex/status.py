@@ -26,16 +26,45 @@ def _ephemeral_sql(settings: Settings) -> str:
     return "(" + ", ".join(f"'{k}'" for k in safe) + ")" if safe else "('')"
 
 
-def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
-    """Apply heuristics and update docs.status for all rows.
+def compute_status(
+    db: sqlite3.Connection, settings: Settings, touched_doc_ids: list[int] | None = None
+) -> dict:
+    """Apply heuristics and update docs.status.
 
     Order matters:
-      1. Reset everything to canonical (clears stale flags from prior runs)
+      1. Reset to canonical (clears stale flags from prior runs)
       2. plan: path patterns / title cues / frontmatter
       3. stale: frontmatter explicit / age threshold
       4. duplicate: nearest-neighbour cosine > threshold, older wins
       5. stale (cascading): if duplicate's canonical is fresher than X
+
+    touched_doc_ids=None (default): FULL recompute over every non-superseded
+    doc — today's original behavior, still the ground truth (`trovex status
+    --full`, and whenever a doc was REMOVED this run: a removed canonical
+    doc's topic might now have no live canonical, or a promotable stale/
+    duplicate sibling, and the incremental path below can't prove either way
+    without re-scanning the whole topic — so a run with any removals must
+    pass None here, not a touched-id list).
+
+    touched_doc_ids=[a list]: INCREMENTAL — profiled 88.9% of a full recompute's
+    cost is Pass 2's duplicate-detection KNN loop (task 7595a3ee, 3637-doc prod
+    copy: 5321/5987ms), so restricting its DRIVER rows to touched docs is what
+    actually matters; collision resolution is scoped to touched docs' own
+    canonical_topic values (a touched doc's new/changed topic can still
+    collide with an EXISTING untouched canonical — that must still be caught);
+    Pass 1 (plan/stale) is scoped to touched docs only. An untouched doc's
+    status is left exactly as-is: correct, because nothing that could change
+    it (content, embedding, topic) changed for that doc — except the pure
+    age-based staleness check, which is time- not content-driven and can't be
+    incrementalized this way; that gap is accepted here and closed by the
+    next full recompute (scheduled or removal-triggered), not every run. An
+    empty list is a no-op — prefer not calling compute_status at all in that
+    case (see indexer.py's skip-when-unchanged path); this still returns a
+    correct zeroed result rather than erroring.
     """
+    incremental = touched_doc_ids is not None
+    if incremental and not touched_doc_ids:
+        return {"plan": 0, "stale": 0, "duplicate": 0, "canonical": 0}
     # 'superseded' is SSOT-managed, not a heuristic status: a doc stepped down by a
     # newer canonical (store.put force / the canonical_topic migration) must STAY
     # superseded. Resetting it to canonical would (a) trip the partial unique index
@@ -54,18 +83,51 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
     # demote every other member to 'duplicate' pointing at it, so the blanket
     # UPDATE below never sees two canonical_topic peers eligible for 'canonical'
     # at once.
-    collisions = db.execute(
-        """SELECT d.id AS loser_id, (
-               SELECT w.id FROM docs w
-               WHERE w.workspace_id = d.workspace_id
-                 AND w.canonical_topic = d.canonical_topic
-                 AND w.status != 'superseded'
-               ORDER BY (w.status = 'canonical') DESC, w.mtime DESC, w.id DESC
-               LIMIT 1
-           ) AS winner_id
-           FROM docs d
-           WHERE d.status != 'superseded' AND d.canonical_topic IS NOT NULL"""
-    ).fetchall()
+    if incremental:
+        touched_ph = ",".join("?" * len(touched_doc_ids))
+        topics = [
+            r["canonical_topic"]
+            for r in db.execute(
+                f"SELECT DISTINCT canonical_topic FROM docs "
+                f"WHERE id IN ({touched_ph}) AND canonical_topic IS NOT NULL",
+                touched_doc_ids,
+            ).fetchall()
+        ]
+        if topics:
+            topic_ph = ",".join("?" * len(topics))
+            collisions = db.execute(
+                f"""SELECT d.id AS loser_id, (
+                       SELECT w.id FROM docs w
+                       WHERE w.workspace_id = d.workspace_id
+                         AND w.canonical_topic = d.canonical_topic
+                         AND w.status != 'superseded'
+                       ORDER BY (w.status = 'canonical') DESC, w.mtime DESC, w.id DESC
+                       LIMIT 1
+                   ) AS winner_id
+                   FROM docs d
+                   WHERE d.status != 'superseded' AND d.canonical_topic IN ({topic_ph})""",
+                topics,
+            ).fetchall()
+        else:
+            collisions = []
+        reset_where = f"status != 'superseded' AND id IN ({touched_ph})"
+        reset_params: list = list(touched_doc_ids)
+    else:
+        collisions = db.execute(
+            """SELECT d.id AS loser_id, (
+                   SELECT w.id FROM docs w
+                   WHERE w.workspace_id = d.workspace_id
+                     AND w.canonical_topic = d.canonical_topic
+                     AND w.status != 'superseded'
+                   ORDER BY (w.status = 'canonical') DESC, w.mtime DESC, w.id DESC
+                   LIMIT 1
+               ) AS winner_id
+               FROM docs d
+               WHERE d.status != 'superseded' AND d.canonical_topic IS NOT NULL"""
+        ).fetchall()
+        reset_where = "status != 'superseded'"
+        reset_params = []
+
     loser_ids = [row["loser_id"] for row in collisions if row["loser_id"] != row["winner_id"]]
     for loser_id, winner_id in (
         (row["loser_id"], row["winner_id"]) for row in collisions if row["loser_id"] != row["winner_id"]
@@ -78,11 +140,14 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
         placeholders = ",".join("?" * len(loser_ids))
         db.execute(
             f"UPDATE docs SET status = 'canonical', dup_of_id = NULL "
-            f"WHERE status != 'superseded' AND id NOT IN ({placeholders})",
-            loser_ids,
+            f"WHERE {reset_where} AND id NOT IN ({placeholders})",
+            reset_params + loser_ids,
         )
     else:
-        db.execute("UPDATE docs SET status = 'canonical', dup_of_id = NULL WHERE status != 'superseded'")
+        db.execute(
+            f"UPDATE docs SET status = 'canonical', dup_of_id = NULL WHERE {reset_where}",
+            reset_params,
+        )
     # Release the write lock here: everything above (collision resolution AND
     # the blanket canonicalize UPDATE) is a complete, self-contained unit —
     # every row touched got its final status+dup_of_id in the same UPDATE, so
@@ -95,11 +160,21 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
     stale_cutoff = now - settings.stale_age_days * 86400
 
     # Pass 1: plan + stale (single-doc rules). Skip superseded — re-marking one
-    # plan/stale would silently un-supersede an SSOT-retired doc.
-    rows = db.execute(
-        "SELECT id, path, absolute_path, mtime, kind FROM docs "
-        "WHERE workspace_id = 'default' AND status != 'superseded'"
-    ).fetchall()
+    # plan/stale would silently un-supersede an SSOT-retired doc. Incremental:
+    # only touched docs — an untouched doc's content didn't change, so neither
+    # could its plan/frontmatter-stale classification (age-staleness gap: see
+    # compute_status's docstring).
+    if incremental:
+        rows = db.execute(
+            f"SELECT id, path, absolute_path, mtime, kind FROM docs "
+            f"WHERE workspace_id = 'default' AND status != 'superseded' AND id IN ({touched_ph})",
+            touched_doc_ids,
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT id, path, absolute_path, mtime, kind FROM docs "
+            "WHERE workspace_id = 'default' AND status != 'superseded'"
+        ).fetchall()
 
     plan_count = stale_count = 0
     for i, row in enumerate(rows):
@@ -149,8 +224,15 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
             db.commit()
     db.commit()
 
-    # Pass 2: duplicate detection (pairwise, only for canonical+plan docs)
-    dup_count = _detect_duplicates(db, settings)
+    # Pass 2: duplicate detection (pairwise, only for canonical+plan docs).
+    # Incremental: driver rows restricted to touched docs — profiled as 88.9%
+    # of a full recompute's cost (see compute_status's docstring), so this is
+    # the scoping that actually matters. A touched doc's KNN query still scans
+    # the WHOLE same-(source,kind) neighbourhood, so it correctly catches (and
+    # demotes) an EXISTING untouched doc that's now its duplicate — untouched
+    # docs just never need to be DRIVERS themselves, since nothing about them
+    # changed.
+    dup_count = _detect_duplicates(db, settings, driver_ids=touched_doc_ids if incremental else None)
 
     # Sync vec0 metadata for every doc this pass re-classified (partitioned KNN
     # pre-filters on vec_docs.status, so it must track docs.status).
@@ -164,23 +246,46 @@ def compute_status(db: sqlite3.Connection, settings: Settings) -> dict:
     }
 
 
-def _detect_duplicates(db: sqlite3.Connection, settings: Settings) -> int:
-    """For each doc, find its nearest SAME-(source_id, kind) neighbour. If cosine
-    sim > threshold, the older doc becomes a duplicate of the newer.
+def _detect_duplicates(
+    db: sqlite3.Connection, settings: Settings, driver_ids: list[int] | None = None
+) -> int:
+    """For each DRIVER doc, find its nearest SAME-(source_id, kind) neighbour
+    among ALL canonical/plan docs. If cosine sim > threshold, the older doc
+    becomes a duplicate of the newer.
 
     Namespaced like the live write path (store.check_duplicate /
     detect_duplicate_for): compares LIKE-WITH-LIKE so a reindex/fs-watch never
     demotes an owned canonical to a duplicate of an unrelated other-kind doc.
     Ephemeral kinds (dup_ephemeral_kinds) are their own events — excluded as
-    drivers AND as neighbours."""
-    # Drivers: canonical/plan, non-ephemeral.
-    rows = db.execute(
-        f"""SELECT d.id, d.mtime, d.kind, d.source_id FROM docs d
-            WHERE d.status IN ('canonical', 'plan')
-              AND d.workspace_id = 'default'
-              AND (d.kind IS NULL OR d.kind NOT IN {_ephemeral_sql(settings)})"""
-    ).fetchall()
-    if len(rows) < 2:
+    drivers AND as neighbours.
+
+    driver_ids=None: every canonical/plan doc is a driver (full recompute).
+    driver_ids=[a list]: only those are drivers — an untouched doc's content
+    and embedding are unchanged, so it can't discover a NEW duplicate
+    relationship on its own; a driver's KNN query still scans every existing
+    canonical/plan doc as a candidate neighbour, so an untouched doc CAN still
+    be found (and demoted) as a driver's duplicate."""
+    if driver_ids is not None:
+        if not driver_ids:
+            return 0
+        driver_ph = ",".join("?" * len(driver_ids))
+        rows = db.execute(
+            f"""SELECT d.id, d.mtime, d.kind, d.source_id FROM docs d
+                WHERE d.status IN ('canonical', 'plan')
+                  AND d.workspace_id = 'default'
+                  AND (d.kind IS NULL OR d.kind NOT IN {_ephemeral_sql(settings)})
+                  AND d.id IN ({driver_ph})""",
+            driver_ids,
+        ).fetchall()
+    else:
+        # Drivers: canonical/plan, non-ephemeral.
+        rows = db.execute(
+            f"""SELECT d.id, d.mtime, d.kind, d.source_id FROM docs d
+                WHERE d.status IN ('canonical', 'plan')
+                  AND d.workspace_id = 'default'
+                  AND (d.kind IS NULL OR d.kind NOT IN {_ephemeral_sql(settings)})"""
+        ).fetchall()
+    if not rows:
         return 0
 
     dup_marked: set[int] = set()

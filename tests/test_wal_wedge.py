@@ -286,7 +286,7 @@ def test_indexer_reindex_rolls_back_on_compute_status_failure(settings, tmp_path
 
     indexer = Indexer(settings, embedder=BagEmbedder())
 
-    def _boom(db, settings):
+    def _boom(db, settings, touched_doc_ids=None):
         raise sqlite3.IntegrityError("UNIQUE constraint failed: docs.workspace_id, docs.canonical_topic")
 
     # reindex() imports compute_status LOCALLY inside the function body, so the

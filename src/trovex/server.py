@@ -921,12 +921,25 @@ def build_app() -> FastAPI:
         if not _write_authorized(request):
             return _unauthorized()
         state = get_state()
+        # `full=true` forces a full re-embed (bypasses the mtime/content-hash
+        # fast paths); default is incremental — only changed docs re-embed.
+        full = request.query_params.get("full", "").strip().lower() in ("1", "true", "yes")
         # Single-flight (085f1d69): two concurrent /api/reindex calls piled onto
-        # the same long write transaction and stalled prod for minutes. Reject
-        # the 2nd instead of serializing it behind the 1st — non-blocking
-        # acquire, so this check itself never touches the event loop.
+        # the same long write transaction and stalled prod for minutes. A 2nd
+        # call coalesces onto the 1st instead of starting its own run — returns
+        # the in-flight run's id rather than a bare rejection, so a caller can
+        # poll/observe the run it actually got. Non-blocking acquire, so this
+        # check itself never touches the event loop.
         if not state.reindex_lock.acquire(blocking=False):
-            return JSONResponse({"error": "reindex already in progress"}, status_code=409)
+            return JSONResponse(
+                {"coalesced": True, "run_id": state.reindex_run_id, "status": "in-progress"}
+            )
+        # Assigned synchronously, before the first await below, so a concurrent
+        # request that fails the acquire above always sees this run's id — no
+        # window where the lock is held but reindex_run_id is stale.
+        state._reindex_run_seq += 1
+        run_id = state._reindex_run_seq
+        state.reindex_run_id = run_id
         try:
             # Off the event loop (same T1 class as boot/search, and wedge class 2):
             # a full reindex can run minutes; inline it would block /api/boot and
@@ -938,7 +951,7 @@ def build_app() -> FastAPI:
             # a freshly added source never indexed over HTTP). Bonus: with no
             # root, load_sources() re-reads sources.yaml on every call, so a
             # source added after boot is picked up without a restart.
-            stats = await offload.off_loop(state.indexer.reindex, timeout=None)
+            stats = await offload.off_loop(state.indexer.reindex, full=full, timeout=None)
             # Scheduled corpus hygiene. reindex (compute_status) already drops
             # now-ignored agent-artifact files and re-ages docs, and it now LEAVES
             # 'superseded' docs untouched (SSOT-managed), so they survive for the sweep
@@ -947,6 +960,8 @@ def build_app() -> FastAPI:
             stats["sweep"] = await offload.off_loop(state.store.sweep_bloat, timeout=None)
         finally:
             state.reindex_lock.release()
+        stats["run_id"] = run_id
+        stats["coalesced"] = False
         return JSONResponse(stats)
 
     @app.get("/healthz", response_class=PlainTextResponse)

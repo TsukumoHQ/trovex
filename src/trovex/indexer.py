@@ -205,8 +205,15 @@ class Indexer:
                 yield p
 
     @_rollback_on_error
-    def reindex(self, root: Path | None = None, sources: list[Source] | None = None) -> dict:
-        """Index all configured sources, or a single root for back-compat."""
+    def reindex(
+        self, root: Path | None = None, sources: list[Source] | None = None, full: bool = False
+    ) -> dict:
+        """Index all configured sources, or a single root for back-compat.
+
+        full=True bypasses both fast paths (mtime match, then content-hash
+        match) and re-embeds every doc unconditionally — an explicit full
+        rebuild. Default (False) is incremental: only a doc whose content hash
+        changed since the last run is re-embedded."""
         if sources is None:
             if root is not None:
                 sources = [Source(id="code", label=root.name, root=root.resolve())]
@@ -270,7 +277,7 @@ class Indexer:
                 # mtime (same-second overwrite, mtime restore/`touch -r`) is
                 # missed until the file's mtime moves again. Same bar make/rsync
                 # accept; a conscious choice, not a silent gap.
-                if existing is not None and existing["mtime"] == stat.st_mtime:
+                if not full and existing is not None and existing["mtime"] == stat.st_mtime:
                     s_unchanged += 1
                     continue
 
@@ -280,7 +287,7 @@ class Indexer:
                     continue
                 content_hash = hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
 
-                if existing is not None and existing["content_hash"] == content_hash:
+                if not full and existing is not None and existing["content_hash"] == content_hash:
                     # mtime moved but content is identical (e.g. `git checkout`,
                     # a rebuild). Refresh the stored mtime so the fast-path hits
                     # next run — no re-embed.
@@ -368,10 +375,19 @@ class Indexer:
         status_stats = compute_status(self.db, self.settings)
 
         elapsed = time.time() - start
+        wall_ms = elapsed * 1000
+        # docs_total: every doc this run accounted for (added+updated+unchanged;
+        # removed docs no longer exist). docs_changed: every doc whose row was
+        # actually written (added+updated+removed) — the measurable "how much
+        # work did this run do" the incremental fast paths are meant to shrink.
+        docs_total = added + updated + unchanged
+        docs_changed = added + updated + removed
         self.db.execute(
-            """INSERT INTO index_runs (ts, duration_sec, added, updated, unchanged, removed)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (time.time(), elapsed, added, updated, unchanged, removed),
+            """INSERT INTO index_runs
+               (ts, duration_sec, added, updated, unchanged, removed,
+                docs_changed, docs_total, wall_ms)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (time.time(), elapsed, added, updated, unchanged, removed, docs_changed, docs_total, wall_ms),
         )
         self.db.commit()
         # P3 headroom: warn if any partition is nearing the brute-force ceiling,
@@ -384,6 +400,9 @@ class Indexer:
             "unchanged": unchanged,
             "removed": removed,
             "duration_sec": elapsed,
+            "wall_ms": wall_ms,
+            "docs_total": docs_total,
+            "docs_changed": docs_changed,
             "status": status_stats,
             "by_source": agg["by_source"],
             "capacity_warnings": capacity_warnings,
@@ -586,9 +605,14 @@ class Indexer:
 
         compute_status(self.db, self.settings)
         elapsed = time.time() - start
+        wall_ms = elapsed * 1000
+        docs_total = counts["added"] + counts["updated"] + counts["unchanged"]
+        docs_changed = counts["added"] + counts["updated"] + counts["removed"]
         self.db.execute(
-            """INSERT INTO index_runs (ts, duration_sec, added, updated, unchanged, removed)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO index_runs
+               (ts, duration_sec, added, updated, unchanged, removed,
+                docs_changed, docs_total, wall_ms)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 time.time(),
                 elapsed,
@@ -596,10 +620,16 @@ class Indexer:
                 counts["updated"],
                 counts["unchanged"],
                 counts["removed"],
+                docs_changed,
+                docs_total,
+                wall_ms,
             ),
         )
         self.db.commit()
         counts["duration_sec"] = elapsed
+        counts["wall_ms"] = wall_ms
+        counts["docs_total"] = docs_total
+        counts["docs_changed"] = docs_changed
         return counts
 
     def _commit_progress(

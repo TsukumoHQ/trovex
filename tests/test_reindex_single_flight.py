@@ -106,7 +106,9 @@ def client(app_state):
     return AsyncClient(transport=transport, base_url="http://test")
 
 
-async def test_second_concurrent_reindex_is_refused(client, app_state, monkeypatch):
+async def test_second_concurrent_reindex_coalesces_onto_first(client, app_state, monkeypatch):
+    """task 67ebd68c: a 2nd concurrent call no longer gets a bare rejection —
+    it coalesces onto the in-flight run and is told that run's id."""
     started = threading.Event()  # set from the threadpool worker, not the loop
 
     def _slow_reindex(*args, **kwargs):
@@ -123,8 +125,30 @@ async def test_second_concurrent_reindex_is_refused(client, app_state, monkeypat
     r1 = await r1_task
 
     assert r1.status_code == 200
-    assert r2.status_code == 409
+    assert r1.json()["coalesced"] is False
+    assert r2.status_code == 200
+    r2_body = r2.json()
+    assert r2_body["coalesced"] is True
+    assert r2_body["run_id"] == r1.json()["run_id"], "2nd call must report the 1st's run id"
     assert not app_state.reindex_lock.locked(), "lock must be released after the call finishes"
+
+
+async def test_reindex_full_param_forwarded_to_indexer(client, app_state, monkeypatch):
+    """?full=true must reach Indexer.reindex(full=True); default omits it (False)."""
+    seen_full = []
+
+    def _fake_reindex(*args, full=False, **kwargs):
+        seen_full.append(full)
+        return _stats()
+
+    monkeypatch.setattr(app_state.indexer, "reindex", _fake_reindex)
+
+    r_default = await client.post("/api/reindex")
+    r_full = await client.post("/api/reindex", params={"full": "true"})
+
+    assert r_default.status_code == 200
+    assert r_full.status_code == 200
+    assert seen_full == [False, True]
 
 
 async def test_boot_stays_responsive_during_reindex(client, app_state, monkeypatch):

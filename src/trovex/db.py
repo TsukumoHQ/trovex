@@ -94,6 +94,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_add_lifecycle(conn)
     _migrate_add_canonical_topic(conn)  # AFTER lifecycle: supersede sets lifecycle='archived'
     _migrate_add_importance(conn)
+    _migrate_add_index_run_metrics(conn)
     _init_schema(conn, embed_dim)
     # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
     # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
@@ -622,6 +623,29 @@ def _migrate_add_importance(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_add_index_run_metrics(conn: sqlite3.Connection) -> None:
+    """Add index_runs.docs_changed/docs_total/wall_ms to an existing store
+    (additive). Lets a run's cost be measured directly (task 67ebd68c) instead
+    of inferred from added+updated+removed and duration_sec alone. Skip if the
+    table doesn't exist yet — _init_schema creates it with the columns."""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='index_runs'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(index_runs)")}
+    for col, decl in (
+        ("docs_changed", "INTEGER NOT NULL DEFAULT 0"),
+        ("docs_total", "INTEGER NOT NULL DEFAULT 0"),
+        ("wall_ms", "REAL NOT NULL DEFAULT 0"),
+    ):
+        if col not in cols:
+            conn.execute(
+                f"ALTER TABLE index_runs ADD COLUMN {col} {decl}"
+            )  # sql-safe: col/decl from fixed literal tuple above, never user input
+    conn.commit()
+
+
 def _migrate_add_canonical_topic(conn: sqlite3.Connection) -> None:
     """Add docs.canonical_topic + enforce SSOT (one live canonical per topic).
 
@@ -841,7 +865,10 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             ts REAL NOT NULL,
             workspace_id TEXT NOT NULL DEFAULT 'default',
             duration_sec REAL,
-            added INTEGER, updated INTEGER, unchanged INTEGER, removed INTEGER
+            added INTEGER, updated INTEGER, unchanged INTEGER, removed INTEGER,
+            docs_changed INTEGER NOT NULL DEFAULT 0,
+            docs_total INTEGER NOT NULL DEFAULT 0,
+            wall_ms REAL NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS mcp_queries (

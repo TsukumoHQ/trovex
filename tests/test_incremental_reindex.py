@@ -194,6 +194,55 @@ def test_index_consistent_no_orphans_or_dupes(settings, source_root):
     assert docs == vecs == 3  # a, b, d — one vector each, no orphan from c
 
 
+def test_unchanged_corpus_reembeds_nothing_and_is_fast(settings, source_root):
+    """task 67ebd68c AC: an incremental run over an unchanged corpus re-embeds
+    0 docs and finishes well under 2s."""
+    for i in range(20):
+        _write(source_root, f"doc{i}.md", f"# Doc {i}\n\nbody text {i}", mtime=1000)
+    _reindex(settings, source_root, CountingEmbedder())
+
+    second = CountingEmbedder()
+    stats2 = _reindex(settings, source_root, second)
+    assert stats2["added"] == stats2["updated"] == stats2["removed"] == 0
+    assert stats2["unchanged"] == 20
+    assert second.embedded == []
+    assert stats2["wall_ms"] < 2000
+
+
+def test_full_reindex_reembeds_every_doc(settings, source_root):
+    """task 67ebd68c AC: full=True bypasses both fast paths and re-embeds the
+    whole corpus even though nothing changed."""
+    _write(source_root, "a.md", "# Alpha\n\nalpha content", mtime=1000)
+    _write(source_root, "b.md", "# Bravo\n\nbravo content", mtime=1000)
+    _reindex(settings, source_root, CountingEmbedder())
+
+    second = CountingEmbedder()
+    stats2 = Indexer(settings, embedder=second).reindex(sources=_src(source_root), full=True)
+    assert stats2["unchanged"] == 0
+    assert stats2["updated"] == 2
+    assert len(second.embedded) == 2
+
+
+def test_index_runs_records_docs_changed_total_wall_ms(settings, source_root):
+    """task 67ebd68c AC: index_runs rows carry docs_changed/docs_total/wall_ms."""
+    _write(source_root, "a.md", "# Alpha\n\nalpha", mtime=1000)
+    _write(source_root, "b.md", "# Bravo\n\nbravo", mtime=1000)
+    _reindex(settings, source_root, CountingEmbedder())  # run 1: 2 added
+
+    _write(source_root, "b.md", "# Bravo\n\nbravo revised", mtime=2000)
+    idx = Indexer(settings, embedder=CountingEmbedder())
+    stats2 = idx.reindex(sources=_src(source_root))  # run 2: 1 updated, 1 unchanged
+
+    assert stats2["docs_changed"] == 1  # only b.md written
+    assert stats2["docs_total"] == 2  # a.md + b.md accounted for
+    assert stats2["wall_ms"] > 0
+
+    row = idx.db.execute("SELECT docs_changed, docs_total, wall_ms FROM index_runs ORDER BY id DESC LIMIT 1").fetchone()
+    assert row["docs_changed"] == 1
+    assert row["docs_total"] == 2
+    assert row["wall_ms"] > 0
+
+
 def test_search_correct_after_incremental_update(settings, source_root):
     """Search reflects the incremental edit: the changed doc matches its NEW topic,
     and the doc that genuinely owns the OLD topic now outranks it there."""

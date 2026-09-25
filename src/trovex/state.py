@@ -25,9 +25,17 @@ class AppState:
     store: SqliteStore
     # Single-flight guard for /api/reindex (085f1d69): a 2nd concurrent reindex
     # piling onto the same long-running write is what turned a slow reindex into
-    # a multi-minute reader stall on prod. Non-blocking acquire only — the route
-    # rejects instead of queuing.
+    # a multi-minute reader stall on prod. Non-blocking acquire only — a 2nd
+    # caller coalesces onto the in-flight run (67ebd68c) instead of queuing or
+    # starting its own.
     reindex_lock: threading.Lock = field(default_factory=threading.Lock)
+    # Identifies the run currently holding reindex_lock (or the last one that
+    # held it) so a coalesced 2nd caller can report which run it piled onto,
+    # instead of a bare rejection. Set synchronously in the route handler
+    # before the first await, so there is no window where the lock is held but
+    # this is stale/unset for a concurrent reader.
+    reindex_run_id: int | None = None
+    _reindex_run_seq: int = 0
 
 
 _state: AppState | None = None

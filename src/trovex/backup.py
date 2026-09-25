@@ -20,10 +20,21 @@ def backup_dir(data_dir: Path) -> Path:
 def make_backup(db_path: Path, data_dir: Path) -> Path:
     bdir = backup_dir(data_dir)
     bdir.mkdir(parents=True, exist_ok=True)
-    # Flush WAL into the main db so the snapshot is complete.
+    # Best-effort pre-checkpoint, PASSIVE only (task 2081581c): TRUNCATE needs
+    # EXCLUSIVE access and busy-waits up to busy_timeout (30s) against any
+    # reader holding an older WAL frame — under the server's read traffic
+    # there's almost always one, so this path reintroduced the exact stall
+    # db.checkpoint_if_wal_large already documents and fixed elsewhere (prod
+    # 2026-08-31 task 7768dbe6: trovex_write/search stalled to exactly
+    # 30000ms). src.backup(dst) below copies a CONSISTENT snapshot including
+    # WAL content regardless — this checkpoint is a pure size/speed
+    # optimization, never required for correctness. PASSIVE "does as much
+    # work as it can without interfering with other database connections"
+    # (sqlite.org/wal.html): it never blocks, so a busy store just gets a
+    # smaller optimization for free instead of a stall.
     flush = sqlite3.connect(str(db_path))
     try:
-        flush.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        flush.execute("PRAGMA wal_checkpoint(PASSIVE)")
     finally:
         flush.close()
     dest = bdir / f"trovex-{time.strftime('%Y%m%d-%H%M%S')}.db"

@@ -259,6 +259,10 @@ def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state = get_state()  # warm up
+    # Start the reindex-queue applier (task dab8766b): recovers any job a prior
+    # crash left 'processing', then drains index_jobs on its own thread for the
+    # life of the process. /api/reindex only ever enqueues from here on.
+    state.applier.start()
     # Retention (finding 5): drop query-log rows older than the configured window
     # so the local DB doesn't grow unbounded and old (potentially sensitive)
     # query text isn't retained forever.
@@ -281,6 +285,7 @@ async def lifespan(app: FastAPI):
             yield
     finally:
         watchdog_task.cancel()
+        state.applier.stop()
 
 
 _AVATAR_PALETTE = [
@@ -947,45 +952,33 @@ def build_app() -> FastAPI:
         # `full=true` forces a full re-embed (bypasses the mtime/content-hash
         # fast paths); default is incremental — only changed docs re-embed.
         full = request.query_params.get("full", "").strip().lower() in ("1", "true", "yes")
-        # Single-flight (085f1d69): two concurrent /api/reindex calls piled onto
-        # the same long write transaction and stalled prod for minutes. A 2nd
-        # call coalesces onto the 1st instead of starting its own run — returns
-        # the in-flight run's id rather than a bare rejection, so a caller can
-        # poll/observe the run it actually got. Non-blocking acquire, so this
-        # check itself never touches the event loop.
-        if not state.reindex_lock.acquire(blocking=False):
-            return JSONResponse(
-                {"coalesced": True, "run_id": state.reindex_run_id, "status": "in-progress"}
-            )
-        # Assigned synchronously, before the first await below, so a concurrent
-        # request that fails the acquire above always sees this run's id — no
-        # window where the lock is held but reindex_run_id is stale.
-        state._reindex_run_seq += 1
-        run_id = state._reindex_run_seq
-        state.reindex_run_id = run_id
-        try:
-            # Off the event loop (same T1 class as boot/search, and wedge class 2):
-            # a full reindex can run minutes; inline it would block /api/boot and
-            # every other request the whole time. No timeout bound (unlike other
-            # off_loop callers) — reindex is legitimately long-running, and the
-            # single-flight lock above already rules out unbounded pile-up.
-            # No explicit root: an explicit root forces the single-source
-            # fallback and silently skips every configured source (found live —
-            # a freshly added source never indexed over HTTP). Bonus: with no
-            # root, load_sources() re-reads sources.yaml on every call, so a
-            # source added after boot is picked up without a restart.
-            stats = await offload.off_loop(state.indexer.reindex, full=full, timeout=None)
-            # Scheduled corpus hygiene. reindex (compute_status) already drops
-            # now-ignored agent-artifact files and re-ages docs, and it now LEAVES
-            # 'superseded' docs untouched (SSOT-managed), so they survive for the sweep
-            # to tombstone superseded forks + collapse ephemeral-owner forks here.
-            # Idempotent, so running it on every reindex is safe.
-            stats["sweep"] = await offload.off_loop(state.store.sweep_bloat, timeout=None)
-        finally:
-            state.reindex_lock.release()
-        stats["run_id"] = run_id
-        stats["coalesced"] = False
-        return JSONResponse(stats)
+        # index_jobs op-log (task dab8766b, replacing 085f1d69/67ebd68c's
+        # per-request lock): enqueue and return immediately — the single
+        # applier thread (started in `lifespan`) is what actually calls
+        # Indexer.reindex(), never this request. Two callers hitting this
+        # while a run is already in flight never collide on the DB or get a
+        # bare rejection: enqueue() coalesces them onto the same job (queued)
+        # or flags the in-flight one to run again the moment it finishes
+        # (processing) — see index_jobs.py.
+        from . import index_jobs
+
+        result = index_jobs.enqueue(
+            state.indexer.db, state.index_jobs_lock, "rebuild" if full else "scan_source", full=full
+        )
+        state.applier.notify()
+        return JSONResponse(
+            {"job_id": result["job_id"], "position": result["position"], "coalesced": result["coalesced"]},
+            status_code=202,
+        )
+
+    @app.get("/api/reindex/{job_id}")
+    async def api_reindex_status(job_id: int) -> JSONResponse:
+        from . import index_jobs
+
+        job = index_jobs.get_job(get_state().indexer.db, job_id)
+        if job is None:
+            return JSONResponse({"error": "no such job"}, status_code=404)
+        return JSONResponse(job)
 
     @app.get("/healthz", response_class=PlainTextResponse)
     async def healthz() -> str:

@@ -155,8 +155,10 @@ class Indexer:
         self.embedder = embedder or embedder_from_settings(settings)
         # Per-run phase/cache counters (task cbb8e8fb). Reset at the top of
         # reindex()/reindex_paths() — _upsert_doc and _flush_*embeddings, called
-        # from inside those, accumulate into them. The single-flight reindex_lock
-        # (server.py) already rules out two runs on one Indexer overlapping.
+        # from inside those, accumulate into them. The single index_jobs applier
+        # thread (index_jobs.py) already rules out two runs on one Indexer
+        # overlapping — it is structurally the only caller of reindex()/
+        # reindex_paths() once the server owns this Indexer.
         self._phase_ms: dict[str, float] = {"chunk": 0.0, "embed": 0.0, "write": 0.0, "status": 0.0}
         self._embed_cache_hits = 0
         self._embed_cache_misses = 0
@@ -215,14 +217,20 @@ class Indexer:
 
     @_rollback_on_error
     def reindex(
-        self, root: Path | None = None, sources: list[Source] | None = None, full: bool = False
+        self,
+        root: Path | None = None,
+        sources: list[Source] | None = None,
+        full: bool = False,
+        job_id: int | None = None,
     ) -> dict:
         """Index all configured sources, or a single root for back-compat.
 
         full=True bypasses both fast paths (mtime match, then content-hash
         match) and re-embeds every doc unconditionally — an explicit full
         rebuild. Default (False) is incremental: only a doc whose content hash
-        changed since the last run is re-embedded."""
+        changed since the last run is re-embedded. job_id: the index_jobs row
+        (if any — see index_jobs.py) this run was driven by, stamped onto the
+        index_runs row so a run's cost is traceable back to what enqueued it."""
         if sources is None:
             if root is not None:
                 sources = [Source(id="code", label=root.name, root=root.resolve())]
@@ -422,8 +430,8 @@ class Indexer:
             """INSERT INTO index_runs
                (ts, duration_sec, added, updated, unchanged, removed,
                 docs_changed, docs_total, wall_ms, phase_ms,
-                embed_cache_hits, embed_cache_misses)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                embed_cache_hits, embed_cache_misses, job_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 time.time(),
                 elapsed,
@@ -437,6 +445,7 @@ class Indexer:
                 json.dumps(phase_ms),
                 self._embed_cache_hits,
                 self._embed_cache_misses,
+                job_id,
             ),
         )
         self.db.commit()
@@ -459,6 +468,7 @@ class Indexer:
             "status": status_stats,
             "by_source": agg["by_source"],
             "capacity_warnings": capacity_warnings,
+            "job_id": job_id,
         }
 
     def _upsert_doc(
@@ -561,7 +571,9 @@ class Indexer:
         return action
 
     @_rollback_on_error
-    def reindex_paths(self, paths, sources: list[Source] | None = None) -> dict:
+    def reindex_paths(
+        self, paths, sources: list[Source] | None = None, job_id: int | None = None
+    ) -> dict:
         """Re-index a KNOWN set of changed/added/removed paths (from fs-watch events),
         touching only those docs — the rest of the store is left untouched.
 
@@ -687,8 +699,8 @@ class Indexer:
             """INSERT INTO index_runs
                (ts, duration_sec, added, updated, unchanged, removed,
                 docs_changed, docs_total, wall_ms, phase_ms,
-                embed_cache_hits, embed_cache_misses)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                embed_cache_hits, embed_cache_misses, job_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 time.time(),
                 elapsed,
@@ -702,6 +714,7 @@ class Indexer:
                 json.dumps(phase_ms),
                 self._embed_cache_hits,
                 self._embed_cache_misses,
+                job_id,
             ),
         )
         self.db.commit()
@@ -712,6 +725,7 @@ class Indexer:
         counts["phase_ms"] = phase_ms
         counts["embed_cache_hits"] = self._embed_cache_hits
         counts["embed_cache_misses"] = self._embed_cache_misses
+        counts["job_id"] = job_id
         return counts
 
     def _commit_progress(

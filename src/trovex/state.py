@@ -9,6 +9,7 @@ from typing import Any
 
 from .config import Settings
 from .embedder import embedder_from_settings
+from .index_jobs import Applier
 from .indexer import Indexer
 from .search import Searcher
 from .store import SqliteStore
@@ -23,19 +24,22 @@ class AppState:
     searcher: Searcher
     indexer: Indexer
     store: SqliteStore
-    # Single-flight guard for /api/reindex (085f1d69): a 2nd concurrent reindex
-    # piling onto the same long-running write is what turned a slow reindex into
-    # a multi-minute reader stall on prod. Non-blocking acquire only — a 2nd
-    # caller coalesces onto the in-flight run (67ebd68c) instead of queuing or
-    # starting its own.
-    reindex_lock: threading.Lock = field(default_factory=threading.Lock)
-    # Identifies the run currently holding reindex_lock (or the last one that
-    # held it) so a coalesced 2nd caller can report which run it piled onto,
-    # instead of a bare rejection. Set synchronously in the route handler
-    # before the first await, so there is no window where the lock is held but
-    # this is stale/unset for a concurrent reader.
-    reindex_run_id: int | None = None
-    _reindex_run_seq: int = 0
+    # Guards index_jobs' read-modify-write transactions (task dab8766b,
+    # replacing 085f1d69/67ebd68c's per-request reindex_lock): enqueue()'s
+    # coalesce-or-insert decision and the Applier's claim/finish steps all take
+    # this, so two threads never race the same index_jobs row.
+    index_jobs_lock: threading.Lock = field(default_factory=threading.Lock)
+    _applier: Applier | None = field(default=None, init=False, repr=False, compare=False)
+
+    @property
+    def applier(self) -> Applier:
+        """The single reindex-queue drainer for this process, bound lazily to
+        this state's indexer — most tests build AppState directly and never
+        touch the queue, so nothing here runs unless something actually reads
+        .applier (e.g. the server's lifespan, or a test exercising the queue)."""
+        if self._applier is None:
+            self._applier = Applier(self.indexer, self.store, lock=self.index_jobs_lock)
+        return self._applier
 
 
 _state: AppState | None = None

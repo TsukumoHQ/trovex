@@ -1,5 +1,6 @@
 """Reindex single-flight guard + reader-stays-responsive fix (085f1d69, fast-follow
-to eda6f60e).
+to eda6f60e; the HTTP-level tests below were rewritten for task dab8766b — see
+tests/test_index_jobs.py for the op-log/applier tests proper).
 
 Root cause: /api/reindex ran state.indexer.reindex() INLINE on the event loop
 (no run_in_threadpool) with no concurrency guard, and indexer.reindex() held ONE
@@ -9,20 +10,23 @@ readers and grew the WAL 5.8M -> 10M, clearing only with a manual kickstart —
 not the ClientDisconnect wedge (that's fixed by eda6f60e), a distinct stall
 class.
 
-Fix:
-  - api_reindex takes a non-blocking threading.Lock (state.reindex_lock) — a 2nd
-    concurrent call gets 409 instead of piling onto the first.
+Fix (085f1d69, superseded by dab8766b for the HTTP contract):
   - indexer.reindex() and store.sweep_bloat() now run via run_in_threadpool, off
     the event loop, so /api/boot and friends stay responsive during a reindex.
   - indexer.reindex() commits + checkpoints every REINDEX_COMMIT_BATCH docs
     instead of holding one txn open for the whole run, bounding WAL growth.
+
+dab8766b: api_reindex no longer runs Indexer.reindex() itself at all — it
+enqueues into index_jobs (see index_jobs.py) and returns 202 immediately. The
+single-flight guarantee moves from a per-request lock (085f1d69) to "there is
+structurally only one caller of reindex()/reindex_paths(), ever" (the applier
+thread) — never a 409, never two runs overlapping.
 
 Hermetic: BagEmbedder, no network, no real model download.
 """
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import re
 import threading
@@ -106,35 +110,26 @@ def client(app_state):
     return AsyncClient(transport=transport, base_url="http://test")
 
 
-async def test_second_concurrent_reindex_coalesces_onto_first(client, app_state, monkeypatch):
-    """task 67ebd68c: a 2nd concurrent call no longer gets a bare rejection —
-    it coalesces onto the in-flight run and is told that run's id."""
-    started = threading.Event()  # set from the threadpool worker, not the loop
-
-    def _slow_reindex(*args, **kwargs):
-        started.set()
-        time.sleep(0.3)
-        return _stats()
-
-    monkeypatch.setattr(app_state.indexer, "reindex", _slow_reindex)
-
-    r1_task = asyncio.create_task(client.post("/api/reindex"))
-    while not started.is_set():
-        await asyncio.sleep(0.01)
+async def test_second_concurrent_reindex_coalesces_onto_first(client, app_state):
+    """task dab8766b: two /api/reindex calls before the queue drains coalesce
+    onto ONE index_jobs row (this fixture's ASGITransport never runs the app's
+    lifespan, so the applier thread never starts here — the two POSTs land
+    purely as enqueue() calls, which is exactly what should coalesce)."""
+    r1 = await client.post("/api/reindex")
     r2 = await client.post("/api/reindex")
-    r1 = await r1_task
 
-    assert r1.status_code == 200
+    assert r1.status_code == 202
     assert r1.json()["coalesced"] is False
-    assert r2.status_code == 200
-    r2_body = r2.json()
-    assert r2_body["coalesced"] is True
-    assert r2_body["run_id"] == r1.json()["run_id"], "2nd call must report the 1st's run id"
-    assert not app_state.reindex_lock.locked(), "lock must be released after the call finishes"
+    assert r2.status_code == 202
+    assert r2.json()["coalesced"] is True
+    assert r2.json()["job_id"] == r1.json()["job_id"], "2nd call must report the 1st's job id"
+    assert app_state.indexer.db.execute("SELECT COUNT(*) AS c FROM index_jobs").fetchone()["c"] == 1
 
 
 async def test_reindex_full_param_forwarded_to_indexer(client, app_state, monkeypatch):
-    """?full=true must reach Indexer.reindex(full=True); default omits it (False)."""
+    """?full=true must reach Indexer.reindex(full=True) once the applier drains
+    the job; default omits it (False). End-to-end: HTTP -> index_jobs ->
+    Applier.run_one() -> Indexer.reindex(full=...)."""
     seen_full = []
 
     def _fake_reindex(*args, full=False, **kwargs):
@@ -144,32 +139,39 @@ async def test_reindex_full_param_forwarded_to_indexer(client, app_state, monkey
     monkeypatch.setattr(app_state.indexer, "reindex", _fake_reindex)
 
     r_default = await client.post("/api/reindex")
+    app_state.applier.run_one()
     r_full = await client.post("/api/reindex", params={"full": "true"})
+    app_state.applier.run_one()
 
-    assert r_default.status_code == 200
-    assert r_full.status_code == 200
+    assert r_default.status_code == 202
+    assert r_full.status_code == 202
     assert seen_full == [False, True]
 
 
 async def test_boot_stays_responsive_during_reindex(client, app_state, monkeypatch):
+    """/api/boot must stay fast while a slow reindex is running — now proven
+    against the real applier thread (started for just this test), not merely
+    "the request handler didn't block the loop"."""
+
     def _slow_reindex(*args, **kwargs):
         time.sleep(0.5)
         return _stats()
 
     monkeypatch.setattr(app_state.indexer, "reindex", _slow_reindex)
 
-    async def boot_call():
+    app_state.applier.start()
+    try:
+        reindex_resp = await client.post("/api/reindex")
+        assert reindex_resp.status_code == 202
+
         t0 = time.perf_counter()
-        r = await client.get("/api/boot", params={"agent": "alpha"})
-        return r, time.perf_counter() - t0
+        boot_resp = await client.get("/api/boot", params={"agent": "alpha"})
+        boot_elapsed = time.perf_counter() - t0
 
-    reindex_resp, (boot_resp, boot_elapsed) = await asyncio.gather(
-        client.post("/api/reindex"), boot_call()
-    )
-
-    assert reindex_resp.status_code == 200
-    assert boot_resp.status_code == 200
-    assert boot_elapsed < 2.0, "boot must not wait out the in-flight reindex"
+        assert boot_resp.status_code == 200
+        assert boot_elapsed < 2.0, "boot must not wait out the in-flight/queued reindex"
+    finally:
+        app_state.applier.stop()
 
 
 def test_reindex_commits_in_bounded_batches(tmp_path, monkeypatch):

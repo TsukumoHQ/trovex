@@ -96,6 +96,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_add_canonical_topic(conn)  # AFTER lifecycle: supersede sets lifecycle='archived'
     _migrate_add_importance(conn)
     _migrate_add_index_run_metrics(conn)
+    _migrate_add_index_jobs_link(conn)
     _init_schema(conn, embed_dim)
     # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
     # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
@@ -761,6 +762,21 @@ def _migrate_add_index_run_metrics(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_add_index_jobs_link(conn: sqlite3.Connection) -> None:
+    """Add index_runs.job_id to an existing store (additive) — links a run row
+    back to the index_jobs row that produced it (task dab8766b). Skip if the
+    table doesn't exist yet — _init_schema creates it with the column."""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='index_runs'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(index_runs)")}
+    if "job_id" not in cols:
+        conn.execute("ALTER TABLE index_runs ADD COLUMN job_id INTEGER")
+    conn.commit()
+
+
 def _migrate_add_canonical_topic(conn: sqlite3.Connection) -> None:
     """Add docs.canonical_topic + enforce SSOT (one live canonical per topic).
 
@@ -986,8 +1002,40 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             wall_ms REAL NOT NULL DEFAULT 0,
             phase_ms TEXT NOT NULL DEFAULT '{{}}',
             embed_cache_hits INTEGER NOT NULL DEFAULT 0,
-            embed_cache_misses INTEGER NOT NULL DEFAULT 0
+            embed_cache_misses INTEGER NOT NULL DEFAULT 0,
+            job_id INTEGER
         );
+
+        -- The reindex op-log (task dab8766b): every /api/reindex call and every
+        -- fs-watch burst enqueues a row here instead of running inline — a single
+        -- applier thread (index_jobs.py) drains it, so two callers hitting the
+        -- same source while a run is in flight coalesce onto one row (queued) or
+        -- flag the in-flight one to rerun (processing) instead of piling up a
+        -- second concurrent indexer.reindex() call or a bare rejection.
+        CREATE TABLE IF NOT EXISTS index_jobs (
+            id INTEGER PRIMARY KEY,
+            kind TEXT NOT NULL,           -- 'scan_source' | 'paths' | 'rebuild'
+            -- Coalescing key: a source id, or NULL for "every configured source"
+            -- (scan_source/rebuild with no explicit source). Two rows with the
+            -- same (kind, source_key) never both sit 'queued' at once.
+            source_key TEXT,
+            payload TEXT NOT NULL DEFAULT '{{}}',   -- json: {{"paths": [...], "full": bool}}
+            seq INTEGER NOT NULL,
+            state TEXT NOT NULL DEFAULT 'queued',   -- queued|processing|succeeded|failed
+            -- Set instead of inserting a new row when a matching request arrives
+            -- while this job is already 'processing'; rerun_payload carries what
+            -- the rerun should use (paths already unioned in), consumed and
+            -- cleared by the applier the moment it re-claims this same row.
+            rerun_after INTEGER NOT NULL DEFAULT 0,
+            rerun_payload TEXT,
+            enqueued_at REAL NOT NULL,
+            started_at REAL,
+            finished_at REAL,
+            error TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_index_jobs_state_seq ON index_jobs(state, seq);
+        CREATE INDEX IF NOT EXISTS idx_index_jobs_coalesce
+            ON index_jobs(kind, source_key, state);
 
         -- Cross-doc/cross-run embedding cache (task cbb8e8fb): identical text
         -- (a rename, a duplicate paragraph, an unchanged doc re-embedded by a

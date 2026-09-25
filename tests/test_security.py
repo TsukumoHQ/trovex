@@ -112,10 +112,11 @@ def test_reindex_requires_write_token(tmp_path):
         client = TestClient(build_app())
         # No token → rejected, same as the other write endpoints.
         assert client.post("/api/reindex").status_code == 403
-        # Correct token → allowed.
+        # Correct token → allowed (enqueued; task dab8766b — /api/reindex no
+        # longer indexes inline, see test_index_jobs.py for the queue itself).
         ok = client.post("/api/reindex", headers={"x-trovex-write-token": "s3cret"})
-        assert ok.status_code == 200
-        assert "added" in ok.json()
+        assert ok.status_code == 202
+        assert "job_id" in ok.json()
     finally:
         state_mod.reset_state()
 

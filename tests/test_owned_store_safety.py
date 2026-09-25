@@ -195,13 +195,20 @@ def multi_source_client(tmp_path):
 
 
 def test_api_reindex_indexes_every_configured_source(multi_source_client):
-    client, _store = multi_source_client
+    """task dab8766b: /api/reindex now enqueues (202) instead of indexing
+    inline — drive the applier synchronously to observe the actual result."""
+    client, store = multi_source_client
     resp = client.post("/api/reindex", headers={"X-TROVEX-Write-Token": "test-token"})
-    assert resp.status_code == 200
-    stats = resp.json()
-    by_source = {s["id"]: s for s in stats["by_source"]}
-    assert set(by_source) == {"alpha", "beta"}, (
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+
+    assert state_mod.get_state().applier.run_one() is True
+
+    status = client.get(f"/api/reindex/{job_id}")
+    assert status.json()["state"] == "succeeded"
+    by_source_id = {
+        r["source_id"] for r in store.db.execute("SELECT DISTINCT source_id FROM docs").fetchall()
+    }
+    assert by_source_id == {"alpha", "beta"}, (
         "api_reindex fell back to the single-source root instead of sources.yaml"
     )
-    assert by_source["alpha"]["added"] == 1
-    assert by_source["beta"]["added"] == 1

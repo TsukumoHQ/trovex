@@ -93,6 +93,7 @@ artifacts = ["src/trovex/assets/**/*", "src/trovex/_benchmark.json"]
 only-include = ["src/trovex"]
 include = [
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "pyproject.toml",
 ]

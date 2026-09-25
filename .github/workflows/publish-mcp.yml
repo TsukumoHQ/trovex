@@ -55,9 +55,26 @@ jobs:
       - name: Sync server.json version to the tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.json.tmp
+          # .packages[] (EVERY entry, not just [0]) — server.json lists one entry
+          # per transport (stdio + streamable-http) of the same PyPI package, and
+          # a sync that only touches the first left the 2nd stale, which is
+          # exactly how v0.15.1's registry publish 400'd against a version PyPI
+          # never had (task 5c18adb7).
+          jq --arg v "$VERSION" '.version = $v | .packages[].version = $v' server.json > server.json.tmp
           mv server.json.tmp server.json
           echo "server.json synced to $VERSION"
+          # Fail loudly here, not at the registry's validation step: every
+          # packages[].version must now equal the top-level version (which
+          # must equal the tag), or this run stops instead of shipping a
+          # server.json the registry will 400 on.
+          stale=$(jq --arg v "$VERSION" '
+            [.version, (.packages[].version)] | map(select(. != $v)) | length
+          ' server.json)
+          if [ "$stale" != "0" ]; then
+            echo "::error::server.json still has $stale version field(s) != $VERSION after sync"
+            jq '{version, packages: [.packages[].version]}' server.json
+            exit 1
+          fi
 
       - name: Publish to MCP Registry
         run: ./mcp-publisher publish ./server.json

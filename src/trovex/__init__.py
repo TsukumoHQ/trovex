@@ -1,3 +1,3 @@
 """trovex — token-efficient routing for agent-generated .md docs."""
 
-__version__ = "0.13.4"
+__version__ = "0.15.1"

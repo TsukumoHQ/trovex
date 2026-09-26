@@ -29,6 +29,10 @@ class Source:
     id: str
     label: str
     root: Path
+    # Opt-in chunk-level indexing of this source's markdown (task 52385ebc). Off by
+    # default: a chunk is a vec_chunks row and a partition is capped by the vec0 KNN
+    # ceiling. Only fs_chunking.enable_chunk_markdown turns it on (guarded).
+    chunk_markdown: bool = False
 
     @classmethod
     def from_dict(cls, d: dict) -> "Source":
@@ -284,9 +288,10 @@ class Settings(BaseSettings):
         return _load_or_create_write_token(self.data_dir)
 
     def load_sources(self) -> list[Source]:
-        """Resolve sources from config file, fall back to single source.
+        """Resolve sources: the `sources` table once it has rows (see sources.py),
+        else the config file, else a single source.
 
-        File format (YAML):
+        Legacy file format (YAML, imported into the table on first start):
           sources:
             - id: code
               label: my-app
@@ -295,6 +300,11 @@ class Settings(BaseSettings):
               label: Obsidian vault
               root: ~/obsidian/notes
         """
+        from . import sources as sources_mod  # config must not import db/store at module load
+
+        from_table = sources_mod.load_enabled(self)
+        if from_table is not None:
+            return from_table
         if self.sources_config_path.exists():
             with self.sources_config_path.open() as f:
                 data = yaml.safe_load(f) or {}

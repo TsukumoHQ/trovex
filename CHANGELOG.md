@@ -6,6 +6,24 @@ entries are what actually shipped in each tagged release, not a bump target.
 
 ## Unreleased
 
+### Added
+- Opt-in chunk-level indexing for an fs source's markdown (`chunk_markdown` on the
+  source, default off) so `tier=passage|card` reads and the `file://` anchor
+  links work on fs `.md` docs. `trovex sources chunk-markdown <id> [--dry-run|--off]`
+  projects the chunk + embed cost, refuses when the source's partition would pass
+  the vec0 KNN ceiling (journaled in `source_runs`), otherwise backfills the docs
+  already indexed (task:52385ebc).
+- Connector protocol (`trovex/connectors/base.py`: `list_slim` / `poll(cursor)` /
+  `fetch`) with `FsConnector` as the first implementation, a `sources` table
+  that replaces `sources.yaml` (imported once on the first start; manage it with
+  `trovex sources list|add|disable`), and `sync_source` / `gc_source` jobs on
+  the index_jobs applier. Each job writes a `source_runs` row with its cursor,
+  ok/failed counts and failed ids; the next sync replays only the failed ids.
+  `gc_source` aborts when the listing returns fewer than `deletion_safety_ratio`
+  of the known ids, otherwise moves missing docs to `pending_delete` and
+  hard-deletes them after the grace window. Nothing enqueues these jobs yet: the
+  poll/gc scheduler is the next slice (task:960a4b64).
+
 ### Fixed
 - MCP registry publish of v0.15.1 400'd (`PyPI package 'trovex' exists, but
   version '0.13.4' was not found`): server.json lists one `packages[]` entry

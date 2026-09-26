@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from importlib.metadata import PackageNotFoundError
@@ -1402,6 +1403,103 @@ def backup() -> None:
     settings = Settings()
     dest = make_backup(settings.data_dir / "trovex.db", settings.data_dir)
     console.print(f"[green]Backed up[/green] -> {dest}")
+
+
+sources_app = typer.Typer(no_args_is_help=True, help="Manage indexed sources (the sources table).")
+app.add_typer(sources_app, name="sources")
+
+
+def _sources_db(settings: Settings):
+    """The db handle for `trovex sources`, with a pending sources.yaml imported first
+    so `add` on a yaml-configured install can't shadow the yaml's sources."""
+    from . import sources as sources_mod
+
+    db = open_db_for_read(settings)
+    sources_mod.import_yaml_once(db, settings)
+    return db
+
+
+@sources_app.command("list")
+def sources_list() -> None:
+    """List every registered source."""
+    from . import sources as sources_mod
+
+    rows = sources_mod.list_sources(_sources_db(Settings()))
+    if not rows:
+        console.print("[yellow]No sources registered.[/yellow] Add one: trovex sources add --id notes --root ~/notes")
+        return
+    for r in rows:
+        state = "enabled" if r["enabled"] else "disabled"
+        console.print(f"{r['id']}  {r['kind']}  {state}  {r['policy']}  {json.loads(r['config']).get('root', '')}")
+
+
+@sources_app.command("add")
+def sources_add(
+    id: str = typer.Option(..., "--id", help="Short kebab-case id (stable: renaming = reindex)."),
+    root: Path = typer.Option(..., "--root", help="Directory to index."),
+    label: str | None = typer.Option(None, help="Display label (default: the id)."),
+    policy: str = typer.Option("upsert_delete", help="upsert | upsert_delete | append_only"),
+) -> None:
+    """Register a filesystem source."""
+    from . import sources as sources_mod
+
+    if policy not in ("upsert", "upsert_delete", "append_only"):
+        console.print(f"[red]unknown policy {policy!r}[/red]")
+        raise typer.Exit(1)
+    try:
+        sources_mod.add_source(_sources_db(Settings()), id=id, root=root, label=label, policy=policy)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
+    console.print(f"[green]Added[/green] source {id} -> {Path(root).expanduser().resolve()}")
+
+
+@sources_app.command("disable")
+def sources_disable(id: str = typer.Argument(..., help="Source id.")) -> None:
+    """Stop syncing a source (its indexed docs stay searchable)."""
+    from . import sources as sources_mod
+
+    if not sources_mod.disable_source(_sources_db(Settings()), id):
+        console.print(f"[red]no such source {id!r}[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]Disabled[/green] source {id}")
+
+
+@sources_app.command("chunk-markdown")
+def sources_chunk_markdown(
+    id: str = typer.Argument(..., help="Source id."),
+    off: bool = typer.Option(False, "--off", help="Turn chunking off and purge the source's markdown chunks."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Only print the projected cost."),
+) -> None:
+    """Opt a source's markdown into chunk-level indexing (passage/card/section + links).
+
+    Refuses when the source's chunks would pass the vec0 KNN ceiling. Embeds the
+    backfill inline, like `trovex backfill-chunks`."""
+    from . import fs_chunking
+
+    settings = Settings()
+    _sources_db(settings).close()
+    idx = Indexer(settings)
+    try:
+        if off:
+            n = fs_chunking.disable_chunk_markdown(idx, id)
+            console.print(f"[green]Disabled[/green] chunk_markdown for {id}, purged {n} chunks")
+        elif dry_run:
+            p = fs_chunking.project_markdown_chunks(idx, id)
+            console.print(
+                f"projected for {id}: {p['new_chunks']} chunks from {p['docs']} docs, "
+                f"{p['embed_tokens']} tokens to embed, partition {p['current_chunks']}"
+                f"/{p['ceiling']} chunks now"
+            )
+        else:
+            res = fs_chunking.enable_chunk_markdown(idx, id)
+            if not res["enabled"]:
+                console.print(f"[red]{res['reason']}[/red]")
+                raise typer.Exit(1)
+            console.print(f"[green]Enabled[/green] chunk_markdown for {id}: {res['chunks']} chunks embedded")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
 
 
 @app.command()

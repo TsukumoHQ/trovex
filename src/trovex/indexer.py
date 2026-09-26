@@ -9,6 +9,9 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from . import capacity, usearch_index
+from . import sources as sources_mod
+from .chunking import CHUNKER_VERSION as MD_CHUNKER_VERSION
+from .chunking import chunk_markdown
 from .chunking_code import CHUNKER_VERSION, CODE_EXTENSIONS, EXTENSION_LANGUAGES, chunk_code
 from .config import RESERVED_SOURCE_ID, Settings, Source
 from .db import (
@@ -153,6 +156,7 @@ class Indexer:
         self.settings = settings
         self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim(), settings.embed_model)
         self.embedder = embedder or embedder_from_settings(settings)
+        sources_mod.import_yaml_once(self.db, settings)
         # Per-run phase/cache counters (task cbb8e8fb). Reset at the top of
         # reindex()/reindex_paths() — _upsert_doc and _flush_*embeddings, called
         # from inside those, accumulate into them. The single index_jobs applier
@@ -495,9 +499,9 @@ class Indexer:
         Code files (CODE_EXTENSIONS) additionally get chunk-level indexing via
         the cAST chunker (chunk_code), through the same Merkle sync markdown
         uses (db.sync_doc_chunks) — so an unchanged symbol never re-embeds.
-        Markdown files are NOT retroactively chunked here (scope containment:
-        this wiring is new only for the code path; turning it on for the
-        existing markdown corpus is a separate, explicitly-costed decision)."""
+        Markdown files are chunked here only for a source with chunk_markdown
+        on (opt-in, capacity-guarded: see fs_chunking.py); otherwise they stay
+        doc-level only."""
         ext = path.suffix.lower().lstrip(".")
         # Code files have no markdown H1/frontmatter — extracting via TITLE_RE
         # would false-positive on a leading "# comment" line, so title is
@@ -573,16 +577,16 @@ class Indexer:
             self._flush_embeddings(embed_batch)
             embed_batch.clear()
 
+        chunker = None
         if ext in CODE_EXTENSIONS:
             lang = EXTENSION_LANGUAGES[ext]
+            chunker, chunker_version = (lambda c, lang=lang: chunk_code(c, lang)), CHUNKER_VERSION
+        elif source.chunk_markdown:  # opt-in per source (task 52385ebc), guarded by fs_chunking
+            chunker, chunker_version = chunk_markdown, MD_CHUNKER_VERSION
+        if chunker is not None:
             _chunk_t0 = time.monotonic()
             new_chunks = sync_doc_chunks(
-                self.db,
-                doc_id,
-                content,
-                title,
-                lambda c, lang=lang: chunk_code(c, lang),
-                chunker_version=CHUNKER_VERSION,
+                self.db, doc_id, content, title, chunker, chunker_version=chunker_version
             )
             self._phase_ms["chunk"] += (time.monotonic() - _chunk_t0) * 1000
             chunk_embed_batch.extend(new_chunks)

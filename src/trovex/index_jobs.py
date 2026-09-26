@@ -34,12 +34,14 @@ import sqlite3
 import threading
 import time
 
+from . import sync
 from .indexer import Indexer
 from .store import SqliteStore
 
 log = logging.getLogger("trovex.index_jobs")
 
-KINDS = ("scan_source", "paths", "rebuild", "rebuild_vec")
+KINDS = ("scan_source", "paths", "rebuild", "rebuild_vec", "sync_source", "gc_source")
+SOURCE_KINDS = ("sync_source", "gc_source")  # connector jobs: source_key names the source, required
 
 POLL_INTERVAL_SEC = 1.0
 
@@ -67,7 +69,11 @@ def enqueue(
     jobs sit ahead of this one (0 = next up or already running)."""
     if kind not in KINDS:
         raise ValueError(f"unknown index job kind: {kind!r}")
+    if kind in SOURCE_KINDS and not source_key:
+        raise ValueError(f"{kind} needs a source_key")
     payload: dict = {}
+    if kind in SOURCE_KINDS:
+        payload["source"] = source_key  # _execute only sees the payload
     if kind == "paths":
         payload["paths"] = sorted(set(paths or ()))
     if full:
@@ -287,4 +293,8 @@ class Applier:
             return db_mod.rebuild_vec_shadow(
                 self.indexer.db, self.indexer.embedder, self.indexer.settings.resolved_embed_dim()
             )
+        if kind == "sync_source":
+            return sync.run_sync_source(self.indexer, payload["source"], job_id)
+        if kind == "gc_source":
+            return sync.run_gc_source(self.indexer, payload["source"], job_id)
         return self.indexer.reindex(full=bool(payload.get("full")), job_id=job_id)

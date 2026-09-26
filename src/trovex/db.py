@@ -1542,7 +1542,7 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         -- second concurrent indexer.reindex() call or a bare rejection.
         CREATE TABLE IF NOT EXISTS index_jobs (
             id INTEGER PRIMARY KEY,
-            kind TEXT NOT NULL,           -- 'scan_source' | 'paths' | 'rebuild'
+            kind TEXT NOT NULL,           -- 'scan_source' | 'paths' | 'rebuild' | 'sync_source' | 'gc_source'
             -- Coalescing key: a source id, or NULL for "every configured source"
             -- (scan_source/rebuild with no explicit source). Two rows with the
             -- same (kind, source_key) never both sit 'queued' at once.
@@ -1562,6 +1562,47 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             error TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_index_jobs_state_seq ON index_jobs(state, seq);
+
+        -- Source registry (steal #5, replaces sources.yaml): one row per corpus
+        -- source. config is kind-specific JSON ({{"root": ...}} for fs); secrets
+        -- never live here (credential_ref names a file outside the DB).
+        CREATE TABLE IF NOT EXISTS sources (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL DEFAULT 'fs',
+            label TEXT NOT NULL,
+            config TEXT NOT NULL DEFAULT '{{}}',
+            credential_ref TEXT,
+            policy TEXT NOT NULL DEFAULT 'upsert_delete',   -- upsert|upsert_delete|append_only
+            poll_sec INTEGER NOT NULL DEFAULT 300,
+            gc_sec INTEGER NOT NULL DEFAULT 86400,
+            deletion_safety_ratio REAL NOT NULL DEFAULT 0.5,
+            meta TEXT NOT NULL DEFAULT '{{}}',
+            enabled INTEGER NOT NULL DEFAULT 1
+        );
+
+        -- One row per sync_source / gc_source job. cursor_json is the connector's
+        -- resume point (only advanced when every batch applied); failures_json the
+        -- inline RecordFailures the next sync replays; error a run-level abort.
+        CREATE TABLE IF NOT EXISTS source_runs (
+            id INTEGER PRIMARY KEY,
+            source_id TEXT NOT NULL,
+            kind TEXT NOT NULL,                              -- 'sync' | 'gc' | 'guard'
+            started REAL NOT NULL,
+            ended REAL,
+            cursor_json TEXT,
+            added INTEGER NOT NULL DEFAULT 0,
+            updated INTEGER NOT NULL DEFAULT 0,
+            removed INTEGER NOT NULL DEFAULT 0,
+            ok INTEGER NOT NULL DEFAULT 0,
+            failed INTEGER NOT NULL DEFAULT 0,
+            failures_json TEXT NOT NULL DEFAULT '[]',
+            removed_ids TEXT NOT NULL DEFAULT '[]',
+            error TEXT,
+            scan_ms REAL NOT NULL DEFAULT 0,
+            embed_ms REAL NOT NULL DEFAULT 0,
+            write_ms REAL NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_source_runs_source ON source_runs(source_id, kind, id);
         CREATE INDEX IF NOT EXISTS idx_index_jobs_coalesce
             ON index_jobs(kind, source_key, state);
 

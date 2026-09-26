@@ -52,6 +52,15 @@ dev = [
     "pytest-asyncio>=0.24",
     "httpx>=0.28",
     "ruff>=0.8",
+    # so the usearch equivalence test (test_usearch_index.py) actually runs in
+    # CI instead of skipping — same package as the `usearch` extra below.
+    "usearch>=2.16",
+]
+# Per-partition HNSW escape hatch (see capacity.py) — offline, no network at
+# query time. Optional in production: absent means every partition stays on
+# sqlite-vec brute force unconditionally, never a hard failure.
+usearch = [
+    "usearch>=2.16",
 ]
 
 # Floors for vulnerable *transitive* deps (pulled by mcp[crypto]) so the

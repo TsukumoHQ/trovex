@@ -59,16 +59,23 @@ def partition_counts(db: sqlite3.Connection) -> dict[str, dict[str, int]]:
     return out
 
 
-def capacity_report(db: sqlite3.Connection) -> list[dict]:
+def capacity_report(db: sqlite3.Connection, usearch_partitions: list[str] | None = None) -> list[dict]:
     """Partitions at or near a capacity limit. Empty when everything has headroom.
 
     Each entry: {source_id, docs, chunks, reason, ratio}. `reason` names the limit
-    being approached; `ratio` is how close (1.0 = at the limit)."""
+    being approached; `ratio` is how close (1.0 = at the limit).
+
+    `usearch_partitions` (task 4c89b89a) excludes a partition from the chunk
+    -ceiling warning: once it's on the usearch escape hatch that specific risk
+    (a tag-scoped chunk KNN silently truncating past 4096) is resolved, so the
+    warning would be noise, not signal. It stays eligible for the SEPARATE
+    brute-force-soft-limit warning below — usearch doesn't change doc-count scale."""
+    covered = set(usearch_partitions or [])
     warnings: list[dict] = []
     for src, c in partition_counts(db).items():
         docs, chunks = c["docs"], c["chunks"]
         # Owned chunks approaching the hard vec0 KNN ceiling — the sharpest edge.
-        if chunks >= VEC0_K_CEILING * WARN_FRACTION:
+        if src not in covered and chunks >= VEC0_K_CEILING * WARN_FRACTION:
             warnings.append(
                 {
                     "source_id": src,
@@ -92,10 +99,10 @@ def capacity_report(db: sqlite3.Connection) -> list[dict]:
     return warnings
 
 
-def log_capacity_warnings(db: sqlite3.Connection) -> int:
+def log_capacity_warnings(db: sqlite3.Connection, usearch_partitions: list[str] | None = None) -> int:
     """Emit a WARN per near-capacity partition; return the count. Safe to call on
     any hot path — a single grouped COUNT, and silent when there's headroom."""
-    warnings = capacity_report(db)
+    warnings = capacity_report(db, usearch_partitions=usearch_partitions)
     for w in warnings:
         log.warning(
             "partition %r at %.0f%% of capacity (%s): %d docs / %d chunks — "

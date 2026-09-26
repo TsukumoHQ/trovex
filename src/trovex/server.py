@@ -24,9 +24,11 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from . import capacity
 from . import insights as insights_mod
 from . import offload
 from . import savings as savings_mod
+from . import usearch_index
 from .boot import boot_pointers
 from .capture import capture_state
 from .db import like_escape
@@ -259,6 +261,15 @@ def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state = get_state()  # warm up
+    # task 4c89b89a: build the HNSW index for every flagged partition BEFORE
+    # serving — a request landing before the first reindex would otherwise see
+    # an empty index and silently fall back to sqlite-vec (safe, but defeats
+    # the point of flagging the partition in the first place).
+    if state.settings.usearch_partitions and usearch_index.available():
+        dim = state.settings.resolved_embed_dim()
+        for src in state.settings.usearch_partitions:
+            usearch_index.rebuild_partition(state.indexer.db, "vec_docs", src, dim)
+            usearch_index.rebuild_partition(state.indexer.db, "vec_chunks", src, dim)
     # Start the reindex-queue applier (task dab8766b): recovers any job a prior
     # crash left 'processing', then drains index_jobs on its own thread for the
     # life of the process. /api/reindex only ever enqueues from here on.
@@ -939,7 +950,29 @@ def build_app() -> FastAPI:
             r["status"]: r["c"]
             for r in db.execute("SELECT status, COUNT(*) AS c FROM docs GROUP BY status").fetchall()
         }
-        return JSONResponse({"total": total, "total_tokens": total_tokens, "by_status": by_status})
+        # task 4c89b89a: per-partition vec0 KNN headroom, so the dashboard shows
+        # the same number capacity.log_capacity_warnings acts on — a partition
+        # already on the usearch escape hatch is marked `usearch: true` instead
+        # of a ceiling ratio (that specific risk no longer applies to it).
+        usearch_partitions = set(state.settings.usearch_partitions)
+        capacity_by_partition = [
+            {
+                "source_id": src,
+                "docs": c["docs"],
+                "chunks": c["chunks"],
+                "ceiling_ratio": round(c["chunks"] / capacity.VEC0_K_CEILING, 3),
+                "usearch": src in usearch_partitions,
+            }
+            for src, c in sorted(capacity.partition_counts(db).items())
+        ]
+        return JSONResponse(
+            {
+                "total": total,
+                "total_tokens": total_tokens,
+                "by_status": by_status,
+                "capacity": capacity_by_partition,
+            }
+        )
 
     @app.post("/api/reindex")
     @write_limit

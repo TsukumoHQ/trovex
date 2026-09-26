@@ -4,16 +4,22 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import usearch_index
 from .config import RESERVED_SOURCE_ID, Settings
 from .db import open_db
 from .embedder import Embedder, embedder_from_settings
 from .query_cache import embed_query_blob
 
-# vec0's hard API ceiling on a KNN `k`. With the partitioned index (P2a) each
-# source is its OWN bounded shard, so a query never needs a k anywhere near this —
+# vec0's hard API ceiling on a KNN `k` — sqlite-vec RAISES past this, it does not
+# clamp. With the partitioned index (P2a) each source is its OWN bounded shard,
+# so a query never needs a k anywhere near this for the small default window —
 # the old SQLITE_VEC_MAX_K clamp + widen-to-4096 retry are retired. It survives
-# only as the k used to scan a whole (bounded) partition for a tag-scoped query,
-# where tags — not a vec0 metadata column — are filtered after the KNN.
+# as the k used to scan a whole partition for a tag-scoped query (tags are not a
+# vec0 metadata column, so they're filtered after the KNN) — but that only
+# actually covers the WHOLE partition while the partition's own vector count
+# stays under this ceiling too (task 4c89b89a). A partition that outgrows it
+# (flag it in Settings.usearch_partitions — see usearch_index.py) needs the HNSW
+# escape hatch for a tag-scoped query to see every candidate again.
 VEC0_MAX_K = 4096
 
 # Reciprocal-rank-fusion constant (the standard k0=60), shared with the chunk
@@ -253,8 +259,52 @@ class Searcher:
             tail_params.extend(tags)
         sql += tail + " ORDER BY v.distance"
 
+        # task 4c89b89a: the usearch fallback below can't reuse `sql` — vec0
+        # only populates `v.distance` inside a MATCH KNN, not for a plain
+        # `rowid IN (...)` lookup — so it re-selects metadata straight off
+        # `docs` (the lifecycle/kind/status source of truth, mirrored onto
+        # vec_docs only for the KNN's own pre-filter) and attaches the
+        # distance usearch already computed, in Python.
+        meta_sql = f"""SELECT d.id, d.path, d.title, d.mtime, d.status, d.size_bytes,
+                              d.tokens_est, d.absolute_path, d.source_id, d.importance
+                       FROM docs d
+                       WHERE d.id IN ({{ph}}) AND {lifecycle_clause.replace("v.", "d.")}"""
+        meta_tail = ""
+        meta_params_tail: list = []
+        if not include_duplicates:
+            meta_tail += " AND d.status != 'duplicate'"
+        if kind:
+            meta_tail += " AND d.kind = ?"
+            meta_params_tail.append(kind)
+        if tags:
+            placeholders = ",".join("?" * len(tags))
+            meta_tail += f" AND d.id IN (SELECT doc_id FROM doc_tags WHERE tag IN ({placeholders}))"
+            meta_params_tail.extend(tags)
+
         rows: list = []
         for src in targets:
+            # A flagged partition (Settings.usearch_partitions) has no
+            # sqlite-vec 4096 k-ceiling — route it through the HNSW index
+            # (built by rebuild_partition, table='vec_docs') when present,
+            # falling back to sqlite-vec unchanged whenever it isn't (dep
+            # absent, or a rebuild hasn't run yet for this partition).
+            hnsw = (
+                usearch_index.get_index("vec_docs", src)
+                if src in self.settings.usearch_partitions
+                else None
+            )
+            if hnsw is not None and len(hnsw):
+                eff_k = len(hnsw) if tags else k
+                dist_by_id = dict(hnsw.search(qblob, eff_k))
+                if dist_by_id:
+                    ids = list(dist_by_id)
+                    ph = ",".join("?" * len(ids))
+                    q = meta_sql.format(ph=ph) + meta_tail
+                    for r in self.db.execute(q, [*ids, *meta_params_tail]).fetchall():
+                        row = dict(r)
+                        row["distance"] = dist_by_id[row["id"]]
+                        rows.append(row)
+                continue
             rows.extend(self.db.execute(sql, [qblob, k, src, *tail_params]).fetchall())
         if len(targets) > 1:
             rows.sort(key=lambda r: r["distance"])  # merge partitions by distance

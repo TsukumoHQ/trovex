@@ -8,7 +8,7 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 
-from . import capacity
+from . import capacity, usearch_index
 from .chunking_code import CHUNKER_VERSION, CODE_EXTENSIONS, EXTENSION_LANGUAGES, chunk_code
 from .config import RESERVED_SOURCE_ID, Settings, Source
 from .db import (
@@ -452,7 +452,12 @@ class Indexer:
         # P3 headroom: warn if any partition is nearing the brute-force ceiling,
         # so the usearch upgrade is prompted before it bites. Observability only —
         # never changes indexing behavior. Report the count for callers/tests.
-        capacity_warnings = capacity.log_capacity_warnings(self.db)
+        # A partition already covered by usearch (task 4c89b89a) is excluded from
+        # the chunk-ceiling warning — that specific risk is what the index resolves.
+        capacity_warnings = capacity.log_capacity_warnings(
+            self.db, usearch_partitions=self.settings.usearch_partitions
+        )
+        self._rebuild_usearch_indexes()
         return {
             "added": added,
             "updated": updated,
@@ -726,7 +731,21 @@ class Indexer:
         counts["embed_cache_hits"] = self._embed_cache_hits
         counts["embed_cache_misses"] = self._embed_cache_misses
         counts["job_id"] = job_id
+        self._rebuild_usearch_indexes()
         return counts
+
+    def _rebuild_usearch_indexes(self) -> None:
+        """task 4c89b89a: rebuild the in-memory HNSW index for every flagged
+        partition (Settings.usearch_partitions) after each index run — cheap
+        next to the reindex itself (a few hundred ms for tens of thousands of
+        vectors) and keeps the index from ever serving stale results. A no-op
+        when usearch isn't installed or nothing is flagged (the default)."""
+        if not self.settings.usearch_partitions or not usearch_index.available():
+            return
+        dim = self.settings.resolved_embed_dim()
+        for src in self.settings.usearch_partitions:
+            usearch_index.rebuild_partition(self.db, "vec_docs", src, dim)
+            usearch_index.rebuild_partition(self.db, "vec_chunks", src, dim)
 
     def _commit_progress(
         self, embed_batch: list[tuple[int, str]], chunk_embed_batch: list[tuple[int, str]]

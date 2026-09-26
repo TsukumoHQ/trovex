@@ -44,7 +44,7 @@ from .db import (
     vec_docs_put,
     vec_sync_meta,
 )
-from . import retention
+from . import retention, usearch_index
 from .query_cache import embed_query_blob
 from .embedder import Embedder, embedder_from_settings
 
@@ -1106,6 +1106,22 @@ class SqliteStore:
         vsql += " ORDER BY v.distance"
         vec_ids: list[int] = []
         for src in targets:
+            # task 4c89b89a: a flagged partition (Settings.usearch_partitions)
+            # has no sqlite-vec 4096 k-ceiling — the tags branch above needs
+            # the WHOLE partition, which sqlite-vec can no longer give past
+            # that size (see usearch_index.py). Falls through to sqlite-vec
+            # unchanged whenever the index isn't built yet (dep absent, or a
+            # rebuild hasn't run) — lifecycle/kind/source/tag filtering all
+            # happen again below regardless of which path found the rowid.
+            hnsw = (
+                usearch_index.get_index("vec_chunks", src)
+                if src in self.settings.usearch_partitions
+                else None
+            )
+            if hnsw is not None and len(hnsw):
+                eff_k = len(hnsw) if tags else k
+                vec_ids.extend(rowid for rowid, _dist in hnsw.search(qblob, eff_k))
+                continue
             vparams = [qblob, k, src] + ([kind] if kind else [])
             vec_ids.extend(r["rowid"] for r in self.db.execute(vsql, vparams))
 

@@ -101,6 +101,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     _migrate_add_importance(conn)
     _migrate_add_index_run_metrics(conn)
     _migrate_add_index_jobs_link(conn)
+    _migrate_add_provenance(conn)
     _init_schema(conn, embed_dim)
     # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
     # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
@@ -563,23 +564,34 @@ def sync_doc_chunks(
         if h and row["chunker_version"] == chunker_version:
             reusable.setdefault(h, []).append(row["id"])
 
+    prov = conn.execute(
+        "SELECT source_url, absolute_path, ext_id FROM docs WHERE id = ?", (doc_id,)
+    ).fetchone()
+    base_link = doc_link(prov["source_url"], prov["absolute_path"], prov["ext_id"]) if prov else ""
+
     to_embed: list[tuple[int, str]] = []
     kept: set[int] = set()
     for ch in chunk_fn(content):
         embed_text = ch.embed_text(title)
         h = hashlib.sha256(embed_text.encode("utf-8", errors="replace")).hexdigest()
         heading = " > ".join(ch.heading_path)
+        anchor = chunk_anchor(heading, ch.index)
+        link = f"{base_link}#{anchor}" if base_link else ""
         pool = reusable.get(h)
         if pool:
             cid = pool.pop()
             kept.add(cid)
-            conn.execute("UPDATE chunks SET chunk_index = ? WHERE id = ?", (ch.index, cid))
+            conn.execute(
+                "UPDATE chunks SET chunk_index = ?, anchor = ?, link = ? WHERE id = ?",
+                (ch.index, anchor, link, cid),
+            )
         else:
             cur = conn.execute(
                 """INSERT INTO chunks
-                       (doc_id, chunk_index, heading_path, content, tokens_est, content_hash, chunker_version)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, ch.index, heading, ch.text, ch.tokens_est, h, chunker_version),
+                       (doc_id, chunk_index, heading_path, content, tokens_est, content_hash,
+                        chunker_version, anchor, link)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, ch.index, heading, ch.text, ch.tokens_est, h, chunker_version, anchor, link),
             )
             cid = cur.lastrowid
             conn.execute("INSERT INTO chunks_fts(content, chunk_id) VALUES (?, ?)", (ch.text, cid))
@@ -908,6 +920,94 @@ def _migrate_add_trovex_store_columns(conn: sqlite3.Connection) -> None:
                 f"ALTER TABLE docs ADD COLUMN {col} TEXT"
             )  # sql-safe: col from fixed literal tuple above, never user input
     conn.commit()
+
+
+_PROVENANCE_DOC_COLS = (
+    ("external_id", "TEXT"),
+    ("source_url", "TEXT"),
+    ("record_locator", "TEXT"),  # JSON, e.g. {"path": ..., "line_range": [1, n]}
+    ("remote_version", "TEXT"),
+    ("remote_updated_at", "REAL"),
+    ("owners", "TEXT"),  # JSON list
+    ("parents", "TEXT"),  # JSON list
+    ("fetched_at", "REAL"),
+)
+
+
+def chunk_anchor(heading_path: str, chunk_index: int) -> str:
+    """Stable in-doc anchor for a chunk: slug of its last heading (or the code
+    chunker's line-range label), else `chunk-<index>` for a heading-less chunk."""
+    last = (heading_path or "").split(" > ")[-1]
+    slug = re.sub(r"[^a-z0-9]+", "-", last.lower()).strip("-")
+    return slug or f"chunk-{chunk_index}"
+
+
+def doc_link(source_url: str | None, absolute_path: str | None, ext_id: str | None) -> str:
+    """Re-fetchable base link for a doc: its remote URL, else file:// for a
+    file-backed doc, else trovex:<ext_id> for a trovex-owned one."""
+    if source_url:
+        return source_url
+    if absolute_path:
+        return f"file://{absolute_path}"
+    return f"trovex:{ext_id}" if ext_id else ""
+
+
+def _migrate_add_provenance(conn: sqlite3.Connection) -> None:
+    """Provenance envelope (steal #6): docs gain the remote-record fields a
+    connector fills; chunks gain anchor + link so every served hit is a
+    verifiable, re-fetchable citation. Additive ALTERs in ONE transaction (no
+    vec rebuild); idempotent — a second boot finds the columns and no
+    anchor='' chunks, so nothing runs. Legacy chunks/fs-docs are backfilled so
+    a live store serves link on every hit without a full reindex."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='docs' AND type='table'").fetchone():
+        return
+    doc_cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    has_chunks = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='chunks' AND type='table'"
+    ).fetchone()
+    chunk_cols = {r[1] for r in conn.execute("PRAGMA table_info(chunks)")} if has_chunks else set()
+    todo_docs = [(c, t) for c, t in _PROVENANCE_DOC_COLS if c not in doc_cols]
+    todo_chunks = [
+        c for c in ("anchor", "link") if has_chunks and c not in chunk_cols
+    ]
+    if not todo_docs and not todo_chunks and not (
+        has_chunks and conn.execute("SELECT 1 FROM chunks WHERE anchor = '' LIMIT 1").fetchone()
+    ):
+        return  # already migrated + backfilled: no writer lock on a normal boot
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        for col, typ in todo_docs:
+            conn.execute(
+                f"ALTER TABLE docs ADD COLUMN {col} {typ}"
+            )  # sql-safe: fixed literal tuple above
+        for col in todo_chunks:
+            conn.execute(
+                f"ALTER TABLE chunks ADD COLUMN {col} TEXT NOT NULL DEFAULT ''"
+            )  # sql-safe: col from fixed literal tuple above
+        conn.execute(
+            "UPDATE docs SET record_locator = json_object('path', path) "
+            "WHERE content IS NULL AND record_locator IS NULL AND absolute_path != ''"
+        )
+        if has_chunks:
+            rows = conn.execute(
+                """SELECT c.id, c.chunk_index, c.heading_path, d.source_url, d.absolute_path, d.ext_id
+                   FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.anchor = ''"""
+            ).fetchall()
+            conn.executemany(
+                "UPDATE chunks SET anchor = ?, link = ? WHERE id = ?",
+                [
+                    (
+                        (a := chunk_anchor(r["heading_path"], r["chunk_index"])),
+                        f"{doc_link(r['source_url'], r['absolute_path'], r['ext_id'])}#{a}",
+                        r["id"],
+                    )
+                    for r in rows
+                ],
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def _migrate_add_chunk_hash(conn: sqlite3.Connection) -> None:
@@ -1382,6 +1482,16 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             -- When lifecycle last changed (epoch secs), so the TTL sweep can
             -- measure time-IN-STATE for the grace windows. 0 = never transitioned.
             lifecycle_changed_at REAL NOT NULL DEFAULT 0,
+            -- Provenance envelope (steal #6): where the record came from and how to
+            -- re-fetch it. All NULL for trovex-owned docs except what a connector fills.
+            external_id TEXT,
+            source_url TEXT,
+            record_locator TEXT,
+            remote_version TEXT,
+            remote_updated_at REAL,
+            owners TEXT,
+            parents TEXT,
+            fetched_at REAL,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
@@ -1577,7 +1687,10 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             -- doc's chunks as non-reusable regardless of content_hash — a stale
             -- chunker's boundaries are never silently trusted just because the
             -- text happened not to change. Legacy rows have '' → non-reusable.
-            chunker_version TEXT NOT NULL DEFAULT ''
+            chunker_version TEXT NOT NULL DEFAULT '',
+            -- Provenance (steal #6): in-doc anchor + re-fetchable link served on every hit.
+            anchor TEXT NOT NULL DEFAULT '',
+            link TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(doc_id, content_hash);
         CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(doc_id);

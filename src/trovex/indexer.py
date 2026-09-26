@@ -508,11 +508,16 @@ class Indexer:
 
         tokens_est = count_tokens(content)
         now = time.time()
+        # Provenance (steal #6): where this record lives, so a served hit is verifiable.
+        record_locator = json.dumps(
+            {"path": rel_path, "line_range": [1, content.count("\n") + 1]}, separators=(",", ":")
+        )
         _write_t0 = time.monotonic()
         if existing:
             self.db.execute(
                 """UPDATE docs SET content_hash=?, size_bytes=?, tokens_est=?,
-                   mtime=?, last_indexed=?, title=?, absolute_path=?, author_agent=?
+                   mtime=?, last_indexed=?, title=?, absolute_path=?, author_agent=?,
+                   record_locator=?, fetched_at=?
                    WHERE id=?""",
                 (
                     content_hash,
@@ -523,6 +528,8 @@ class Indexer:
                     title,
                     str(path),
                     author,
+                    record_locator,
+                    now,
                     existing["id"],
                 ),
             )
@@ -532,8 +539,8 @@ class Indexer:
             cur = self.db.execute(
                 """INSERT INTO docs (source_id, path, absolute_path, content_hash,
                    size_bytes, tokens_est, mtime, first_indexed, last_indexed,
-                   title, author_agent)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   title, author_agent, record_locator, fetched_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     source.id,
                     rel_path,
@@ -546,6 +553,8 @@ class Indexer:
                     now,
                     title,
                     author,
+                    record_locator,
+                    now,
                 ),
             )
             doc_id = cur.lastrowid

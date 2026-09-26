@@ -34,7 +34,9 @@ from .db import (
     MARKDOWN_CHUNK_EMBED_NS,
     canonical_topic_slug,
     checkpoint_if_wal_large,
+    chunk_anchor,
     delete_doc_cascade,
+    doc_link,
     like_escape,
     open_db,
     reconcile_vec_meta,
@@ -1258,6 +1260,7 @@ class SqliteStore:
             ph = ",".join("?" * len(batch))
             for r in self.db.execute(
                 f"""SELECT c.id AS cid, c.doc_id, c.heading_path, c.content, c.tokens_est,
+                          c.anchor, c.link, d.record_locator,
                           d.ext_id, d.path, d.title, d.kind, d.source_id, d.lifecycle,
                           d.tokens_est AS doc_tokens
                    FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.id IN ({ph})""",
@@ -1302,6 +1305,22 @@ class SqliteStore:
             if len(out) >= limit:
                 break
         return out
+
+    def provenance(self, ext_id: str, heading: str = "") -> dict:
+        """{link, record_locator} for a doc (and, with `heading`, that section's
+        anchor) — the citation served on a trovex_read slice. Empty values
+        are omitted."""
+        row = self.db.execute(
+            "SELECT source_url, absolute_path, record_locator FROM docs WHERE ext_id = ?",
+            (ext_id,),
+        ).fetchone()
+        if row is None:
+            return {}
+        link = doc_link(row["source_url"], row["absolute_path"], ext_id)
+        if link and heading:
+            # Same slug the chunker stamps on that section's chunks (last heading).
+            link = f"{link}#{chunk_anchor(heading, 0)}"
+        return {k: v for k, v in (("link", link), ("record_locator", row["record_locator"])) if v}
 
     def section_text(self, doc_id: int, heading_path: str) -> str:
         """Small-to-big: all chunks of a doc sharing a heading path = the section."""

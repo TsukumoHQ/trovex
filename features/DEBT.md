@@ -10,3 +10,4 @@
 - No [LEGACY_OPPORTUNITY] — this is a fix to code from the same task line (T4/T6/F6 rerank work), not a change touching unrelated legacy code.
 - No [LEGACY_OPPORTUNITY] beyond what's in scope.
 - [LEGACY_OPPORTUNITY]: The boot and prompt hook local truncation paths can be removed after deployment once they send their existing local token ceiling as budget.
+- - Per-chunk line ranges (anchor as line range): [LEGACY_OPPORTUNITY] chunks have no line offsets and markdown fs docs are not chunked at all; dev-codex f460f703 owns chunk line ranges.

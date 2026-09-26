@@ -743,7 +743,10 @@ def trovex_read(
             return content if content is not None else f"(version {version_id} not found)"
         if section:
             sec = extract_section(doc.content, section)
-            return sec if sec is not None else f"(section '{section}' not found)"
+            if sec is None:
+                return f"(section '{section}' not found)"
+            cite = _prov_line(state.store.provenance(resolved, section))
+            return f"{sec}\n\n{cite}" if cite else sec
         return doc.content
     if not query:
         return _err(
@@ -884,9 +887,25 @@ def trovex_search(
     return _with_inline(state.searcher.db, out, saved)
 
 
+def _prov_line(prov: dict) -> str:
+    """One-line provenance citation (steal #6): the re-fetchable link, plus the
+    record locator when the doc has one. Empty when there is nothing to cite."""
+    link, loc = prov.get("link"), prov.get("record_locator")
+    if not link:
+        return ""
+    return f"↳ {link}" + (f" · loc={loc}" if loc else "")
+
+
+def _hit_prov(h: dict) -> dict:
+    """Provenance of a search_chunks hit; a not-yet-backfilled chunk falls back
+    to the doc-level link so a hit is never served without a citation."""
+    link = h.get("link") or f"trovex:{h['ext_id']}"
+    return {"link": link, "record_locator": h.get("record_locator")}
+
+
 def _fmt_passage(h: dict) -> str:
     bc = f"{h['title']} > {h['heading_path']}" if h.get("heading_path") else h["title"]
-    return f"{bc}\n\n{h['content']}\n\n— trovex:{h['ext_id']}"
+    return f"{bc}\n\n{h['content']}\n\n— trovex:{h['ext_id']}\n{_prov_line(_hit_prov(h))}"
 
 
 def _breadcrumb(h: dict) -> str:
@@ -921,7 +940,7 @@ def _fmt_citation(h: dict, words: int = 28) -> str:
     span is trovex_read(doc_id, section=<heading>)."""
     bc = _breadcrumb(h)
     snippet = _extract_words(h.get("content", ""), words)
-    return f"{bc}  — trovex:{h['ext_id']}\n{snippet}"
+    return f"{bc}  — trovex:{h['ext_id']}\n{snippet}\n{_prov_line(_hit_prov(h))}"
 
 
 def _fmt_card(h: dict) -> str:
@@ -932,8 +951,8 @@ def _fmt_card(h: dict) -> str:
     bc = _breadcrumb(h)
     extract = _extract_words(h.get("content", ""))
     return (
-        f"{bc}\n\n{extract}\n\n— trovex:{h['ext_id']} · card"
-        f' · escalate: trovex_read(query=…, tier="passage") for the full passage,'
+        f"{bc}\n\n{extract}\n\n— trovex:{h['ext_id']} · card\n{_prov_line(_hit_prov(h))}\n"
+        f'escalate: trovex_read(query=…, tier="passage") for the full passage,'
         f' tier="full" for the whole doc'
     )
 

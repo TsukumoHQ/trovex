@@ -1293,6 +1293,9 @@ def eval(  # noqa: A001
     ),
     since: str = typer.Option("7d", "--since", help="Replay window: <n>s/m/h/d (default 7d)."),
     limit: int = typer.Option(500, "--limit", help="Replay: max queries sampled from the window."),
+    source: str | None = typer.Option(
+        None, "--source", help="Replay: narrow to one of mcp/boot/prompt (default: all)."
+    ),
     baseline: Path | None = typer.Option(
         None, "--baseline", help="Replay: thresholds JSON {min_hit_at_1, max_tokens_served_median}."
     ),
@@ -1327,7 +1330,9 @@ def eval(  # noqa: A001
         settings = Settings()
         emb = embedder_from_settings(settings)
         searcher = Searcher(settings, embedder=emb)
-        report = replay_eval(searcher.db, searcher, since_seconds=since_seconds, limit=limit, k=k)
+        report = replay_eval(
+            searcher.db, searcher, since_seconds=since_seconds, limit=limit, k=k, source=source
+        )
 
         if json_out:
             print(
@@ -1341,6 +1346,7 @@ def eval(  # noqa: A001
                         "tokens_served_median": report.tokens_served_median,
                         "rank_drift_mean": report.rank_drift_mean,
                         "k": report.k,
+                        "per_source": report.per_source,
                     }
                 )
             )

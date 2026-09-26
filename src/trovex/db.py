@@ -92,6 +92,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     _migrate_add_trovex_store_columns(conn)
     _migrate_add_query_session(conn)
     _migrate_add_query_used(conn)
+    _migrate_add_query_source(conn)
     _migrate_add_chunk_hash(conn)
     _migrate_add_chunker_version(conn)
     _migrate_add_lifecycle(conn)
@@ -1001,6 +1002,24 @@ def _migrate_add_query_used(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _migrate_add_query_source(conn: sqlite3.Connection) -> None:
+    """Add mcp_queries.source to an existing query log (additive, task 2b7974cf).
+    Default 'mcp' so every pre-migration row (all logged before boot/prompt
+    calls were tracked) is correctly attributed to the explicit-tool-call path,
+    not misfiled as boot/prompt traffic it never was. Skip if the table doesn't
+    exist yet — _init_schema creates it with the column."""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_queries'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(mcp_queries)")}
+    if "source" not in cols:
+        conn.execute("ALTER TABLE mcp_queries ADD COLUMN source TEXT NOT NULL DEFAULT 'mcp'")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_mcp_queries_source ON mcp_queries(source, ts DESC)")
+        conn.commit()
+
+
 def _migrate_add_importance(conn: sqlite3.Connection) -> None:
     """Add docs.importance + docs.pinned to an existing store (additive, P3).
 
@@ -1448,11 +1467,19 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             pre_top1_path TEXT,
             top1_changed INTEGER NOT NULL DEFAULT 0,
             top1_lift INTEGER NOT NULL DEFAULT 0,
-            top5_overlap INTEGER NOT NULL DEFAULT 5
+            top5_overlap INTEGER NOT NULL DEFAULT 5,
+            -- task 2b7974cf: which caller produced this row. 'mcp' = an explicit
+            -- trovex_search/trovex_read tool call (the default — the only kind
+            -- logged before this column existed); 'boot' = the SessionStart hook's
+            -- generic /api/boot call; 'prompt' = the UserPromptSubmit hook's
+            -- /api/boot?q=<prompt> call. Both hook sources are the fleet's REAL
+            -- traffic volume (hundreds/day) that the replay eval was blind to.
+            source TEXT NOT NULL DEFAULT 'mcp'
         );
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_ts ON mcp_queries(ts DESC);
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_user ON mcp_queries(user, ts DESC);
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_session ON mcp_queries(session_id, ts DESC);
+        CREATE INDEX IF NOT EXISTS idx_mcp_queries_source ON mcp_queries(source, ts DESC);
 
         -- Latest retrieval-quality eval runs (retrieval_eval.evaluate_retrieval),
         -- persisted so the savings receipt can gate its number on measured hit@1

@@ -221,3 +221,62 @@ def log_query(
             [(query_id, i, r.path, r.status, r.tokens_est, r.score) for i, r in enumerate(results)],
         )
     db.commit()
+
+
+def log_pointer_query(
+    db,
+    *,
+    source: str,
+    agent: str,
+    query: str,
+    pointers: list[dict],
+    tokens_est: int,
+    elapsed_ms: int,
+) -> None:
+    """Log an /api/boot call — the SessionStart hook ('boot') or the
+    UserPromptSubmit hook ('prompt') — into mcp_queries/mcp_query_results
+    (task 2b7974cf), the same shape `log_query` writes for an explicit
+    trovex_search/trovex_read call, so the replay eval and the used-label see
+    the fleet's real (hook-driven) traffic volume instead of only the rare
+    explicit tool call.
+
+    session_id = the agent's own name: a hook call has no MCP transport
+    session, and the agent name IS the natural session key here — it's also
+    what an agent's own MCP calls carry via X-TROVEX-Session, so a later
+    trovex_read(doc_id=...) from that same agent labels a boot-served pointer
+    `used` exactly like an MCP-served one.
+
+    Best-effort: never raises — a logging miss must not break a boot call
+    (boot_pointers' own "never 500" contract).
+    """
+    try:
+        cur = db.execute(
+            """INSERT INTO mcp_queries
+               (ts, user, session_id, query, n_results, source,
+                response_tokens_est, top_result_tokens, elapsed_ms)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                time.time(),
+                agent,
+                agent,
+                redact_secrets(query)[:500],
+                len(pointers),
+                source,
+                tokens_est,
+                tokens_est,
+                elapsed_ms,
+            ),
+        )
+        query_id = cur.lastrowid
+        if pointers and query_id is not None:
+            db.executemany(
+                """INSERT INTO mcp_query_results (query_id, rank, path, status, tokens_est, score)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [
+                    (query_id, i, p["id"], "canonical", 0, p.get("score", 0.0))
+                    for i, p in enumerate(pointers)
+                ],
+            )
+        db.commit()
+    except Exception:  # noqa: BLE001 — a boot call must never 500 on a log failure
+        log.debug("log_pointer_query failed", exc_info=True)

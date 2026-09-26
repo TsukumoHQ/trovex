@@ -192,6 +192,55 @@ def test_api_boot_owner_scope_excludes_other_owners(client):
     assert titles == {"Auth incident"}
 
 
+def test_api_boot_logs_one_query_row_with_served_ids(client):
+    """task 2b7974cf: a SessionStart-style boot call (no q=) logs exactly one
+    mcp_queries row with source='boot' and its served pointer ids into
+    mcp_query_results — the replay eval's blind spot before this landed."""
+    db = state_mod._state.store.db
+
+    before = db.execute("SELECT COUNT(*) AS c FROM mcp_queries WHERE source='boot'").fetchone()["c"]
+    out = client.get("/api/boot", params={"agent": "coo", "floor": 0.0}).json()
+    after = db.execute("SELECT COUNT(*) AS c FROM mcp_queries WHERE source='boot'").fetchone()["c"]
+    assert after == before + 1
+
+    row = db.execute(
+        "SELECT id, session_id, user FROM mcp_queries WHERE source='boot' ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert row["session_id"] == "coo"  # the agent name, not an MCP transport session
+    assert row["user"] == "coo"
+    served = [
+        r["path"] for r in db.execute(
+            "SELECT path FROM mcp_query_results WHERE query_id = ? ORDER BY rank", (row["id"],)
+        )
+    ]
+    assert served == [p["id"] for p in out["pointers"]]
+    assert served  # this fixture's coo record clears scope+floor
+
+
+def test_api_boot_logs_source_prompt_when_q_given(client):
+    """The UserPromptSubmit hook (trovex-prompt.sh) passes q=<prompt> — that same
+    /api/boot call must log source='prompt', not 'boot', so --replay can tell
+    hook-driven prompt recall apart from a plain session start."""
+    db = state_mod._state.store.db
+    client.get("/api/boot", params={"agent": "coo", "floor": 0.0, "q": "current state resume"})
+    row = db.execute(
+        "SELECT source FROM mcp_queries ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert row["source"] == "prompt"
+
+
+def test_api_boot_empty_pointers_still_logs_a_row(client):
+    """An unknown agent's boot call is a real (zero-result) traffic event — it
+    must still show up in the replay eval's n, not vanish silently."""
+    db = state_mod._state.store.db
+    before = db.execute("SELECT COUNT(*) AS c FROM mcp_queries").fetchone()["c"]
+    client.get("/api/boot", params={"agent": "nobody", "floor": 0.0})
+    after = db.execute("SELECT COUNT(*) AS c FROM mcp_queries").fetchone()["c"]
+    assert after == before + 1
+    row = db.execute("SELECT n_results FROM mcp_queries ORDER BY id DESC LIMIT 1").fetchone()
+    assert row["n_results"] == 0
+
+
 def test_search_page_renders_states(client):
     """The /search surface ships all four UX states. Empty (no query) prompts; a real
     query renders the result list; and the page wires the error-state template + the

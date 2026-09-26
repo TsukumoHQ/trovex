@@ -57,13 +57,15 @@ def corpus(settings):
     return Searcher(settings, embedder=BagEmbedder()), ids
 
 
-def _log_query(db, *, query: str, session_id: str, ts: float, served: list[tuple[str, int]]) -> int:
+def _log_query(
+    db, *, query: str, session_id: str, ts: float, served: list[tuple[str, int]], source: str = "mcp"
+) -> int:
     """Insert one mcp_queries row + its served mcp_query_results rows.
     `served` is [(path, used), ...] in rank order."""
     cur = db.execute(
-        """INSERT INTO mcp_queries (ts, user, session_id, query, n_results, top_result_tokens)
-           VALUES (?, 'test', ?, ?, ?, 40)""",
-        (ts, session_id, query, len(served)),
+        """INSERT INTO mcp_queries (ts, user, session_id, query, n_results, top_result_tokens, source)
+           VALUES (?, 'test', ?, ?, ?, 40, ?)""",
+        (ts, session_id, query, len(served), source),
     )
     query_id = cur.lastrowid
     for rank, (path, used) in enumerate(served):
@@ -87,6 +89,38 @@ def test_sample_queries_respects_window_and_limit(corpus):
 
     sampled_limited = sample_queries(searcher.db, since_seconds=86400 * 30, limit=1)
     assert len(sampled_limited) == 1
+
+
+def test_sample_queries_source_filter(corpus):
+    searcher, ids = corpus
+    now = time.time()
+    _log_query(searcher.db, query="a", session_id="s1", ts=now - 60, served=[(ids["auth"], 0)], source="mcp")
+    _log_query(searcher.db, query="b", session_id="s1", ts=now - 60, served=[(ids["auth"], 0)], source="boot")
+    _log_query(searcher.db, query="c", session_id="s1", ts=now - 60, served=[(ids["auth"], 0)], source="prompt")
+
+    assert [s["query"] for s in sample_queries(searcher.db, since_seconds=3600, limit=10, source="boot")] == ["b"]
+    assert len(sample_queries(searcher.db, since_seconds=3600, limit=10)) == 3
+
+
+def test_replay_reports_per_source_breakdown(corpus):
+    """task 2b7974cf: --replay reports per-source counts regardless of whether
+    --source narrowed the sample — boot/prompt traffic is now visible, not just
+    explicit mcp tool calls."""
+    searcher, ids = corpus
+    now = time.time()
+    _log_query(searcher.db, query="jwt token signature validation", session_id="s1", ts=now - 60,
+                served=[(ids["auth"], 0)], source="mcp")
+    _log_query(searcher.db, query="jwt token signature validation", session_id="s2", ts=now - 60,
+                served=[(ids["auth"], 0)], source="boot")
+    _log_query(searcher.db, query="jwt token signature validation", session_id="s3", ts=now - 60,
+                served=[(ids["auth"], 0)], source="boot")
+
+    report = replay_eval(searcher.db, searcher, since_seconds=3600, limit=10, k=3)
+    assert report.per_source == {"mcp": 1, "boot": 2}
+
+    narrowed = replay_eval(searcher.db, searcher, since_seconds=3600, limit=10, k=3, source="boot")
+    assert narrowed.n == 2
+    assert narrowed.per_source == {"boot": 2}
 
 
 def test_replay_scores_hit_at_1_only_on_used_labelled(corpus):

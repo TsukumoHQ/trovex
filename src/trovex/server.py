@@ -29,7 +29,7 @@ from . import insights as insights_mod
 from . import offload
 from . import savings as savings_mod
 from . import usearch_index
-from .boot import boot_pointers
+from .boot import BOOT_Q_MAX, BOOT_QUERY, boot_pointers
 from .capture import capture_state
 from .db import like_escape
 from .markdown import PYGMENTS_CSS, render_markdown
@@ -902,12 +902,32 @@ def build_app() -> FastAPI:
         # must NEVER 500 (boot_pointers' own contract) — a timeout degrades to
         # the same empty pack boot_pointers itself returns on a retrieval error,
         # rather than surfacing as an error to the prompt hook.
+        t0 = time.perf_counter()
         try:
             pack = await offload.off_loop(
                 boot_pointers, get_state().searcher, agent, k=k, floor=floor, q=q
             )
         except TimeoutError:
             pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
+        # task 2b7974cf: log every boot/prompt-hook call — the fleet's real
+        # recall traffic, invisible to the replay eval until this landed. `q`
+        # present = the UserPromptSubmit hook (trovex-prompt.sh); absent = the
+        # generic SessionStart hook (trovex-boot.sh). Best-effort, never blocks
+        # or fails the response — boot must never 500.
+        try:
+            from .usage import log_pointer_query
+
+            log_pointer_query(
+                get_state().searcher.db,
+                source="prompt" if q else "boot",
+                agent=agent,
+                query=(q or BOOT_QUERY)[:BOOT_Q_MAX],
+                pointers=pack.get("pointers", []),
+                tokens_est=pack.get("tokens_est", 0),
+                elapsed_ms=int((time.perf_counter() - t0) * 1000),
+            )
+        except Exception:  # noqa: BLE001 — boot must never 500 on a log failure
+            pass
         return JSONResponse(pack)
 
     @app.post("/api/capture")

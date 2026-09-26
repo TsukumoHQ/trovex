@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import statistics
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 
 from .search import Searcher
@@ -24,6 +25,7 @@ class ReplayedQuery:
     query_id: int
     query: str
     session_id: str
+    source: str  # 'mcp' | 'boot' | 'prompt' (task 2b7974cf)
     served_path: str | None  # rank-0 path served at the time
     used_path: str | None  # a served path this session later read back, if any
     tokens_served: int
@@ -42,17 +44,24 @@ class ReplayReport:
     tokens_served_median: float
     rank_drift_mean: float | None
     k: int
+    per_source: dict[str, int] = field(default_factory=dict)
     queries: list[ReplayedQuery] = field(default_factory=list)
 
 
-def sample_queries(db, *, since_seconds: float, limit: int) -> list[dict]:
+def sample_queries(db, *, since_seconds: float, limit: int, source: str | None = None) -> list[dict]:
     """Most recent `limit` mcp_queries rows within the window, each carrying its
-    served results (ordered by rank, with their `used` label)."""
+    served results (ordered by rank, with their `used` label). `source` narrows
+    to one of 'mcp'/'boot'/'prompt' (task 2b7974cf); None samples all of them."""
     cutoff = time.time() - since_seconds
+    where = "ts >= ?"
+    params: list = [cutoff]
+    if source:
+        where += " AND source = ?"
+        params.append(source)
     rows = db.execute(
-        """SELECT id, query, session_id, top_result_tokens, response_tokens_est
-           FROM mcp_queries WHERE ts >= ? ORDER BY ts DESC LIMIT ?""",
-        (cutoff, limit),
+        f"""SELECT id, query, session_id, source, top_result_tokens, response_tokens_est
+           FROM mcp_queries WHERE {where} ORDER BY ts DESC LIMIT ?""",
+        (*params, limit),
     ).fetchall()
     out: list[dict] = []
     for r in rows:
@@ -66,6 +75,7 @@ def sample_queries(db, *, since_seconds: float, limit: int) -> list[dict]:
                 "id": r["id"],
                 "query": r["query"],
                 "session_id": r["session_id"],
+                "source": r["source"],
                 "tokens_served": r["top_result_tokens"] or r["response_tokens_est"] or 0,
                 "results": [dict(x) for x in results],
             }
@@ -80,11 +90,14 @@ def replay_eval(
     since_seconds: float,
     limit: int = 500,
     k: int = 5,
+    source: str | None = None,
 ) -> ReplayReport:
     """Re-run each sampled query against the CURRENT index and compare to what was
     actually served. Every sampled query contributes to tokens_served_median and
-    rank_drift; only used-labelled queries contribute to hit@1/hit@k/MRR."""
-    sampled = sample_queries(db, since_seconds=since_seconds, limit=limit)
+    rank_drift; only used-labelled queries contribute to hit@1/hit@k/MRR.
+    `source` narrows the sample to one of 'mcp'/'boot'/'prompt'; the report's
+    `per_source` breakdown is always over whatever was actually sampled."""
+    sampled = sample_queries(db, since_seconds=since_seconds, limit=limit, source=source)
     queries: list[ReplayedQuery] = []
     tokens: list[float] = []
     drifts: list[int] = []
@@ -127,6 +140,7 @@ def replay_eval(
                 query_id=row["id"],
                 query=row["query"],
                 session_id=row["session_id"],
+                source=row["source"],
                 served_path=served_path,
                 used_path=used_path,
                 tokens_served=row["tokens_served"] or 0,
@@ -145,6 +159,7 @@ def replay_eval(
         tokens_served_median=statistics.median(tokens) if tokens else 0.0,
         rank_drift_mean=(sum(drifts) / len(drifts)) if drifts else None,
         k=k,
+        per_source=dict(Counter(row["source"] for row in sampled)),
         queries=queries,
     )
 
@@ -176,6 +191,9 @@ def format_replay_report(report: ReplayReport) -> str:
         f"hit@1(used)={report.hit_at_1_used:.2f} hit@{report.k}(used)={report.hit_at_k_used:.2f} "
         f"MRR(used)={report.mrr_used:.3f} tokens-served median={report.tokens_served_median:.0f}",
     ]
+    if report.per_source:
+        by_source = ", ".join(f"{s}={n}" for s, n in sorted(report.per_source.items()))
+        lines.append(f"by source: {by_source}")
     if report.rank_drift_mean is not None:
         lines.append(f"rank drift (served top1 vs fresh top-20): mean={report.rank_drift_mean:.2f}")
     return "\n".join(lines)

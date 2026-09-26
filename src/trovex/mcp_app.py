@@ -461,6 +461,30 @@ def _as_taglist(v) -> list[str]:
     return [str(t).strip() for t in v if str(t).strip()]
 
 
+def _as_links(v) -> list[dict]:
+    """Accept a list of {"rel","target"} dicts (the natural agent form) or a
+    JSON string of the same (some MCP clients serialize nested args that way).
+    Rel validity is checked downstream in store.put (db.DOC_LINK_RELS) — this
+    only normalizes shape, never raises."""
+    if not v:
+        return []
+    if isinstance(v, str):
+        v = v.strip()
+        if not v:
+            return []
+        try:
+            v = json.loads(v)
+        except json.JSONDecodeError:
+            return []
+    if isinstance(v, dict):
+        v = [v]
+    return [
+        {"rel": str(item.get("rel", "")).strip(), "target": str(item.get("target", "")).strip()}
+        for item in v
+        if isinstance(item, dict)
+    ]
+
+
 @_off_loop
 def trovex_write(
     content: str,
@@ -470,6 +494,7 @@ def trovex_write(
     ticket: str = "",
     force: bool = False,
     section: str = "",
+    links: list[dict] | str | None = None,
 ) -> str:
     """Store a doc INSIDE trovex so every agent of every dev can read it.
 
@@ -502,6 +527,17 @@ def trovex_write(
             Stored as a `ticket/<id>` tag so the doc links back to its tracker
             item — tracker-agnostic, no schema change. Find everything tied to
             it via `trovex_search(tags=["ticket/<id>"])`.
+        links: Typed edges FROM this doc, e.g.
+            [{"rel": "supersedes", "target": "<doc_id>"}] — a decision doc
+            superseding a prior one, a QA verdict that is verdict-of a ticket
+            doc, a resume that is resume-of an agent's prior resume. rel must
+            be one of "supersedes", "verdict-of", "decided-in", "resume-of";
+            target resolves like doc_id (full or unique short prefix). A
+            "supersedes" edge makes the target invisible to
+            trovex_search(current_only=true) (the default) and lets
+            trovex_read(as_of=...) resolve which version was current at a
+            past timestamp. An unknown rel or unresolvable target writes
+            NOTHING (the whole call fails, content included).
     """
     if not _authorized():
         return _DENY
@@ -572,7 +608,12 @@ def trovex_write(
             ext_id=doc_id or None,
             tags=taglist or None,
             force=force,
+            links=_as_links(links) or None,
         )
+    except ValueError as e:
+        # _add_links_locked: unknown rel or unresolvable target — the write
+        # rolled back entirely, nothing (content included) was stored.
+        return _err("invalid_link", "validation", str(e))
     except TopicCollisionError as c:
         # Schema-enforced SSOT: a second live canonical for this topic. Point at the
         # existing one (a title-collision the embedding dedup above didn't catch).
@@ -618,6 +659,7 @@ def trovex_read(
     tier: str = "",
     versions: bool = False,
     version_id: int = 0,
+    as_of: float = 0,
 ) -> str:
     """Read a trovex-owned doc — by default returns the most relevant *passage*.
 
@@ -648,12 +690,19 @@ def trovex_read(
             trovex_restore(doc_id, version_id), or read one via version_id below.
         version_id: With doc_id, return the stored CONTENT of that prior version
             (from the `versions` listing) instead of the current doc.
+        as_of: With doc_id, a unix timestamp — walks any `supersedes` chain
+            (trovex_write links=[{"rel":"supersedes",...}]) backward to the
+            version that was current at that time, then reads THAT doc instead.
+            Ignored with `versions`/`version_id` (those read one doc's own
+            content history, not a chain of separate superseding docs).
     """
     state = get_state()
     query = (query or q).strip()
     if doc_id:
         # Accept a full OR short/prefix id (a bare short id used to return (not found)).
         resolved = state.store.resolve_ext_id(doc_id)
+        if resolved and as_of and not versions and not version_id:
+            resolved = state.store.resolve_as_of(resolved, as_of)
         doc = state.store.get(resolved) if resolved else None
         if doc is None:
             return "(not found)"
@@ -743,6 +792,7 @@ def trovex_search(
     source: str = "",
     q: str = "",
     include_archived: bool = False,
+    current_only: bool = True,
 ) -> str:
     """Search the store — returns the top K relevant *citations* (not dumps).
 
@@ -766,6 +816,10 @@ def trovex_search(
         q: Alias for `query`.
         include_archived: Also surface archived docs (hidden from retrieval by
             default). pending_delete docs are never returned.
+        current_only: Hide a doc that another doc explicitly `supersedes`
+            (trovex_write links=[{"rel":"supersedes",...}]) — the current
+            default. Pass false to also see superseded versions (e.g. auditing
+            a decision's history).
     """
     state = get_state()
     t0 = time.perf_counter()
@@ -787,6 +841,7 @@ def trovex_search(
         source=scope,
         tags=_as_taglist(tags) or None,
         include_archived=include_archived,
+        current_only=current_only,
     )
     if hits:
         # Citations, not dumps: k compact anchored snippets + one ladder-climb

@@ -33,8 +33,11 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     "trovex": {"props": {"q", "summary", "source", "query"}, "required": set()},
     # trovex_search gained `include_archived` (optional) with the doc lifecycle —
     # retrieval defaults to active; pass it to also surface archived docs. Additive.
+    # task edaf8627: gained `current_only` (optional, default True) — hides a doc
+    # explicitly `supersedes`-linked by another; additive, default preserves the
+    # new (safer) behavior for a client that never sends it.
     "trovex_search": {
-        "props": {"query", "k", "kind", "tags", "source", "q", "include_archived"},
+        "props": {"query", "k", "kind", "tags", "source", "q", "include_archived", "current_only"},
         "required": set(),
     },
     # trovex_read gained `versions`/`version_id` (both optional) for the non-clobber
@@ -42,12 +45,18 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     # It then gained `tier` (optional) for the graduated-access ladder
     # (card→passage→full); default stays passage and `full=true` still maps to the
     # full rung, so existing readers are unaffected.
+    # task edaf8627: gained `as_of` (optional, default 0=disabled) — walks a
+    # `supersedes` chain back to the version current at that timestamp. Additive.
     "trovex_read": {
-        "props": {"query", "doc_id", "section", "full", "q", "tier", "versions", "version_id"},
+        "props": {
+            "query", "doc_id", "section", "full", "q", "tier", "versions", "version_id", "as_of",
+        },
         "required": set(),
     },
+    # task edaf8627: gained `links` (optional) — typed edges FROM this doc
+    # (supersedes/verdict-of/decided-in/resume-of). Additive.
     "trovex_write": {
-        "props": {"content", "kind", "doc_id", "tags", "ticket", "force", "section"},
+        "props": {"content", "kind", "doc_id", "tags", "ticket", "force", "section", "links"},
         "required": {"content"},
     },
     "trovex_tag": {"props": {"doc_id", "add", "remove"}, "required": {"doc_id"}},

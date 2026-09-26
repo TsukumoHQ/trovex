@@ -30,6 +30,7 @@ from .chunking import CHUNKER_VERSION, chunk_markdown
 from .config import RESERVED_SOURCE_ID, Settings
 from .db import (
     DOC_EMBED_NS,
+    DOC_LINK_RELS,
     MARKDOWN_CHUNK_EMBED_NS,
     canonical_topic_slug,
     checkpoint_if_wal_large,
@@ -196,6 +197,7 @@ class SqliteStore:
         author: str | None = None,
         tags: list[str] | None = None,
         force: bool = False,
+        links: list[dict] | None = None,
     ) -> str:
         """Create or replace a trovex-owned doc; return its opaque ext_id.
 
@@ -203,7 +205,13 @@ class SqliteStore:
         live canonical raises TopicCollisionError unless force=True, which atomically
         SUPERSEDES the existing canon (status='superseded' + lifecycle='archived')
         so exactly one live canonical per topic survives. Ephemeral kinds
-        (record/checkpoint/resume) carry no topic and are exempt."""
+        (record/checkpoint/resume) carry no topic and are exempt.
+
+        links: typed edges FROM this doc (task edaf8627), e.g.
+        [{"rel": "supersedes", "target": "<ext_id>"}]. rel must be one of
+        db.DOC_LINK_RELS; target resolves like doc_id (full or unique prefix
+        ext_id). Raises ValueError on an unknown rel or unresolvable target —
+        the whole write rolls back (see _retry_on_locked), never half-applied."""
         ext_id = ext_id or uuid.uuid4().hex
         title = title or _extract_title(content)
         topic = None if self.settings.is_ephemeral_kind(kind) else canonical_topic_slug(title)
@@ -304,6 +312,8 @@ class SqliteStore:
                         # No re-embed on an identical rewrite, but lifecycle just reset
                         # to 'active' (and kind may have changed) — sync vec0 metadata.
                         vec_sync_meta(self.db, doc_id)
+                    if links:
+                        self._add_links_locked(doc_id, links, created_by=author)
                     self.db.commit()
                     return ext_id
             else:
@@ -377,6 +387,8 @@ class SqliteStore:
                 )
                 self.db.execute("UPDATE docs SET content_hash = '' WHERE id = ?", (doc_id,))
             self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
+            if links:
+                self._add_links_locked(doc_id, links, created_by=author)
             self.db.commit()
             # Flag near-duplicates on the live write path too (the batch pass in
             # compute_status still runs on reindex/fs-watch, but a trovex_write must
@@ -499,6 +511,75 @@ class SqliteStore:
             (like_escape(ref) + "%",),
         ).fetchall()
         return rows[0]["ext_id"] if len(rows) == 1 else None
+
+    def _add_links_locked(self, src_doc_id: int, links: list[dict], created_by: str | None) -> None:
+        """Insert doc_links rows FROM src_doc_id (task edaf8627). Caller holds
+        self._lock and commits; raises ValueError (rolling the whole write back
+        via _retry_on_locked) on an unknown rel or an unresolvable target — a bad
+        link must never half-land."""
+        now = time.time()
+        for link in links:
+            rel = str((link or {}).get("rel", "")).strip()
+            target = str((link or {}).get("target", "")).strip()
+            if rel not in DOC_LINK_RELS:
+                raise ValueError(
+                    f"unknown link rel {rel!r}; valid: {', '.join(sorted(DOC_LINK_RELS))}"
+                )
+            if not target:
+                raise ValueError("link target is required")
+            dst_id = self._resolve_doc_id_locked(target)
+            if dst_id is None:
+                raise ValueError(f"link target {target!r} not found")
+            self.db.execute(
+                """INSERT INTO doc_links (src_doc_id, rel, dst_doc_id, created_at, created_by)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (src_doc_id, rel, dst_doc_id) DO NOTHING""",
+                (src_doc_id, rel, dst_id, now, created_by),
+            )
+
+    def _resolve_doc_id_locked(self, ref: str) -> int | None:
+        """Like resolve_ext_id but returns the internal integer id — the shape
+        doc_links and delete_doc_cascade key on. Caller holds self._lock."""
+        exact = self.db.execute("SELECT id FROM docs WHERE ext_id = ?", (ref,)).fetchone()
+        if exact:
+            return exact["id"]
+        rows = self.db.execute(
+            "SELECT id FROM docs WHERE ext_id LIKE ? ESCAPE '\\' LIMIT 2",
+            (like_escape(ref) + "%",),
+        ).fetchall()
+        return rows[0]["id"] if len(rows) == 1 else None
+
+    def resolve_as_of(self, ext_id: str, as_of: float) -> str:
+        """Walk the 'supersedes' chain backward from ext_id to the version valid
+        at `as_of` (task edaf8627). 'supersedes' points from the NEWER doc to the
+        OLDER one it replaced, so a doc is "current as of" any timestamp from its
+        own docs.first_indexed onward, until whatever superseded it starts. Walks
+        toward older docs while the current node's first_indexed is AFTER as_of;
+        stops (returns what it has) at the oldest reachable predecessor, so an
+        as_of earlier than the whole chain still resolves to something rather
+        than nothing. Returns ext_id unchanged if it isn't linked at all."""
+        row = self.db.execute(
+            "SELECT id, ext_id, first_indexed FROM docs WHERE ext_id = ?", (ext_id,)
+        ).fetchone()
+        if row is None:
+            return ext_id
+        current_id, current_ext, current_ts = row["id"], row["ext_id"], row["first_indexed"]
+        seen = {current_id}
+        while current_ts > as_of:
+            edge = self.db.execute(
+                "SELECT dst_doc_id FROM doc_links WHERE src_doc_id = ? AND rel = 'supersedes' LIMIT 1",
+                (current_id,),
+            ).fetchone()
+            if edge is None or edge["dst_doc_id"] in seen:
+                break  # oldest reachable node, or a cycle guard
+            nxt = self.db.execute(
+                "SELECT id, ext_id, first_indexed FROM docs WHERE id = ?", (edge["dst_doc_id"],)
+            ).fetchone()
+            if nxt is None:
+                break
+            current_id, current_ext, current_ts = nxt["id"], nxt["ext_id"], nxt["first_indexed"]
+            seen.add(current_id)
+        return current_ext
 
     def list_docs(
         self,
@@ -1066,6 +1147,7 @@ class SqliteStore:
         source: str | None = None,
         tags: list[str] | None = None,
         include_archived: bool = False,
+        current_only: bool = True,
     ) -> list[dict]:
         """Hybrid chunk retrieval: vector + BM25 fused by reciprocal rank, then
         metadata-filtered. Vector finds semantic matches; BM25 catches exact terms
@@ -1073,7 +1155,13 @@ class SqliteStore:
 
         Lifecycle-filtered: 'pending_delete' docs are never surfaced and
         'archived' docs only when include_archived=True — retrieval defaults to
-        the active canon."""
+        the active canon.
+
+        current_only (task edaf8627, default True): hides a doc that is the
+        target (dst) of a 'supersedes' doc_links edge — an explicitly-declared
+        superseded version — even if its lifecycle/status never changed. Pass
+        False to also see superseded versions (e.g. auditing a decision's
+        history)."""
         if not query.strip():
             return []
         # Partitioned chunk KNN (P2a): scan the target source's shard, pre-filtering
@@ -1151,6 +1239,15 @@ class SqliteStore:
         if not ranked:
             return []
 
+        superseded_doc_ids: set[int] = set()
+        if current_only:
+            superseded_doc_ids = {
+                r["dst_doc_id"]
+                for r in self.db.execute(
+                    "SELECT DISTINCT dst_doc_id FROM doc_links WHERE rel = 'supersedes'"
+                )
+            }
+
         # T6: fetch every candidate chunk + its doc in ONE batched query (was N+1:
         # a SELECT per ranked chunk). Batch the IN() to stay under sqlite's bound-
         # variable cap.
@@ -1195,6 +1292,8 @@ class SqliteStore:
             if source and r["source_id"] != source:
                 continue
             if tagset and not (tagset & tags_by_doc.get(r["doc_id"], set())):
+                continue
+            if current_only and r["doc_id"] in superseded_doc_ids:
                 continue
             hit = dict(r)
             hit.pop("cid", None)  # internal join key — keep the output shape identical

@@ -201,6 +201,11 @@ def _backfill_docs_fts(conn: sqlite3.Connection) -> None:
 # this tuple is the single list both delete paths walk.
 _DOC_CHILD_TABLES = ("doc_tags", "doc_versions", "collection_docs")
 
+# Closed enum for doc_links.rel (task edaf8627) — deliberately small and
+# reviewed here, not a CHECK constraint, so trovex_write's validation error can
+# name every valid value without a schema migration to add one.
+DOC_LINK_RELS = frozenset({"supersedes", "verdict-of", "decided-in", "resume-of"})
+
 
 # --- partitioned vec0 write helpers (P2a) ----------------------------------
 # vec_docs/vec_chunks carry the doc's source_id (partition key) + kind/lifecycle/
@@ -660,6 +665,9 @@ def delete_doc_cascade(conn: sqlite3.Connection, doc_id: int) -> None:
             f"DELETE FROM {table} WHERE doc_id = ?",  # sql-safe: fixed literal tuple
             (doc_id,),
         )
+    # doc_links has TWO doc-id columns (a link's src and dst can each be the doc
+    # being deleted) — not a _DOC_CHILD_TABLES member, needs its own two-sided delete.
+    conn.execute("DELETE FROM doc_links WHERE src_doc_id = ? OR dst_doc_id = ?", (doc_id, doc_id))
     conn.execute("DELETE FROM docs_fts WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
@@ -1600,6 +1608,28 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
             PRIMARY KEY (collection_id, doc_id)
         );
+
+        -- Typed edges between owned docs (task edaf8627) — the zero-LLM answer
+        -- to "what is the current decision on X": src supersedes/verdict-of/
+        -- decided-in/resume-of dst (rel in doc_links.REL_KINDS, enforced at the
+        -- MCP boundary in trovex_write, not by a CHECK constraint, so a future
+        -- rel doesn't need a migration). 'supersedes' points from the NEWER doc
+        -- to the OLDER one it replaces — trovex_read(as_of=...) walks src->dst
+        -- backward through it; trovex_search's current_only hides any doc that
+        -- is a dst of a 'supersedes' edge. No FK cascade relied upon (see
+        -- _DOC_CHILD_TABLES above) — delete_doc_cascade removes both directions
+        -- by hand.
+        CREATE TABLE IF NOT EXISTS doc_links (
+            id INTEGER PRIMARY KEY,
+            src_doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            rel TEXT NOT NULL,
+            dst_doc_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            created_at REAL NOT NULL,
+            created_by TEXT,
+            UNIQUE (src_doc_id, rel, dst_doc_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_links_src ON doc_links(src_doc_id, rel);
+        CREATE INDEX IF NOT EXISTS idx_doc_links_dst ON doc_links(dst_doc_id, rel);
 
         -- Doc history: a snapshot of the previous content on every overwrite
         CREATE TABLE IF NOT EXISTS doc_versions (

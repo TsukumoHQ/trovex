@@ -26,7 +26,7 @@ from typing import Protocol
 
 import sqlite_vec
 
-from .chunking import chunk_markdown
+from .chunking import CHUNKER_VERSION, chunk_markdown
 from .config import RESERVED_SOURCE_ID, Settings
 from .db import (
     DOC_EMBED_NS,
@@ -178,7 +178,7 @@ class SqliteStore:
     def __init__(self, settings: Settings, embedder: Embedder | None = None):
         self.settings = settings
         self.db: sqlite3.Connection = open_db(
-            settings.data_dir / "trovex.db", settings.resolved_embed_dim()
+            settings.data_dir / "trovex.db", settings.resolved_embed_dim(), settings.embed_model
         )
         self.embedder = embedder or embedder_from_settings(settings)
         # Serialize writes: the sqlite connection is shared across the server's
@@ -1024,7 +1024,7 @@ class SqliteStore:
                 DOC_EMBED_NS, commit_before_embed=False,
             )
             for (doc_id, _), blob in zip(to_embed, blobs, strict=True):
-                vec_docs_put(self.db, doc_id, blob)
+                vec_docs_put(self.db, doc_id, blob, self.embedder.name)
             for doc_id, tags in tag_jobs:
                 self._set_tags(doc_id, tags)
             self._embed_chunks(chunk_pairs)
@@ -1036,7 +1036,9 @@ class SqliteStore:
         over db.sync_doc_chunks (the chunker-agnostic Merkle sync shared with
         Indexer's code-chunking path) — see that docstring for the incremental
         contract."""
-        return sync_doc_chunks(self.db, doc_id, content, title, chunk_markdown)
+        return sync_doc_chunks(
+            self.db, doc_id, content, title, chunk_markdown, chunker_version=CHUNKER_VERSION
+        )
 
     def _embed_chunks(self, pairs: list[tuple[int, str]]) -> None:
         """Batch-embed chunk texts (prefix-fused) into vec_chunks. Via
@@ -1053,7 +1055,7 @@ class SqliteStore:
             MARKDOWN_CHUNK_EMBED_NS, commit_before_embed=False,
         )
         for (cid, _), blob in zip(pairs, blobs, strict=True):
-            vec_chunks_put(self.db, cid, blob)
+            vec_chunks_put(self.db, cid, blob, self.embedder.name)
 
     def search_chunks(
         self,
@@ -1387,7 +1389,7 @@ class SqliteStore:
             self.db, self.embedder, [text], self.embedder.name, DOC_EMBED_NS,
             commit_before_embed=False,
         )
-        vec_docs_put(self.db, doc_id, blobs[0])
+        vec_docs_put(self.db, doc_id, blobs[0], self.embedder.name)
 
 
 def _row_to_doc(row: sqlite3.Row) -> StoredDoc:

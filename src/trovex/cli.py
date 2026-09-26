@@ -1427,7 +1427,7 @@ def facet() -> None:
 def open_db_for_read(settings: Settings):
     from .db import open_db
 
-    return open_db(settings.data_dir / "trovex.db", settings.embed_dim)
+    return open_db(settings.data_dir / "trovex.db", settings.embed_dim, settings.embed_model)
 
 
 if __name__ == "__main__":

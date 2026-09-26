@@ -39,7 +39,7 @@ from .store import SqliteStore
 
 log = logging.getLogger("trovex.index_jobs")
 
-KINDS = ("scan_source", "paths", "rebuild")
+KINDS = ("scan_source", "paths", "rebuild", "rebuild_vec")
 
 POLL_INTERVAL_SEC = 1.0
 
@@ -274,5 +274,17 @@ class Applier:
         if kind == "paths":
             return self.indexer.reindex_paths(
                 payload.get("paths", []), sources=self.indexer.settings.load_sources(), job_id=job_id
+            )
+        if kind == "rebuild_vec":
+            # task 6851d755: an embed_model/dim change, swapped without the
+            # blocking inline wipe _migrate_embed_dim used to do — see
+            # db.rebuild_vec_shadow for the actual (staging + short-
+            # transaction swap) mechanism. Routed through the SAME single-
+            # writer applier as every other index job, so it can never run
+            # concurrently with a reindex().
+            from . import db as db_mod
+
+            return db_mod.rebuild_vec_shadow(
+                self.indexer.db, self.indexer.embedder, self.indexer.settings.resolved_embed_dim()
             )
         return self.indexer.reindex(full=bool(payload.get("full")), job_id=job_id)

@@ -15,6 +15,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+# task 6851d755: stamped onto chunks.chunker_version. A change to this
+# chunker's boundary/breadcrumb logic bumps this so sync_doc_chunks treats
+# every existing chunk of a re-synced doc as non-reusable (re-chunked +
+# re-embedded) rather than silently keeping stale boundaries whose hash still
+# happens to match. Mirrors chunking_code.CHUNKER_VERSION for the code path.
+CHUNKER_VERSION = "1"
+
 FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$")
 FENCE_RE = re.compile(r"^\s*```")

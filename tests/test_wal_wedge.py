@@ -261,7 +261,8 @@ def test_tag_scoped_search_survives_over_4096_chunk_partition(store):
         [(1000 + i, doc["id"], i) for i in range(n)],
     )
     store.db.executemany(
-        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, ?, ?, ?, ?, ?, 'test')",
         [
             (1000 + i, doc["source_id"], blob, doc["kind"], doc["lifecycle"], doc["status"])
             for i in range(n)

@@ -55,7 +55,7 @@ def like_escape(s: str) -> str:
     )
 
 
-def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
+def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -92,6 +92,7 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     _migrate_add_trovex_store_columns(conn)
     _migrate_add_query_session(conn)
     _migrate_add_chunk_hash(conn)
+    _migrate_add_chunker_version(conn)
     _migrate_add_lifecycle(conn)
     _migrate_add_canonical_topic(conn)  # AFTER lifecycle: supersede sets lifecycle='archived'
     _migrate_add_importance(conn)
@@ -101,8 +102,24 @@ def open_db(db_path: Path, embed_dim: int = 384) -> sqlite3.Connection:
     # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
     # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
     _migrate_partition_vec(conn, embed_dim)
+    # AFTER partitioning: adds the embed_model metadata column (task 6851d755),
+    # so it always sees the partitioned DDL shape.
+    _migrate_add_vec_embed_model(conn, embed_dim, embed_model)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
+    # task 6851d755: stamp store_meta['embed_model'] once — a fresh store, or
+    # a pre-existing one on its first boot after this shipped. Only from this
+    # point on can a LATER runtime embed_model change (same dim — the dim
+    # check alone misses it) ever be detected; skipped when a rebuild is
+    # already pending (the dim mismatch case) so store_meta never claims a
+    # model the live vec tables don't actually hold yet.
+    if (
+        embed_model
+        and get_store_meta(conn, "embed_model") is None
+        and not rebuild_vec_needed(conn, embed_dim, embed_model)
+    ):
+        set_store_meta(conn, "embed_model", embed_model)
+        conn.commit()
     return conn
 
 
@@ -200,24 +217,31 @@ def _doc_vec_meta(conn: sqlite3.Connection, doc_id: int) -> tuple | None:
     return (r["source_id"], r["kind"] or "doc", r["lifecycle"], r["status"])
 
 
-def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes) -> None:
-    """Upsert a doc's embedding + partition/metadata into vec_docs. Does NOT commit."""
+def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes, embed_model: str = "") -> None:
+    """Upsert a doc's embedding + partition/metadata into vec_docs. Does NOT commit.
+
+    `embed_model` (task 6851d755) stamps which model produced `emb_blob` — lets a
+    future lazy re-embed sweep or the rebuild_vec_shadow job tell a row's current
+    model apart from the store's configured one, without needing a global rebuild
+    just to check. Empty string (never NULL — vec0 rejects NULL metadata) for a
+    caller that hasn't been updated to pass it; treated as 'unknown', never a
+    false match against a real model name."""
     meta = _doc_vec_meta(conn, doc_id)
     if meta is None:
         return
     src, kind, lifecycle, status = meta
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute(
-        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (doc_id, src, emb_blob, kind, lifecycle, status),
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (doc_id, src, emb_blob, kind, lifecycle, status, embed_model),
     )
 
 
-def vec_chunks_put(conn: sqlite3.Connection, chunk_id: int, emb_blob: bytes) -> None:
+def vec_chunks_put(conn: sqlite3.Connection, chunk_id: int, emb_blob: bytes, embed_model: str = "") -> None:
     """Upsert a chunk's embedding into vec_chunks with its PARENT doc's partition +
     metadata (a chunk inherits them). Looks up the parent doc from the chunk row.
-    Does NOT commit."""
+    Does NOT commit. `embed_model`: see vec_docs_put."""
     parent = conn.execute("SELECT doc_id FROM chunks WHERE id = ?", (chunk_id,)).fetchone()
     if parent is None:
         return
@@ -227,9 +251,9 @@ def vec_chunks_put(conn: sqlite3.Connection, chunk_id: int, emb_blob: bytes) -> 
     src, kind, lifecycle, status = meta
     conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (chunk_id,))
     conn.execute(
-        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (chunk_id, src, emb_blob, kind, lifecycle, status),
+        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (chunk_id, src, emb_blob, kind, lifecycle, status, embed_model),
     )
 
 
@@ -342,8 +366,165 @@ def resolve_embedding_blobs(
     return [resolved[h] for h in hashes], hits, misses
 
 
+def _doc_embed_text(content: str, title: str) -> str:
+    """Same shape as Indexer._embed_text / SqliteStore._embed (task cbb8e8fb
+    keeps all three identical on purpose so they share embed_cache entries)."""
+    import re as _re
+
+    stripped = _re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, flags=_re.DOTALL)
+    return f"{title}\n\n{stripped}"[:8000]
+
+
+def _chunk_embed_text(doc_title: str, heading_path: str, content: str) -> str:
+    """Reconstructs Chunk.embed_text(title) from stored columns (no Chunk
+    object survives past the original chunk_fn() call) — same prefix-fusion
+    shape: breadcrumb (title > heading path) + blank line + body."""
+    bc = f"{doc_title} > {heading_path}" if heading_path else doc_title
+    return f"{bc}\n\n{content}" if bc else content
+
+
+def rebuild_vec_shadow(
+    conn: sqlite3.Connection,
+    embedder,
+    embed_dim: int,
+    *,
+    batch_size: int = 200,
+    on_batch: Callable[[str, int, int], None] | None = None,
+) -> dict:
+    """Rebuild vec_docs/vec_chunks under embedder's CURRENT model/dim, without
+    ever holding a write lock for the expensive part (task 6851d755).
+
+    sqlite-vec's vec0 module does NOT support ALTER TABLE RENAME — verified
+    empirically: SQLite renames the master-table entry but vec0 never gets a
+    chance to rename its own internal shadow tables (_rowids, _chunks, ...),
+    so every read after a literal rename fails with "no such table:
+    ..._rowids". A rename-based atomic swap (the ticket's original wording)
+    is not achievable for vec0; this is the correct equivalent instead: build
+    a plain (non-vec0) STAGING snapshot of every re-embedded row in short,
+    individually-committed batches (each batch's model calls run with NO
+    transaction open — resolve_embedding_blobs's commit_before_embed), then
+    do the mechanical part — drop the old vec0 tables, create fresh ones at
+    the new dim, bulk-copy from staging — in ONE short transaction. Only that
+    final bulk-copy briefly excludes another WRITER; a reader on any other
+    connection (WAL) keeps seeing the OLD vec_docs/vec_chunks intact right up
+    until this transaction commits, then sees the fully-swapped new ones —
+    never a torn or partial read either way.
+
+    Returns {"docs": n, "chunks": n, "elapsed_sec": float}."""
+    t0 = time.time()
+    embed_model = embedder.name
+    conn.execute("DROP TABLE IF EXISTS temp._vec_rebuild_docs")
+    conn.execute("DROP TABLE IF EXISTS temp._vec_rebuild_chunks")
+    conn.execute(
+        "CREATE TEMP TABLE _vec_rebuild_docs "
+        "(rid INTEGER PRIMARY KEY, source_id TEXT, embedding BLOB, kind TEXT, lifecycle TEXT, status TEXT)"
+    )
+    conn.execute(
+        "CREATE TEMP TABLE _vec_rebuild_chunks "
+        "(rid INTEGER PRIMARY KEY, source_id TEXT, embedding BLOB, kind TEXT, lifecycle TEXT, status TEXT)"
+    )
+
+    # --- docs, batched -----------------------------------------------------
+    doc_rows = conn.execute(
+        "SELECT id, title, content, absolute_path, source_id, "
+        "COALESCE(kind, 'doc') AS kind, lifecycle, status FROM docs"
+    ).fetchall()
+    n_docs = len(doc_rows)
+    for i in range(0, n_docs, batch_size):
+        batch = doc_rows[i : i + batch_size]
+        texts: list[str] = []
+        keep: list[sqlite3.Row] = []
+        for r in batch:
+            if r["content"] is not None:
+                body = r["content"]
+            else:
+                try:
+                    body = Path(r["absolute_path"]).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    log.warning(
+                        "rebuild_vec_shadow: %s vanished since indexing, skipping", r["absolute_path"]
+                    )
+                    continue
+            texts.append(_doc_embed_text(body, r["title"] or ""))
+            keep.append(r)
+        blobs, _, _ = resolve_embedding_blobs(
+            conn, embedder, texts, embed_model, DOC_EMBED_NS, commit_before_embed=True
+        )
+        for r, blob in zip(keep, blobs, strict=True):
+            conn.execute(
+                "INSERT OR REPLACE INTO _vec_rebuild_docs VALUES (?, ?, ?, ?, ?, ?)",
+                (r["id"], r["source_id"], blob, r["kind"], r["lifecycle"], r["status"]),
+            )
+        conn.commit()
+        if on_batch:
+            on_batch("docs", min(i + batch_size, n_docs), n_docs)
+
+    # --- chunks, batched -----------------------------------------------------
+    chunk_rows = conn.execute(
+        "SELECT c.id, c.heading_path, c.content, d.title AS doc_title, d.source_id, "
+        "COALESCE(d.kind, 'doc') AS kind, d.lifecycle, d.status "
+        "FROM chunks c JOIN docs d ON d.id = c.doc_id"
+    ).fetchall()
+    n_chunks = len(chunk_rows)
+    for i in range(0, n_chunks, batch_size):
+        batch = chunk_rows[i : i + batch_size]
+        texts = [
+            _chunk_embed_text(r["doc_title"] or "", r["heading_path"] or "", r["content"]) for r in batch
+        ]
+        blobs, _, _ = resolve_embedding_blobs(
+            conn, embedder, texts, embed_model, MARKDOWN_CHUNK_EMBED_NS, commit_before_embed=True
+        )
+        for r, blob in zip(batch, blobs, strict=True):
+            conn.execute(
+                "INSERT OR REPLACE INTO _vec_rebuild_chunks VALUES (?, ?, ?, ?, ?, ?)",
+                (r["id"], r["source_id"], blob, r["kind"], r["lifecycle"], r["status"]),
+            )
+        conn.commit()
+        if on_batch:
+            on_batch("chunks", min(i + batch_size, n_chunks), n_chunks)
+
+    # --- swap: one short transaction, mechanical only -----------------------
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute("DROP TABLE IF EXISTS vec_docs")
+        conn.execute("DROP TABLE IF EXISTS vec_chunks")
+        conn.execute(
+            f"""CREATE VIRTUAL TABLE vec_docs USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
+            )"""
+        )
+        conn.execute(
+            f"""CREATE VIRTUAL TABLE vec_chunks USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+            "SELECT rid, source_id, embedding, kind, lifecycle, status, ? FROM _vec_rebuild_docs",
+            (embed_model,),
+        )
+        conn.execute(
+            "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+            "SELECT rid, source_id, embedding, kind, lifecycle, status, ? FROM _vec_rebuild_chunks",
+            (embed_model,),
+        )
+        conn.execute("DROP TABLE _vec_rebuild_docs")
+        conn.execute("DROP TABLE _vec_rebuild_chunks")
+        set_store_meta(conn, "embed_model", embed_model)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+    return {"docs": len(doc_rows), "chunks": len(chunk_rows), "elapsed_sec": time.time() - t0}
+
+
 def sync_doc_chunks(
-    conn: sqlite3.Connection, doc_id: int, content: str, title: str, chunk_fn
+    conn: sqlite3.Connection, doc_id: int, content: str, title: str, chunk_fn, chunker_version: str = ""
 ) -> list[tuple[int, str]]:
     """(Re)chunk a doc via `chunk_fn(content) -> list[Chunk]`; return (chunk_id,
     embed_text) for chunks that NEED embedding — i.e. only the new/changed ones.
@@ -356,14 +537,22 @@ def sync_doc_chunks(
     one chunk, not the whole doc. Chunks whose hash is no longer present are
     deleted. Shared by SqliteStore (markdown, via chunk_markdown) and Indexer
     (markdown + code, via chunk_markdown/chunk_code dispatch) — the sync
-    mechanism itself needs no per-chunker special-casing. Does NOT commit."""
+    mechanism itself needs no per-chunker special-casing. Does NOT commit.
+
+    `chunker_version` (task 6851d755) gates reuse on TOP of the content-hash
+    match: an existing chunk stamped with a DIFFERENT chunker_version is never
+    put in the reusable pool, even if its hash happens to still match — a
+    chunker boundary/breadcrumb change must never be silently trusted just
+    because the resulting text coincided with the old output. Every kept
+    (reused) row is already correct by construction (same doc, same call), so
+    only new/inserted rows need the current version stamped."""
     existing = conn.execute(
-        "SELECT id, content_hash FROM chunks WHERE doc_id = ? ORDER BY id", (doc_id,)
+        "SELECT id, content_hash, chunker_version FROM chunks WHERE doc_id = ? ORDER BY id", (doc_id,)
     ).fetchall()
     reusable: dict[str, list[int]] = {}
     for row in existing:
         h = row["content_hash"]
-        if h:
+        if h and row["chunker_version"] == chunker_version:
             reusable.setdefault(h, []).append(row["id"])
 
     to_embed: list[tuple[int, str]] = []
@@ -380,9 +569,9 @@ def sync_doc_chunks(
         else:
             cur = conn.execute(
                 """INSERT INTO chunks
-                       (doc_id, chunk_index, heading_path, content, tokens_est, content_hash)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (doc_id, ch.index, heading, ch.text, ch.tokens_est, h),
+                       (doc_id, chunk_index, heading_path, content, tokens_est, content_hash, chunker_version)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, ch.index, heading, ch.text, ch.tokens_est, h, chunker_version),
             )
             cid = cur.lastrowid
             conn.execute("INSERT INTO chunks_fts(content, chunk_id) VALUES (?, ?)", (ch.text, cid))
@@ -532,12 +721,31 @@ def _migrate_embed_dim(conn: sqlite3.Connection, embed_dim: int) -> None:
     current_dim = int(m.group(1))
     if current_dim == embed_dim:
         return
-    # Dim mismatch — wipe BOTH vec tables and clear any docs that referenced
-    # them (forces a full reindex). docs.content_hash '' → all rows re-embed.
-    # vec_chunks must go too: leaving it at the old dim made every
-    # trovex_write crash with "Expected N dimensions" after an embedder
-    # switch (found live). The chunk rows themselves are re-derived from doc
-    # content, so they are dropped alongside their embeddings.
+    # task 6851d755: a NON-EMPTY store never takes the inline wipe below —
+    # that used to mean "database is locked" for every writer racing the
+    # DROP+rebuild, and the store stays fully empty of vectors until a full
+    # reindex finishes (minutes, for a real corpus). Leave the OLD (still
+    # internally consistent) vec tables serving reads/writes exactly as
+    # before; the caller (server startup — see rebuild_vec_needed) is
+    # responsible for enqueueing a 'rebuild_vec' index job, which does the
+    # equivalent swap WITHOUT the blocking window (rebuild_vec_shadow).
+    # An EMPTY store has nothing to lose and no write stall to avoid — wipe
+    # it instantly, exactly as before (the fallback this migration keeps).
+    doc_count = conn.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+    if doc_count > 0:
+        log.warning(
+            "embed dim mismatch (%d -> %d) on a non-empty store (%d docs) — leaving old "
+            "vec tables in place; enqueue a 'rebuild_vec' index job (db.rebuild_vec_shadow) "
+            "to complete the swap instead of blocking here",
+            current_dim, embed_dim, doc_count,
+        )
+        return
+    # Dim mismatch on an EMPTY store — wipe BOTH vec tables and clear any docs
+    # that referenced them (forces a full reindex). docs.content_hash '' →
+    # all rows re-embed. vec_chunks must go too: leaving it at the old dim
+    # made every trovex_write crash with "Expected N dimensions" after an
+    # embedder switch (found live). The chunk rows themselves are re-derived
+    # from doc content, so they are dropped alongside their embeddings.
     #
     # BEGIN IMMEDIATE makes the whole drop+clear sequence atomic: a process
     # killed mid-sequence (crash, kickstart restart, machine sleep) used to
@@ -562,6 +770,50 @@ def _migrate_embed_dim(conn: sqlite3.Connection, embed_dim: int) -> None:
     except Exception:
         conn.rollback()
         raise
+
+
+def get_store_meta(conn: sqlite3.Connection, key: str) -> str | None:
+    row = conn.execute("SELECT value FROM store_meta WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_store_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
+    """Does NOT commit — caller controls the transaction (rebuild_vec_shadow
+    stamps this inside its own swap transaction; a standalone caller commits)."""
+    conn.execute(
+        "INSERT INTO store_meta(key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+
+
+def rebuild_vec_needed(conn: sqlite3.Connection, embed_dim: int, embed_model: str) -> bool:
+    """True when vec_docs/vec_chunks need a rebuild_vec_shadow pass (task
+    6851d755) — checked at server startup instead of _migrate_embed_dim's
+    inline wipe. EITHER of:
+      - a dim mismatch (float[N] in the vec_docs DDL != embed_dim) — the hard
+        case: sqlite-vec can't hold a different-dim vector in the same table
+        at all, so old rows are unreadable at the new dim the instant it
+        starts writing.
+      - a store_meta['embed_model'] mismatch — a SAME-dim model swap (the
+        task's own validation scenario: bge-small-en-v1.5 -> paraphrase-
+        multilingual-MiniLM-L12-v2 are BOTH 384-dim, so the dim check alone
+        would never see this case at all).
+    False for an empty store (nothing to rebuild) or when store_meta has
+    never been stamped (a legacy store on its first boot after this shipped —
+    open_db stamps it then, assumed to match rather than forcing a spurious
+    rebuild on the very next boot with no real model change)."""
+    if conn.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"] == 0:
+        return False
+    ddl = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_docs'"
+    ).fetchone()
+    if ddl:
+        m = re.search(r"float\[(\d+)\]", ddl["sql"] or "")
+        if m and int(m.group(1)) != embed_dim:
+            return True
+    stamped = get_store_meta(conn, "embed_model")
+    return stamped is not None and stamped != embed_model
 
 
 def _migrate_to_multi_source(conn: sqlite3.Connection) -> None:
@@ -665,6 +917,26 @@ def _migrate_add_chunk_hash(conn: sqlite3.Connection) -> None:
     if "content_hash" not in cols:
         conn.execute("ALTER TABLE chunks ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(doc_id, content_hash)")
+        conn.commit()
+
+
+def _migrate_add_chunker_version(conn: sqlite3.Connection) -> None:
+    """Add chunks.chunker_version to an existing store (additive; task
+    6851d755). A chunker boundary/breadcrumb change bumps CHUNKER_VERSION
+    (chunking.py / chunking_code.py) so sync_doc_chunks re-derives every
+    existing chunk of a re-synced doc instead of trusting a stale-boundary
+    chunk whose content_hash still coincidentally matches. Nullable-safe
+    default '' so pre-migration chunks read as non-reusable and get
+    re-chunked + stamped on the next rewrite of their doc — same shape as
+    _migrate_add_chunk_hash. Skip if the table doesn't exist yet."""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chunks'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(chunks)")}
+    if "chunker_version" not in cols:
+        conn.execute("ALTER TABLE chunks ADD COLUMN chunker_version TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
@@ -932,6 +1204,79 @@ def _migrate_partition_vec(conn: sqlite3.Connection, embed_dim: int) -> None:
         raise
 
 
+def _migrate_add_vec_embed_model(conn: sqlite3.Connection, embed_dim: int, embed_model: str) -> None:
+    """Add an `embed_model` vec0 metadata column to vec_docs/vec_chunks on an
+    existing (already-partitioned) store — task 6851d755. Same rebuild shape
+    as _migrate_partition_vec (vec0 has no ALTER TABLE ADD COLUMN; a schema
+    change means drop + recreate + reinsert), run AFTER it so it only ever
+    sees the partitioned DDL. Every existing row is stamped with the store's
+    CURRENT `embed_model` — accurate for a store that has never swapped
+    models (the overwhelming common case this one-time migration handles); a
+    deliberate model swap afterwards is the SEPARATE rebuild_vec_shadow path
+    (never this migration), which re-embeds and stamps the new model for real.
+
+    Runs unconditionally at every open_db (like _migrate_partition_vec) but
+    no-ops instantly once the column exists — PRAGMA table_info is cheap."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_docs'"
+    ).fetchone()
+    if not row:
+        return  # no vec_docs at all — nothing to migrate, _init_schema creates it fresh
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(vec_docs)")}
+    if "embed_model" in cols:
+        return  # already migrated
+
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute(
+            "CREATE TEMP TABLE _vd_old2 AS "
+            "SELECT rowid AS rid, source_id, embedding AS emb, kind, lifecycle, status FROM vec_docs"
+        )
+        has_chunks = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vec_chunks'"
+        ).fetchone()
+        if has_chunks:
+            conn.execute(
+                "CREATE TEMP TABLE _vc_old2 AS "
+                "SELECT rowid AS rid, source_id, embedding AS emb, kind, lifecycle, status FROM vec_chunks"
+            )
+        conn.execute("DROP TABLE vec_docs")
+        conn.execute("DROP TABLE IF EXISTS vec_chunks")
+        conn.execute(
+            f"""CREATE VIRTUAL TABLE vec_docs USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
+            )"""
+        )
+        conn.execute(
+            f"""CREATE VIRTUAL TABLE vec_chunks USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
+            )"""
+        )
+        for r in conn.execute("SELECT * FROM _vd_old2").fetchall():
+            conn.execute(
+                "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (r["rid"], r["source_id"], r["emb"], r["kind"], r["lifecycle"], r["status"], embed_model),
+            )
+        conn.execute("DROP TABLE _vd_old2")
+        if has_chunks:
+            for r in conn.execute("SELECT * FROM _vc_old2").fetchall():
+                conn.execute(
+                    "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (r["rid"], r["source_id"], r["emb"], r["kind"], r["lifecycle"], r["status"], embed_model),
+                )
+            conn.execute("DROP TABLE _vc_old2")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
     conn.executescript(
         f"""
@@ -1055,6 +1400,16 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             PRIMARY KEY (text_hash, embed_model, chunker_version)
         );
 
+        -- Small store-wide key/value facts that outlive any single doc/chunk
+        -- row (task 6851d755). Currently one key: 'embed_model' — the model
+        -- vec_docs/vec_chunks were last (re)built under, so a same-DIM model
+        -- swap (bge-small -> paraphrase-multilingual, both 384-dim — the dim
+        -- comparison alone would miss it) is still detectable at startup.
+        CREATE TABLE IF NOT EXISTS store_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS mcp_queries (
             id INTEGER PRIMARY KEY,
             ts REAL NOT NULL,
@@ -1119,7 +1474,8 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             embedding float[{embed_dim}] distance_metric=cosine,
             kind TEXT,
             lifecycle TEXT,
-            status TEXT
+            status TEXT,
+            embed_model TEXT
         );
 
         -- Chunk-level retrieval (structure-aware chunks + their embeddings)
@@ -1135,7 +1491,14 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             -- embedding). On a doc rewrite, a chunk whose hash is unchanged keeps
             -- its existing embedding instead of being re-embedded. Legacy rows have
             -- '' → treated as non-reusable, so the first rewrite re-embeds + stamps.
-            content_hash TEXT NOT NULL DEFAULT ''
+            content_hash TEXT NOT NULL DEFAULT '',
+            -- Chunker identity (task 6851d755): chunking.CHUNKER_VERSION /
+            -- chunking_code.CHUNKER_VERSION at the time this chunk was cut. A
+            -- version bump makes sync_doc_chunks treat every one of a re-synced
+            -- doc's chunks as non-reusable regardless of content_hash — a stale
+            -- chunker's boundaries are never silently trusted just because the
+            -- text happened not to change. Legacy rows have '' → non-reusable.
+            chunker_version TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(doc_id, content_hash);
         CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(doc_id);
@@ -1147,7 +1510,8 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             embedding float[{embed_dim}] distance_metric=cosine,
             kind TEXT,
             lifecycle TEXT,
-            status TEXT
+            status TEXT,
+            embed_model TEXT
         );
         -- Keyword side of hybrid retrieval (BM25). chunk_id = chunks.id.
         CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(

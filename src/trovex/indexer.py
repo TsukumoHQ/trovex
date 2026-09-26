@@ -151,7 +151,7 @@ def _walk_files(root: Path, ignore_dirs: set[str]) -> Iterator[Path]:
 class Indexer:
     def __init__(self, settings: Settings, embedder: Embedder | None = None):
         self.settings = settings
-        self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim())
+        self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim(), settings.embed_model)
         self.embedder = embedder or embedder_from_settings(settings)
         # Per-run phase/cache counters (task cbb8e8fb). Reset at the top of
         # reindex()/reindex_paths() — _upsert_doc and _flush_*embeddings, called
@@ -567,7 +567,14 @@ class Indexer:
         if ext in CODE_EXTENSIONS:
             lang = EXTENSION_LANGUAGES[ext]
             _chunk_t0 = time.monotonic()
-            new_chunks = sync_doc_chunks(self.db, doc_id, content, title, lambda c, lang=lang: chunk_code(c, lang))
+            new_chunks = sync_doc_chunks(
+                self.db,
+                doc_id,
+                content,
+                title,
+                lambda c, lang=lang: chunk_code(c, lang),
+                chunker_version=CHUNKER_VERSION,
+            )
             self._phase_ms["chunk"] += (time.monotonic() - _chunk_t0) * 1000
             chunk_embed_batch.extend(new_chunks)
             if len(chunk_embed_batch) >= 32:
@@ -785,7 +792,7 @@ class Indexer:
         blobs = self._embed_texts_cached(texts, DOC_EMBED_NS)
         t0 = time.monotonic()
         for doc_id, blob in zip(ids, blobs, strict=True):
-            vec_docs_put(self.db, doc_id, blob)
+            vec_docs_put(self.db, doc_id, blob, self.embedder.name)
         self._phase_ms["write"] += (time.monotonic() - t0) * 1000
 
     def _flush_chunk_embeddings(self, batch: list[tuple[int, str]]) -> None:
@@ -796,7 +803,7 @@ class Indexer:
         blobs = self._embed_texts_cached(texts, CHUNKER_VERSION)
         t0 = time.monotonic()
         for chunk_id, blob in zip(ids, blobs, strict=True):
-            vec_chunks_put(self.db, chunk_id, blob)
+            vec_chunks_put(self.db, chunk_id, blob, self.embedder.name)
         self._phase_ms["write"] += (time.monotonic() - t0) * 1000
 
     @staticmethod

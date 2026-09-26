@@ -53,8 +53,8 @@ def _seed_partition(db, source_id: str, n: int) -> None:
         v /= np.linalg.norm(v)
         blob = sqlite_vec.serialize_float32(v.tolist())
         db.execute(
-            "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
-            "VALUES (?, ?, ?, '', 'active', 'canonical')",
+            "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+            "VALUES (?, ?, ?, '', 'active', 'canonical', 'test')",
             (i + 1 + hash(source_id) % 1_000_000, source_id, blob),
         )
     db.commit()

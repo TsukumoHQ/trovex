@@ -239,8 +239,8 @@ def _bulk_seed_docs(store, n: int) -> None:
     ids = [r["id"] for r in store.db.execute("SELECT id FROM docs")]
     # Partitioned vec_docs: source_id='code' shard, metadata from the docs defaults.
     store.db.executemany(
-        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
-        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical')",
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical', 'test')",
         [(i, blob) for i in ids],
     )
     store.db.commit()
@@ -307,8 +307,8 @@ def test_archived_heavy_partition_does_not_squeeze_live_recall(settings, store):
         )
         rid = store.db.execute("SELECT id FROM docs WHERE path = ?", (f"arch/{i}.md",)).fetchone()["id"]
         store.db.execute(
-            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
-            "VALUES (?, 'arch', ?, 'doc', ?, 'canonical')",
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+            "VALUES (?, 'arch', ?, 'doc', ?, 'canonical', 'test')",
             (rid, b, lifecycle),
         )
 
@@ -354,8 +354,8 @@ def test_unpinned_search_scans_all_partitions_not_just_trovex(settings, store):
         )
         rid = store.db.execute("SELECT id FROM docs WHERE path = ?", (path,)).fetchone()["id"]
         store.db.execute(
-            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
-            "VALUES (?, ?, ?, 'doc', 'active', 'canonical')",
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+            "VALUES (?, ?, ?, 'doc', 'active', 'canonical', 'test')",
             (rid, source_id, blob),
         )
 
@@ -393,8 +393,8 @@ def test_boot_never_returns_cold_tier_but_explicit_source_reaches_it(settings, s
     )
     rid = store.db.execute("SELECT id FROM docs WHERE path = 'code/hot.md'").fetchone()["id"]
     store.db.execute(
-        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
-        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical')",
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical', 'test')",
         (rid, blob),
     )
     # One owner record in the ssot tier so boot has something legitimate to recall.

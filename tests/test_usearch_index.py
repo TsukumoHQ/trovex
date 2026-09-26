@@ -46,8 +46,8 @@ def big_partition(tmp_path):
     for i in range(N_CHUNKS):
         blob = sqlite_vec.serialize_float32(vecs[i].tolist())
         db.execute(
-            "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
-            "VALUES (?, 'big', ?, '', 'active', 'canonical')",
+            "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+            "VALUES (?, 'big', ?, '', 'active', 'canonical', 'test')",
             (i + 1, blob),
         )
     db.commit()
@@ -179,8 +179,8 @@ def test_flagged_partition_serves_from_hnsw_others_stay_on_sqlite_vec(tmp_path):
     db.execute("INSERT INTO doc_tags(doc_id, tag) VALUES (?, 't')", (other_doc_id,))
     other_blob = embed_query_blob(emb, "other partition marker content")
     db.execute(
-        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
-        "VALUES (?, 'other', ?, '', 'active', 'canonical')",
+        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, 'other', ?, '', 'active', 'canonical', 'test')",
         (other_chunk_id, other_blob),
     )
     db.commit()

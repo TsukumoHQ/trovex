@@ -165,6 +165,11 @@ def test_interrupted_partition_migration_is_atomic_and_self_heals(tmp_path):
 
 
 def test_interrupted_embed_dim_migration_is_atomic_and_self_heals(tmp_path):
+    """task 6851d755: the inline wipe now only ever fires for an EMPTY store
+    (a non-empty one skips it entirely — see test_owned_store_safety.py's
+    test_dim_migration_on_non_empty_store_leaves_old_tables_and_flags_rebuild)
+    — so this atomicity-under-crash test seeds zero docs, the one case where
+    the wipe path this test exercises is still reachable at all."""
     conn = _boom_execute_conn(tmp_path)
     conn.executescript(
         """
@@ -173,24 +178,20 @@ def test_interrupted_embed_dim_migration_is_atomic_and_self_heals(tmp_path):
         CREATE VIRTUAL TABLE vec_chunks USING vec0(embedding float[8] distance_metric=cosine);
         """
     )
-    conn.execute("INSERT INTO docs (id, content_hash) VALUES (1, 'h')")
     conn.commit()
 
     # Kill the process right after vec_docs + vec_chunks are dropped, before
-    # chunks_fts/chunks are touched or content_hash is cleared.
+    # chunks_fts/chunks are touched.
     conn.boom_on = "DROP TABLE IF EXISTS chunks_fts"
     with pytest.raises(RuntimeError):
         db._migrate_embed_dim(conn, 16)  # 16 != the stored dim (8) -> triggers the drop
 
-    # Nothing must have taken effect: vec_docs survives at its OLD dim, and
-    # the doc's content_hash was never cleared.
+    # Nothing must have taken effect: vec_docs survives at its OLD dim.
     row = conn.execute("SELECT sql FROM sqlite_master WHERE name = 'vec_docs'").fetchone()
     assert row is not None and "float[8]" in row["sql"]
-    assert conn.execute("SELECT content_hash FROM docs WHERE id = 1").fetchone()["content_hash"] == "h"
 
     # A clean retry must now succeed.
     conn.boom_on = None
     db._migrate_embed_dim(conn, 16)
     row = conn.execute("SELECT sql FROM sqlite_master WHERE name = 'vec_docs'").fetchone()
     assert row is None  # dropped for real this time; _init_schema recreates it at the new dim
-    assert conn.execute("SELECT content_hash FROM docs WHERE id = 1").fetchone()["content_hash"] == ""

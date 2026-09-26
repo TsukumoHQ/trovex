@@ -146,8 +146,8 @@ def test_api_boot_and_search_200_over_4096_docs(client):
     ids = [r["id"] for r in store.db.execute("SELECT id FROM docs WHERE path LIKE 'seed/%'")]
     # Partitioned vec_docs: 'code' shard, metadata from the docs defaults.
     store.db.executemany(
-        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status) "
-        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical')",
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical', 'test')",
         [(i, blob) for i in ids],
     )
     store.db.commit()

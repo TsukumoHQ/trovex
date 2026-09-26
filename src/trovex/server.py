@@ -258,6 +258,36 @@ def _rows_with_age(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def _maybe_enqueue_rebuild_vec(state) -> bool:
+    """task 6851d755: an embed_model/dim change on a NON-EMPTY store never
+    runs _migrate_embed_dim's inline wipe (see db.py) — it enqueues the
+    rebuild_vec job instead, which swaps without ever blocking a writer for
+    the expensive (re-embedding) part. Called once at startup; the caller is
+    responsible for having already started the applier so it can pick the
+    job up. A standalone function (not inlined in lifespan) so it's testable
+    without the MCP session manager, which can only ever run() once per
+    process. Returns True iff a job was enqueued this call."""
+    try:
+        from . import db as db_mod
+        from . import index_jobs
+
+        dim = state.settings.resolved_embed_dim()
+        if db_mod.rebuild_vec_needed(state.indexer.db, dim, state.settings.embed_model):
+            log.warning(
+                "embed_model/dim changed on a non-empty store — enqueueing rebuild_vec "
+                "(model=%r dim=%d)",
+                state.settings.embed_model,
+                dim,
+            )
+            index_jobs.enqueue(state.indexer.db, state.index_jobs_lock, "rebuild_vec")
+            state.applier.notify()
+            return True
+        return False
+    except Exception:  # noqa: BLE001 — must never block startup
+        log.exception("rebuild_vec startup check failed")
+        return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state = get_state()  # warm up
@@ -274,6 +304,7 @@ async def lifespan(app: FastAPI):
     # crash left 'processing', then drains index_jobs on its own thread for the
     # life of the process. /api/reindex only ever enqueues from here on.
     state.applier.start()
+    _maybe_enqueue_rebuild_vec(state)
     # Retention (finding 5): drop query-log rows older than the configured window
     # so the local DB doesn't grow unbounded and old (potentially sensitive)
     # query text isn't retained forever.

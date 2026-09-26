@@ -20,6 +20,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
+from trovex import db
 from trovex import state as state_mod
 from trovex.config import RESERVED_SOURCE_ID, Settings, Source
 from trovex.db import open_db
@@ -116,10 +117,39 @@ def test_reindex_never_purges_owned_docs_even_with_reserved_source(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_dim_migration_recreates_chunk_tables_at_new_dim(tmp_path):
+def test_dim_migration_recreates_chunk_tables_at_new_dim_on_empty_store(tmp_path):
+    """An EMPTY store still gets the fast inline wipe (task 6851d755's
+    fallback) — nothing to lose, no write-stall risk to avoid."""
     path = tmp_path / "trovex.db"
     conn = open_db(path, embed_dim=8)
-    # Seed a chunk + its embedding at the old dim.
+    conn.close()
+
+    conn = open_db(path, embed_dim=4)
+    for table in ("vec_docs", "vec_chunks"):
+        ddl = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name = ?", (table,)
+        ).fetchone()["sql"]
+        assert "float[4]" in ddl, f"{table} still at the old dim: {ddl}"
+    import sqlite_vec
+
+    # A new-dim insert must not raise (the live failure mode).
+    conn.execute(
+        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (1, 's', ?, 'doc', 'active', 'canonical', 'test')",
+        (sqlite_vec.serialize_float32([0.0] * 4),),
+    )
+    conn.close()
+
+
+def test_dim_migration_on_non_empty_store_leaves_old_tables_and_flags_rebuild(tmp_path):
+    """task 6851d755: a NON-EMPTY store never takes the inline wipe — the old
+    (still internally consistent) vec tables keep serving reads/writes
+    unchanged, and db.rebuild_vec_needed() is the signal the caller (server
+    startup) uses to enqueue the real rebuild_vec_shadow swap instead."""
+    import sqlite_vec
+
+    path = tmp_path / "trovex.db"
+    conn = open_db(path, embed_dim=8)
     conn.execute(
         "INSERT INTO docs (source_id, path, absolute_path, content_hash, size_bytes, "
         "tokens_est, mtime, first_indexed, last_indexed) "
@@ -131,30 +161,27 @@ def test_dim_migration_recreates_chunk_tables_at_new_dim(tmp_path):
         "VALUES (?, 0, 't', 'text', 1)",
         (doc_id,),
     )
-    import sqlite_vec
-
     chunk_id = conn.execute("SELECT id FROM chunks").fetchone()["id"]
     conn.execute(
-        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
-        "VALUES (?, 's', ?, 'doc', 'active', 'canonical')",
+        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, 's', ?, 'doc', 'active', 'canonical', 'test')",
         (chunk_id, sqlite_vec.serialize_float32([0.0] * 8)),
     )
     conn.commit()
     conn.close()
 
-    conn = open_db(path, embed_dim=4)
+    conn = open_db(path, embed_dim=4)  # mismatch, but the store is non-empty
     for table in ("vec_docs", "vec_chunks"):
         ddl = conn.execute(
             "SELECT sql FROM sqlite_master WHERE name = ?", (table,)
         ).fetchone()["sql"]
-        assert "float[4]" in ddl, f"{table} still at the old dim: {ddl}"
-    assert conn.execute("SELECT COUNT(*) c FROM chunks").fetchone()["c"] == 0
-    # A new-dim insert must not raise (the live failure mode).
-    conn.execute(
-        "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status) "
-        "VALUES (1, 's', ?, 'doc', 'active', 'canonical')",
-        (sqlite_vec.serialize_float32([0.0] * 4),),
-    )
+        assert "float[8]" in ddl, f"{table} was wiped on a non-empty store: {ddl}"
+    assert conn.execute("SELECT COUNT(*) c FROM chunks").fetchone()["c"] == 1  # untouched
+    assert conn.execute(
+        "SELECT COUNT(*) c FROM vec_chunks WHERE rowid = ?", (chunk_id,)
+    ).fetchone()["c"] == 1  # old embedding still readable at the OLD dim
+
+    assert db.rebuild_vec_needed(conn, embed_dim=4, embed_model="some-model") is True
     conn.close()
 
 

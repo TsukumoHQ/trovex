@@ -295,3 +295,42 @@ def test_format_report_omits_rubric_line_when_none_scored():
     report = _report(n_scored=0, mean_weighted=None)
     out = format_harness_report(report)
     assert "rubric weighted score" not in out
+
+
+def test_format_report_shows_skip_fraction_when_present():
+    report = _report()
+    report.rerank_skip_fraction = 0.75
+    out = format_harness_report(report)
+    assert "rerank skip fraction: 0.75" in out
+
+
+def test_format_report_omits_skip_fraction_when_none():
+    report = _report()  # default rerank_skip_fraction=None (rerank=False)
+    out = format_harness_report(report)
+    assert "rerank skip fraction" not in out
+
+
+# ── run_harness: rerank_skip_fraction wiring (task 4478fe53) ──────────────
+
+
+def test_run_harness_retrieval_only_rerank_reports_skip_fraction(corpus, monkeypatch):
+    """rerank=True routes through the tiered dispatch (maybe_rerank) — the
+    skip fraction it measures must reach the caller through HarnessReport."""
+    from trovex import rerank_local
+
+    monkeypatch.setattr(rerank_local, "_get_encoder", lambda: None)  # deterministic, no ONNX load
+    searcher, ids = corpus
+    cases = [
+        EvalCase(query="jwt token signature", category="c", expected_docs=[ids["auth"]]),
+        EvalCase(query="kubernetes pod rollout", category="c", expected_docs=[ids["deploy"]]),
+    ]
+    report = run_harness(cases, searcher, retrieval_only=True, rerank=True, k=1)
+    assert report.rerank_skip_fraction is not None
+    assert 0.0 <= report.rerank_skip_fraction <= 1.0
+
+
+def test_run_harness_retrieval_only_without_rerank_has_no_skip_fraction(corpus):
+    searcher, ids = corpus
+    cases = [EvalCase(query="jwt token signature", category="c", expected_docs=[ids["auth"]])]
+    report = run_harness(cases, searcher, retrieval_only=True, rerank=False, k=1)
+    assert report.rerank_skip_fraction is None

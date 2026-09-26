@@ -18,7 +18,12 @@ from pathlib import Path
 
 from .eval_bench import EvalQuery
 from .eval_rubric import RubricScore
-from .retrieval_eval import LabeledQuery, RetrievalStats, evaluate_retrieval
+from .retrieval_eval import (
+    LabeledQuery,
+    RetrievalStats,
+    evaluate_retrieval,
+    evaluate_retrieval_tiered,
+)
 
 
 @dataclass(frozen=True)
@@ -82,6 +87,10 @@ class HarnessReport:
     per_category: list[CategoryScore]
     retrieval: RetrievalStats
     results: list[CaseResult]
+    # task 4478fe53: fraction of queries where the production tiered dispatch
+    # (rerank.maybe_rerank) skipped the rerank pass on a clear RRF margin.
+    # None when rerank=False (skip fraction is meaningless without reranking).
+    rerank_skip_fraction: float | None = None
 
 
 def _load_resume(resume_path: Path | None) -> dict[str, CaseResult]:
@@ -155,7 +164,15 @@ def run_harness(
     `gate_retrieval_only`, not `gate` (which treats n_scored==0 as a failure to score).
     """
     labeled = [c.as_labeled_query() for c in cases if c.expected_docs]
-    retrieval = evaluate_retrieval(searcher, labeled, k=k, rerank=rerank)
+    # task 4478fe53: rerank=True routes through the PRODUCTION tiered dispatch
+    # (maybe_rerank), which measures the RRF-margin skip exactly as the live
+    # tool exercises it — not the plain evaluate_retrieval(rerank=True), which
+    # calls the local cross-encoder unconditionally and would never see a skip.
+    skip_fraction: float | None = None
+    if rerank:
+        retrieval, skip_fraction = evaluate_retrieval_tiered(searcher, labeled, k=k)
+    else:
+        retrieval = evaluate_retrieval(searcher, labeled, k=k, rerank=False)
 
     if retrieval_only:
         return HarnessReport(
@@ -166,6 +183,7 @@ def run_harness(
             per_category=[],
             retrieval=retrieval,
             results=[],
+            rerank_skip_fraction=skip_fraction,
         )
 
     assert answer_fn is not None and judge_fn is not None and content_fn is not None, (
@@ -214,6 +232,7 @@ def run_harness(
         per_category=per_category,
         retrieval=retrieval,
         results=results,
+        rerank_skip_fraction=skip_fraction,
     )
 
 
@@ -255,6 +274,8 @@ def format_harness_report(report: HarnessReport) -> str:
         f"{report.retrieval.hit_at_k:.2f} MRR={report.retrieval.mrr:.3f} "
         f"recall@{report.retrieval.k}={report.retrieval.recall_at_k:.2f}",
     ]
+    if report.rerank_skip_fraction is not None:
+        lines.append(f"rerank skip fraction: {report.rerank_skip_fraction:.2f} (RRF margin clear)")
     if report.mean_weighted is not None:
         lines.append(f"rubric weighted score: {report.mean_weighted:.1f}/100")
         for c in report.per_category:

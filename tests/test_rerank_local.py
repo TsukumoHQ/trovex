@@ -139,6 +139,87 @@ def test_maybe_rerank_uses_local_when_no_key(monkeypatch):
     assert info is not None and info.model == "fake-local"
 
 
+def test_margin_clear_true_on_wide_score_gap():
+    """task 4478fe53: rank 1 beating rank 2 by more than RERANK_MARGIN (default
+    0.2) of rank 1's score is a settled fusion result — a rerank pass can't
+    change it."""
+    cands = [_sr("a.md"), _sr("b.md")]
+    cands[0].score = 1.0
+    cands[1].score = 0.5  # (1.0 - 0.5) / 1.0 = 0.5 > 0.2
+    assert rerank._margin_clear(cands) is True
+
+
+def test_margin_clear_false_on_tight_score_gap():
+    cands = [_sr("a.md"), _sr("b.md")]
+    cands[0].score = 1.0
+    cands[1].score = 0.9  # (1.0 - 0.9) / 1.0 = 0.1 <= 0.2
+    assert rerank._margin_clear(cands) is False
+
+
+def test_margin_clear_true_with_fewer_than_two_candidates():
+    assert rerank._margin_clear([_sr("a.md")]) is True
+    assert rerank._margin_clear([]) is True
+
+
+def test_margin_clear_false_when_top_score_not_positive():
+    cands = [_sr("a.md"), _sr("b.md")]
+    cands[0].score = 0.0
+    cands[1].score = 0.0
+    assert rerank._margin_clear(cands) is False  # no positive signal to measure
+
+
+def test_maybe_rerank_skips_when_margin_clear(monkeypatch):
+    """Skip path: RerankInfo carries rerank_skipped=True, candidate order is
+    untouched, and neither the local cross-encoder nor the LLM tier is ever
+    invoked — a settled winner should cost nothing."""
+    tok = rerank.current_openai_key.set(None)
+    cands = [_sr("a.md"), _sr("b.md"), _sr("c.md")]
+    cands[0].score = 1.0
+    cands[1].score = 0.5
+    cands[2].score = 0.4
+
+    def _boom(*a, **k):
+        raise AssertionError("local rerank must not run on a clear-margin skip")
+
+    monkeypatch.setattr(rerank_local, "rerank", _boom)
+    try:
+        results, info = rerank.maybe_rerank("q", cands, limit=1)
+    finally:
+        rerank.current_openai_key.reset(tok)
+    assert [r.path for r in results] == ["a.md"]  # original order, untouched
+    assert info is not None
+    assert info.rerank_skipped is True
+    assert info.model == "skip"
+
+
+def test_maybe_rerank_runs_rerank_when_margin_tight(monkeypatch):
+    """No-skip path: a tight margin falls through to the local cross-encoder
+    tier and RerankInfo.rerank_skipped stays False."""
+    tok = rerank.current_openai_key.set(None)
+    cands = [_sr("a.md"), _sr("b.md"), _sr("c.md")]
+    cands[0].score = 1.0
+    cands[1].score = 0.95  # (1.0 - 0.95) / 1.0 = 0.05 <= 0.2 — margin not clear
+    cands[2].score = 0.9
+
+    def fake_local(query, cs, limit, text_fn=None):  # noqa: ARG001
+        return list(reversed(cs))[:limit], {
+            "model": "fake-local",
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "elapsed_ms": 1,
+        }
+
+    monkeypatch.setattr(rerank_local, "rerank", fake_local)
+    try:
+        results, info = rerank.maybe_rerank("q", cands, limit=1)
+    finally:
+        rerank.current_openai_key.reset(tok)
+    assert [r.path for r in results] == ["c.md"]  # reversed by the fake local tier
+    assert info is not None
+    assert info.rerank_skipped is False
+    assert info.model == "fake-local"
+
+
 def test_maybe_rerank_llm_failure_falls_back_to_local(monkeypatch):
     tok = rerank.current_openai_key.set("sk-test-key")
     # LLM client construction blows up → the tier must fall through to local.

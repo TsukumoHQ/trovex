@@ -167,7 +167,10 @@ def log_query(
             elapsed_ms,
             would_have_read_tokens,
             top_result_tokens,
-            1 if rerank_info else 0,
+            # "reranked" means reordering actually happened — a margin-skip
+            # (task 4478fe53) carries a non-None rerank_info (so callers can
+            # count the skip) but never touched the candidate order.
+            1 if (rerank_info and not rerank_info.get("rerank_skipped")) else 0,
             (rerank_info or {}).get("model"),
             (rerank_info or {}).get("tokens_in", 0),
             (rerank_info or {}).get("tokens_out", 0),

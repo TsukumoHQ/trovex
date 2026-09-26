@@ -1143,7 +1143,7 @@ class SqliteStore:
             ph = ",".join("?" * len(batch))
             for r in self.db.execute(
                 f"""SELECT c.id AS cid, c.doc_id, c.heading_path, c.content, c.tokens_est,
-                          d.ext_id, d.title, d.kind, d.source_id, d.lifecycle,
+                          d.ext_id, d.path, d.title, d.kind, d.source_id, d.lifecycle,
                           d.tokens_est AS doc_tokens
                    FROM chunks c JOIN docs d ON d.id = c.doc_id WHERE c.id IN ({ph})""",
                 batch,

@@ -100,6 +100,70 @@ def evaluate_retrieval(
     )
 
 
+def evaluate_retrieval_tiered(
+    searcher: Searcher,
+    labeled: list[LabeledQuery],
+    *,
+    k: int = 5,
+    source_ids: list[str] | None = None,
+    kind: str | None = None,
+    tags: list[str] | None = None,
+    text_fn=None,
+) -> tuple[RetrievalStats, float]:
+    """Like `evaluate_retrieval(rerank=True)` but through the PRODUCTION tiered
+    dispatch (`rerank.maybe_rerank`, task 4478fe53) instead of calling the local
+    cross-encoder directly — so the RRF-margin skip is exercised exactly as the
+    live `trovex()` tool exercises it, not bypassed the way the plain `rerank=True`
+    knob above bypasses it. Returns (stats, skip_fraction): the fraction of scored
+    queries where maybe_rerank skipped the rerank pass because fusion already gave
+    rank 1 a clear margin over rank 2.
+    """
+    from .rerank import maybe_rerank
+
+    valid = [lq for lq in labeled if lq.query.strip() and lq.relevant]
+    if not valid:
+        return RetrievalStats(n=0, k=k, hit_at_1=0.0, hit_at_k=0.0, mrr=0.0, recall_at_k=0.0), 0.0
+
+    hit1 = hitk = mrr_sum = recall_sum = 0.0
+    misses: list[str] = []
+    skipped = 0
+    fetch = max(k, 20)
+    for lq in valid:
+        results = searcher.search(
+            lq.query, limit=fetch, source_ids=source_ids, kind=kind, tags=tags
+        )
+        results, info = maybe_rerank(lq.query, results, k, text_fn=text_fn)
+        if info is not None and info.rerank_skipped:
+            skipped += 1
+        ranked = [r.path for r in results[:k]]
+        relevant = set(lq.relevant)
+
+        if ranked and ranked[0] in relevant:
+            hit1 += 1.0
+
+        first_rank = next((i for i, p in enumerate(ranked, start=1) if p in relevant), 0)
+        if first_rank:
+            hitk += 1.0
+            mrr_sum += 1.0 / first_rank
+        else:
+            misses.append(lq.query)
+
+        found = sum(1 for p in relevant if p in ranked[:k])
+        recall_sum += found / len(relevant)
+
+    n = len(valid)
+    stats = RetrievalStats(
+        n=n,
+        k=k,
+        hit_at_1=hit1 / n,
+        hit_at_k=hitk / n,
+        mrr=mrr_sum / n,
+        recall_at_k=recall_sum / n,
+        misses=misses,
+    )
+    return stats, skipped / n
+
+
 def format_retrieval_stats(stats: RetrievalStats) -> str:
     lines = [
         f"retrieval quality over n={stats.n} (k={stats.k}): "

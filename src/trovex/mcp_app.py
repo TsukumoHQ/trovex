@@ -247,6 +247,50 @@ def _resolve_source(explicit: str = "") -> str | None:
     return value
 
 
+def _build_chunk_text_fn(store, query: str, candidates: list, *, source: str | None = None):
+    """The reranker's per-candidate document text: the SECTION that actually
+    matched the query (heading breadcrumb + chunk body, via store.search_chunks'
+    own hybrid vector+BM25 fusion), not the file's first 400 chars — which on a
+    decision-record or resume doc (frontmatter + an H1) told the cross-encoder
+    about metadata, never the section that matched (task 4478fe53). Falls back
+    to the doc's first chunk (still DB-backed, never a disk read — T4) for a
+    candidate with no chunk-level hit for this query."""
+    paths = {c.path for c in candidates}
+    best_by_path: dict[str, dict] = {}
+    if paths:
+        # Wide net so most/all doc-level candidates get their own matched
+        # chunk, not just whichever happen to rank in a narrow chunk pool.
+        for hit in store.search_chunks(query, limit=max(len(candidates) * 3, 30), source=source):
+            p = hit.get("path")
+            if p in paths and p not in best_by_path:  # already ranked best-first
+                best_by_path[p] = hit
+
+    fallback_paths = [p for p in paths if p not in best_by_path]
+    fallback_content: dict[str, str] = {}
+    if fallback_paths:
+        ph = ",".join("?" * len(fallback_paths))
+        for row in store.db.execute(
+            f"""SELECT d.path AS path, c.content AS content
+                FROM docs d JOIN chunks c ON c.doc_id = d.id
+                WHERE d.path IN ({ph}) AND c.chunk_index = 0""",
+            fallback_paths,
+        ):
+            fallback_content[row["path"]] = row["content"]
+
+    def _text_fn(cand) -> str:
+        head = (getattr(cand, "title", "") or getattr(cand, "path", "") or "").strip()
+        hit = best_by_path.get(getattr(cand, "path", ""))
+        if hit:
+            breadcrumb = hit.get("heading_path") or ""
+            body = (hit.get("content") or "")[:400]
+            prefix = f"{head} › {breadcrumb}" if breadcrumb else head
+            return f"{prefix}. {body}".strip() if body else prefix
+        body = (fallback_content.get(getattr(cand, "path", ""), "") or "")[:400]
+        return f"{head}. {body}".strip() if body else head
+
+    return _text_fn
+
+
 @_off_loop
 def trovex(q: str = "", summary: bool = False, source: str = "", query: str = "") -> str:
     """Find canonical docs for a query.
@@ -322,26 +366,8 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
     # Fetch a wider candidate pool when reranking is possible.
     candidates = state.searcher.search(q, limit=20, source_ids=[scope] if scope else None)
     pre_rerank_paths = [c.path for c in candidates]
-    # T4: feed the cross-encoder each candidate's body from the DB in ONE batched
-    # query (first chunk per doc), instead of re-reading ~20 files off disk per
-    # query. Owned docs have no file at all, so the disk read returned nothing for
-    # them; the DB path works for owned + file-backed alike.
-    rr_paths = [c.path for c in candidates[:20]]
-    content_by_path: dict[str, str] = {}
-    if rr_paths:
-        ph = ",".join("?" * len(rr_paths))
-        for row in db.execute(
-            f"""SELECT d.path AS path, c.content AS content
-                FROM docs d JOIN chunks c ON c.doc_id = d.id
-                WHERE d.path IN ({ph}) AND c.chunk_index = 0""",
-            rr_paths,
-        ):
-            content_by_path[row["path"]] = row["content"]
-
-    def _rr_text(cand):
-        head = (getattr(cand, "title", "") or getattr(cand, "path", "") or "").strip()
-        snip = (content_by_path.get(getattr(cand, "path", ""), "") or "")[:400]
-        return f"{head}. {snip}".strip() if snip else head
+    rr_candidates = candidates[:20]
+    _rr_text = _build_chunk_text_fn(state.store, q, rr_candidates, source=scope)
 
     results, rerank_info = maybe_rerank(q, candidates, limit=5, text_fn=_rr_text)
 
@@ -371,13 +397,17 @@ def trovex(q: str = "", summary: bool = False, source: str = "", query: str = ""
                     "tokens_in": rerank_info.tokens_in,
                     "tokens_out": rerank_info.tokens_out,
                     "elapsed_ms": rerank_info.elapsed_ms,
+                    "rerank_skipped": rerank_info.rerank_skipped,
                 }
                 if rerank_info
                 else None
             ),
-            # Only pass pre-rerank when actually reranking — otherwise it's
-            # the same list and metrics would be meaningless.
-            pre_rerank_paths=pre_rerank_paths if rerank_info else None,
+            # Only pass pre-rerank when reordering actually happened — a
+            # margin-skip (task 4478fe53) carries rerank_info but never
+            # touched the order, so divergence metrics would be meaningless.
+            pre_rerank_paths=(
+                pre_rerank_paths if (rerank_info and not rerank_info.rerank_skipped) else None
+            ),
         )
     except Exception:  # noqa: BLE001 — logging must never break the tool
         log.debug("log_query failed", exc_info=True)

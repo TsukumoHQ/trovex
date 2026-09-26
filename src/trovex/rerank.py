@@ -35,6 +35,13 @@ RERANK_TIMEOUT_SEC = 8.0
 MAX_CANDIDATES = 20
 MAX_SNIPPET_CHARS = 400  # ~100 tokens per candidate
 
+# task 4478fe53: when the fusion ranking already separates rank 1 from rank 2
+# by more than this fraction of rank 1's score, a rerank pass (LLM call or
+# cross-encoder model pass) can't change the winner — skip it. 0.2 chosen from
+# the retrieval eval's cases.jsonl (see the PR body for the hit@1/MRR numbers
+# at this threshold vs. always-rerank); override with TROVEX_RERANK_MARGIN.
+RERANK_MARGIN = float(os.environ.get("TROVEX_RERANK_MARGIN", "0.2"))
+
 
 def _pick_model() -> str:
     override = current_rerank_model.get()
@@ -47,6 +54,19 @@ class RerankInfo:
     tokens_in: int
     tokens_out: int
     elapsed_ms: int
+    rerank_skipped: bool = False
+
+
+def _margin_clear(candidates: list[SearchResult]) -> bool:
+    """True when rank 1 already beats rank 2 by more than RERANK_MARGIN of
+    rank 1's score — a rerank pass (LLM or local cross-encoder) is O(candidates)
+    model calls it can't change a winner that fusion has already settled."""
+    if len(candidates) < 2:
+        return True
+    s1, s2 = candidates[0].score, candidates[1].score
+    if s1 <= 0:
+        return False  # no positive signal to measure a margin against
+    return (s1 - s2) / s1 > RERANK_MARGIN
 
 
 def maybe_rerank(
@@ -74,6 +94,16 @@ def maybe_rerank(
     # SET — skip it and save the latency (T4).
     if len(candidates) <= limit:
         return candidates[:limit], None
+
+    # task 4478fe53: fusion already separated rank 1 from rank 2 by a clear
+    # margin — skip the rerank pass entirely (info carries rerank_skipped=True
+    # rather than None, so callers can COUNT this, distinct from "rerank
+    # wasn't applicable at all"). Checked before spending an LLM key or a
+    # cross-encoder pass on a winner that's already settled.
+    if _margin_clear(candidates):
+        return candidates[:limit], RerankInfo(
+            model="skip", tokens_in=0, tokens_out=0, elapsed_ms=0, rerank_skipped=True
+        )
 
     key = current_openai_key.get()
     if key:

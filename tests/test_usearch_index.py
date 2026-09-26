@@ -16,6 +16,17 @@ import sqlite_vec
 from trovex import usearch_index
 from trovex.db import open_db
 
+# task 52532317: `usearch` is an optional dep (the 4c89b89a escape hatch) — a
+# plain `uv sync` (no extras) checkout doesn't have it, and every test below
+# exercises the real HNSW index, not just the availability guard. Skip the
+# whole module rather than let each test fail on a missing package; the
+# sqlite-vec fallback path itself is covered unconditionally by
+# test_usearch_fallback.py, which never needs the package installed.
+pytestmark = pytest.mark.skipif(
+    not usearch_index.available(),
+    reason="usearch not installed (optional dep — `pip install usearch` or the `usearch` extra)",
+)
+
 DIM = 384
 N_CHUNKS = 5000
 

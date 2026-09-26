@@ -91,6 +91,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     _migrate_embed_dim(conn, embed_dim)
     _migrate_add_trovex_store_columns(conn)
     _migrate_add_query_session(conn)
+    _migrate_add_query_used(conn)
     _migrate_add_chunk_hash(conn)
     _migrate_add_chunker_version(conn)
     _migrate_add_lifecycle(conn)
@@ -983,6 +984,23 @@ def _migrate_add_query_session(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _migrate_add_query_used(conn: sqlite3.Connection) -> None:
+    """Add mcp_query_results.used to an existing query log (additive, task
+    b47301eb). Nullable-by-default (0) so a store created before this migration
+    just has every served row unlabelled until the next read marks one, rather
+    than breaking. Skip if the table doesn't exist yet — _init_schema creates it
+    with the column."""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_query_results'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(mcp_query_results)")}
+    if "used" not in cols:
+        conn.execute("ALTER TABLE mcp_query_results ADD COLUMN used INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+
+
 def _migrate_add_importance(conn: sqlite3.Connection) -> None:
     """Add docs.importance + docs.pinned to an existing store (additive, P3).
 
@@ -1458,10 +1476,18 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             status TEXT,
             tokens_est INTEGER,
             score REAL,
+            -- task b47301eb: the free relevance label. Set by
+            -- usage.mark_result_used when the SAME session reads this served
+            -- path back (trovex_read(doc_id=...)) within the labeling window —
+            -- the fleet's own traffic tells us which served result was actually
+            -- relevant, no hand-written cases.jsonl needed. 0 stays the default
+            -- for served-but-never-read rows (not "irrelevant", just unlabelled).
+            used INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (query_id, rank)
         );
         CREATE INDEX IF NOT EXISTS idx_mqr_path ON mcp_query_results(path);
         CREATE INDEX IF NOT EXISTS idx_mqr_query ON mcp_query_results(query_id);
+        CREATE INDEX IF NOT EXISTS idx_mqr_used ON mcp_query_results(used) WHERE used = 1;
 
         -- Partitioned vector index (P2a). source_id is a vec0 PARTITION KEY: a KNN
         -- constrained to `source_id = ?` scans ONLY that source's shard, so k stays

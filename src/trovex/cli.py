@@ -397,6 +397,16 @@ def _load_queries(path: Path | None) -> list[str]:
         return []
 
 
+def _parse_since(s: str) -> float:
+    """Duration string → seconds. Accepts a trailing unit (s/m/h/d, default 'd'
+    on a bare number), e.g. '7d', '24h', '30m'."""
+    s = s.strip().lower()
+    units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+    if s and s[-1] in units:
+        return float(s[:-1]) * units[s[-1]]
+    return float(s) * 86400
+
+
 def _default_eval_path(name: str) -> Path | None:
     """Package-relative default for a bundled benchmarks/token-savings/ file — only resolves
     inside a source checkout (an installed wheel doesn't ship benchmarks/); caller must fall
@@ -1275,12 +1285,79 @@ def _pick_query(content: str) -> str:
 
 
 @app.command()
-def eval(n: int = 40, k: int = 5) -> None:  # noqa: A001
+def eval(  # noqa: A001
+    n: int = 40,
+    k: int = 5,
+    replay: bool = typer.Option(
+        False, "--replay", help="Replay real agent queries (mcp_queries) against the CURRENT index."
+    ),
+    since: str = typer.Option("7d", "--since", help="Replay window: <n>s/m/h/d (default 7d)."),
+    limit: int = typer.Option(500, "--limit", help="Replay: max queries sampled from the window."),
+    baseline: Path | None = typer.Option(
+        None, "--baseline", help="Replay: thresholds JSON {min_hit_at_1, max_tokens_served_median}."
+    ),
+    gate: bool = typer.Option(
+        False, "--gate", help="Replay: exit non-zero when it misses --baseline thresholds."
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Replay: emit machine-readable JSON."),
+) -> None:
     """Retrieval eval: sample docs, query with a sentence from each, measure recall.
 
     recall@1 = top passage is from the right doc; recall@k = right doc in top k.
     A sanity check so we stop flying blind on retrieval quality.
+
+    `--replay` (task b47301eb) switches to a different eval entirely: instead of
+    sampling docs, it replays REAL agent queries logged in mcp_queries against the
+    current index. The fleet labels its own eval for free — a served doc that a
+    session reads back (trovex_read(doc_id=...)) within the labeling window is
+    marked `used`, and only used-labelled queries score hit@1/MRR. See
+    `trovex eval-harness` for the hand-written cases.jsonl blind-judged harness.
     """
+    if replay:
+        import json as _json
+
+        from .embedder import embedder_from_settings
+        from .eval_replay import format_replay_report, gate_replay, replay_eval
+
+        if gate and baseline is None:
+            console.print("[red]--gate needs --baseline FILE.[/red]")
+            raise typer.Exit(1)
+
+        since_seconds = _parse_since(since)
+        settings = Settings()
+        emb = embedder_from_settings(settings)
+        searcher = Searcher(settings, embedder=emb)
+        report = replay_eval(searcher.db, searcher, since_seconds=since_seconds, limit=limit, k=k)
+
+        if json_out:
+            print(
+                _json.dumps(
+                    {
+                        "n": report.n,
+                        "n_used_labeled": report.n_used_labeled,
+                        "hit_at_1_used": report.hit_at_1_used,
+                        "hit_at_k_used": report.hit_at_k_used,
+                        "mrr_used": report.mrr_used,
+                        "tokens_served_median": report.tokens_served_median,
+                        "rank_drift_mean": report.rank_drift_mean,
+                        "k": report.k,
+                    }
+                )
+            )
+        else:
+            console.print(
+                f"[bold]eval replay[/bold] · since={since} limit={limit}\n{format_replay_report(report)}"
+            )
+
+        if gate:
+            baseline_obj = _json.loads(baseline.read_text(encoding="utf-8"))
+            ok, reason = gate_replay(report, baseline_obj)
+            if not ok:
+                console.print(f"[red]GATE FAIL: {reason}[/red]")
+                raise typer.Exit(1)
+            console.print("[green]GATE PASS[/green]")
+        return
+
     import random
 
     from .store import SqliteStore

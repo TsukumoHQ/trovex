@@ -155,3 +155,21 @@ def test_bench_json_serializes_both_report_types():
     )
     d2 = json.loads(_bench_json(er))
     assert d2["median_saving"] == 0.7 and d2["per_category"][0]["category"] == "C1"
+
+
+def test_eval_replay_gate_requires_baseline_fails_fast():
+    """`trovex eval --replay --gate` without --baseline must fail before doing any
+    work (no embedder load, no store open), like the --eval key guard on `bench`."""
+    res = runner.invoke(app, ["eval", "--replay", "--gate"])
+    assert res.exit_code == 1
+    assert "--baseline" in res.output
+
+
+def test_parse_since_units():
+    from trovex.cli import _parse_since
+
+    assert _parse_since("7d") == 7 * 86400
+    assert _parse_since("24h") == 24 * 3600
+    assert _parse_since("30m") == 30 * 60
+    assert _parse_since("90s") == 90
+    assert _parse_since("2") == 2 * 86400

@@ -8,11 +8,14 @@ and logs the query for the dashboard.
 from __future__ import annotations
 
 import contextvars
+import logging
 import re
 import time
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+
+log = logging.getLogger("trovex.usage")
 
 # Conservative secret/PII patterns redacted from query text before it's stored
 # (finding 5). Each is anchored to a recognisable shape so ordinary queries
@@ -50,6 +53,35 @@ def purge_old_queries(db, retention_days: int) -> int:
     cur = db.execute("DELETE FROM mcp_queries WHERE ts < ?", (cutoff,))
     db.commit()
     return cur.rowcount or 0
+
+
+def mark_result_used(db, path: str, session_id: str, window_seconds: float) -> int:
+    """Label a served result relevant (task b47301eb): a served-but-unread doc is
+    unlabelled, not "irrelevant" — but when THIS session reads `path` back
+    (trovex_read(doc_id=...)) within `window_seconds` of it being served, that's
+    the fleet's own free relevance signal, so mark it. Marks every still-unused
+    served row for `path` in that session's window, not just the newest, since a
+    single doc_id read can plausibly answer more than one recent query.
+
+    Best-effort: a labeling miss must never break the read that triggered it, so
+    this swallows its own errors.
+    """
+    if not path or not session_id or session_id == "unknown":
+        return 0
+    cutoff = time.time() - window_seconds
+    try:
+        cur = db.execute(
+            """UPDATE mcp_query_results SET used = 1
+               WHERE used = 0 AND path = ? AND query_id IN (
+                   SELECT id FROM mcp_queries WHERE session_id = ? AND ts >= ?
+               )""",
+            (path, session_id, cutoff),
+        )
+        db.commit()
+        return cur.rowcount or 0
+    except Exception:  # noqa: BLE001 — labeling must never break a read
+        log.debug("mark_result_used failed", exc_info=True)
+        return 0
 
 
 current_user: contextvars.ContextVar[str] = contextvars.ContextVar(

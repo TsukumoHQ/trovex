@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     # than this are purged at startup. <= 0 disables purging (keep everything).
     query_retention_days: int = 90
 
+    # Used-vs-served labeling window (env TROVEX_USED_LABEL_WINDOW_MINUTES, task
+    # b47301eb): a served doc read back via trovex_read(doc_id=...) by the SAME
+    # session within this many minutes is marked mcp_query_results.used=1 — the
+    # free relevance label `trovex eval --replay` scores hit@1 against. Too short
+    # misses a slow agent reading its own served result; too long risks crediting
+    # an unrelated later read as if it answered this query.
+    used_label_window_minutes: int = 30
+
     # Doc-version history depth (env TROVEX_DOC_VERSION_CAP): how many prior
     # content snapshots an owned doc keeps. Each overwrite snapshots the previous
     # body (non-clobber, degrade-not-delete), so a bad save is recoverable via

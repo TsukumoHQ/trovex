@@ -657,6 +657,18 @@ def trovex_read(
         doc = state.store.get(resolved) if resolved else None
         if doc is None:
             return "(not found)"
+        # task b47301eb: this session reading a resolved doc back is the free
+        # used-vs-served label the replay eval scores hit@1 against. Skipped for
+        # versions/version_id — those read history, not the doc that was served.
+        if not versions and not version_id:
+            from .usage import current_session, mark_result_used
+
+            mark_result_used(
+                state.searcher.db,
+                resolved,
+                current_session.get(),
+                state.settings.used_label_window_minutes * 60,
+            )
         if versions:
             vs = state.store.list_versions(resolved)
             if not vs:

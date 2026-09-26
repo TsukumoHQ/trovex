@@ -122,6 +122,22 @@ def test_api_boot_recalls_mixed_case_owner(client):
     assert upper["tokens_est"] > 0
 
 
+def test_api_boot_budget_receipt_header_and_query_log(client):
+    response = client.get(
+        "/api/boot", params={"agent": "coo", "floor": 0.0, "budget": 200}
+    )
+    out = response.json()
+
+    assert response.headers["X-Trovex-Budget-Used"] == str(out["budget_used"])
+    assert out["budget_requested"] == 200
+    assert sum(pointer["tokens_est"] for pointer in out["pointers"]) == out["budget_used"]
+    assert all(set(item) == {"doc_id", "tier"} for item in out["trimmed"])
+    row = state_mod._state.store.db.execute(
+        "SELECT budget_requested, budget_used FROM mcp_queries ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert dict(row) == {"budget_requested": 200, "budget_used": out["budget_used"]}
+
+
 def test_api_boot_and_search_200_over_4096_docs(client):
     """OUTAGE regression at the HTTP surface: once the corpus crossed sqlite-vec's
     4096 KNN ceiling, the widen-retry issued a k>4096 MATCH that raised and

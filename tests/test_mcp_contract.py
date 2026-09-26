@@ -37,7 +37,10 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     # explicitly `supersedes`-linked by another; additive, default preserves the
     # new (safer) behavior for a client that never sends it.
     "trovex_search": {
-        "props": {"query", "k", "kind", "tags", "source", "q", "include_archived", "current_only"},
+        "props": {
+            "query", "k", "kind", "tags", "source", "q", "include_archived", "current_only",
+            "budget",
+        },
         "required": set(),
     },
     # trovex_read gained `versions`/`version_id` (both optional) for the non-clobber

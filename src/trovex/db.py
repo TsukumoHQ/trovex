@@ -93,6 +93,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     _migrate_add_query_session(conn)
     _migrate_add_query_used(conn)
     _migrate_add_query_source(conn)
+    _migrate_add_query_budget(conn)
     _migrate_add_chunk_hash(conn)
     _migrate_add_chunker_version(conn)
     _migrate_add_lifecycle(conn)
@@ -1028,6 +1029,21 @@ def _migrate_add_query_source(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _migrate_add_query_budget(conn: sqlite3.Connection) -> None:
+    """Add the requested/used budget receipt to legacy query ledgers."""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_queries'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(mcp_queries)")}
+    if "budget_requested" not in cols:
+        conn.execute("ALTER TABLE mcp_queries ADD COLUMN budget_requested INTEGER")
+    if "budget_used" not in cols:
+        conn.execute("ALTER TABLE mcp_queries ADD COLUMN budget_used INTEGER NOT NULL DEFAULT 0")
+    conn.commit()
+
+
 def _migrate_add_importance(conn: sqlite3.Connection) -> None:
     """Add docs.importance + docs.pinned to an existing store (additive, P3).
 
@@ -1482,7 +1498,9 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             -- generic /api/boot call; 'prompt' = the UserPromptSubmit hook's
             -- /api/boot?q=<prompt> call. Both hook sources are the fleet's REAL
             -- traffic volume (hundreds/day) that the replay eval was blind to.
-            source TEXT NOT NULL DEFAULT 'mcp'
+            source TEXT NOT NULL DEFAULT 'mcp',
+            budget_requested INTEGER,
+            budget_used INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_ts ON mcp_queries(ts DESC);
         CREATE INDEX IF NOT EXISTS idx_mcp_queries_user ON mcp_queries(user, ts DESC);

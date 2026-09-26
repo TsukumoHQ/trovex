@@ -160,6 +160,8 @@ def log_query(
     results: list | None = None,
     rerank_info: dict | None = None,
     pre_rerank_paths: list[str] | None = None,
+    budget_requested: int | None = None,
+    budget_used: int = 0,
 ) -> None:
     # Divergence metrics: if pre-rerank paths supplied, compare with post-rerank.
     pre_top1: str | None = None
@@ -186,8 +188,9 @@ def log_query(
            (ts, user, session_id, query, n_results, summary, response_tokens_est, elapsed_ms,
             would_have_read_tokens, top_result_tokens,
             reranked, llm_model, llm_tokens_in, llm_tokens_out, llm_elapsed_ms,
-            pre_top1_path, top1_changed, top1_lift, top5_overlap)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            pre_top1_path, top1_changed, top1_lift, top5_overlap,
+            budget_requested, budget_used)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             time.time(),
             current_user.get(),
@@ -211,6 +214,8 @@ def log_query(
             top1_changed,
             top1_lift,
             top5_overlap,
+            budget_requested,
+            budget_used,
         ),
     )
     query_id = cur.lastrowid
@@ -232,6 +237,8 @@ def log_pointer_query(
     pointers: list[dict],
     tokens_est: int,
     elapsed_ms: int,
+    budget_requested: int | None = None,
+    budget_used: int = 0,
 ) -> None:
     """Log an /api/boot call — the SessionStart hook ('boot') or the
     UserPromptSubmit hook ('prompt') — into mcp_queries/mcp_query_results
@@ -253,8 +260,9 @@ def log_pointer_query(
         cur = db.execute(
             """INSERT INTO mcp_queries
                (ts, user, session_id, query, n_results, source,
-                response_tokens_est, top_result_tokens, elapsed_ms)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                response_tokens_est, top_result_tokens, elapsed_ms,
+                budget_requested, budget_used)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 time.time(),
                 agent,
@@ -265,6 +273,8 @@ def log_pointer_query(
                 tokens_est,
                 tokens_est,
                 elapsed_ms,
+                budget_requested,
+                budget_used,
             ),
         )
         query_id = cur.lastrowid

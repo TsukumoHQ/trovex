@@ -166,6 +166,21 @@ def test_migrate_add_query_source_idempotent_when_column_present(tmp_path):
     assert {r[1] for r in conn.execute("PRAGMA table_info(mcp_queries)")} == {"id", "source"}
 
 
+def test_migrate_add_query_budget_adds_receipt_columns_to_legacy_table(tmp_path):
+    conn = _vec_conn(tmp_path)
+    conn.execute("CREATE TABLE mcp_queries (id INTEGER PRIMARY KEY)")
+    conn.commit()
+
+    db._migrate_add_query_budget(conn)
+    db._migrate_add_query_budget(conn)
+
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(mcp_queries)")}
+    assert {"budget_requested", "budget_used"} <= cols
+    conn.execute("INSERT INTO mcp_queries DEFAULT VALUES")
+    row = conn.execute("SELECT budget_requested, budget_used FROM mcp_queries").fetchone()
+    assert dict(row) == {"budget_requested": None, "budget_used": 0}
+
+
 def test_log_pointer_query_writes_one_row_and_its_served_ids(tmp_path):
     conn = db.open_db(tmp_path / "trovex.db")
 

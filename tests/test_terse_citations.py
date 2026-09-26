@@ -11,6 +11,7 @@ Hermetic: deterministic BagEmbedder, no model download / network.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 
 import numpy as np
@@ -94,6 +95,25 @@ def test_ladder_hint_appears_once_for_many_hits(wired):
     out = mcp_app.trovex_search(q="reverse proxy tls", k=5)
     assert out.count("Climb the ladder") == 1  # one affordance, not per-hit
     assert out.count("———") >= 1  # multiple citations separated
+
+
+def test_trovex_search_budget_returns_receipt_and_logs_budget(wired):
+    out = json.loads(mcp_app.trovex_search(q="reverse proxy tls", budget=200))
+
+    assert out["budget_requested"] == 200
+    assert out["budget_used"] <= 200
+    assert sum(item["tokens_est"] for item in out["results"]) == out["budget_used"]
+    row = wired.store.db.execute(
+        "SELECT budget_requested, budget_used FROM mcp_queries ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert dict(row) == {"budget_requested": 200, "budget_used": out["budget_used"]}
+
+
+def test_trovex_search_without_budget_is_byte_identical(wired, monkeypatch):
+    monkeypatch.setattr(mcp_app, "_INLINE_SAVINGS_ON", False)
+    before = mcp_app.trovex_search(q="reverse proxy tls")
+    after = mcp_app.trovex_search(q="reverse proxy tls", budget=None)
+    assert after == before
 
 
 def test_no_results_is_clean(tmp_path, monkeypatch):

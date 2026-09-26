@@ -16,6 +16,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from . import offload
+from .budget import BudgetCandidate, fit_budget
 from .state import get_state
 from .store import (
     TROVEX_SOURCE_ID,
@@ -793,6 +794,7 @@ def trovex_search(
     q: str = "",
     include_archived: bool = False,
     current_only: bool = True,
+    budget: int | None = None,
 ) -> str:
     """Search the store — returns the top K relevant *citations* (not dumps).
 
@@ -820,6 +822,8 @@ def trovex_search(
             (trovex_write links=[{"rel":"supersedes",...}]) — the current
             default. Pass false to also see superseded versions (e.g. auditing
             a decision's history).
+        budget: Optional response budget in tokens. When set, returns a JSON
+            envelope with ranked results fitted across stub/card/passage tiers.
     """
     state = get_state()
     t0 = time.perf_counter()
@@ -836,13 +840,39 @@ def trovex_search(
         return _err("unknown_source", "validation", str(e))
     hits = state.store.search_chunks(
         query,
-        limit=k,
+        limit=50 if budget is not None else k,
         kind=kind or None,
         source=scope,
         tags=_as_taglist(tags) or None,
         include_archived=include_archived,
         current_only=current_only,
     )
+    if budget is not None:
+        if budget < 1:
+            return _err("invalid_budget", "validation", "budget must be at least 1 token")
+        candidates = [
+            BudgetCandidate(
+                h["ext_id"],
+                {
+                    "stub": f"{_breadcrumb(h)}  — trovex:{h['ext_id']}",
+                    "card": _fmt_card(h),
+                    "passage": _fmt_passage(h),
+                },
+            )
+            for h in hits
+        ]
+        fitted = fit_budget(candidates, budget)
+        out = json.dumps(fitted, ensure_ascii=False)
+        _log_retrieval(
+            state,
+            query,
+            hits[: len(fitted["results"])],
+            out,
+            t0,
+            budget_requested=budget,
+            budget_used=fitted["budget_used"],
+        )
+        return out
     if hits:
         # Citations, not dumps: k compact anchored snippets + one ladder-climb
         # affordance, instead of k full sections concatenated. The agent reads the
@@ -908,7 +938,16 @@ def _fmt_card(h: dict) -> str:
     )
 
 
-def _log_retrieval(state, query: str, hits: list, response: str, t0: float) -> int:
+def _log_retrieval(
+    state,
+    query: str,
+    hits: list,
+    response: str,
+    t0: float,
+    *,
+    budget_requested: int | None = None,
+    budget_used: int = 0,
+) -> int:
     """Log a chunk-retrieval call for usage/savings/insights and return the raw
     tokens saved for this call. Savings story: baseline = reading the whole
     parent doc(s); served = the passages (the response)."""
@@ -926,6 +965,8 @@ def _log_retrieval(state, query: str, hits: list, response: str, t0: float) -> i
             elapsed_ms=int((time.perf_counter() - t0) * 1000),
             would_have_read_tokens=would_have_read,
             top_result_tokens=0,
+            budget_requested=budget_requested,
+            budget_used=budget_used,
         )
         return max(0, would_have_read - resp_tokens)
     except Exception:  # noqa: BLE001 — logging must never break a tool

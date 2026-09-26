@@ -893,6 +893,7 @@ def build_app() -> FastAPI:
         # No max_length: the prompt hook sends whole prompts here, and a 422 is a
         # silently-dropped recall. boot_pointers truncates to BOOT_Q_MAX instead.
         q: str | None = Query(None, description="override the generic boot query"),
+        budget: int | None = Query(None, ge=1, description="response budget in tokens"),
     ) -> JSONResponse:
         """Active-memory recall: the agent's own records as a ~80-token pointer
         pack (RFC 330e7d43, step 2). Read-only; empty when nothing clears
@@ -905,10 +906,18 @@ def build_app() -> FastAPI:
         t0 = time.perf_counter()
         try:
             pack = await offload.off_loop(
-                boot_pointers, get_state().searcher, agent, k=k, floor=floor, q=q
+                boot_pointers,
+                get_state().searcher,
+                agent,
+                k=k,
+                floor=floor,
+                q=q,
+                budget=budget,
             )
         except TimeoutError:
             pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
+            if budget is not None:
+                pack.update(budget_requested=budget, budget_used=0, trimmed=[])
         # task 2b7974cf: log every boot/prompt-hook call — the fleet's real
         # recall traffic, invisible to the replay eval until this landed. `q`
         # present = the UserPromptSubmit hook (trovex-prompt.sh); absent = the
@@ -925,10 +934,17 @@ def build_app() -> FastAPI:
                 pointers=pack.get("pointers", []),
                 tokens_est=pack.get("tokens_est", 0),
                 elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                budget_requested=budget,
+                budget_used=pack.get("budget_used", 0),
             )
         except Exception:  # noqa: BLE001 — boot must never 500 on a log failure
             pass
-        return JSONResponse(pack)
+        headers = (
+            {"X-Trovex-Budget-Used": str(pack["budget_used"])}
+            if budget is not None
+            else None
+        )
+        return JSONResponse(pack, headers=headers)
 
     @app.post("/api/capture")
     @write_limit

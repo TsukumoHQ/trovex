@@ -19,7 +19,11 @@ rm -f dist/*.whl
 uv build --wheel -o dist
 
 echo "== install wheel into a clean venv =="
-python3 -m venv "$venv"
+# pyproject requires-python >=3.11 -- plain `python3 -m venv` uses whatever
+# python3 is first on PATH (e.g. the macOS system 3.9), which fails the pip
+# install with a confusing ResolutionImpossible/no-matching-distribution
+# error instead of a clear version message. uv provisions/uses a real 3.11.
+uv venv --python 3.11 --seed --quiet "$venv"
 "$venv/bin/pip" install --quiet dist/*.whl
 
 echo "== trovex setup on a fresh CLAUDE_CONFIG_DIR (no mcp) =="

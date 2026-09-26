@@ -78,6 +78,9 @@ def distil_summary(transcript: str, *, prior: str = "") -> str | None:
     return md
 
 
+GATE_PROBE_CHARS = 4000  # tail of a transcript embedded for the gate
+
+
 def capture_state(
     store: SqliteStore,
     agent: str,
@@ -86,15 +89,64 @@ def capture_state(
     transcript: str = "",
     reason: str = "postcompact",
 ) -> dict:
+    """Upsert the agent's current-state record, gated by surprisal (steal #13).
+
+    The incoming text (the free summary, else the transcript tail) is embedded and
+    compared to the agent's own owner/<agent> records BEFORE any LLM call:
+    skip a near-duplicate, write the middle band (or a short capture) verbatim,
+    distil only what is novel AND long. A transcript-only capture (no free summary)
+    can only be skipped or distilled — a raw transcript is not a state record. See Settings.capture_* for the thresholds.
+    """
+    cfg = store.settings
     summary = (summary or "").strip()
-    # Free path takes the summary verbatim; transcript path distils (merging the
-    # existing record forward so truncation doesn't lose earlier state).
-    if not summary and transcript:
-        existing = store.get(f"owner-{agent}-current-state")
-        summary = distil_summary(transcript, prior=existing.content if existing else "") or ""
-    if len(summary) < 20:
+    transcript = (transcript or "").strip()
+    text = summary or transcript[-GATE_PROBE_CHARS:]
+    if len(text) < 20:
         return {"captured": False, "reason": "no durable signal"}
     doc_id = f"owner-{agent}-current-state"
+    existing = store.get(doc_id)
+    nearest = store.nearest_owner_record(
+        f"owner/{agent.lower()}", f"# {agent} — current state ({reason})\n\n{text}"
+    )
+    max_cos = nearest["cosine"] if nearest else None
+    if (
+        nearest
+        and cfg.capture_skip_cosine < 1.0  # 1.0 disables the gate
+        and max_cos > cfg.capture_skip_cosine
+    ):
+        decision = "skip"
+    elif len(text) < cfg.capture_distil_min_chars or (
+        max_cos is not None and max_cos >= cfg.capture_verbatim_cosine
+    ):
+        decision = "verbatim"
+    else:
+        decision = "distil"
+    if decision == "verbatim" and not summary:
+        decision = "distil"  # a raw transcript is never a state record: no free summary → distil
+    counts = store.log_capture_decision(
+        agent, decision, max_cos, nearest["ext_id"] if nearest else None, len(text)
+    )
+    gate = {
+        "decision": decision,
+        "max_cos": None if max_cos is None else round(max_cos, 4),
+        "counts": counts,
+    }
+    if decision == "skip":
+        return {
+            "captured": False,
+            "reason": "near-duplicate",
+            "nearest_doc_id": nearest["ext_id"],
+            **gate,
+        }
+    if decision == "distil":
+        # Summary path distils the (long, novel) summary; transcript path distils the
+        # transcript. Both merge the prior state forward. No key / error → the
+        # summary is kept as-is; a transcript with no distillation captures nothing.
+        prior = existing.content if existing else ""
+        distilled = distil_summary(summary or transcript, prior=prior)
+        summary = distilled or summary
+    if len(summary) < 20:
+        return {"captured": False, "reason": "no durable signal", **gate}
     content = f"# {agent} — current state ({reason})\n\n{summary}"
     store.put(
         content,
@@ -106,4 +158,4 @@ def capture_state(
     )
     from .tokens import count_tokens
 
-    return {"captured": True, "doc_id": doc_id, "tokens": count_tokens(content)}
+    return {"captured": True, "doc_id": doc_id, "tokens": count_tokens(content), **gate}

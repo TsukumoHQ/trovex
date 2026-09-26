@@ -485,6 +485,62 @@ class SqliteStore:
             return None  # a guard failure must never block a legit write
         return None
 
+    def nearest_owner_record(self, owner_tag: str, text: str) -> dict | None:
+        """Nearest ACTIVE record tagged `owner_tag` to `text` by cosine similarity
+        (the capture surprisal gate's probe): {ext_id, cosine} or None when the
+        owner has no records. The text is embedded transiently (no insert), and the
+        KNN is restricted to that owner's record rowids, so another agent's
+        near-identical state can never cause a skip. Never raises into the caller."""
+        try:
+            ids = [
+                r["id"]
+                for r in self.db.execute(
+                    """SELECT d.id FROM docs d JOIN doc_tags t ON t.doc_id = d.id
+                       WHERE t.tag = ? AND d.kind = 'record' AND d.lifecycle = 'active'
+                         AND d.source_id = ? ORDER BY d.mtime DESC LIMIT 200""",
+                    (owner_tag, TROVEX_SOURCE_ID),
+                )
+            ]
+            if not ids:
+                return None
+            emb = next(iter(self.embedder.embed([text[:8000]])))
+            qv = sqlite_vec.serialize_float32(emb.tolist())
+            ph = ",".join("?" * len(ids))
+            with self._lock:
+                row = self.db.execute(
+                    f"""SELECT d.ext_id, v.distance FROM vec_docs v JOIN docs d ON d.id = v.rowid
+                        WHERE v.embedding MATCH ? AND k = {len(ids)} AND v.rowid IN ({ph})
+                        ORDER BY v.distance LIMIT 1""",  # sql-safe: placeholders + int len
+                    (qv, *ids),
+                ).fetchone()
+            return {"ext_id": row["ext_id"], "cosine": 1.0 - row["distance"]} if row else None
+        except Exception:
+            return None  # a gate failure must never block a capture
+
+    def log_capture_decision(
+        self,
+        agent: str,
+        decision: str,
+        max_cos: float | None,
+        nearest_doc_id: str | None,
+        chars: int,
+    ) -> dict:
+        """Record one gated capture and return the running {skip, verbatim, distil}
+        counts (all rows, so they survive a restart)."""
+        with self._lock:
+            self.db.execute(
+                "INSERT INTO capture_decisions(ts, agent, decision, max_cos, nearest_doc_id, chars)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (time.time(), agent, decision, max_cos, nearest_doc_id, chars),
+            )
+            self.db.commit()
+            counts = {"skip": 0, "verbatim": 0, "distil": 0}
+            for r in self.db.execute(
+                "SELECT decision, COUNT(*) AS n FROM capture_decisions GROUP BY decision"
+            ):
+                counts[r["decision"]] = r["n"]
+        return counts
+
     def get(self, ext_id: str) -> StoredDoc | None:
         row = self.db.execute(
             """SELECT d.ext_id, d.title, d.content, d.kind, d.status, d.tokens_est,

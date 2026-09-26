@@ -74,6 +74,16 @@ class Settings(BaseSettings):
     # an unrelated later read as if it answered this query.
     used_label_window_minutes: int = 30
 
+    # Capture surprisal gate (env TROVEX_CAPTURE_*): a capture is embedded and
+    # compared to the agent's own owner/<agent> records BEFORE any LLM call.
+    #   max cosine > capture_skip_cosine        -> skip (says nothing new; 1.0 disables)
+    #   max cosine >= capture_verbatim_cosine   -> write verbatim, no distiller
+    #   shorter than capture_distil_min_chars   -> write verbatim, no distiller
+    #   otherwise (novel AND long)              -> distil
+    capture_skip_cosine: float = 0.95
+    capture_verbatim_cosine: float = 0.80
+    capture_distil_min_chars: int = 1500
+
     # Doc-version history depth (env TROVEX_DOC_VERSION_CAP): how many prior
     # content snapshots an owned doc keeps. Each overwrite snapshots the previous
     # body (non-clobber, degrade-not-delete), so a bad save is recoverable via

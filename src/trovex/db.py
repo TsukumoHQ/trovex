@@ -1507,6 +1507,18 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             ON docs(workspace_id, canonical_topic)
             WHERE status = 'canonical' AND canonical_topic IS NOT NULL;
 
+        -- Capture surprisal gate: one row per gated capture (skip|verbatim|distil),
+        -- so the decision mix is auditable and survives a restart.
+        CREATE TABLE IF NOT EXISTS capture_decisions (
+            id INTEGER PRIMARY KEY,
+            ts REAL NOT NULL,
+            agent TEXT NOT NULL,
+            decision TEXT NOT NULL,
+            max_cos REAL,
+            nearest_doc_id TEXT,
+            chars INTEGER NOT NULL DEFAULT 0
+        );
+
         CREATE TABLE IF NOT EXISTS index_runs (
             id INTEGER PRIMARY KEY,
             ts REAL NOT NULL,

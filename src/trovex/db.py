@@ -1,5 +1,7 @@
+import asyncio
 import hashlib
 import logging
+import os
 import re
 import sqlite3
 import time
@@ -18,6 +20,19 @@ LIKE_ESCAPE_CHAR = "\\"
 # open transaction is blocking it. Force one and warn so it shows up in logs
 # instead of silently growing until a write finally hits "database is locked".
 WAL_WARN_BYTES = 10 * 1024 * 1024
+
+# wal_autocheckpoint, in pages (SQLite's own default is 1000 ≈ 4MB at the
+# standard 4096-byte page size). Set explicitly rather than left implicit so
+# it's documented and can't silently drift from what WAL_WARN_BYTES assumes:
+# every write already runs sqlite's own automatic PASSIVE checkpoint at this
+# threshold, keeping the WAL small and routine so checkpoint_if_wal_large's
+# 10MB forced path — the one that took ~60s in prod under disk contention,
+# task 20afcaf7 — becomes a rare last resort instead of the normal case.
+WAL_AUTOCHECKPOINT_PAGES = 1000
+
+# How often run_wal_checkpoint_timer ticks (task 20afcaf7 r4): the sole owner
+# of file-shrinking (TRUNCATE) checkpoints, off the request path. 0 disables it.
+WAL_CHECKPOINT_POLL_SEC = float(os.environ.get("TROVEX_WAL_CHECKPOINT_POLL_SEC", "30"))
 
 # Kinds that are their OWN event/snapshot and never take part in SSOT collapse —
 # kept in sync with Settings.dup_ephemeral_kinds (config.py). Duplicated here as a
@@ -67,6 +82,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     # 30s: the reindex writes the whole corpus in one ~25s transaction; a chunk
     # write or backfill racing it must wait that out, not fail at 5s.
     conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute(f"PRAGMA wal_autocheckpoint={WAL_AUTOCHECKPOINT_PAGES}")  # sql-safe: module constant, no user input; PRAGMA doesn't accept bound params
     try:
         conn.enable_load_extension(True)
         sqlite_vec.load(conn)
@@ -127,6 +143,25 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     return conn
 
 
+# Backoff after a forced checkpoint attempt (success OR deferred), keyed by
+# db_path so independent stores in one process back off independently.
+# PASSIVE never shrinks the WAL FILE itself (only TRUNCATE does — now the
+# periodic timer's job, see run_wal_checkpoint_timer) — so once the file's
+# high-water mark crosses WAL_WARN_BYTES, a size-only gate re-forces on every
+# single write FOREVER even when each attempt succeeds cleanly, because the
+# file size that triggered it never drops. Back off after every attempt,
+# not just a deferred (locked) one (task 20afcaf7 r4, live repro 2026-09-26
+# 23:15-23:17Z: same 68548592-byte WAL, forcing/deferring every ~45s,
+# /healthz + trovex_write stalls in that window; root cause confirmed
+# 23:23Z: a 77MB high-water-mark file held only ~1.3MB of real pending
+# content). Exponential, capped at 10 minutes; the only way this fully
+# clears is the file itself dropping back under threshold, which now only
+# the periodic timer's TRUNCATE can do.
+_CHECKPOINT_BACKOFF_BASE_SECS = 30.0
+_CHECKPOINT_BACKOFF_CAP_SECS = 600.0
+_checkpoint_backoff: dict[str, tuple[float, float]] = {}  # str(db_path) -> (next_attempt_at, backoff_secs)
+
+
 def checkpoint_if_wal_large(conn: sqlite3.Connection, db_path: Path) -> None:
     """Force a WAL checkpoint if trovex.db-wal has grown past WAL_WARN_BYTES.
 
@@ -150,17 +185,99 @@ def checkpoint_if_wal_large(conn: sqlite3.Connection, db_path: Path) -> None:
     without waiting on anyone and returns immediately either way — it may
     leave the WAL only partially truncated under sustained load, but it never
     blocks the write path."""
+    key = str(db_path)
     try:
         wal_path = db_path.with_name(db_path.name + "-wal")
         size = wal_path.stat().st_size
         if size <= WAL_WARN_BYTES:
+            _checkpoint_backoff.pop(key, None)
             return
+        now = time.monotonic()
+        next_attempt_at, backoff = _checkpoint_backoff.get(key, (0.0, 0.0))
+        if now < next_attempt_at:
+            return  # still backing off a prior attempt; the file is still oversized either way
         log.warning("trovex.db WAL at %d bytes (> %d), forcing checkpoint", size, WAL_WARN_BYTES)
-        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        try:
+            t0 = time.monotonic()
+            row = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+            duration_ms = (time.monotonic() - t0) * 1000
+            # wal_checkpoint's result row is (busy, log_pages, checkpointed_pages);
+            # busy=1 means PASSIVE stopped early on a lock it wouldn't wait for —
+            # still logged (not an error, see the PASSIVE-vs-TRUNCATE note above).
+            busy, log_pages, checkpointed_pages = row[0], row[1], row[2]
+            log.warning(
+                "wal checkpoint mode=PASSIVE busy=%d log_pages=%d checkpointed_pages=%d duration_ms=%.1f",
+                busy,
+                log_pages,
+                checkpointed_pages,
+                duration_ms,
+            )
+        except sqlite3.Error as e:
+            log.warning("wal checkpoint deferred: %s", e)
+        # Back off regardless of outcome: PASSIVE — success or deferred — never
+        # shrinks the FILE, so the size check above would otherwise re-fire on
+        # the very next write either way.
+        backoff = min(_CHECKPOINT_BACKOFF_CAP_SECS, max(_CHECKPOINT_BACKOFF_BASE_SECS, backoff * 2))
+        _checkpoint_backoff[key] = (time.monotonic() + backoff, backoff)
     except OSError:
         pass
+
+
+def periodic_checkpoint_tick(conn: sqlite3.Connection, db_path: Path) -> tuple[int, int, int] | None:
+    """One tick of the periodic WAL-checkpoint timer (task 20afcaf7 r4 root
+    cause, measured 2026-09-26 23:23Z): checkpoint_if_wal_large's per-write
+    backstop gates on the WAL FILE's size, but a PASSIVE checkpoint never
+    shrinks that file — only TRUNCATE does, and only when nothing holds an
+    older snapshot. So once the file's high-water mark crosses WAL_WARN_BYTES
+    it stays there, and every subsequent write re-attempts a checkpoint
+    forever even when the WAL's actual pending content is tiny (e.g. a 77MB
+    file holding ~1.3MB / 323 frames of real content).
+
+    This runs off the request path entirely, on a fixed interval, regardless
+    of file size: always PASSIVE (never blocks); TRUNCATE only when PASSIVE
+    reports zero pending frames (log_pages == 0 — nothing left an older
+    snapshot could still need), so the file's disk footprint actually shrinks
+    without ever contending with a live reader. Returns None if deferred
+    (locked) — never raises, this must not crash the timer loop.
+
+    A TRUNCATE that actually shrinks the file clears checkpoint_if_wal_large's
+    backoff for this db_path: the condition that started the backoff (a
+    permanently-oversized file) is gone, so the write-path backstop goes back
+    to normal instead of staying capped at its last backoff for up to 10
+    minutes after a real cleanup."""
+    try:
+        wal_path = db_path.with_name(db_path.name + "-wal")
+        size_before = wal_path.stat().st_size if wal_path.exists() else 0
+        row = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+        busy, log_pages, checkpointed_pages = row[0], row[1], row[2]
+        if log_pages == 0:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            size_after = wal_path.stat().st_size if wal_path.exists() else 0
+            if size_after < size_before:
+                _checkpoint_backoff.pop(str(db_path), None)
+        return busy, log_pages, checkpointed_pages
+    except OSError:
+        return None
     except sqlite3.Error as e:
-        log.warning("wal checkpoint deferred: %s", e)
+        log.debug("periodic wal checkpoint tick deferred: %s", e)
+        return None
+
+
+async def run_wal_checkpoint_timer(conn: sqlite3.Connection, db_path: Path, interval_sec: float) -> None:
+    """Background task (started at app startup, see server.lifespan): the sole
+    owner of file-shrinking WAL checkpoints now — see periodic_checkpoint_tick.
+    Runs the (potentially briefly blocking, on TRUNCATE) tick in a worker
+    thread via off_loop so a slow tick never touches the event loop."""
+    from . import offload
+
+    if interval_sec <= 0:
+        return
+    while True:
+        await asyncio.sleep(interval_sec)
+        try:
+            await offload.off_loop(periodic_checkpoint_tick, conn, db_path)
+        except TimeoutError:
+            log.warning("periodic wal checkpoint tick timed out")
 
 
 def upsert_docs_fts(conn: sqlite3.Connection, doc_id: int, title: str, body: str) -> None:

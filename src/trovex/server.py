@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import secrets
+import sqlite3
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,7 +32,7 @@ from . import savings as savings_mod
 from . import usearch_index
 from .boot import BOOT_Q_MAX, BOOT_QUERY, boot_pointers
 from .capture import capture_state
-from .db import like_escape
+from .db import WAL_CHECKPOINT_POLL_SEC, like_escape, run_wal_checkpoint_timer
 from .markdown import PYGMENTS_CSS, render_markdown
 from .mcp_app import mcp
 from .state import get_state
@@ -322,11 +323,19 @@ async def lifespan(app: FastAPI):
     # than stay wedged indefinitely — automates the manual `launchctl kickstart`
     # mitigation. Cancelled on shutdown along with everything else in `async with`.
     watchdog_task = asyncio.create_task(offload.run_watchdog())
+    # task 20afcaf7 r4: the sole owner of file-shrinking WAL checkpoints, off
+    # the request path entirely — see db.run_wal_checkpoint_timer's docstring.
+    wal_checkpoint_task = asyncio.create_task(
+        run_wal_checkpoint_timer(
+            state.store.db, state.settings.data_dir / "trovex.db", WAL_CHECKPOINT_POLL_SEC
+        )
+    )
     try:
         async with mcp.session_manager.run():
             yield
     finally:
         watchdog_task.cancel()
+        wal_checkpoint_task.cancel()
         state.applier.stop()
 
 
@@ -426,11 +435,7 @@ def build_app() -> FastAPI:
 
     # ── HTML pages ───────────────────────────────────────────────────
 
-    @app.get("/", response_class=HTMLResponse)
-    async def home(request: Request) -> HTMLResponse:
-        state = get_state()
-        db = state.searcher.db
-
+    def _compute_home_context(db: sqlite3.Connection, state: Any) -> dict:
         total = db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
         total_tokens = db.execute("SELECT COALESCE(SUM(tokens_est), 0) AS t FROM docs").fetchone()[
             "t"
@@ -522,32 +527,40 @@ def build_app() -> FastAPI:
         ).fetchone()["c"]
 
         sources = _sources_meta(db)
-        return templates.TemplateResponse(
-            request,
-            "home.html",
-            {
-                "total": total,
-                "total_tokens": total_tokens,
-                "avg_tokens": avg_tokens,
-                "by_status": by_status,
-                "last_run": last_run,
-                "last_run_relative": last_run_relative,
-                "last_write_relative": last_write_relative,
-                "recent": recent,
-                "attention": attention,
-                "heaviest": heaviest,
-                "corpus_path": str(state.settings.project_root),
-                "by_user": by_user_rows,
-                "recent_queries": recent_queries,
-                "total_queries_7d": total_queries_7d,
-                "has_any_queries": total_queries_7d > 0 or len(by_user_rows) > 0,
-                "savings_totals": savings_totals,
-                "savings_spark": savings_spark,
-                "saved_delta_pct": saved_delta_pct,
-                "docs_written_7d": docs_written_7d,
-                "sources": sources,
-            },
-        )
+        return {
+            "total": total,
+            "total_tokens": total_tokens,
+            "avg_tokens": avg_tokens,
+            "by_status": by_status,
+            "last_run": last_run,
+            "last_run_relative": last_run_relative,
+            "last_write_relative": last_write_relative,
+            "recent": recent,
+            "attention": attention,
+            "heaviest": heaviest,
+            "corpus_path": str(state.settings.project_root),
+            "by_user": by_user_rows,
+            "recent_queries": recent_queries,
+            "total_queries_7d": total_queries_7d,
+            "has_any_queries": total_queries_7d > 0 or len(by_user_rows) > 0,
+            "savings_totals": savings_totals,
+            "savings_spark": savings_spark,
+            "saved_delta_pct": saved_delta_pct,
+            "docs_written_7d": docs_written_7d,
+            "sources": sources,
+        }
+
+    @app.get("/", response_class=HTMLResponse)
+    async def home(request: Request) -> HTMLResponse:
+        """Wedge-class-2 (task 20afcaf7 r3): this HTML dashboard did ~10 db calls
+        inline on the event loop, same bug class as /api/map and /api/stats —
+        a slow one (e.g. blocked behind a forced WAL checkpoint) would freeze
+        /healthz along with it. off_loop like every route below."""
+        state = get_state()
+        context, timeout_resp = await _offloaded(_compute_home_context, state.searcher.db, state)
+        if timeout_resp is not None:
+            return timeout_resp
+        return templates.TemplateResponse(request, "home.html", context)
 
     @app.get("/search", response_class=HTMLResponse)
     @search_limit
@@ -562,7 +575,7 @@ def build_app() -> FastAPI:
     ) -> HTMLResponse:
         # Dedicated search page over the trovex store (hybrid vector + BM25), not a
         # redirect to /store — search is trovex's core verb and deserves its own surface.
-        return _render_search(
+        return await _render_search(
             request, templates, q, summary, partial=False, tags=tag, kind=kind, sort=sort, page=page
         )
 
@@ -579,7 +592,7 @@ def build_app() -> FastAPI:
     ) -> HTMLResponse:
         # Same embed+fusion cost as /search (a paid embed call per hit) — MUST carry the
         # same rate-limit + q length cap, else an anon client loops it to burn OpenAI spend.
-        return _render_search(
+        return await _render_search(
             request, templates, q, summary, partial=True, tags=tag, kind=kind, sort=sort, page=page
         )
 
@@ -602,14 +615,29 @@ def build_app() -> FastAPI:
         # charset → 422 on anything malformed, before it reaches the LIKE query.
         if qpath and (len(qpath) > MAX_QPATH_LEN or not QPATH_RE.match(qpath)):
             return JSONResponse({"error": f"invalid qpath: {_redact(qpath)!r}"}, status_code=422)
-        trovex_data = _docs_query(qpath, status, sort, limit, source)
+        # Wedge-class-2 (task 20afcaf7 r3): off_loop like every route above.
+        trovex_data, timeout_resp = await _offloaded(_docs_query, qpath, status, sort, limit, source)
+        if timeout_resp is not None:
+            return timeout_resp
         return templates.TemplateResponse(request, "_docs_table.html", trovex_data)
+
+    def _compute_doc_view(store: Any, ext_id: str) -> tuple[Any, str | None, Any]:
+        doc = store.get(ext_id)
+        if doc is None:
+            return None, None, None
+        body_html, toc = render_markdown(doc.content)
+        return doc, body_html, toc
 
     @app.get("/doc/{ext_id}", response_class=HTMLResponse)
     async def doc_view(request: Request, ext_id: str) -> HTMLResponse:
         """Render a trovex-owned doc's content — how humans read what agents store
-        (no local file; the frontend is the human surface)."""
-        doc = get_state().store.get(ext_id)
+        (no local file; the frontend is the human surface). Wedge-class-2 (task
+        20afcaf7 r3): store.get + markdown render off_loop'd like every route above."""
+        (doc, body_html, toc), timeout_resp = await _offloaded(
+            _compute_doc_view, get_state().store, ext_id
+        )
+        if timeout_resp is not None:
+            return timeout_resp
         if doc is None:
             from html import escape
 
@@ -628,7 +656,6 @@ def build_app() -> FastAPI:
                 "<a href='/store'>browse all docs</a></p></div></body></html>",
                 status_code=404,
             )
-        body_html, toc = render_markdown(doc.content)
         return templates.TemplateResponse(
             request,
             "doc.html",
@@ -648,20 +675,9 @@ def build_app() -> FastAPI:
             return timeout_resp
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
 
-    @app.get("/store", response_class=HTMLResponse)
-    async def store_page(
-        request: Request,
-        tag: str = "",
-        kind: str = "",
-        collection: str = "",
-        q: str = Query("", max_length=200),
-        page: int = 1,
-    ) -> HTMLResponse:
-        """The trovex-owned doc store — browse + quick title/text filter. Semantic
-        search lives on /search (this `q` is a lightweight view filter, paginated
-        like the rest of the browse)."""
-        state = get_state()
-        store = state.store
+    def _compute_store_context(
+        store: Any, tag: str, kind: str, collection: str, q: str, page: int
+    ) -> dict:
         now = _now()
         f_tag, f_kind = tag, kind
         if collection:
@@ -669,7 +685,7 @@ def build_app() -> FastAPI:
             f_tag = cf.get("tag", f_tag)
             f_kind = cf.get("kind", f_kind)
         page = max(1, page)
-        per = state.settings.store_page_size
+        per = get_state().settings.store_page_size
 
         def card(d, snippet):
             return {
@@ -692,28 +708,49 @@ def build_app() -> FastAPI:
         pages = (total + per - 1) // per
 
         facets, other_tags = store.tags_by_facet()
-        return templates.TemplateResponse(
-            request,
-            "store.html",
-            {
-                "items": items,
-                "total": total,
-                "total_tokens": sum(i["tokens_est"] for i in items),
-                "facets": facets,
-                "other_tags": other_tags,
-                "collections": store.list_collections(),
-                "active_tag": tag,
-                "active_kind": kind,
-                "active_collection": collection,
-                "q": q,
-                "page": page,
-                "pages": pages,
-            },
+        return {
+            "items": items,
+            "total": total,
+            "total_tokens": sum(i["tokens_est"] for i in items),
+            "facets": facets,
+            "other_tags": other_tags,
+            "collections": store.list_collections(),
+            "active_tag": tag,
+            "active_kind": kind,
+            "active_collection": collection,
+            "q": q,
+            "page": page,
+            "pages": pages,
+        }
+
+    @app.get("/store", response_class=HTMLResponse)
+    async def store_page(
+        request: Request,
+        tag: str = "",
+        kind: str = "",
+        collection: str = "",
+        q: str = Query("", max_length=200),
+        page: int = 1,
+    ) -> HTMLResponse:
+        """The trovex-owned doc store — browse + quick title/text filter. Semantic
+        search lives on /search (this `q` is a lightweight view filter, paginated
+        like the rest of the browse). Wedge-class-2 (task 20afcaf7 r3): off_loop
+        like every route above."""
+        context, timeout_resp = await _offloaded(
+            _compute_store_context, get_state().store, tag, kind, collection, q, page
         )
+        if timeout_resp is not None:
+            return timeout_resp
+        return templates.TemplateResponse(request, "store.html", context)
 
     @app.get("/api/collections")
     async def api_collections() -> JSONResponse:
-        return JSONResponse(get_state().store.list_collections())
+        # Off the loop (wedge class 2, task 20afcaf7): a store read stuck behind
+        # disk-contended write traffic must not stall the event loop either.
+        result, timeout_resp = await _offloaded(get_state().store.list_collections)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.post("/api/collections")
     @write_limit
@@ -745,7 +782,11 @@ def build_app() -> FastAPI:
 
     @app.get("/api/doc/{ext_id}/versions")
     async def api_doc_versions(ext_id: str) -> JSONResponse:
-        return JSONResponse(get_state().store.list_versions(ext_id))
+        # Off the loop (wedge class 2, task 20afcaf7).
+        result, timeout_resp = await _offloaded(get_state().store.list_versions, ext_id)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.post("/api/doc/{ext_id}/restore")
     @write_limit
@@ -774,7 +815,11 @@ def build_app() -> FastAPI:
     @app.get("/api/tombstones")
     async def api_tombstones() -> JSONResponse:
         """Deleted owned docs still recoverable from their tombstones (read-only)."""
-        return JSONResponse(get_state().store.list_tombstones())
+        # Off the loop (wedge class 2, task 20afcaf7).
+        result, timeout_resp = await _offloaded(get_state().store.list_tombstones)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.post("/api/doc/{ext_id}/undelete")
     @write_limit
@@ -926,7 +971,12 @@ def build_app() -> FastAPI:
         try:
             from .usage import log_pointer_query
 
-            log_pointer_query(
+            # Off the loop (wedge class 2, task 20afcaf7): this INSERT ran
+            # inline here even though the main recall above is already
+            # off-loaded — a slow write (disk contention, a forced checkpoint)
+            # would still stall the loop right after boot's own fast path.
+            await offload.off_loop(
+                log_pointer_query,
                 get_state().searcher.db,
                 source="prompt" if q else "boot",
                 agent=agent,
@@ -980,35 +1030,42 @@ def build_app() -> FastAPI:
             return JSONResponse({"captured": False, "reason": "capture timed out"}, status_code=504)
         return JSONResponse(result)
 
-    @app.get("/api/map")
-    async def api_map(canonical_only: bool = True) -> JSONResponse:
-        """The 'map' of the store: titles + tags + status, no content. Cheap enough
-        to inject at session start so an agent *sees the territory* and knows what
-        it can ask trovex for — turning an unknown-unknown into a queryable target."""
+    def _compute_map(canonical_only: bool) -> dict:
         store = get_state().store
         docs = store.list_docs(limit=2000)
         if canonical_only:
             docs = [d for d in docs if d.status not in ("stale", "duplicate")]
-        return JSONResponse(
-            {
-                "count": len(docs),
-                "docs": [
-                    {
-                        "id": d.ext_id,
-                        "title": d.title,
-                        "kind": d.kind,
-                        "status": d.status,
-                        "tags": d.tags,
-                    }
-                    for d in docs
-                ],
-            }
-        )
+        return {
+            "count": len(docs),
+            "docs": [
+                {
+                    "id": d.ext_id,
+                    "title": d.title,
+                    "kind": d.kind,
+                    "status": d.status,
+                    "tags": d.tags,
+                }
+                for d in docs
+            ],
+        }
 
-    @app.get("/api/stats")
-    async def api_stats() -> JSONResponse:
-        state = get_state()
-        db = state.searcher.db
+    @app.get("/api/map")
+    async def api_map(canonical_only: bool = True) -> JSONResponse:
+        """The 'map' of the store: titles + tags + status, no content. Cheap enough
+        to inject at session start so an agent *sees the territory* and knows what
+        it can ask trovex for — turning an unknown-unknown into a queryable target.
+
+        Wedge-class-2 (task 20afcaf7): this read hit the store directly inline on
+        the event loop, same bug class as the capture/doc-mutation routes fixed by
+        33ca98a/f2b4c872 — a slow store call (e.g. one blocked behind a forced WAL
+        checkpoint under disk contention) would freeze /healthz along with it.
+        off_loop like every other store-touching route now."""
+        result, timeout_resp = await _offloaded(_compute_map, canonical_only)
+        if timeout_resp is not None:
+            return timeout_resp
+        return JSONResponse(result)
+
+    def _compute_stats(db: sqlite3.Connection, usearch_partitions: set[str]) -> dict:
         total = db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
         total_tokens = db.execute("SELECT COALESCE(SUM(tokens_est), 0) AS t FROM docs").fetchone()[
             "t"
@@ -1021,7 +1078,6 @@ def build_app() -> FastAPI:
         # the same number capacity.log_capacity_warnings acts on — a partition
         # already on the usearch escape hatch is marked `usearch: true` instead
         # of a ceiling ratio (that specific risk no longer applies to it).
-        usearch_partitions = set(state.settings.usearch_partitions)
         capacity_by_partition = [
             {
                 "source_id": src,
@@ -1032,14 +1088,24 @@ def build_app() -> FastAPI:
             }
             for src, c in sorted(capacity.partition_counts(db).items())
         ]
-        return JSONResponse(
-            {
-                "total": total,
-                "total_tokens": total_tokens,
-                "by_status": by_status,
-                "capacity": capacity_by_partition,
-            }
+        return {
+            "total": total,
+            "total_tokens": total_tokens,
+            "by_status": by_status,
+            "capacity": capacity_by_partition,
+        }
+
+    @app.get("/api/stats")
+    async def api_stats() -> JSONResponse:
+        """Wedge-class-2 (task 20afcaf7): see _compute_map's docstring — same
+        direct-inline-on-the-event-loop bug, off_loop'd for the same reason."""
+        state = get_state()
+        result, timeout_resp = await _offloaded(
+            _compute_stats, state.searcher.db, set(state.settings.usearch_partitions)
         )
+        if timeout_resp is not None:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.post("/api/reindex")
     @write_limit
@@ -1062,9 +1128,18 @@ def build_app() -> FastAPI:
         # (processing) — see index_jobs.py.
         from . import index_jobs
 
-        result = index_jobs.enqueue(
-            state.indexer.db, state.index_jobs_lock, "rebuild" if full else "scan_source", full=full
+        # Off the loop (wedge class 2, task 20afcaf7): enqueue does a BEGIN
+        # IMMEDIATE write under state.index_jobs_lock — same disk-contention
+        # exposure as every other write route here.
+        result, timeout_resp = await _offloaded(
+            index_jobs.enqueue,
+            state.indexer.db,
+            state.index_jobs_lock,
+            "rebuild" if full else "scan_source",
+            full=full,
         )
+        if timeout_resp:
+            return timeout_resp
         state.applier.notify()
         return JSONResponse(
             {"job_id": result["job_id"], "position": result["position"], "coalesced": result["coalesced"]},
@@ -1075,7 +1150,10 @@ def build_app() -> FastAPI:
     async def api_reindex_status(job_id: int) -> JSONResponse:
         from . import index_jobs
 
-        job = index_jobs.get_job(get_state().indexer.db, job_id)
+        # Off the loop (wedge class 2, task 20afcaf7).
+        job, timeout_resp = await _offloaded(index_jobs.get_job, get_state().indexer.db, job_id)
+        if timeout_resp:
+            return timeout_resp
         if job is None:
             return JSONResponse({"error": "no such job"}, status_code=404)
         return JSONResponse(job)
@@ -1084,52 +1162,73 @@ def build_app() -> FastAPI:
     async def healthz() -> str:
         return "ok"
 
-    @app.get("/settings", response_class=HTMLResponse)
-    async def settings_page(request: Request) -> HTMLResponse:
+    def _compute_settings_context(db: sqlite3.Connection, state: Any) -> dict:
         from . import backup as backup_mod
 
-        state = get_state()
-        db = state.searcher.db
         db_path = state.settings.data_dir / "trovex.db"
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {
-                "db_size": db_path.stat().st_size if db_path.exists() else 0,
-                "doc_count": db.execute(
-                    "SELECT COUNT(*) AS c FROM docs WHERE source_id='trovex'"
-                ).fetchone()["c"],
-                "chunk_count": db.execute("SELECT COUNT(*) AS c FROM chunks").fetchone()["c"],
-                "auth_on": bool(state.settings.write_token),
-                "backups": backup_mod.list_backups(state.settings.data_dir),
-            },
+        return {
+            "db_size": db_path.stat().st_size if db_path.exists() else 0,
+            "doc_count": db.execute(
+                "SELECT COUNT(*) AS c FROM docs WHERE source_id='trovex'"
+            ).fetchone()["c"],
+            "chunk_count": db.execute("SELECT COUNT(*) AS c FROM chunks").fetchone()["c"],
+            "auth_on": bool(state.settings.write_token),
+            "backups": backup_mod.list_backups(state.settings.data_dir),
+        }
+
+    @app.get("/settings", response_class=HTMLResponse)
+    async def settings_page(request: Request) -> HTMLResponse:
+        """Wedge-class-2 (task 20afcaf7 r3): off_loop like every route above."""
+        state = get_state()
+        context, timeout_resp = await _offloaded(
+            _compute_settings_context, state.searcher.db, state
         )
+        if timeout_resp is not None:
+            return timeout_resp
+        return templates.TemplateResponse(request, "settings.html", context)
 
     @app.get("/api/backups")
     async def api_backups() -> JSONResponse:
+        # Wedge-class-2 (task 20afcaf7 r3): backup_mod.list_backups globs the
+        # backups dir and stat()s every file — off_loop like every route above.
         from . import backup as backup_mod
 
-        return JSONResponse(backup_mod.list_backups(get_state().settings.data_dir))
+        result, timeout_resp = await _offloaded(
+            backup_mod.list_backups, get_state().settings.data_dir
+        )
+        if timeout_resp is not None:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.post("/api/backup")
     @write_limit
     async def api_backup(request: Request) -> JSONResponse:
         if not _write_authorized(request):
             return _unauthorized()
+        # Wedge-class-2 (task 20afcaf7 r3): the exact stall class this whole
+        # ticket is about — a PASSIVE checkpoint + Connection.backup() over the
+        # full ~340MB store, inline on the event loop until now. off_loop it.
         from . import backup as backup_mod
 
         state = get_state()
-        dest = backup_mod.make_backup(
-            state.settings.data_dir / "trovex.db", state.settings.data_dir
+        dest, timeout_resp = await _offloaded(
+            backup_mod.make_backup, state.settings.data_dir / "trovex.db", state.settings.data_dir
         )
+        if timeout_resp is not None:
+            return timeout_resp
         return JSONResponse({"ok": True, "file": dest.name})
 
     # ── Install page + hook downloads ────────────────────────────────
 
+    def _compute_doc_total(db: sqlite3.Connection) -> int:
+        return db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+
     @app.get("/install", response_class=HTMLResponse)
     async def install_page(request: Request) -> HTMLResponse:
-        state = get_state()
-        total = state.searcher.db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
+        """Wedge-class-2 (task 20afcaf7 r3): off_loop like every route above."""
+        total, timeout_resp = await _offloaded(_compute_doc_total, get_state().searcher.db)
+        if timeout_resp is not None:
+            return timeout_resp
         return templates.TemplateResponse(request, "install.html", {"total": total})
 
     @app.get("/api/write-token")
@@ -1169,16 +1268,9 @@ def build_app() -> FastAPI:
 
     # ── Usage page ───────────────────────────────────────────────────
 
-    @app.get("/usage", response_class=HTMLResponse)
-    async def usage_page(
-        request: Request,
-        user: str = "",
-        days: int = 7,
-    ) -> HTMLResponse:
+    def _compute_usage_context(db: sqlite3.Connection, user: str, days: int) -> dict:
         from datetime import datetime, timezone
 
-        state = get_state()
-        db = state.searcher.db
         days = max(1, min(90, int(days)))
         since = _now() - days * 86400
 
@@ -1245,26 +1337,33 @@ def build_app() -> FastAPI:
         avg_elapsed = sum(r["elapsed_ms"] for r in queries) / total_queries if total_queries else 0
         unique_users = len({r["user"] for r in queries})
 
-        return templates.TemplateResponse(
-            request,
-            "usage.html",
-            {
-                "buckets": buckets,
-                "per_user": per_user,
-                "users": users,
-                "user": user,
-                "days": days,
-                "total_queries": total_queries,
-                "total_tokens": total_tokens,
-                "avg_elapsed": int(avg_elapsed),
-                "unique_users": unique_users,
-            },
-        )
+        return {
+            "buckets": buckets,
+            "per_user": per_user,
+            "users": users,
+            "user": user,
+            "days": days,
+            "total_queries": total_queries,
+            "total_tokens": total_tokens,
+            "avg_elapsed": int(avg_elapsed),
+            "unique_users": unique_users,
+        }
 
-    @app.get("/insights", response_class=HTMLResponse)
-    async def insights_page(request: Request, days: int = 7) -> HTMLResponse:
-        state = get_state()
-        db = state.searcher.db
+    @app.get("/usage", response_class=HTMLResponse)
+    async def usage_page(
+        request: Request,
+        user: str = "",
+        days: int = 7,
+    ) -> HTMLResponse:
+        """Wedge-class-2 (task 20afcaf7 r3): off_loop like every route above."""
+        context, timeout_resp = await _offloaded(
+            _compute_usage_context, get_state().searcher.db, user, days
+        )
+        if timeout_resp is not None:
+            return timeout_resp
+        return templates.TemplateResponse(request, "usage.html", context)
+
+    def _compute_insights_context(db: sqlite3.Connection, days: int) -> dict:
         days = max(1, min(90, int(days)))
         since = _now() - days * 86400
         now = _now()
@@ -1292,21 +1391,27 @@ def build_app() -> FastAPI:
         heatmap = insights_mod.hour_heatmap(db, since)
         rerank = insights_mod.rerank_stats(db, since)
         divergence = insights_mod.rerank_divergence(db, since)
-        return templates.TemplateResponse(
-            request,
-            "insights.html",
-            {
-                "days": days,
-                "top_q": top_q,
-                "failed": failed,
-                "repeated": repeated,
-                "most_returned": most_returned,
-                "dead": dead,
-                "heatmap": heatmap,
-                "rerank": rerank,
-                "divergence": divergence,
-            },
+        return {
+            "days": days,
+            "top_q": top_q,
+            "failed": failed,
+            "repeated": repeated,
+            "most_returned": most_returned,
+            "dead": dead,
+            "heatmap": heatmap,
+            "rerank": rerank,
+            "divergence": divergence,
+        }
+
+    @app.get("/insights", response_class=HTMLResponse)
+    async def insights_page(request: Request, days: int = 7) -> HTMLResponse:
+        """Wedge-class-2 (task 20afcaf7 r3): off_loop like every route above."""
+        context, timeout_resp = await _offloaded(
+            _compute_insights_context, get_state().searcher.db, days
         )
+        if timeout_resp is not None:
+            return timeout_resp
+        return templates.TemplateResponse(request, "insights.html", context)
 
     @app.get("/api/suggest")
     async def api_suggest(q: str = Query("", max_length=200)) -> JSONResponse:
@@ -1314,29 +1419,32 @@ def build_app() -> FastAPI:
         db = state.searcher.db
         # Log the query truncated (finding 8) — never the full user text.
         log.debug("suggest q=%r", _redact(q))
-        return JSONResponse(insights_mod.suggest_queries(db, q))
+        # Off the loop (wedge class 2, task 20afcaf7).
+        result, timeout_resp = await _offloaded(insights_mod.suggest_queries, db, q)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
+
+    def _compute_savings_page_context(db: sqlite3.Connection, days: int) -> dict:
+        days = max(1, min(90, int(days)))
+        since = _now() - days * 86400
+        return {
+            "totals": savings_mod.totals(db, since),
+            "per_user": savings_mod.per_user(db, since),
+            "daily": savings_mod.daily_series(db, since, _now()),
+            "top_queries": savings_mod.top_queries(db, since, limit=10),
+            "days": days,
+        }
 
     @app.get("/savings", response_class=HTMLResponse)
     async def savings_page(request: Request, days: int = 7) -> HTMLResponse:
-        state = get_state()
-        db = state.searcher.db
-        days = max(1, min(90, int(days)))
-        since = _now() - days * 86400
-        totals = savings_mod.totals(db, since)
-        per_user = savings_mod.per_user(db, since)
-        daily = savings_mod.daily_series(db, since, _now())
-        top_q = savings_mod.top_queries(db, since, limit=10)
-        return templates.TemplateResponse(
-            request,
-            "savings.html",
-            {
-                "totals": totals,
-                "per_user": per_user,
-                "daily": daily,
-                "top_queries": top_q,
-                "days": days,
-            },
+        """Wedge-class-2 (task 20afcaf7 r3): off_loop like every route above."""
+        context, timeout_resp = await _offloaded(
+            _compute_savings_page_context, get_state().searcher.db, days
         )
+        if timeout_resp is not None:
+            return timeout_resp
+        return templates.TemplateResponse(request, "savings.html", context)
 
     @app.get("/api/savings")
     async def api_savings(days: int = 7) -> JSONResponse:
@@ -1344,24 +1452,37 @@ def build_app() -> FastAPI:
         db = state.searcher.db
         days = max(1, min(90, int(days)))
         since = _now() - days * 86400
-        return JSONResponse(savings_mod.totals(db, since))
+        # Off the loop (wedge class 2, task 20afcaf7).
+        result, timeout_resp = await _offloaded(savings_mod.totals, db, since)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.get("/api/savings/lifetime")
     async def api_savings_lifetime() -> JSONResponse:
         state = get_state()
-        return JSONResponse(savings_mod.totals(state.searcher.db, 0.0))
+        result, timeout_resp = await _offloaded(savings_mod.totals, state.searcher.db, 0.0)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.get("/api/savings/agents")
     async def api_savings_agents(days: int = 7) -> JSONResponse:
         state = get_state()
         since = _now() - max(1, min(90, int(days))) * 86400
-        return JSONResponse(savings_mod.per_agent(state.searcher.db, since))
+        result, timeout_resp = await _offloaded(savings_mod.per_agent, state.searcher.db, since)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.get("/api/savings/sessions")
     async def api_savings_sessions(days: int = 7) -> JSONResponse:
         state = get_state()
         since = _now() - max(1, min(90, int(days))) * 86400
-        return JSONResponse(savings_mod.per_session(state.searcher.db, since))
+        result, timeout_resp = await _offloaded(savings_mod.per_session, state.searcher.db, since)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
 
     @app.get("/api/savings/benchmark")
     async def api_savings_benchmark() -> JSONResponse:
@@ -1370,11 +1491,7 @@ def build_app() -> FastAPI:
         headline savings %, distinct from the live per-user ledger above."""
         return JSONResponse(savings_mod.benchmark_result())
 
-    @app.get("/api/usage")
-    async def api_usage(days: int = 7) -> JSONResponse:
-        state = get_state()
-        db = state.searcher.db
-        since = _now() - max(1, min(90, int(days))) * 86400
+    def _compute_usage(db: sqlite3.Connection, since: float) -> list[dict]:
         by_user = db.execute(
             """SELECT user, COUNT(*) AS queries,
                       COALESCE(SUM(response_tokens_est),0) AS resp_tokens,
@@ -1383,33 +1500,38 @@ def build_app() -> FastAPI:
                GROUP BY user ORDER BY queries DESC""",
             (since,),
         ).fetchall()
-        return JSONResponse(
-            [
-                {
-                    "user": r["user"],
-                    "queries": r["queries"],
-                    "response_tokens_est": r["resp_tokens"],
-                    "last_seen": r["last_seen"],
-                }
-                for r in by_user
-            ]
-        )
+        return [
+            {
+                "user": r["user"],
+                "queries": r["queries"],
+                "response_tokens_est": r["resp_tokens"],
+                "last_seen": r["last_seen"],
+            }
+            for r in by_user
+        ]
+
+    @app.get("/api/usage")
+    async def api_usage(days: int = 7) -> JSONResponse:
+        state = get_state()
+        db = state.searcher.db
+        since = _now() - max(1, min(90, int(days))) * 86400
+        # Off the loop (wedge class 2, task 20afcaf7).
+        result, timeout_resp = await _offloaded(_compute_usage, db, since)
+        if timeout_resp:
+            return timeout_resp
+        return JSONResponse(result)
 
     return app
 
 
-def _render_search(
-    request: Request,
-    templates: Jinja2Templates,
+def _compute_search_context(
     q: str,
     summary: bool,
-    partial: bool,
-    *,
-    tags: list[str] | None = None,
-    kind: str = "",
-    sort: str = "relevance",
-    page: int = 1,
-) -> HTMLResponse:
+    tags: list[str] | None,
+    kind: str,
+    sort: str,
+    page: int,
+) -> dict:
     from urllib.parse import urlencode
 
     state = get_state()
@@ -1528,6 +1650,28 @@ def _render_search(
         "clear_url": _u(tags=[], kind="", page=1),
         "has_filters": bool(tags or kind),
     }
+    return trovex_data
+
+
+async def _render_search(
+    request: Request,
+    templates: Jinja2Templates,
+    q: str,
+    summary: bool,
+    partial: bool,
+    *,
+    tags: list[str] | None = None,
+    kind: str = "",
+    sort: str = "relevance",
+    page: int = 1,
+) -> HTMLResponse:
+    """Wedge-class-2 (task 20afcaf7 r3): search_chunks + the per-hit store.get
+    loop below ran inline on the event loop. off_loop like every route above."""
+    trovex_data, timeout_resp = await _offloaded(
+        _compute_search_context, q, summary, tags, kind, sort, page
+    )
+    if timeout_resp is not None:
+        return timeout_resp
     template_name = "_results.html" if partial else "search.html"
     return templates.TemplateResponse(request, template_name, trovex_data)
 

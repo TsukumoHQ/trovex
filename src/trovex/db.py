@@ -798,6 +798,14 @@ def delete_doc_cascade(conn: sqlite3.Connection, doc_id: int) -> None:
     # doc_links has TWO doc-id columns (a link's src and dst can each be the doc
     # being deleted) — not a _DOC_CHILD_TABLES member, needs its own two-sided delete.
     conn.execute("DELETE FROM doc_links WHERE src_doc_id = ? OR dst_doc_id = ?", (doc_id, doc_id))
+    # doc_refs (extracted Obsidian-style edges, task a1b5a169) is also two-sided
+    # but ASYMMETRIC: the deleted doc's OUTGOING refs die with it, while a ref
+    # that POINTED AT it survives as dangling (dst_id NULL) so it re-binds if the
+    # target reappears (e.g. a rename, which is delete+insert). Not a
+    # _DOC_CHILD_TABLES member (its FK column is src_id, and the incoming side is
+    # a reset, not a delete).
+    conn.execute("DELETE FROM doc_refs WHERE src_id = ?", (doc_id,))
+    conn.execute("UPDATE doc_refs SET dst_id = NULL WHERE dst_id = ?", (doc_id,))
     conn.execute("DELETE FROM docs_fts WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
@@ -1931,6 +1939,38 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_doc_links_src ON doc_links(src_doc_id, rel);
         CREATE INDEX IF NOT EXISTS idx_doc_links_dst ON doc_links(dst_doc_id, rel);
+
+        -- Obsidian-style extracted edges (task a1b5a169, trovex/links L1) — the
+        -- AUTOMATIC counterpart to doc_links above. One row per [[wikilink]] or
+        -- relative .md link found in ANY indexed doc (file-backed included).
+        -- dst_id IS NULL = dangling: the target doc doesn't exist yet (or was
+        -- deleted), and the edge is KEPT so it binds the moment the target
+        -- appears. All parse + resolve + rebind logic lives in links_parse.py;
+        -- this is just the store. delete_doc_cascade handles both sides by hand
+        -- (outgoing removed, incoming reset to dangling) — see below.
+        --   dst_norm = rebind lookup key (target basename, no .md, lowercased).
+        --   anchor   = #heading fragment; alias = display text; kind links-to|embeds.
+        CREATE TABLE IF NOT EXISTS doc_refs (
+            id INTEGER PRIMARY KEY,
+            src_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            dst_id INTEGER REFERENCES docs(id),
+            dst_raw TEXT NOT NULL,
+            dst_norm TEXT NOT NULL,
+            anchor TEXT,
+            alias TEXT,
+            context TEXT,
+            kind TEXT NOT NULL DEFAULT 'links-to'
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_src ON doc_refs(src_id);
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_dst ON doc_refs(dst_id);
+        -- Dangling re-bind on insert is an indexed lookup on dst_norm.
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_dangling
+            ON doc_refs(dst_norm) WHERE dst_id IS NULL;
+        -- UNIQUE(src_id, dst_raw, anchor) with NULL anchors deduped (SQLite
+        -- treats NULLs as distinct in a plain UNIQUE, so a COALESCE index is the
+        -- only form that collapses two anchorless links to the same target).
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_doc_refs_uniq
+            ON doc_refs(src_id, dst_raw, COALESCE(anchor, ''));
 
         -- Doc history: a snapshot of the previous content on every overwrite
         CREATE TABLE IF NOT EXISTS doc_versions (

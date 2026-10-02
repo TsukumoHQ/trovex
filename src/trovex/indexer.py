@@ -25,6 +25,7 @@ from .db import (
     vec_chunks_put,
     vec_docs_put,
 )
+from .links_parse import sync_doc_refs
 from .embedder import Embedder, embedder_from_settings
 
 MARKDOWN_EXTENSIONS = ("md", "mdx", "markdown")
@@ -571,6 +572,10 @@ class Indexer:
 
         # Doc-level BM25 side of the hybrid doc-router search.
         upsert_docs_fts(self.db, doc_id, title, content)
+        # Extracted Obsidian-style edges (task a1b5a169): refresh this doc's
+        # outgoing [[links]]/.md links and re-bind any dangling ref now pointing
+        # here. rel_path + source.id are this file-backed doc's resolve context.
+        sync_doc_refs(self.db, src_id=doc_id, source_id=source.id, path=rel_path, content=content)
         self._phase_ms["write"] += (time.monotonic() - _write_t0) * 1000
         embed_batch.append((doc_id, self._embed_text(content, title)))
         if len(embed_batch) >= 32:

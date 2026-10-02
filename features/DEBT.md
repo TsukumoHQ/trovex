@@ -12,3 +12,4 @@
 - [LEGACY_OPPORTUNITY]: The boot and prompt hook local truncation paths can be removed after deployment once they send their existing local token ceiling as budget.
 - - Per-chunk line ranges (anchor as line range): [LEGACY_OPPORTUNITY] chunks have no line offsets and markdown fs docs are not chunked at all; dev-codex f460f703 owns chunk line ranges.
 - - [LEGACY_OPPORTUNITY] check_duplicate's similarity `1 - distance/2` is not a cosine for a cosine-metric vec0 column (it maps cos 0.9 to 0.95); dup_cosine_threshold is tuned against that scale, do not unify blindly.
+- [LEGACY_OPPORTUNITY] `SqliteStore.put_batch` (store.py:~1084) upserts owned docs without calling `sync_doc_refs`, so a batch-created doc neither emits its own refs nor triggers dangling re-bind until individually re-written; L1 scope wired only the single `put` path the AC exercises.

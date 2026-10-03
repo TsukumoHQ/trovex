@@ -26,6 +26,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from . import capacity
+from . import graphview
 from . import insights as insights_mod
 from . import offload
 from . import savings as savings_mod
@@ -47,6 +48,11 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 # be served here (it would expose the dashboard under a wrong base). Mounted at
 # /receipt only when present — see create_app.
 WEB_DIST = Path(__file__).parent.parent.parent / "web" / "dist-receipt"
+# The React knowledge-graph SPA ("the codebase's brain") — another SEPARATE
+# build (base '/graph/', via `npm run build:graph` -> web/dist-graph). Mounted
+# at /graph only when present, exactly like /receipt, so a build-less tree
+# still boots.
+GRAPH_DIST = Path(__file__).parent.parent.parent / "web" / "dist-graph"
 
 # Validation patterns for free-text filter params (finding 6). kind is a bare
 # slug; tags allow `/` (owner/alpha scope) but nothing else exotic.
@@ -433,6 +439,14 @@ def build_app() -> FastAPI:
 
         app.mount("/receipt", StaticFiles(directory=str(WEB_DIST), html=True), name="receipt")
 
+    # Serve the knowledge-graph SPA same-origin with /api/graph, same contract
+    # as /receipt: registered only when web/dist-graph exists, html=True for SPA
+    # fallback. Private local view (noindex) — reads the running index.
+    if GRAPH_DIST.is_dir():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/graph", StaticFiles(directory=str(GRAPH_DIST), html=True), name="graph")
+
     # ── HTML pages ───────────────────────────────────────────────────
 
     def _compute_home_context(db: sqlite3.Connection, state: Any) -> dict:
@@ -656,10 +670,28 @@ def build_app() -> FastAPI:
                 "<a href='/store'>browse all docs</a></p></div></body></html>",
                 status_code=404,
             )
+        # Backlinks panel: the typed doc_links into/out of this doc, so a reader
+        # sees the decision lineage (what superseded it, what it's a verdict of)
+        # right on the page — the Jinja twin of the graph side panel. Off the loop
+        # (wedge class 2) like the render above, since node_detail reads the store.
+        detail, bl_timeout = await _offloaded(
+            graphview.node_detail, get_state().searcher.db, ext_id
+        )
+        if bl_timeout is not None:
+            return bl_timeout
+        links_out = detail["out_links"] if detail else []
+        links_in = detail["in_links"] if detail else []
         return templates.TemplateResponse(
             request,
             "doc.html",
-            {"doc": doc, "body_html": body_html, "toc": toc, "pygments_css": PYGMENTS_CSS},
+            {
+                "doc": doc,
+                "body_html": body_html,
+                "toc": toc,
+                "pygments_css": PYGMENTS_CSS,
+                "links_out": links_out,
+                "links_in": links_in,
+            },
         )
 
     @app.delete("/api/doc/{ext_id}")
@@ -1064,6 +1096,46 @@ def build_app() -> FastAPI:
         if timeout_resp is not None:
             return timeout_resp
         return JSONResponse(result)
+
+    @app.get("/api/graph")
+    async def api_graph(
+        source: str | None = Query(
+            None, max_length=100, pattern=r"^[A-Za-z0-9_.:/-]+$",
+            description="restrict to one source_id partition",
+        ),
+        depth: int = Query(2, ge=0, le=6, description="k-hop radius around focus"),
+        focus: str | None = Query(
+            None, max_length=200, description="centre node id (doc id or ext_id)",
+        ),
+    ) -> JSONResponse:
+        """The knowledge graph of the live index: docs/code/tickets/decisions as
+        nodes, typed doc_links as edges, with per-node status / agent-read heat /
+        drift so the SPA can paint its engineering lenses. `focus`+`depth` limit
+        the result to a k-hop neighbourhood; bad params 422 via Query bounds.
+
+        Off the loop (wedge class 2, task 20afcaf7): build_graph scans docs +
+        doc_links + the agent-usage tables, the same store-read exposure the map
+        and stats routes offload."""
+        db = get_state().searcher.db
+        result, timeout_resp = await _offloaded(
+            graphview.build_graph, db, source=source, focus=focus, depth=depth
+        )
+        if timeout_resp is not None:
+            return timeout_resp
+        return JSONResponse(result)
+
+    @app.get("/api/graph/node/{node_id}")
+    async def api_graph_node(node_id: str) -> JSONResponse:
+        """Side-panel detail: the doc rendered + its in/out links with context."""
+        db = get_state().searcher.db
+        detail, timeout_resp = await _offloaded(graphview.node_detail, db, node_id)
+        if timeout_resp is not None:
+            return timeout_resp
+        if detail is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        html, _headings = render_markdown(detail.pop("content") or "")
+        detail["html"] = html
+        return JSONResponse(detail)
 
     def _compute_stats(db: sqlite3.Connection, usearch_partitions: set[str]) -> dict:
         total = db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]

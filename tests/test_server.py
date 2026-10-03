@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
 
 import numpy as np
 import pytest
@@ -311,3 +312,192 @@ def test_api_search_rejects_unknown_source(client):
     r = client.get("/api/search", params={"q": "anything", "source": "nope"})
     assert r.status_code == 422
     assert "unknown source" in r.json()["error"]
+
+
+# ── /api/graph — the knowledge-graph projection for the /graph SPA ──────────
+
+
+def _seed_link_graph(store):
+    """A tiny lineage: a canonical decision that SUPERSEDES an older one and is
+    DECIDED-IN a note, plus a code file (classified by its .py path) and one
+    real agent read. Returns the path we recorded a read against."""
+    # Create every node first (a link target must already exist), then wire the
+    # typed edges from dec-new.
+    store.put("# Old decision\n\npick postgres", kind="decision", ext_id="dec-old")
+    store.put("# New decision\n\npick sqlite after all", kind="decision", ext_id="dec-new")
+    store.put("# Design note\n\nwhy sqlite", kind=None, ext_id="note-c")
+    for rel, tgt in (("supersedes", "dec-old"), ("decided-in", "note-c")):
+        store.db.execute(
+            """INSERT INTO doc_links (src_doc_id, rel, dst_doc_id, created_at, created_by)
+               SELECT s.id, ?, d.id, ?, 'test'
+               FROM docs s, docs d WHERE s.ext_id='dec-new' AND d.ext_id=?""",
+            (rel, time.time(), tgt),
+        )
+    # A code file node — classification is by the .py path extension.
+    store.put("# module\n\ncode", kind=None, ext_id="code-x")
+    store.db.execute("UPDATE docs SET path='src/trovex/graphview.py' WHERE ext_id='code-x'")
+    # Canonical/superseded statuses so the status lens has something to show.
+    store.db.execute("UPDATE docs SET status='canonical' WHERE ext_id='dec-new'")
+    store.db.execute("UPDATE docs SET status='superseded' WHERE ext_id='dec-old'")
+    # One real agent read against dec-new's path within the 7d window.
+    read_path = store.db.execute("SELECT path FROM docs WHERE ext_id='dec-new'").fetchone()["path"]
+    cur = store.db.execute(
+        "INSERT INTO mcp_queries (ts, query) VALUES (?, ?)", (time.time(), "why sqlite")
+    )
+    store.db.execute(
+        "INSERT INTO mcp_query_results (query_id, rank, path, used) VALUES (?, 0, ?, 1)",
+        (cur.lastrowid, read_path),
+    )
+    store.db.commit()
+    return read_path
+
+
+def test_api_graph_returns_nodes_edges_with_fields(client):
+    """Core contract: nodes carry kind/status/reads_7d/drift; typed doc_links
+    come back as edges; the .py doc is classified as a code node."""
+    store = state_mod._state.store
+    _seed_link_graph(store)
+
+    out = client.get("/api/graph").json()
+    nodes = {n["title"]: n for n in out["nodes"]}
+
+    assert "New decision" in nodes
+    nd = nodes["New decision"]
+    # every contracted field is present on every node
+    for key in ("id", "title", "path", "kind", "status", "reads_7d", "drift"):
+        assert key in nd
+    assert nd["kind"] == "decision"
+    assert nd["status"] == "canonical"
+    assert nd["reads_7d"] >= 1  # the real read we recorded
+    assert nd["drift"] == 0  # L5 drift column not on dev → defaults to 0
+
+    # the .py doc is a code node; the old decision kept its decision kind
+    assert nodes["module"]["kind"] == "code"
+    assert nodes["Old decision"]["kind"] == "decision"
+
+    # the supersedes lineage edge is present and typed
+    by_id = {n["id"]: n["title"] for n in out["nodes"]}
+    sup = [
+        e for e in out["edges"]
+        if e["kind"] == "supersedes"
+        and by_id.get(e["src"]) == "New decision"
+        and by_id.get(e["dst"]) == "Old decision"
+    ]
+    assert len(sup) == 1
+
+
+def test_api_graph_focus_depth_limits_neighbourhood(client):
+    """focus+depth restrict the result to the k-hop neighbourhood of a node."""
+    store = state_mod._state.store
+    _seed_link_graph(store)
+
+    d0 = client.get("/api/graph", params={"focus": "dec-new", "depth": 0}).json()
+    assert [n["title"] for n in d0["nodes"]] == ["New decision"]
+    assert d0["edges"] == []
+
+    d1 = client.get("/api/graph", params={"focus": "dec-new", "depth": 1}).json()
+    titles = {n["title"] for n in d1["nodes"]}
+    # one hop out reaches both direct neighbours, and nothing unrelated
+    assert titles == {"New decision", "Old decision", "Design note"}
+
+    missing = client.get("/api/graph", params={"focus": "no-such-node"}).json()
+    assert missing["nodes"] == [] and missing["edges"] == []
+
+
+def test_api_graph_bad_params_422(client):
+    assert client.get("/api/graph", params={"depth": -1}).status_code == 422
+    assert client.get("/api/graph", params={"depth": 99}).status_code == 422
+    assert client.get("/api/graph", params={"source": "bad source!"}).status_code == 422
+
+
+def test_api_graph_node_detail_renders_and_lists_links(client):
+    """The side-panel endpoint renders the doc and lists in/out links w/ context."""
+    store = state_mod._state.store
+    _seed_link_graph(store)
+
+    detail = client.get("/api/graph/node/dec-new").json()
+    assert detail["title"] == "New decision"
+    assert "<" in detail["html"]  # markdown rendered to HTML
+    out_rels = {(x["rel"], x["title"]) for x in detail["out_links"]}
+    assert ("supersedes", "Old decision") in out_rels
+    assert ("decided-in", "Design note") in out_rels
+
+    # dec-old is on the receiving end of the supersedes edge
+    back = client.get("/api/graph/node/dec-old").json()
+    assert ("supersedes", "New decision") in {(x["rel"], x["title"]) for x in back["in_links"]}
+
+    assert client.get("/api/graph/node/does-not-exist").status_code == 404
+
+
+def test_graph_mount_is_404_safe_when_dist_missing(client, tmp_path, monkeypatch):
+    """Like /receipt: with no web/dist-graph build, the app still boots and the
+    route is simply absent (404) — never a 500, and the API still serves.
+    Hermetic: point GRAPH_DIST at a path that does not exist, regardless of
+    whether a real build happens to be sitting in the tree. (`client` injects
+    the app state the routes read.)"""
+    from trovex.server import build_app
+
+    monkeypatch.setattr("trovex.server.GRAPH_DIST", tmp_path / "no-such-dist-graph")
+    app = TestClient(build_app())
+    assert app.get("/graph/").status_code == 404
+    assert app.get("/api/graph").status_code == 200
+
+
+def test_graph_mount_serves_spa_when_built(tmp_path, monkeypatch, client):
+    """When the build exists, /graph serves the SPA index (html=True fallback)."""
+    from trovex.server import build_app
+
+    dist = tmp_path / "dist-graph"
+    dist.mkdir()
+    (dist / "index.html").write_text("<!doctype html><title>graph spa</title>", encoding="utf-8")
+    monkeypatch.setattr("trovex.server.GRAPH_DIST", dist)
+
+    built = TestClient(build_app())
+    r = built.get("/graph/")
+    assert r.status_code == 200
+    assert "graph spa" in r.text
+
+
+def test_api_graph_coread_backbone(client):
+    """Docs pulled into the SAME agent query twice earn a faint 'co-read' edge —
+    the agent-usage backbone that turns a sparse link cloud into communities."""
+    store = state_mod._state.store
+    store.put("# Alpha\n\none", ext_id="co-a")
+    store.put("# Beta\n\ntwo", ext_id="co-b")
+    pa = store.db.execute("SELECT path FROM docs WHERE ext_id='co-a'").fetchone()["path"]
+    pb = store.db.execute("SELECT path FROM docs WHERE ext_id='co-b'").fetchone()["path"]
+    # the pair is co-retrieved in two separate queries → weight 2 (>= threshold)
+    for _ in range(2):
+        cur = store.db.execute("INSERT INTO mcp_queries (ts, query) VALUES (?, 'q')", (time.time(),))
+        qid = cur.lastrowid
+        store.db.execute("INSERT INTO mcp_query_results (query_id, rank, path) VALUES (?, 0, ?)", (qid, pa))
+        store.db.execute("INSERT INTO mcp_query_results (query_id, rank, path) VALUES (?, 1, ?)", (qid, pb))
+    store.db.commit()
+
+    out = client.get("/api/graph").json()
+    by_id = {n["id"]: n["title"] for n in out["nodes"]}
+    coread = [
+        e for e in out["edges"]
+        if e["kind"] == "co-read"
+        and {by_id.get(e["src"]), by_id.get(e["dst"])} == {"Alpha", "Beta"}
+    ]
+    assert len(coread) == 1
+    assert coread[0]["weight"] == 2
+
+
+def test_doc_view_shows_backlinks_panel(client):
+    """The Jinja doc page renders its typed doc_links: out-links on the newer
+    doc, backlinks on the one it superseded."""
+    store = state_mod._state.store
+    old = store.put("# Old choice\n\nx", kind="decision", ext_id="bl-old")
+    new = store.put(
+        "# New choice\n\ny", kind="decision", ext_id="bl-new",
+        links=[{"rel": "supersedes", "target": "bl-old"}],
+    )
+
+    newer = client.get(f"/doc/{new}").text
+    assert "doc-backlinks" in newer
+    assert "supersedes" in newer and "Old choice" in newer
+
+    older = client.get(f"/doc/{old}").text
+    assert "Backlinks" in older and "New choice" in older

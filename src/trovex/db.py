@@ -126,6 +126,9 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     # AFTER partitioning: adds the embed_model metadata column (task 6851d755),
     # so it always sees the partitioned DDL shape.
     _migrate_add_vec_embed_model(conn, embed_dim, embed_model)
+    # AFTER embed_model: adds the owner metadata column (perf C, task 33ecdc9f),
+    # populated from doc_tags, so an owner-scoped KNN filters inside the search.
+    _migrate_add_vec_owner(conn, embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
     # task 6851d755: stamp store_meta['embed_model'] once — a fresh store, or
@@ -344,6 +347,25 @@ def _doc_vec_meta(conn: sqlite3.Connection, doc_id: int) -> tuple | None:
     return (r["source_id"], r["kind"] or "doc", r["lifecycle"], r["status"])
 
 
+def doc_vec_owner(conn: sqlite3.Connection, doc_id: int) -> str:
+    """The doc's SINGLE owner tag for the vec_docs.owner metadata column (perf C,
+    task 33ecdc9f). Owner lives in doc_tags as `owner/<agent>`; a record has exactly
+    one by construction, so storing it as a vec0 metadata column lets the owner
+    filter push INTO the KNN (k=limit, no 4096 over-fetch).
+
+    A doc with 0 owner tags or >1 (the rare multi-owner case) stores '' — never NULL
+    (vec0 rejects NULL metadata). The '' rows are recalled by the doc_tags post-filter
+    FALLBACK in Searcher.search, so multi-owner recall stays correct; only the
+    single-owner fast path is pushed into the KNN."""
+    owners = [
+        r["tag"]
+        for r in conn.execute(
+            "SELECT tag FROM doc_tags WHERE doc_id = ? AND tag LIKE 'owner/%'", (doc_id,)
+        )
+    ]
+    return owners[0] if len(owners) == 1 else ""
+
+
 def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes, embed_model: str = "") -> None:
     """Upsert a doc's embedding + partition/metadata into vec_docs. Does NOT commit.
 
@@ -357,11 +379,12 @@ def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes, embed_m
     if meta is None:
         return
     src, kind, lifecycle, status = meta
+    owner = doc_vec_owner(conn, doc_id)
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute(
-        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (doc_id, src, emb_blob, kind, lifecycle, status, embed_model),
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (doc_id, src, emb_blob, kind, lifecycle, status, embed_model, owner),
     )
 
 
@@ -619,7 +642,7 @@ def rebuild_vec_shadow(
             f"""CREATE VIRTUAL TABLE vec_docs USING vec0(
                 source_id TEXT partition key,
                 embedding float[{embed_dim}] distance_metric=cosine,
-                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT, owner TEXT
             )"""
         )
         conn.execute(
@@ -629,9 +652,15 @@ def rebuild_vec_shadow(
                 kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
             )"""
         )
+        # owner (perf C): a correlated subquery derives the single `owner/<agent>`
+        # tag per rebuilt doc, '' when none or multi-owner — same rule as
+        # doc_vec_owner, so a model-swap rebuild never drops the owner metadata.
         conn.execute(
-            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
-            "SELECT rid, source_id, embedding, kind, lifecycle, status, ? FROM _vec_rebuild_docs",
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+            "SELECT rid, source_id, embedding, kind, lifecycle, status, ?, "
+            "  (SELECT CASE WHEN COUNT(*) = 1 THEN MAX(tag) ELSE '' END "
+            "   FROM doc_tags WHERE doc_id = rid AND tag LIKE 'owner/%') "
+            "FROM _vec_rebuild_docs",
             (embed_model,),
         )
         conn.execute(
@@ -732,9 +761,13 @@ def vec_sync_meta(conn: sqlite3.Connection, doc_id: int) -> None:
     if meta is None:
         return
     _src, kind, lifecycle, status = meta
+    # owner (perf C, task 33ecdc9f) is a vec_docs-only metadata column, refreshed
+    # here too so a tag-only change (set_tags) that never re-embeds still keeps the
+    # vec0 owner filter in step. vec0 allows an in-place metadata UPDATE (no rebuild).
+    owner = doc_vec_owner(conn, doc_id)
     conn.execute(
-        "UPDATE vec_docs SET kind = ?, lifecycle = ?, status = ? WHERE rowid = ?",
-        (kind, lifecycle, status, doc_id),
+        "UPDATE vec_docs SET kind = ?, lifecycle = ?, status = ?, owner = ? WHERE rowid = ?",
+        (kind, lifecycle, status, owner, doc_id),
     )
     for c in conn.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
         conn.execute(
@@ -1588,6 +1621,56 @@ def _migrate_add_vec_embed_model(conn: sqlite3.Connection, embed_dim: int, embed
         raise
 
 
+def _migrate_add_vec_owner(conn: sqlite3.Connection, embed_dim: int) -> None:
+    """Add an `owner` vec0 metadata column to vec_docs on an existing store (perf C,
+    task 33ecdc9f) — same rebuild shape as _migrate_add_vec_embed_model (vec0 has no
+    ALTER TABLE ADD COLUMN), run AFTER it so it always sees the embed_model DDL.
+
+    Rebuilds ONLY vec_docs (owner is a doc-level filter; vec_chunks is untouched —
+    the duplicate-row multi-owner scheme for chunks is deferred to a later ticket).
+    No re-embed: existing embedding blobs are copied straight across. Each row's
+    owner is derived from doc_tags exactly as doc_vec_owner does (single `owner/<x>`
+    tag, else '').
+
+    No-ops instantly once the column exists (PRAGMA table_info is cheap)."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_docs'"
+    ).fetchone()
+    if not row:
+        return  # no vec_docs — _init_schema creates it fresh (already with owner)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(vec_docs)")}
+    if "owner" in cols:
+        return  # already migrated
+
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute(
+            "CREATE TEMP TABLE _vd_owner AS "
+            "SELECT rowid AS rid, source_id, embedding AS emb, kind, lifecycle, status, embed_model "
+            "FROM vec_docs"
+        )
+        conn.execute("DROP TABLE vec_docs")
+        conn.execute(
+            f"""CREATE VIRTUAL TABLE vec_docs USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT, owner TEXT
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+            "SELECT rid, source_id, emb, kind, lifecycle, status, embed_model, "
+            "  (SELECT CASE WHEN COUNT(*) = 1 THEN MAX(tag) ELSE '' END "
+            "   FROM doc_tags WHERE doc_id = rid AND tag LIKE 'owner/%') "
+            "FROM _vd_owner"
+        )
+        conn.execute("DROP TABLE _vd_owner")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
     conn.executescript(
         f"""
@@ -1873,7 +1956,12 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             kind TEXT,
             lifecycle TEXT,
             status TEXT,
-            embed_model TEXT
+            embed_model TEXT,
+            -- owner (perf C, task 33ecdc9f): the doc's SINGLE `owner/<agent>` tag,
+            -- '' when none or multi-owner. A vec0 metadata column so an owner-scoped
+            -- boot KNN pushes `owner = ?` INTO the search (k=limit, no 4096 over-
+            -- fetch); multi-owner ('' ) docs are recalled by the doc_tags fallback.
+            owner TEXT
         );
 
         -- Chunk-level retrieval (structure-aware chunks + their embeddings)

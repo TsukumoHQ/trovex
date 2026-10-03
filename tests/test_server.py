@@ -715,3 +715,11 @@ def test_doc_view_shows_backlinks_panel(client):
 
     older = client.get(f"/doc/{old}").text
     assert "Backlinks" in older and "New choice" in older
+
+
+def test_query_embed_model_default_is_int8_mirror():
+    """AC3: the configured int8 query model defaults to the Xenova bge-small mirror
+    and reads its file from the quantized ONNX path."""
+    s = Settings()
+    assert s.query_embed_model == "Xenova/bge-small-en-v1.5"
+    assert s.query_embed_file == "onnx/model_quantized.onnx"

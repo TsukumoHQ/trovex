@@ -9,6 +9,7 @@ pulls a full record on demand via trovex_read(doc_id).
 
 from __future__ import annotations
 
+import re
 import sqlite3
 
 from .search import Searcher
@@ -20,12 +21,42 @@ BOOT_QUERY = "current state resume open work in flight next steps gotchas"
 # The prompt hook passes the WHOLE user prompt as q=. Agent preambles and task
 # notifications run to tens of thousands of chars, and rejecting those was a
 # silently-lost recall: the hook swallows the error, so the agent just got no
-# pointers. Truncate instead. 2000 chars ≈ the 512-token window of the default
-# encoder (bge-small-en-v1.5), so anything past it never reached the vector
-# anyway — the cap observes that limit rather than adding one. Head, not tail:
-# in these prompts the task identity (name, branch, id) leads and the
-# boilerplate trails.
-BOOT_Q_MAX = 2000
+# pointers. Truncate instead. Head, not tail: in these prompts the task identity
+# (name, branch, id) leads and the boilerplate trails.
+#
+# perf A (task 62c53f35): 2000 chars ≈ 512 tokens is the model's MAX sequence
+# length, so every long prompt paid the full quadratic forward pass (746 ms on a
+# loaded host vs 246 ms at 500 chars — measured in the cto perf audit). The
+# retrieval signal for owner-scoped recall lives in the first few hundred chars;
+# cap at 500 (~128 tokens) so boot embeds stay cheap on the request path.
+BOOT_Q_MAX = 500
+
+# Harness boilerplate that leads the prompt hook's q= and carries no retrieval
+# signal: the <task-notification>/<system-reminder>/<pasted_content> XML blocks,
+# the "You are **name**, role" agent preamble, and the relay "check your relay …"
+# nudge line. Stripping these BEFORE the length cap keeps the real task text from
+# being truncated away behind boilerplate (which would silently drop recall).
+_BOILERPLATE_BLOCK_RE = re.compile(
+    r"<(task-notification|system-reminder|pasted_content)\b[^>]*>.*?</\1>",
+    re.DOTALL | re.IGNORECASE,
+)
+_AGENT_PREAMBLE_RE = re.compile(r"You are \*\*[^*]+\*\*[^.\n]*[.\n]", re.IGNORECASE)
+_RELAY_NUDGE_RE = re.compile(r"[^\n]*check your relay[^\n]*", re.IGNORECASE)
+_WS_RE = re.compile(r"\s+")
+
+
+def clean_query(text: str) -> str:
+    """Strip harness boilerplate from a hook-supplied prompt, then cap length.
+
+    Pure + deterministic so the SAME transform runs on the embed path (boot
+    recall) and on the logged query text (the replay eval re-embeds what it
+    logged — the two must match or replay drifts). Boilerplate-only input
+    collapses to "" and the caller falls back to BOOT_QUERY."""
+    t = _BOILERPLATE_BLOCK_RE.sub(" ", text)
+    t = _AGENT_PREAMBLE_RE.sub(" ", t)
+    t = _RELAY_NUDGE_RE.sub(" ", t)
+    t = _WS_RE.sub(" ", t).strip()
+    return t[:BOOT_Q_MAX]
 
 
 def _empty_pack(agent: str, budget: int | None = None) -> dict:
@@ -50,9 +81,10 @@ def boot_pointers(
     Best-effort: boot must NEVER 500. Any retrieval OperationalError (e.g. the
     sqlite-vec KNN ceiling on a large store, a locked/backup db) degrades to an
     empty pack instead of taking the whole fleet's Active-Memory boot down."""
+    cleaned = clean_query(q) if q else ""
     try:
         results = searcher.search(
-            (q or BOOT_QUERY)[:BOOT_Q_MAX],
+            cleaned or BOOT_QUERY,
             limit=50 if budget is not None else k,
             source_ids=["trovex"],
             kind="record",

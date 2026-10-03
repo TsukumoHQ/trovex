@@ -121,6 +121,19 @@ class Settings(BaseSettings):
     # when the model name can't be inferred: "fastembed" (local ONNX) or "openai"
     # (an OpenAI-compatible HTTP endpoint). "" = infer (unknown → local fastembed).
     embed_provider: str = ""
+
+    # Query-side embedder (perf A, task 62c53f35). The search hot path embeds one
+    # short query per request synchronously; an int8 raw-ORT session with a single,
+    # non-spinning thread is ~2x cheaper and stops ORT's spin-wait pool from
+    # contending with the fleet (6.9 ms p50 / 62 ms p95 at 16 concurrent vs 16 /
+    # 172 ms fp32 — cto research). DOC vectors stay fp32; the drift is negligible
+    # and checked on the replay eval. Only applies when the doc model is the default
+    # local bge-small (else no matching int8 build); set False to use the fp32 path.
+    query_embed_int8: bool = True
+    query_embed_model: str = "Xenova/bge-small-en-v1.5"  # int8 ONNX mirror of bge-small
+    query_embed_file: str = "onnx/model_quantized.onnx"
+    query_embed_threads: int = 1  # intra/inter-op threads for the query session
+    query_embed_spinning: bool = False  # ORT spin-wait; off = don't burn fleet CPU
     # OpenAI-compatible endpoint for the "openai" provider. Point this at a LOCAL
     # server (Ollama / LM Studio / vLLM / LocalAI, e.g. http://localhost:11434/v1)
     # to keep embeddings on your machine, or at a proxy. Empty = OpenAI's hosted API.

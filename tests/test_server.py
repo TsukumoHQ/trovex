@@ -161,10 +161,11 @@ def test_api_boot_and_search_200_over_4096_docs(client):
         [(f"seed/{i}.md", f"/seed/{i}.md", f"h{i}", now, now, now, f"seed {i}") for i in range(4100)],
     )
     ids = [r["id"] for r in store.db.execute("SELECT id FROM docs WHERE path LIKE 'seed/%'")]
-    # Partitioned vec_docs: 'code' shard, metadata from the docs defaults.
+    # Partitioned vec_docs: 'code' shard, metadata from the docs defaults. owner=''
+    # (perf C) — these seed docs carry no owner tag; vec0 rejects NULL metadata.
     store.db.executemany(
-        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
-        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical', 'test')",
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+        "VALUES (?, 'code', ?, 'doc', 'active', 'canonical', 'test', '')",
         [(i, blob) for i in ids],
     )
     store.db.commit()
@@ -501,3 +502,177 @@ def test_doc_view_shows_backlinks_panel(client):
 
     older = client.get(f"/doc/{old}").text
     assert "Backlinks" in older and "New choice" in older
+
+
+# ---------------------------------------------------------------------------
+# perf C (task 33ecdc9f): owner as a vec0 metadata column, capped FTS5, no rerank
+# AC1 wording "multi-owner = duplicate rows" is SUPERSEDED by cto's ruling
+# (2026-10-03): Reading A — owner TEXT metadata on vec_docs (single owner, ''
+# otherwise), pushed into the KNN with k=limit, rowid=doc.id unchanged; the
+# doc_tags post-filter is kept only as the multi-owner fallback. vec_chunks
+# duplicate rows deferred to a later ticket.
+# ---------------------------------------------------------------------------
+from trovex import db as db_mod  # noqa: E402
+from trovex import search as search_mod  # noqa: E402
+
+
+def _perfc_store(tmp_path):
+    settings = Settings(
+        data_dir=tmp_path,
+        embed_model="BAAI/bge-small-en-v1.5",
+        sources_config_path=tmp_path / "no-such-sources.yaml",
+    )
+    return settings, SqliteStore(settings, embedder=BagEmbedder())
+
+
+def test_owner_stored_as_vec0_metadata_column(tmp_path):
+    """AC1: a record's single owner tag is denormalised onto the vec_docs.owner
+    metadata column at write time (so it can filter inside the KNN)."""
+    _settings, store = _perfc_store(tmp_path)
+    store.put("# A\n\ncurrent state resume work", kind="record", tags=["owner/alpha"])
+    rid = store.db.execute("SELECT id FROM docs LIMIT 1").fetchone()["id"]
+    assert store.db.execute("SELECT owner FROM vec_docs WHERE rowid=?", (rid,)).fetchone()[0] == "owner/alpha"
+
+
+def test_owner_knn_pushes_filter_and_does_not_overfetch(tmp_path):
+    """AC1: an owner-scoped search pushes `v.owner = ?` INTO the KNN with a small
+    bounded k (k=limit*5, never the 4096 VEC0_MAX_K over-fetch)."""
+    settings, store = _perfc_store(tmp_path)
+    store.put("# mine\n\ncurrent state resume work", kind="record", tags=["owner/alpha"])
+    for i in range(30):
+        store.put(f"# b{i}\n\ncurrent state resume work", kind="record", tags=["owner/beta"])
+
+    searcher = Searcher(settings, embedder=BagEmbedder())
+    calls: list = []
+
+    class _SpyConn:
+        # sqlite3.Connection.execute is read-only, so wrap the connection instead.
+        def __init__(self, real):
+            self._real = real
+
+        def execute(self, sql, params=()):
+            calls.append((sql, list(params)))
+            return self._real.execute(sql, params)
+
+        def __getattr__(self, name):
+            return getattr(self._real, name)
+
+    searcher.db = _SpyConn(searcher.db)  # type: ignore[assignment]
+    res = searcher.search(
+        "current state resume work", limit=5, source_ids=["trovex"], kind="record",
+        tags=["owner/alpha"], hybrid=False,
+    )
+
+    assert [r.title for r in res] == ["mine"]  # only alpha's record
+    knn_calls = [(s, p) for s, p in calls if "v.embedding MATCH" in s]
+    assert knn_calls, "no KNN issued"
+    for sql, params in knn_calls:
+        assert "v.owner = ?" in sql  # owner pushed into the KNN
+        assert "doc_tags" not in sql  # NOT the post-filter path
+        assert params[1] != search_mod.VEC0_MAX_K  # k is bounded, not the 4096 over-fetch
+
+
+def test_multi_owner_doc_recalled_via_fallback(tmp_path):
+    """cto ruling: a multi-owner doc stores owner='' (the fast KNN misses it) but is
+    still recalled for each of its owners via the doc_tags fallback."""
+    settings, store = _perfc_store(tmp_path)
+    store.put("# shared\n\ncurrent state resume work", kind="record", tags=["owner/alpha", "owner/beta"])
+    rid = store.db.execute("SELECT id FROM docs LIMIT 1").fetchone()["id"]
+    # multi-owner → '' in the vec0 column
+    assert store.db.execute("SELECT owner FROM vec_docs WHERE rowid=?", (rid,)).fetchone()[0] == ""
+
+    searcher = Searcher(settings, embedder=BagEmbedder())
+    for owner in ("owner/alpha", "owner/beta"):
+        res = searcher.search(
+            "current state resume work", limit=5, source_ids=["trovex"], kind="record",
+            tags=[owner], hybrid=False,
+        )
+        assert [r.title for r in res] == ["shared"], owner
+
+
+def test_set_tags_refreshes_vec_owner(tmp_path):
+    """A tag-only change (set_tags) that never re-embeds still keeps vec_docs.owner
+    in step (vec0 in-place metadata UPDATE)."""
+    _settings, store = _perfc_store(tmp_path)
+    ext = store.put("# a\n\ncurrent state resume work", kind="record", tags=["owner/alpha"])
+    rid = store.db.execute("SELECT id FROM docs LIMIT 1").fetchone()["id"]
+    store.set_tags(ext, remove=["owner/alpha"], add=["owner/gamma"])
+    assert store.db.execute("SELECT owner FROM vec_docs WHERE rowid=?", (rid,)).fetchone()[0] == "owner/gamma"
+
+
+def test_bm25_capped_stopwords_and_owner_filter(tmp_path):
+    """AC2: the BM25 recall query drops stopwords, caps terms, LIMIT 50, and pushes
+    the owner filter into the id set."""
+    settings, store = _perfc_store(tmp_path)
+    store.put("# alpha doc\n\nnginx reverse proxy tls", kind="record", tags=["owner/alpha"])
+    store.put("# beta doc\n\nnginx reverse proxy tls", kind="record", tags=["owner/beta"])
+    searcher = Searcher(settings, embedder=BagEmbedder())
+
+    # A query of only stopwords yields nothing (they're dropped, no terms left).
+    assert searcher._bm25_ids("the a an of to", pool=50) == []
+
+    # Owner filter: only alpha's doc comes back when scoped to owner/alpha.
+    alpha_id = store.db.execute(
+        "SELECT doc_id FROM doc_tags WHERE tag='owner/alpha'"
+    ).fetchone()["doc_id"]
+    scoped = searcher._bm25_ids("nginx reverse proxy", pool=50, owner_tag="owner/alpha")
+    assert scoped == [alpha_id]
+
+
+def test_bm25_term_cap_and_limit_constants():
+    """AC2: the caps are the configured small bounds, not the old 24-term / 4096."""
+    assert search_mod.BM25_MAX_TERMS <= 8
+    assert search_mod.BM25_RECALL_LIMIT == 50
+
+
+def test_boot_recall_path_never_reranks(client, monkeypatch):
+    """AC3: /api/boot recall must not run the cross-encoder rerank (it stays opt-in on
+    the search API). Poison maybe_rerank — boot must still return correct recall."""
+    import trovex.rerank as rerank_mod
+
+    def _boom(*a, **k):
+        raise AssertionError("rerank must not run on the boot recall path")
+
+    monkeypatch.setattr(rerank_mod, "maybe_rerank", _boom)
+    out = client.get("/api/boot", params={"agent": "coo", "floor": 0.0}).json()
+    assert [p["title"] for p in out["pointers"]] == ["COO handoff"]
+
+
+def test_migration_add_vec_owner_backfills_from_doc_tags(tmp_path):
+    """AC1: the migration adds the owner column to a legacy (owner-less) vec_docs and
+    backfills it from doc_tags WITHOUT re-embedding (blobs copied across): single
+    owner → the tag, multi/none owner → ''."""
+    _settings, store = _perfc_store(tmp_path)
+    store.put("# single\n\ncurrent state resume work", kind="record", tags=["owner/alpha"])
+    store.put("# multi\n\ncurrent state resume work", kind="record", tags=["owner/alpha", "owner/beta"])
+    store.put("# none\n\ncurrent state resume work", kind="record", tags=[])
+    conn = store.db
+
+    # Simulate a legacy store: rebuild vec_docs WITHOUT the owner column, preserving blobs.
+    rows = conn.execute(
+        "SELECT rowid AS rid, source_id, embedding AS emb, kind, lifecycle, status, embed_model FROM vec_docs"
+    ).fetchall()
+    conn.execute("DROP TABLE vec_docs")
+    conn.execute(
+        f"CREATE VIRTUAL TABLE vec_docs USING vec0(source_id TEXT partition key, "
+        f"embedding float[{DIM}] distance_metric=cosine, kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT)"
+    )
+    for r in rows:
+        conn.execute(
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (r["rid"], r["source_id"], r["emb"], r["kind"], r["lifecycle"], r["status"], r["embed_model"]),
+        )
+    conn.commit()
+    assert "owner" not in {r[1] for r in conn.execute("PRAGMA table_info(vec_docs)")}
+
+    db_mod._migrate_add_vec_owner(conn, DIM)
+
+    assert "owner" in {r[1] for r in conn.execute("PRAGMA table_info(vec_docs)")}
+    owners = {
+        r["title"]: conn.execute("SELECT owner FROM vec_docs WHERE rowid=?", (r["id"],)).fetchone()[0]
+        for r in conn.execute("SELECT id, title FROM docs")
+    }
+    assert owners["single"] == "owner/alpha"
+    assert owners["multi"] == ""
+    assert owners["none"] == ""

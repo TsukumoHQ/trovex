@@ -368,12 +368,21 @@ async def lifespan(app: FastAPI):
             state.store.db, state.settings.data_dir / "trovex.db", WAL_CHECKPOINT_POLL_SEC
         )
     )
+    # Served-empty-store guard (incident 35c0631e, audit Q9): refresh the
+    # staleness flag once now so the first probe is accurate, then keep it fresh
+    # in the background — /healthz only ever reads the flag, never the DB.
+    try:
+        await offload.off_loop(_refresh_health, state, timeout=5.0)
+    except Exception:  # noqa: BLE001 — a startup refresh miss must not block serving
+        pass
+    health_task = asyncio.create_task(_health_refresh_timer(state, _HEALTH_REFRESH_SEC))
     try:
         async with mcp.session_manager.run():
             yield
     finally:
         watchdog_task.cancel()
         wal_checkpoint_task.cancel()
+        health_task.cancel()
         state.applier.stop()
 
 
@@ -435,6 +444,78 @@ def _sparkline(values: list[int], w: int = 100, h: int = 30, pad: int = 3) -> di
     line = " ".join(f"{x},{y}" for x, y in pts)
     area = f"{pad},{h - pad} {line} {round(pts[-1][0], 1)},{h - pad}"
     return {"line": line, "area": area, "w": w, "h": h}
+
+
+# How often the background refresher recomputes the served-empty-store
+# staleness flag (audit Q9): /healthz itself stays LOOP-ONLY and only reads the
+# flag, so a probe never takes an offload worker or queues behind recall — the
+# refresh is one short, infrequent worker use, not one per probe.
+_HEALTH_REFRESH_SEC = 15.0
+
+
+def _refresh_health(state: Any) -> None:
+    """Recompute AppState.health OFF the request path (the refresher's worker).
+    stale=True exactly when the served connection reads 0/None docs while the DB
+    file on disk holds rows (incident 35c0631e: a frozen snapshot served empty
+    while still answering 200)."""
+    served, on_disk = _healthz_store_counts(state)
+    if not served and on_disk > 0:
+        state.health = {
+            "stale": True,
+            "detail": f"stale store: served {served!r} but db file has {on_disk}",
+        }
+    else:
+        state.health = {"stale": False, "detail": "ok"}
+
+
+async def _health_refresh_timer(state: Any, interval_sec: float) -> None:
+    """Refresh the health flag periodically on the offload pool (same pattern as
+    the WAL checkpoint timer) — never on the /healthz probe path."""
+    while True:
+        try:
+            await offload.off_loop(_refresh_health, state, timeout=5.0)
+        except Exception:  # noqa: BLE001 — a refresh miss must never crash the timer
+            pass
+        await asyncio.sleep(interval_sec)
+
+
+def _healthz_store_counts(state: Any) -> tuple[int | None, int]:
+    """(served, on_disk) for the /healthz staleness guard, run OFF the event loop.
+
+    served = docs count via the long-lived served connection (None if that read
+    raised). on_disk is read ONLY when served is 0/None, through a FRESH
+    connection (_docs_on_disk) so a frozen-snapshot server can't vouch for its
+    own stale read; it stays 0 otherwise so a healthy server never pays for the
+    second open."""
+    try:
+        served: int | None = state.searcher.db.execute(
+            "SELECT COUNT(*) AS c FROM docs"
+        ).fetchone()["c"]
+    except Exception:  # noqa: BLE001 — a dead/locked served conn is unhealthy, not a 500
+        served = None
+    on_disk = 0
+    if not served:  # 0 or None
+        on_disk = _docs_on_disk(state.settings.data_dir / "trovex.db")
+    return served, on_disk
+
+
+def _docs_on_disk(db_path: Path) -> int:
+    """Ground-truth docs count, read through a FRESH short-lived connection — never
+    the long-lived served connection (incident 35c0631e), so a server frozen on a
+    stale snapshot can't hide behind its own stale read. query_only so this never
+    writes or checkpoints. Best-effort: -1 when the file can't be read, so a genuine
+    read error can't masquerade as a populated disk and bounce a healthy server."""
+    try:
+        if not db_path.exists():
+            return -1
+        conn = sqlite3.connect(str(db_path), timeout=2.0)
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            return conn.execute("SELECT COUNT(*) FROM docs").fetchone()[0]
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 — a probe hiccup must never bounce a healthy server
+        return -1
 
 
 def build_app() -> FastAPI:
@@ -1266,8 +1347,23 @@ def build_app() -> FastAPI:
         return JSONResponse(job)
 
     @app.get("/healthz", response_class=PlainTextResponse)
-    async def healthz() -> str:
-        return "ok"
+    async def healthz() -> PlainTextResponse:
+        """Liveness + served-empty-store guard (incident 35c0631e), LOOP-ONLY
+        (audit Q9).
+
+        A frozen/stale served connection (a half-open write txn pinned the
+        snapshot) kept answering 200 while serving 0 docs on a 4.7k-doc store,
+        so the whole fleet silently booted empty for days. /healthz now reads a
+        staleness flag refreshed in the BACKGROUND and returns 503 when it is
+        set — never touching the DB or the offload pool on the probe path, so a
+        health check can't queue behind recall or orphan a worker during the
+        very overload it exists to report. The flag goes stale when the served
+        connection reads 0 docs while the DB file on disk holds rows.
+        """
+        health = get_state().health
+        if health.get("stale"):
+            return PlainTextResponse(health.get("detail", "stale store"), status_code=503)
+        return PlainTextResponse("ok")
 
     def _compute_settings_context(db: sqlite3.Connection, state: Any) -> dict:
         from . import backup as backup_mod

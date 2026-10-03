@@ -33,6 +33,11 @@ class AppState:
     # coalesce-or-insert decision and the Applier's claim/finish steps all take
     # this, so two threads never race the same index_jobs row.
     index_jobs_lock: threading.Lock = field(default_factory=threading.Lock)
+    # Served-empty-store staleness flag (incident 35c0631e), refreshed by the
+    # server's background health timer and read LOOP-ONLY by /healthz (audit Q9).
+    # Defaults healthy — a fresh process is assumed live until a refresh proves
+    # the served connection reads empty while the DB file on disk holds rows.
+    health: dict = field(default_factory=lambda: {"stale": False, "detail": "ok"})
     _applier: Applier | None = field(default=None, init=False, repr=False, compare=False)
 
     @property

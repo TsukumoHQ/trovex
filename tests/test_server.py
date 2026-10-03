@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import sqlite3
 import time
 
 import numpy as np
@@ -723,3 +724,93 @@ def test_query_embed_model_default_is_int8_mirror():
     s = Settings()
     assert s.query_embed_model == "Xenova/bge-small-en-v1.5"
     assert s.query_embed_file == "onnx/model_quantized.onnx"
+
+
+# ── incident 35c0631e: served-empty-store (frozen snapshot) ──────────────────
+
+
+def test_log_pointer_query_rolls_back_stuck_txn_on_error(client):
+    """Root-cause regression (incident 35c0631e): a malformed pointer makes
+    log_pointer_query raise AFTER its mcp_queries INSERT has already opened a
+    write transaction. The except MUST roll back — otherwise the long-lived
+    served connection is stuck in an open write txn, which freezes every later
+    read to a stale snapshot (/api/stats served 0 on a 4.7k-doc store) and holds
+    the WAL write lock so the separate reindex writer is locked out and the WAL
+    can never checkpoint."""
+    from trovex.usage import log_pointer_query
+
+    db = state_mod._state.searcher.db
+    before = db.execute("SELECT COUNT(*) FROM mcp_queries").fetchone()[0]
+
+    # pointer dict missing "id" -> the executemany list-comp raises KeyError
+    # AFTER the mcp_queries INSERT opened the write txn.
+    log_pointer_query(
+        db,
+        source="boot",
+        agent="probe",
+        query="q",
+        pointers=[{"score": 1.0}],
+        tokens_est=0,
+        elapsed_ms=1,
+    )
+
+    # fix: the half-open write txn was released, not left dangling
+    assert db.in_transaction is False
+    # the failed INSERT was rolled back, not silently committed
+    assert db.execute("SELECT COUNT(*) FROM mcp_queries").fetchone()[0] == before
+
+    # and the WAL write lock is free: a separate writer is not locked out
+    other = sqlite3.connect(str(state_mod._state.settings.data_dir / "trovex.db"))
+    other.execute("PRAGMA busy_timeout=1500")
+    try:
+        other.execute("CREATE TABLE IF NOT EXISTS _healthz_probe(x)")
+        other.execute("INSERT INTO _healthz_probe(x) VALUES (1)")
+        other.commit()  # pre-fix this raises sqlite3.OperationalError: database is locked
+    finally:
+        other.close()
+
+
+def test_healthz_ok_when_store_populated(client):
+    # a fresh refresh on the populated fixture store clears the flag
+    from trovex.server import _refresh_health
+
+    _refresh_health(state_mod._state)
+    resp = client.get("/healthz")
+    assert resp.status_code == 200
+    assert resp.text == "ok"
+
+
+def test_healthz_is_loop_only_reads_flag_not_db(client, monkeypatch):
+    """Audit Q9: /healthz must NOT touch the DB or the offload pool on the probe
+    path — it reads the background-refreshed flag only. Prove it: a served
+    connection that raises on every execute does not affect /healthz."""
+    class _BoomDB:
+        def execute(self, *a, **k):
+            raise AssertionError("/healthz must not query the DB on the probe path")
+
+    monkeypatch.setattr(state_mod._state.searcher, "db", _BoomDB())
+    resp = client.get("/healthz")  # reads state.health (default healthy), no db
+    assert resp.status_code == 200
+    assert resp.text == "ok"
+
+
+def test_healthz_503_when_served_empty_but_db_populated(client):
+    """A frozen/stale served connection that reads 0 docs while the DB file on
+    disk holds rows must make /healthz fail LOUD (503), so the monitor restarts
+    us instead of silently handing every agent an empty context (incident
+    35c0631e). The flag is set by the BACKGROUND refresher (_refresh_health),
+    which cross-checks the file through a FRESH connection so a stale server
+    can't vouch for itself; /healthz then just reads the flag."""
+    from trovex.server import _refresh_health
+
+    # the real tmp DB file has the fixture's docs; swap the SERVED connection for
+    # an empty one to mimic the frozen 0-row snapshot, then refresh the flag.
+    empty = sqlite3.connect(":memory:")
+    empty.row_factory = sqlite3.Row
+    empty.execute("CREATE TABLE docs(id INTEGER PRIMARY KEY)")  # 0 rows
+    state_mod._state.searcher.db = empty
+    _refresh_health(state_mod._state)
+
+    resp = client.get("/healthz")
+    assert resp.status_code == 503
+    assert "stale store" in resp.text

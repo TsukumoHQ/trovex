@@ -24,7 +24,18 @@ import re
 import sqlite3
 from dataclasses import dataclass
 
-__all__ = ["ParsedRef", "parse_links", "resolve_ref", "sync_doc_refs"]
+__all__ = [
+    "ParsedRef",
+    "backlinks",
+    "link_counts",
+    "outgoing_links",
+    "parse_links",
+    "render_links_block",
+    "resolve_doc_handle",
+    "resolve_ref",
+    "sync_doc_refs",
+    "valid_handle",
+]
 
 _CONTEXT_LIMIT = 160
 
@@ -329,3 +340,118 @@ def sync_doc_refs(
         bound = resolve_ref(conn, row["src_source_id"], row["src_path"], row["dst_raw"])
         if bound is not None:
             conn.execute("UPDATE doc_refs SET dst_id = ? WHERE id = ?", (bound, row["id"]))
+
+
+# --- read side: expose the graph to agents (task b9687dfb, trovex/links L2) --
+
+_LINK_CAP = 10
+# A doc handle reaching resolve_doc_handle: an ext_id, a "source:path", or a
+# bare path. Validated before it reaches SQL (defence-in-depth; the queries are
+# parameterised regardless) — ids/paths never contain these chars.
+_HANDLE_RE = re.compile(r"^[A-Za-z0-9._/:#\- ]{1,512}$")
+
+
+def valid_handle(handle: str) -> bool:
+    """True if `handle` is a plausible doc id / path (length + charset bounded)."""
+    return bool(handle) and bool(_HANDLE_RE.match(handle))
+
+
+def resolve_doc_handle(conn: sqlite3.Connection, handle: str):
+    """Resolve a doc handle to its `(id, source_id, path, ext_id)` row, or None.
+
+    Accepts an owned doc's `ext_id` (full or unique prefix), a `source:path`, or
+    a bare `path` (when unique across sources) — so link queries work for a
+    file-backed doc, not just owned ones (`store.get` is ext_id-only)."""
+    handle = (handle or "").strip()
+    if not valid_handle(handle):
+        return None
+    row = conn.execute(
+        "SELECT id, source_id, path, ext_id FROM docs WHERE ext_id = ?", (handle,)
+    ).fetchone()
+    if row is not None:
+        return row
+    if ":" in handle:
+        src, _, p = handle.partition(":")
+        row = conn.execute(
+            """SELECT id, source_id, path, ext_id FROM docs
+               WHERE source_id = ? AND path = ? AND workspace_id = 'default'""",
+            (src, p),
+        ).fetchone()
+        if row is not None:
+            return row
+    rows = conn.execute(
+        """SELECT id, source_id, path, ext_id FROM docs
+           WHERE path = ? AND workspace_id = 'default' LIMIT 2""",
+        (handle,),
+    ).fetchall()
+    if len(rows) == 1:
+        return rows[0]
+    # ext_id unique prefix, last (a short id the agent pasted). Escape LIKE
+    # metacharacters (_ and %) so a handle can't widen the prefix match.
+    from .db import like_escape
+
+    rows = conn.execute(
+        "SELECT id, source_id, path, ext_id FROM docs WHERE ext_id LIKE ? ESCAPE '\\' LIMIT 2",
+        (like_escape(handle) + "%",),
+    ).fetchall()
+    return rows[0] if len(rows) == 1 else None
+
+
+def outgoing_links(conn: sqlite3.Connection, src_id: int) -> list:
+    """This doc's outgoing refs, resolved rows first then dangling, insert order."""
+    return conn.execute(
+        """SELECT r.dst_id, r.dst_raw, r.anchor, r.context, r.kind,
+                  d.path AS dst_path, d.source_id AS dst_source
+           FROM doc_refs r LEFT JOIN docs d ON d.id = r.dst_id
+           WHERE r.src_id = ?
+           ORDER BY (r.dst_id IS NULL), r.id""",
+        (src_id,),
+    ).fetchall()
+
+
+def backlinks(conn: sqlite3.Connection, dst_id: int) -> list:
+    """Docs that link TO this one (resolved edges only), insert order."""
+    return conn.execute(
+        """SELECT r.context, r.anchor, s.path AS src_path, s.source_id AS src_source
+           FROM doc_refs r JOIN docs s ON s.id = r.src_id
+           WHERE r.dst_id = ?
+           ORDER BY r.id""",
+        (dst_id,),
+    ).fetchall()
+
+
+def link_counts(conn: sqlite3.Connection, doc_id: int) -> tuple[int, int]:
+    """(incoming, outgoing) ref counts for a doc — the trovex(q) count hint."""
+    out = conn.execute(
+        "SELECT COUNT(*) n FROM doc_refs WHERE src_id = ?", (doc_id,)
+    ).fetchone()["n"]
+    inc = conn.execute(
+        "SELECT COUNT(*) n FROM doc_refs WHERE dst_id = ?", (doc_id,)
+    ).fetchone()["n"]
+    return inc, out
+
+
+def _ctx(context: str | None) -> str:
+    return f" — {context}" if context else ""
+
+
+def render_links_block(conn: sqlite3.Connection, doc_id: int, cap: int = _LINK_CAP) -> str:
+    """Compact plain-text link block for trovex_read(links=True): outgoing edges
+    (`→ out:` resolved / `∅` dangling) then backlinks (`← in:`), each side capped
+    at `cap` with a `+N more` tail. '(no links)' when the doc has none."""
+    out_rows = outgoing_links(conn, doc_id)
+    in_rows = backlinks(conn, doc_id)
+    lines: list[str] = []
+    for r in out_rows[:cap]:
+        anchor = f"#{r['anchor']}" if r["anchor"] else ""
+        if r["dst_id"] is None:
+            lines.append(f"∅ {r['dst_raw']}{anchor}")
+        else:
+            lines.append(f"→ out: {r['dst_path']}{anchor}{_ctx(r['context'])}")
+    if len(out_rows) > cap:
+        lines.append(f"  +{len(out_rows) - cap} more out")
+    for r in in_rows[:cap]:
+        lines.append(f"← in: {r['src_path']}{_ctx(r['context'])}")
+    if len(in_rows) > cap:
+        lines.append(f"  +{len(in_rows) - cap} more in")
+    return "\n".join(lines) if lines else "(no links)"

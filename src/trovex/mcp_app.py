@@ -650,6 +650,25 @@ def trovex_tag(
     return ", ".join(tags) if tags else "(no tags)"
 
 
+def _read_file_doc_body(db, internal_id: int) -> str:
+    """Body of a file-backed doc (which has no `content` in the DB) — read from
+    its indexed `absolute_path`, falling back to any stored content, then title.
+    Used by trovex_read(links=True) on a non-owned doc."""
+    row = db.execute(
+        "SELECT absolute_path, content, title FROM docs WHERE id = ?", (internal_id,)
+    ).fetchone()
+    if row is None:
+        return ""
+    if row["absolute_path"]:
+        try:
+            from pathlib import Path
+
+            return Path(row["absolute_path"]).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            pass
+    return row["content"] or row["title"] or ""
+
+
 @_off_loop
 def trovex_read(
     query: str = "",
@@ -661,6 +680,7 @@ def trovex_read(
     versions: bool = False,
     version_id: int = 0,
     as_of: float = 0,
+    links: bool = False,
 ) -> str:
     """Read a trovex-owned doc — by default returns the most relevant *passage*.
 
@@ -696,9 +716,22 @@ def trovex_read(
             version that was current at that time, then reads THAT doc instead.
             Ignored with `versions`/`version_id` (those read one doc's own
             content history, not a chain of separate superseding docs).
+        links: Append the doc's graph edges (task b9687dfb) after the body: its
+            outgoing `[[links]]`/.md links (`→ out:` resolved, `∅` dangling) and
+            its backlinks (`← in:`), each with the citing sentence, capped 10 a
+            side. Works for a file-backed doc too — pass its source path (or
+            `source:path`) as `doc_id`.
     """
     state = get_state()
     query = (query or q).strip()
+
+    def _links_suffix(internal_id: int) -> str:
+        if not links:
+            return ""
+        from .links_parse import render_links_block
+
+        return "\n\n" + render_links_block(state.store.db, internal_id)
+
     if doc_id:
         # Accept a full OR short/prefix id (a bare short id used to return (not found)).
         resolved = state.store.resolve_ext_id(doc_id)
@@ -706,7 +739,22 @@ def trovex_read(
             resolved = state.store.resolve_as_of(resolved, as_of)
         doc = state.store.get(resolved) if resolved else None
         if doc is None:
+            # File-backed doc (no ext_id, so store.get can't reach it): with
+            # links=True, resolve it by source path and serve body-from-disk +
+            # its graph edges (task b9687dfb). Without links, behaviour is
+            # unchanged ((not found) for a non-owned id).
+            if links:
+                from .links_parse import resolve_doc_handle
+
+                handle = resolve_doc_handle(state.store.db, doc_id)
+                if handle is not None:
+                    body = _read_file_doc_body(state.store.db, handle["id"])
+                    return (body + _links_suffix(handle["id"])).strip()
             return "(not found)"
+        owned_id_row = state.store.db.execute(
+            "SELECT id FROM docs WHERE ext_id = ?", (resolved,)
+        ).fetchone()
+        owned_id = owned_id_row["id"] if owned_id_row else 0
         # task b47301eb: this session reading a resolved doc back is the free
         # used-vs-served label the replay eval scores hit@1 against. Skipped for
         # versions/version_id — those read history, not the doc that was served.
@@ -746,8 +794,9 @@ def trovex_read(
             if sec is None:
                 return f"(section '{section}' not found)"
             cite = _prov_line(state.store.provenance(resolved, section))
-            return f"{sec}\n\n{cite}" if cite else sec
-        return doc.content
+            body = f"{sec}\n\n{cite}" if cite else sec
+            return body + _links_suffix(owned_id)
+        return doc.content + _links_suffix(owned_id)
     if not query:
         return _err(
             "missing_input",
@@ -781,6 +830,7 @@ def trovex_read(
             # parent section.
             section = state.store.section_text(h["doc_id"], h["heading_path"]) or h["content"]
             out = _fmt_passage({**h, "content": section})
+        out += _links_suffix(h["doc_id"])
     else:
         out = "(no results)"
     saved = _log_retrieval(state, query, hits, out, t0)
@@ -1262,3 +1312,21 @@ def catalog_for_source(source: str) -> str:
     if len(rows) >= _CATALOG_CAP:
         out.append(f"\n(capped at {_CATALOG_CAP})")
     return "\n".join(out) + "\n"
+
+
+@_off_loop_resource("trovex://graph/{doc}", name="doc-graph", mime_type="text/markdown")
+def doc_graph(doc: str) -> str:
+    """The 1-hop link neighbourhood of one doc (task b9687dfb): what it links to
+    (`→ out:` resolved / `∅` dangling) and what links to it (`← in:`), with the
+    citing sentence. `doc` is an owned doc's id, a file-backed `source:path`, or
+    a bare path. Follows an edge with trovex_read(doc_id=..., links=True)."""
+    from .links_parse import render_links_block, resolve_doc_handle, valid_handle
+
+    db = get_state().searcher.db
+    if not valid_handle(doc):
+        return f"# {doc}\n\n(invalid doc handle)"
+    handle = resolve_doc_handle(db, doc)
+    if handle is None:
+        return f"# {doc}\n\n(unknown doc — pass an owned id, a source:path, or a unique path)"
+    label = handle["ext_id"] or f"{handle['source_id']}:{handle['path']}"
+    return f"# graph: {label}\n\n{render_links_block(db, handle['id'])}\n"

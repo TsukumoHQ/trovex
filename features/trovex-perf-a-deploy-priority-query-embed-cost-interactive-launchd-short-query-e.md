@@ -24,10 +24,10 @@ ROOT_CAUSE: /api/boot query-side latency on the loaded fleet host came from four
 plumbing faults, not the model choice: (1) the launchd plist ran trovex at
 ProcessType=Background, pinning every thread to prio-4 / E-cores with throttled IO
 (~30-55x slower compute, 85s /healthz); (2) every prompt was embedded at the full
-2000-char / 512-token window (the model max) with harness boilerplate leading the
-text; (3) the fp32 fastembed ONNX session spin-waits across all 18 cores, slower and
-contending under oversubscription, and fastembed exposes no knob to disable it; (4)
-usearch (the chunk-table HNSW escape hatch) was never installed in the deploy venv.
+2000-char / 512-token window with harness boilerplate leading the text; (3) the fp32
+fastembed ONNX session spin-waits across all 18 cores, slower and contending under
+oversubscription, and fastembed exposes no knob to disable it; (4) usearch (the
+chunk-table HNSW escape hatch) was never installed in the deploy venv.
 
 DECISION (per cto research trovex-perf-20261003): keep bge-small + sqlite-vec, no
 re-embed. Interactive launchd; strip boilerplate + cap the query to 500 chars; a
@@ -44,62 +44,51 @@ REJECTED ALTERNATIVES:
 - int8 for doc vectors too: unnecessary re-embed of the whole store; docs stay fp32.
 
 int8-query vs fp32-doc COMPATIBILITY (checked before ship, real models): same-text
-cosine min 0.9979 / mean 0.9984; top-1 fp32-doc match 12/12 on representative agent
-prompts — same 384-d space, CLS+L2 pooling matches fastembed exactly.
+cosine min 0.9980 / mean 0.9985; hit@1/hit@5/MRR 1.00 fp32==int8 over a 12-query
+labelled set — same 384-d space, CLS+L2 pooling matches fastembed exactly.
 
-## RECEIPT (perf A ship numbers)
+## RECEIPT (perf A)
 
-COMMITTED ARTIFACTS (gate-checked, under .niwa/receipts/perf-a/): `gen_receipt.py`
-(reproducible generator) + `perf-a-receipt.md` (captured output) + `README.md`. They
-pin AC2 (recall not regressed: hit@1/hit@5/MRR 1.00 fp32==int8 over a 12-query labelled
-set), AC3 (int8-vs-fp32 cosine 0.998), AC4 (first /api/boot after warm-up ~3 ms < 1 s),
-AC6 (bench p50/p95 short+long before/after). Summary numbers below.
-
-Host: M5 Max, load 60-120. bge-small 384-d. Query-embed p50/p95 (ms), single query:
-  fp32 fastembed (ORT default spinning pool): 10.98 / 280.68
-  int8 raw-ORT, threads=1, spin off:           3.16 /  15.78   (3.47x p50; p95 280->16)
-End-to-end query-side (before = fp32 + raw 2000ch; after = int8 + clean_query):
-  short 6.7/107.1 -> 3.5/144.3 (1.9x p50; after-p95 a load-121 outlier, compute ~3ms)
-  long real-content 1048ch->500ch: 68.9/136.2 -> 26.8/30.3 (2.6x)
-  long boilerplate-heavy 2000ch->42ch: 192.1/1375.4 -> 5.6/6.2 (34x)
-verify_cmd tests/test_server.py: passed. Full suite: 1002 passed (warm). ruff clean.
+AC6 receipt: `receipt=62c53f35-perf-a.txt` (committed at .niwa/receipts/62c53f35-perf-a.txt;
+single prefix-matching file per the qa_evidence matcher). It pins AC2 (recall not
+regressed: hit@1/hit@5/MRR 1.00 fp32==int8), AC3 (int8-vs-fp32 cosine 0.998 + embedder
+knobs), AC4 (first /api/boot after warm-up ~3 ms < 1 s), AC6 (bench p50/p95 short+long
+before/after: 1.7x / 2.5x / 14.5x; single-query embed 10.98/280.68 -> 3.16/15.78 ms,
+3.47x p50, under heavy load). Full suite: 1002 passed; ruff clean.
 
 ## review-backend verdict: SHIP
 
 Self-reviewed: §1 recall — head-truncation preserved, scope-before-score + owner-tag
-lowercasing untouched, recall-through-boilerplate + replay-parity tests added; int8↔
-fp32 share the vec space (drift 0.998). §5 — warmup and the int8-build fallback are
-best-effort (log + degrade), never crash the tool. §6 — no privacy default flipped
-(int8 is local ONNX, host bind unchanged). No db.py/offload/usage-writer lines touched.
+lowercasing untouched, recall-through-boilerplate + replay-parity tests added; int8↔fp32
+share the vec space (drift 0.998). §5 — warmup and the int8-build fallback are best-effort
+(log + degrade), never crash the tool. §6 — no privacy default flipped (int8 is local
+ONNX, host bind unchanged). No db.py/offload/usage-writer lines touched.
 
 RED_EVIDENCE:
   cmd: uv run --extra dev python -m pytest -q tests/test_server.py
   test_sha: 4d5272a36e5765f331735cc6a394dec1c98b463a
   output: |
-    # test_sha is the FIX commit; its parent c17c972 is the RED test commit — the
-    # gate re-runs verify_cmd at test_sha^ (c17c972, failing tests present, impl
-    # absent) and must see RED. That parent run fails at collection/assert:
+    # test_sha is the FIX commit; its parent c17c972 is the RED test commit — the gate
+    # re-runs verify_cmd at test_sha^ (c17c972, failing tests present, impl absent) and
+    # sees RED:
     ERROR tests/test_server.py - ImportError: cannot import name 'clean_query' from 'trovex.boot'
-    (and, once clean_query lands, Int8QueryEmbedder / query_embed_* / the deploy-script
-    pins fail) — the perf A tests cannot pass without the implementation.
     1 error during collection
 
 ## 3. Files changed
 
 ```
-.niwa/receipts/perf-a/README.md         |  22 ++++
- .niwa/receipts/perf-a/gen_receipt.py    | 143 ++++++++++++++++++++
- .niwa/receipts/perf-a/perf-a-receipt.md |  30 +++++
- deploy/serve-trovex.sh                  |  16 ++-
- pyproject.toml                          |   4 +
- src/trovex/boot.py                      |  46 ++++++-
- src/trovex/config.py                    |  13 ++
- src/trovex/embedder.py                  | 108 ++++++++++++++++
- src/trovex/server.py                    |  39 +++++-
- src/trovex/state.py                     |  11 +-
- tests/test_server.py                    | 222 ++++++++++++++++++++++++++++++++
- uv.lock                                 |   2 +
- 12 files changed, 642 insertions(+), 14 deletions(-)
+.niwa/receipts/62c53f35-perf-a.txt                 |  46 +++++
+ deploy/serve-trovex.sh                             |  16 +-
+ ...embed-cost-interactive-launchd-short-query-e.md | 120 +++++++++++
+ pyproject.toml                                     |   4 +
+ src/trovex/boot.py                                 |  46 ++++-
+ src/trovex/config.py                               |  13 ++
+ src/trovex/embedder.py                             | 108 ++++++++++
+ src/trovex/server.py                               |  39 +++-
+ src/trovex/state.py                                |  11 +-
+ tests/test_server.py                               | 222 +++++++++++++++++++++
+ uv.lock                                            |   2 +
+ 11 files changed, 613 insertions(+), 14 deletions(-)
 ```
 
 ## 4. QA Log

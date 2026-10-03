@@ -7,6 +7,7 @@ and logs the query for the dashboard.
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
 import logging
 import re
@@ -289,4 +290,14 @@ def log_pointer_query(
             )
         db.commit()
     except Exception:  # noqa: BLE001 — a boot call must never 500 on a log failure
+        # CRITICAL (incident 35c0631e): the mcp_queries INSERT above opens an
+        # implicit write transaction (Python's default isolation_level). If the
+        # executemany then raises, swallowing without a rollback leaves this
+        # long-lived served connection stuck in an open write txn — which freezes
+        # every later SELECT to that snapshot (/api/stats served 0 and /api/boot
+        # recall went empty on a 4.7k-doc store) AND holds the WAL write lock, so
+        # the WAL can never checkpoint (it grew to 140MB) and the separate reindex
+        # writer hits "database is locked". Always release it.
+        with contextlib.suppress(Exception):
+            db.rollback()
         log.debug("log_pointer_query failed", exc_info=True)

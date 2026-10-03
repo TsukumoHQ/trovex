@@ -50,6 +50,7 @@ from .db import (
 from . import retention, usearch_index
 from .query_cache import embed_query_blob
 from .embedder import Embedder, embedder_from_settings
+from .code_refs import sync_code_refs
 from .links_parse import sync_doc_refs
 
 TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
@@ -397,6 +398,18 @@ class SqliteStore:
             # it. An owned doc's resolve context is (TROVEX_SOURCE_ID, its ext_id).
             sync_doc_refs(
                 self.db, src_id=doc_id, source_id=TROVEX_SOURCE_ID, path=ext_id, content=content
+            )
+            # Code citations (task ef1c4106): an owned record often cites a task
+            # id / commit sha. git_root=None — owned docs aren't a git-backed
+            # source, so cites-code paths/drift don't apply, only ticket/commit.
+            sync_code_refs(
+                self.db,
+                src_id=doc_id,
+                source_id=TROVEX_SOURCE_ID,
+                path=ext_id,
+                content=content,
+                git_root=None,
+                doc_mtime=now,
             )
             self.db.commit()
             # Flag near-duplicates on the live write path too (the batch pass in

@@ -118,6 +118,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     _migrate_add_index_run_metrics(conn)
     _migrate_add_index_jobs_link(conn)
     _migrate_add_provenance(conn)
+    _migrate_add_drift(conn)
     _init_schema(conn, embed_dim)
     # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
     # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
@@ -1077,6 +1078,30 @@ def doc_link(source_url: str | None, absolute_path: str | None, ext_id: str | No
     return f"trovex:{ext_id}" if ext_id else ""
 
 
+def _migrate_add_drift(conn: sqlite3.Connection) -> None:
+    """Docs↔code drift (task ef1c4106, trovex/links L5): add docs.drift +
+    drift_reason to a pre-existing docs table. Additive, idempotent — a second
+    boot finds the columns and no-ops before taking a writer lock."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='docs' AND type='table'").fetchone():
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    todo = [
+        (c, t)
+        for c, t in (("drift", "INTEGER NOT NULL DEFAULT 0"), ("drift_reason", "TEXT"))
+        if c not in cols
+    ]
+    if not todo:
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        for col, typ in todo:
+            conn.execute(f"ALTER TABLE docs ADD COLUMN {col} {typ}")  # sql-safe: fixed literal tuple
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def _migrate_add_provenance(conn: sqlite3.Connection) -> None:
     """Provenance envelope (steal #6): docs gain the remote-record fields a
     connector fills; chunks gain anchor + link so every served hit is a
@@ -1617,6 +1642,12 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             owners TEXT,
             parents TEXT,
             fetched_at REAL,
+            -- Docs↔code drift (task ef1c4106, trovex/links L5): set when a code
+            -- file this doc cites (cites-code edge in doc_refs) has a commit
+            -- NEWER than the doc's last change. Computed at index time from git,
+            -- never per query. drift_reason names the file + commit count.
+            drift INTEGER NOT NULL DEFAULT 0,
+            drift_reason TEXT,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
@@ -1971,6 +2002,18 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         -- only form that collapses two anchorless links to the same target).
         CREATE UNIQUE INDEX IF NOT EXISTS idx_doc_refs_uniq
             ON doc_refs(src_id, dst_raw, COALESCE(anchor, ''));
+
+        -- Git last-commit-ts cache for the L5 drift computation (task ef1c4106).
+        -- Keyed by a code file's content_hash so an UNCHANGED repo reindex reuses
+        -- the row and never shells out to git (the "no git per query/per doc"
+        -- invariant). Rebuilt lazily when a file's content changes.
+        CREATE TABLE IF NOT EXISTS code_commit_cache (
+            source_id TEXT NOT NULL,
+            path TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            last_commit_ts REAL,
+            PRIMARY KEY (source_id, path)
+        );
 
         -- Doc history: a snapshot of the previous content on every overwrite
         CREATE TABLE IF NOT EXISTS doc_versions (

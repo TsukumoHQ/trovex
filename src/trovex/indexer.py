@@ -25,6 +25,7 @@ from .db import (
     vec_chunks_put,
     vec_docs_put,
 )
+from .code_refs import recompute_drift_for_code_docs, sync_code_refs
 from .links_parse import sync_doc_refs
 from .embedder import Embedder, embedder_from_settings
 
@@ -406,6 +407,10 @@ class Indexer:
         #   - nothing added/updated and nothing removed: status can't have
         #     changed for anyone either — skip the call entirely (status_ms 0).
         #   - otherwise: incremental, scoped to this run's touched doc ids.
+        # Docs↔code graph + drift (task ef1c4106): after the upsert loop, before
+        # status, so every code doc + its chunks exist for cites-code resolution.
+        self._sync_code_graph(sources)
+
         from .status import compute_status
 
         if not self._touched_ids and removed == 0:
@@ -600,6 +605,45 @@ class Indexer:
                 chunk_embed_batch.clear()
         return action
 
+    def _sync_code_graph(self, sources: list[Source]) -> None:
+        """Post-loop pass (task ef1c4106): extract code/symbol/sha/ticket
+        citations + recompute drift for every doc touched this run. Runs AFTER
+        the upsert loop so forward cites-code (a doc citing a file indexed later
+        in the same run) resolve and code chunks exist for symbol lookup. Then
+        re-drifts non-touched docs whose cited code files changed this run."""
+        if not self._touched_ids:
+            return
+        root_by = {s.id: s.root for s in sources}
+        memo: dict = {}
+        changed_code: list[int] = []
+        for doc_id in self._touched_ids:
+            row = self.db.execute(
+                "SELECT source_id, path, content, absolute_path, mtime FROM docs WHERE id = ?",
+                (doc_id,),
+            ).fetchone()
+            if row is None:
+                continue
+            content = row["content"]
+            if content is None and row["absolute_path"]:
+                try:
+                    content = Path(row["absolute_path"]).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    content = ""
+            sync_code_refs(
+                self.db,
+                src_id=doc_id,
+                source_id=row["source_id"],
+                path=row["path"],
+                content=content or "",
+                git_root=root_by.get(row["source_id"]),
+                doc_mtime=row["mtime"],
+                memo=memo,
+            )
+            ext = row["path"].rsplit(".", 1)[-1].lower()
+            if ext in CODE_EXTENSIONS:
+                changed_code.append(doc_id)
+        recompute_drift_for_code_docs(self.db, changed_code, root_by, time.time())
+
     @_rollback_on_error
     def reindex_paths(
         self, paths, sources: list[Source] | None = None, job_id: int | None = None
@@ -707,6 +751,9 @@ class Indexer:
             self._flush_embeddings(embed_batch)
         if chunk_embed_batch:
             self._flush_chunk_embeddings(chunk_embed_batch)
+
+        # Docs↔code graph + drift (task ef1c4106), same post-loop pass as reindex().
+        self._sync_code_graph(sources)
 
         from .status import compute_status
 

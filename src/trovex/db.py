@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sqlite3
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -144,6 +145,62 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     return conn
 
 
+def open_read_conn(db_path: Path) -> sqlite3.Connection:
+    """A lightweight READ connection to an ALREADY-initialised store — WAL,
+    busy_timeout, and sqlite-vec loaded (needed for the vec0 KNN), but NO
+    migrations or schema init (the primary connection from open_db owns those).
+
+    Used by ThreadLocalReadConn to give each offload worker thread its own read
+    connection, so N concurrent reads don't serialize on one connection's mutex
+    (audit b02389c2 #4: 4 threads on one searcher.db measured ~serial, 4
+    connections ~3x faster)."""
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    try:
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+    except AttributeError:
+        # sqlite3 built without loadable-extension support — open_db already
+        # raises an actionable error on the primary connection; a read conn here
+        # just goes without vec (callers that need vec never reach this build).
+        pass
+    return conn
+
+
+class ThreadLocalReadConn:
+    """Drop-in for a shared sqlite3 connection that routes reads to a PER-THREAD
+    connection (audit b02389c2 #4). Exposes ``.execute``/``.executemany`` and
+    proxies every other attribute to the calling thread's own connection, lazily
+    opened via open_read_conn and cached per thread. For the READ path only
+    (search / boot): writes must keep using the owning store/indexer connection.
+
+    Lets the recall offload pool's worker threads run their KNNs in parallel
+    instead of serializing on one connection's mutex. Wiring Searcher.db to this
+    is a one-line change owned by the search.py lane (coordinated follow-up)."""
+
+    def __init__(self, db_path: Path):
+        self._db_path = Path(db_path)
+        self._local = threading.local()
+
+    def _conn(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = open_read_conn(self._db_path)
+            self._local.conn = conn
+        return conn
+
+    def execute(self, *args, **kwargs):
+        return self._conn().execute(*args, **kwargs)
+
+    def executemany(self, *args, **kwargs):
+        return self._conn().executemany(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._conn(), name)
+
+
 # Backoff after a forced checkpoint attempt (success OR deferred), keyed by
 # db_path so independent stores in one process back off independently.
 # PASSIVE never shrinks the WAL FILE itself (only TRUNCATE does — now the
@@ -236,10 +293,11 @@ def periodic_checkpoint_tick(conn: sqlite3.Connection, db_path: Path) -> tuple[i
 
     This runs off the request path entirely, on a fixed interval, regardless
     of file size: always PASSIVE (never blocks); TRUNCATE only when PASSIVE
-    reports zero pending frames (log_pages == 0 — nothing left an older
-    snapshot could still need), so the file's disk footprint actually shrinks
-    without ever contending with a live reader. Returns None if deferred
-    (locked) — never raises, this must not crash the timer loop.
+    moved every frame with no contention (busy == 0 and checkpointed_pages ==
+    log_pages — the whole WAL is now in the db, nothing older is still pinned),
+    so the file's disk footprint actually shrinks without ever starving a live
+    reader. Returns None if deferred (locked) — never raises, this must not
+    crash the timer loop.
 
     A TRUNCATE that actually shrinks the file clears checkpoint_if_wal_large's
     backoff for this db_path: the condition that started the backoff (a
@@ -251,7 +309,16 @@ def periodic_checkpoint_tick(conn: sqlite3.Connection, db_path: Path) -> tuple[i
         size_before = wal_path.stat().st_size if wal_path.exists() else 0
         row = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
         busy, log_pages, checkpointed_pages = row[0], row[1], row[2]
-        if log_pages == 0:
+        # Safe to shrink the file iff the PASSIVE pass just moved EVERY pending
+        # frame into the db with no lock contention. The old gate `log_pages == 0`
+        # almost never held (incident b02389c2 / audit Q7): PRAGMA reports
+        # log_pages as the WAL's TOTAL frame count, not a remaining count, so
+        # after a full checkpoint it equals checkpointed_pages (observed 129/129)
+        # and TRUNCATE never fired — the 140MB WAL grew forever and
+        # checkpoint_if_wal_large kept warning and re-forcing. `busy == 0 and
+        # checkpointed_pages == log_pages` is the real "WAL fully flushed, nothing
+        # older still pinned" condition.
+        if busy == 0 and log_pages > 0 and checkpointed_pages == log_pages:
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             size_after = wal_path.stat().st_size if wal_path.exists() else 0
             if size_after < size_before:
@@ -276,7 +343,7 @@ async def run_wal_checkpoint_timer(conn: sqlite3.Connection, db_path: Path, inte
     while True:
         await asyncio.sleep(interval_sec)
         try:
-            await offload.off_loop(periodic_checkpoint_tick, conn, db_path)
+            await offload.off_loop_heavy(periodic_checkpoint_tick, conn, db_path)
         except TimeoutError:
             log.warning("periodic wal checkpoint tick timed out")
 

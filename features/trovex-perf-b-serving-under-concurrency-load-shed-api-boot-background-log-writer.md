@@ -38,18 +38,19 @@ final tip f9a465c: full suite 1000 passed (331s), tree = tested tip f02ea32 + be
 ## 3. Files changed
 
 ```
-.niwa/receipts/b02389c2-bench-after.json  |  14 ++
- .niwa/receipts/b02389c2-bench-before.json |  14 ++
- .niwa/receipts/b02389c2-bench.md          |  30 +++++
- scripts/bench_boot_concurrency.py         | 170 ++++++++++++++++++++++++
- src/trovex/db.py                          |  79 ++++++++++-
- src/trovex/offload.py                     |  53 ++++++++
- src/trovex/server.py                      |  89 +++++++++----
- src/trovex/usage.py                       | 210 +++++++++++++++++++++++++-----
- tests/test_server.py                      |  84 ++++++++++++
- tests/test_wal_wedge.py                   |  86 ++++++++++--
- tests/test_wedge_class2_recurrence.py     |  39 +++++-
- 11 files changed, 798 insertions(+), 70 deletions(-)
+.niwa/receipts/b02389c2-bench-after.json           |  14 ++
+ .niwa/receipts/b02389c2-bench-before.json          |  14 ++
+ .niwa/receipts/b02389c2-bench.md                   |  30 +++
+ ...ncy-load-shed-api-boot-background-log-writer.md |  63 +++++++
+ scripts/bench_boot_concurrency.py                  | 170 +++++++++++++++++
+ src/trovex/db.py                                   |  79 +++++++-
+ src/trovex/offload.py                              |  53 ++++++
+ src/trovex/server.py                               |  89 ++++++---
+ src/trovex/usage.py                                | 210 ++++++++++++++++++---
+ tests/test_server.py                               |  84 +++++++++
+ tests/test_wal_wedge.py                            |  86 ++++++++-
+ tests/test_wedge_class2_recurrence.py              |  39 +++-
+ 12 files changed, 861 insertions(+), 70 deletions(-)
 ```
 
 ## 4. QA Log

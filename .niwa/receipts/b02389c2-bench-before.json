@@ -1,0 +1,14 @@
+{
+  "concurrency": 30,
+  "requests": 300,
+  "docs": 200,
+  "agents": 30,
+  "wall_s": 7.359,
+  "throughput_rps": 40.8,
+  "p50_ms": 645.9,
+  "p95_ms": 1060.4,
+  "max_ms": 1241.9,
+  "mean_ms": 676.9,
+  "errors": 0,
+  "empty_or_shed": 0
+}

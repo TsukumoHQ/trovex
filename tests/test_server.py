@@ -592,3 +592,87 @@ def test_healthz_503_when_served_empty_but_db_populated(client):
     resp = client.get("/healthz")
     assert resp.status_code == 503
     assert "stale store" in resp.text
+
+
+# ── b02389c2 AC1: /api/boot load-shed (audit Q5) ─────────────────────────────
+
+
+def test_api_boot_sheds_when_pool_saturated(client, monkeypatch):
+    """When the offload pool is saturated, /api/boot returns the empty pack (200)
+    immediately and never submits a recall — a burst must not pile onto a full
+    pool and orphan workers (audit Q5)."""
+    import trovex.offload as off
+
+    monkeypatch.setattr(off, "pool_saturated", lambda: True)
+
+    async def _boom(*a, **k):
+        raise AssertionError("shed path must not submit to the offload pool")
+
+    monkeypatch.setattr(off, "off_loop", _boom)
+    resp = client.get("/api/boot", params={"agent": "coo", "floor": 0.0})
+    assert resp.status_code == 200
+    assert resp.json()["pointers"] == []
+
+
+def test_api_boot_sheds_when_client_disconnected(client, monkeypatch):
+    """A client that already gave up (the prompt hook abandons at ~2s) must not
+    cost a recall: /api/boot sheds to the empty pack (200) without hitting the
+    pool (audit Q5)."""
+    import trovex.offload as off
+    from starlette.requests import Request
+
+    async def _disconnected(self):
+        return True
+
+    monkeypatch.setattr(off, "pool_saturated", lambda: False)
+    monkeypatch.setattr(Request, "is_disconnected", _disconnected)
+
+    async def _boom(*a, **k):
+        raise AssertionError("disconnected client must not trigger a recall")
+
+    monkeypatch.setattr(off, "off_loop", _boom)
+    resp = client.get("/api/boot", params={"agent": "coo", "floor": 0.0})
+    assert resp.status_code == 200
+    assert resp.json()["pointers"] == []
+
+
+# ── b02389c2 AC2: background query-log writer (audit Q6) ──────────────────────
+
+
+def test_query_log_writer_writes_enqueued_rows(client):
+    """The background writer drains enqueued rows on its OWN connection and
+    commits them (task b02389c2 AC2)."""
+    import trovex.usage as usage
+
+    db = state_mod._state.store.db
+    before = db.execute("SELECT COUNT(*) FROM mcp_queries").fetchone()[0]
+    usage.start_query_log_writer(state_mod._state.settings.data_dir)
+    try:
+        usage.enqueue_pointer_query(
+            db, source="boot", agent="coo", query="q",
+            pointers=[{"id": "x", "score": 1.0}], tokens_est=5, elapsed_ms=1,
+        )
+        for _ in range(100):  # wait for the writer thread to drain + commit
+            if db.execute("SELECT COUNT(*) FROM mcp_queries").fetchone()[0] > before:
+                break
+            time.sleep(0.05)
+    finally:
+        usage.stop_query_log_writer()
+    assert db.execute("SELECT COUNT(*) FROM mcp_queries").fetchone()[0] == before + 1
+
+
+def test_api_boot_enqueues_log_no_synchronous_write(client, monkeypatch):
+    """AC2: /api/boot does ZERO synchronous log writes on the request path — it
+    enqueues to the running background writer, so log_pointer_query (the sync
+    fallback) is never called from the handler."""
+    import trovex.usage as usage
+
+    sync = {"n": 0}
+    monkeypatch.setattr(usage, "log_pointer_query", lambda *a, **k: sync.__setitem__("n", sync["n"] + 1))
+    usage.start_query_log_writer(state_mod._state.settings.data_dir)
+    try:
+        resp = client.get("/api/boot", params={"agent": "coo", "floor": 0.0})
+        assert resp.status_code == 200
+    finally:
+        usage.stop_query_log_writer()
+    assert sync["n"] == 0  # enqueued, not written synchronously

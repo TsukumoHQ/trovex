@@ -133,10 +133,12 @@ def test_locked_retry_still_works(store, monkeypatch):
 
 
 class _FakeCheckpointCursor:
-    """wal_checkpoint's real result row is (busy, log_pages, checkpointed_pages)."""
+    """wal_checkpoint's real result row is (busy, log_pages, checkpointed_pages).
+    Fully-flushed: busy=0 and checkpointed_pages == log_pages, the condition the
+    periodic tick TRUNCATEs on (b02389c2 / audit Q7)."""
 
     def fetchone(self):
-        return (0, 0, 0)
+        return (0, 323, 323)
 
 
 def test_checkpoint_if_wal_large_forces_checkpoint(store, monkeypatch):
@@ -342,11 +344,14 @@ def test_periodic_checkpoint_tick_always_runs_passive_never_gated_on_size(store)
     assert busy in (0, 1)
 
 
-def test_periodic_checkpoint_tick_truncates_only_when_log_empty(store, monkeypatch):
-    """task 20afcaf7 r4: TRUNCATE (the only mode that actually shrinks the WAL
-    FILE) only runs when PASSIVE reports zero pending frames — nothing could
-    still need an older snapshot — never unconditionally, since TRUNCATE can
-    busy-wait on this connection's busy_timeout if a reader holds one."""
+def test_periodic_checkpoint_tick_truncates_when_fully_checkpointed(store, monkeypatch):
+    """b02389c2 / audit Q7: TRUNCATE (the only mode that shrinks the WAL FILE)
+    runs exactly when the PASSIVE pass moved EVERY frame with no contention
+    (busy == 0 and checkpointed_pages == log_pages) — the whole WAL is now in
+    the db, nothing older is still pinned. The old gate `log_pages == 0` almost
+    never held (PRAGMA reports log_pages as the total frame count, so a fully
+    checkpointed WAL still reads log_pages == checkpointed_pages > 0), so
+    TRUNCATE never fired and the file grew unbounded."""
     from trovex.db import periodic_checkpoint_tick
 
     calls = []
@@ -362,7 +367,7 @@ def test_periodic_checkpoint_tick_truncates_only_when_log_empty(store, monkeypat
 
                 class _Row:
                     def fetchone(self):
-                        return (0, 0, 0)  # busy=0, log_pages=0 — nothing pending
+                        return (0, 323, 323)  # busy=0, fully flushed (checkpointed == log)
 
                 return _Row()
             return real_db.execute(sql, *a, **kw)
@@ -390,7 +395,7 @@ def test_periodic_checkpoint_tick_skips_truncate_when_frames_pending(store):
 
                 class _Row:
                     def fetchone(self):
-                        return (0, 323, 191)  # log_pages > 0 — real pending content
+                        return (0, 323, 191)  # checkpointed (191) < log (323) — frames still pending
 
                 return _Row()
             return real_db.execute(sql, *a, **kw)
@@ -440,7 +445,7 @@ def test_periodic_tick_truncate_shrink_resets_write_path_backoff(store, monkeypa
 
         def execute(self, sql, *a, **kw):
             if sql == "PRAGMA wal_checkpoint(PASSIVE)":
-                return _FakeCheckpointCursor()  # busy=0, log_pages=0 — nothing pending
+                return _FakeCheckpointCursor()  # busy=0, fully flushed (checkpointed == log) -> TRUNCATE fires
             if sql == "PRAGMA wal_checkpoint(TRUNCATE)":
                 return _FakeCheckpointCursor()
             return real_db.execute(sql, *a, **kw)
@@ -644,3 +649,64 @@ def test_indexer_reindex_rolls_back_on_compute_status_failure(settings, tmp_path
     indexer.db.execute("INSERT INTO index_runs (ts, duration_sec, added, updated, unchanged, removed) "
                         "VALUES (0, 0, 0, 0, 0, 0)")
     indexer.db.commit()
+
+
+# ── b02389c2 / audit Q7: WAL TRUNCATE gate ───────────────────────────────────
+
+
+def test_periodic_checkpoint_tick_truncates_wal_after_full_checkpoint(store):
+    """AC5: once a PASSIVE pass has moved every frame into the db, the periodic
+    tick must TRUNCATE so the WAL file returns under its cap. The old gate
+    `log_pages == 0` never held — PRAGMA reports log_pages as the WAL's total
+    frame count, so after a full checkpoint it equals checkpointed_pages and
+    TRUNCATE never fired, leaving the WAL (140 MB in prod) to grow forever."""
+    from trovex.db import periodic_checkpoint_tick
+
+    db_path = store.settings.data_dir / "trovex.db"
+    wal_path = db_path.with_name(db_path.name + "-wal")
+
+    # Real committed writes grow the WAL; a handful of small docs stays well
+    # under the forced/auto checkpoint thresholds, so frames pile up unflushed.
+    for i in range(50):
+        store.put(f"# doc {i}\n\n" + ("lorem ipsum dolor sit amet " * 40), tags=[f"owner/n{i}"])
+    size_before = wal_path.stat().st_size
+    assert size_before > 0, "precondition: the WAL should hold committed frames"
+
+    row = periodic_checkpoint_tick(store.db, db_path)
+    assert row is not None  # (busy, log_pages, checkpointed_pages)
+
+    size_after = wal_path.stat().st_size
+    # Pre-fix (log_pages == 0 gate): TRUNCATE never fires, PASSIVE leaves the
+    # file at its high-water mark -> size unchanged. Post-fix: TRUNCATE shrinks.
+    assert size_after < size_before, (
+        f"WAL did not shrink: {size_before} -> {size_after} (TRUNCATE never fired)"
+    )
+
+
+# ── b02389c2 AC3: per-thread read connection (audit #4) ──────────────────────
+
+
+def test_threadlocal_read_conn_is_per_thread(store):
+    """Each thread gets its OWN read connection (so recall-pool workers don't
+    serialize on one connection's mutex), and every connection sees the
+    committed store (task b02389c2 AC3)."""
+    import threading as _threading
+
+    from trovex.db import ThreadLocalReadConn
+
+    store.put("# doc\n\nbody one two three", tags=["owner/x"])
+    proxy = ThreadLocalReadConn(store.settings.data_dir / "trovex.db")
+    assert proxy.execute("SELECT COUNT(*) FROM docs").fetchone()[0] >= 1
+
+    conn_ids: dict[int, int] = {}
+
+    def worker(tid: int) -> None:
+        conn_ids[tid] = id(proxy._conn())
+        assert proxy.execute("SELECT COUNT(*) FROM docs").fetchone()[0] >= 1
+
+    threads = [_threading.Thread(target=worker, args=(i,)) for i in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(set(conn_ids.values())) == 3  # three distinct per-thread connections

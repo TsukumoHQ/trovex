@@ -29,6 +29,13 @@ Call the MCP tools (server at `http://localhost:8765/mcp` after `trovex serve`):
   `tags=["owner/...","domain/..."]` or `kind` (`record` | `reference`).
 - `trovex_read(doc_id, section=...)` — read the whole doc or just one heading's
   section (token-minimal; prefer `section`).
+- `trovex_read(doc_id, links=True)` — append the doc's graph edges: what it
+  links to (`→ out:`), dangling links to docs that don't exist yet (`∅`), and
+  its backlinks (`← in:`), each with the citing sentence. Follow a link to learn
+  what a doc cites and what cites it in one call — no second search. Works for a
+  file-backed doc too (pass its `source:path`). `trovex(q)` lines carry a
+  `⇄in/out` edge count, and `trovex://graph/{doc}` is the same 1-hop view as a
+  resource.
 - `trovex_write(content, kind, tags, doc_id)` — store/update a doc. `kind="record"`
   for event-anchored notes (never goes stale by age). Pass an existing `doc_id`
   to update in place (no duplicate). One canonical doc per topic.

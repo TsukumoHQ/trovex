@@ -50,3 +50,7 @@ benchmarks/**/*.md
 
 # niwa gate control file (transient, per-worktree; not a doc)
 .niwa-decision.md
+
+# niwa review receipts: screenshots + a perf/anti-slop README the gate reads as
+# the PR's receipt artifacts. Committed binaries + their index, not store docs.
+.niwa/receipts/**

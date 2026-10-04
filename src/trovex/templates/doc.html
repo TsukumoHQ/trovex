@@ -366,6 +366,54 @@
       </summary>
       <div class="history-body" data-doc="{{ doc.ext_id }}">…</div>
     </details>
+
+    {% if links_out or links_in %}
+    <section class="doc-backlinks" aria-label="Linked docs">
+      <style>
+        .doc-backlinks{margin-top:1.75rem;padding-top:1.25rem;border-top:1px solid rgba(148,163,184,.12)}
+        .doc-backlinks h2{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#74808f;margin:0 0 .6rem}
+        .doc-backlinks .bl-group{margin-bottom:1rem}
+        .doc-backlinks ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.3rem}
+        .doc-backlinks li a,.doc-backlinks li span.nolink{display:grid;grid-template-columns:auto 1fr;gap:.55rem;align-items:center;
+          padding:.4rem .55rem;border-radius:7px;color:#e6edf3;text-decoration:none;font-size:.85rem}
+        .doc-backlinks li a:hover{background:rgba(148,163,184,.08)}
+        .doc-backlinks .rel{font:500 .66rem ui-monospace,Menlo,monospace;color:#9aa6b8;background:rgba(13,17,25,.9);
+          padding:.14rem .4rem;border-radius:5px;white-space:nowrap}
+        .doc-backlinks .bl-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .doc-backlinks .nolink{color:#9aa6b8}
+      </style>
+      <h2>Links</h2>
+      {% if links_out %}
+      <div class="bl-group">
+        {% for l in links_out %}
+        <ul>
+          <li>
+            {% if l.ext_id %}<a href="/doc/{{ l.ext_id }}">{% else %}<span class="nolink">{% endif %}
+              <span class="rel">{{ l.rel }}</span>
+              <span class="bl-title">{{ l.title }}</span>
+            {% if l.ext_id %}</a>{% else %}</span>{% endif %}
+          </li>
+        </ul>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if links_in %}
+      <div class="bl-group">
+        <h2>Backlinks</h2>
+        {% for l in links_in %}
+        <ul>
+          <li>
+            {% if l.ext_id %}<a href="/doc/{{ l.ext_id }}">{% else %}<span class="nolink">{% endif %}
+              <span class="rel">{{ l.rel }}</span>
+              <span class="bl-title">{{ l.title }}</span>
+            {% if l.ext_id %}</a>{% else %}</span>{% endif %}
+          </li>
+        </ul>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
   </article>
 
   {% if toc %}

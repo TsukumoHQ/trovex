@@ -118,6 +118,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     _migrate_add_index_run_metrics(conn)
     _migrate_add_index_jobs_link(conn)
     _migrate_add_provenance(conn)
+    _migrate_add_drift(conn)
     _init_schema(conn, embed_dim)
     # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
     # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
@@ -798,6 +799,14 @@ def delete_doc_cascade(conn: sqlite3.Connection, doc_id: int) -> None:
     # doc_links has TWO doc-id columns (a link's src and dst can each be the doc
     # being deleted) — not a _DOC_CHILD_TABLES member, needs its own two-sided delete.
     conn.execute("DELETE FROM doc_links WHERE src_doc_id = ? OR dst_doc_id = ?", (doc_id, doc_id))
+    # doc_refs (extracted Obsidian-style edges, task a1b5a169) is also two-sided
+    # but ASYMMETRIC: the deleted doc's OUTGOING refs die with it, while a ref
+    # that POINTED AT it survives as dangling (dst_id NULL) so it re-binds if the
+    # target reappears (e.g. a rename, which is delete+insert). Not a
+    # _DOC_CHILD_TABLES member (its FK column is src_id, and the incoming side is
+    # a reset, not a delete).
+    conn.execute("DELETE FROM doc_refs WHERE src_id = ?", (doc_id,))
+    conn.execute("UPDATE doc_refs SET dst_id = NULL WHERE dst_id = ?", (doc_id,))
     conn.execute("DELETE FROM docs_fts WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
@@ -1067,6 +1076,30 @@ def doc_link(source_url: str | None, absolute_path: str | None, ext_id: str | No
     if absolute_path:
         return f"file://{absolute_path}"
     return f"trovex:{ext_id}" if ext_id else ""
+
+
+def _migrate_add_drift(conn: sqlite3.Connection) -> None:
+    """Docs↔code drift (task ef1c4106, trovex/links L5): add docs.drift +
+    drift_reason to a pre-existing docs table. Additive, idempotent — a second
+    boot finds the columns and no-ops before taking a writer lock."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='docs' AND type='table'").fetchone():
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    todo = [
+        (c, t)
+        for c, t in (("drift", "INTEGER NOT NULL DEFAULT 0"), ("drift_reason", "TEXT"))
+        if c not in cols
+    ]
+    if not todo:
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        for col, typ in todo:
+            conn.execute(f"ALTER TABLE docs ADD COLUMN {col} {typ}")  # sql-safe: fixed literal tuple
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def _migrate_add_provenance(conn: sqlite3.Connection) -> None:
@@ -1609,6 +1642,12 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             owners TEXT,
             parents TEXT,
             fetched_at REAL,
+            -- Docs↔code drift (task ef1c4106, trovex/links L5): set when a code
+            -- file this doc cites (cites-code edge in doc_refs) has a commit
+            -- NEWER than the doc's last change. Computed at index time from git,
+            -- never per query. drift_reason names the file + commit count.
+            drift INTEGER NOT NULL DEFAULT 0,
+            drift_reason TEXT,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
@@ -1931,6 +1970,50 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_doc_links_src ON doc_links(src_doc_id, rel);
         CREATE INDEX IF NOT EXISTS idx_doc_links_dst ON doc_links(dst_doc_id, rel);
+
+        -- Obsidian-style extracted edges (task a1b5a169, trovex/links L1) — the
+        -- AUTOMATIC counterpart to doc_links above. One row per [[wikilink]] or
+        -- relative .md link found in ANY indexed doc (file-backed included).
+        -- dst_id IS NULL = dangling: the target doc doesn't exist yet (or was
+        -- deleted), and the edge is KEPT so it binds the moment the target
+        -- appears. All parse + resolve + rebind logic lives in links_parse.py;
+        -- this is just the store. delete_doc_cascade handles both sides by hand
+        -- (outgoing removed, incoming reset to dangling) — see below.
+        --   dst_norm = rebind lookup key (target basename, no .md, lowercased).
+        --   anchor   = #heading fragment; alias = display text; kind links-to|embeds.
+        CREATE TABLE IF NOT EXISTS doc_refs (
+            id INTEGER PRIMARY KEY,
+            src_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            dst_id INTEGER REFERENCES docs(id),
+            dst_raw TEXT NOT NULL,
+            dst_norm TEXT NOT NULL,
+            anchor TEXT,
+            alias TEXT,
+            context TEXT,
+            kind TEXT NOT NULL DEFAULT 'links-to'
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_src ON doc_refs(src_id);
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_dst ON doc_refs(dst_id);
+        -- Dangling re-bind on insert is an indexed lookup on dst_norm.
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_dangling
+            ON doc_refs(dst_norm) WHERE dst_id IS NULL;
+        -- UNIQUE(src_id, dst_raw, anchor) with NULL anchors deduped (SQLite
+        -- treats NULLs as distinct in a plain UNIQUE, so a COALESCE index is the
+        -- only form that collapses two anchorless links to the same target).
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_doc_refs_uniq
+            ON doc_refs(src_id, dst_raw, COALESCE(anchor, ''));
+
+        -- Git last-commit-ts cache for the L5 drift computation (task ef1c4106).
+        -- Keyed by a code file's content_hash so an UNCHANGED repo reindex reuses
+        -- the row and never shells out to git (the "no git per query/per doc"
+        -- invariant). Rebuilt lazily when a file's content changes.
+        CREATE TABLE IF NOT EXISTS code_commit_cache (
+            source_id TEXT NOT NULL,
+            path TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            last_commit_ts REAL,
+            PRIMARY KEY (source_id, path)
+        );
 
         -- Doc history: a snapshot of the previous content on every overwrite
         CREATE TABLE IF NOT EXISTS doc_versions (

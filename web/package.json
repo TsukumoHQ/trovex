@@ -20,16 +20,24 @@
     "build": "node scripts/check-brand.mjs && node scripts/check-sitemap.mjs && node scripts/check-no-blog.mjs && node scripts/check-no-client-secrets.mjs && node scripts/check-pii-openai.mjs && node scripts/check-voice.mjs && node scripts/check-internal-links.mjs && node scripts/check-silo-schema.mjs && node scripts/check-install-cta.mjs && node scripts/check-analytics.mjs && npm run lint && npm run typecheck:api && tsc -b && vitest run && vite build && node scripts/gen-md-twins.mjs",
     "lint": "eslint .",
     "build:receipt": "tsc -b && vite build --config vite.receipt.config.ts",
+    "build:graph": "tsc -b && vite build --config vite.graph.config.ts && node -e \"require('fs').renameSync('dist-graph/graph.html','dist-graph/index.html')\"",
     "preview": "vite preview",
     "indexnow": "node scripts/indexnow-ping.mjs"
   },
   "dependencies": {
+    "@react-sigma/core": "^5.0.6",
     "@resvg/resvg-js": "^2.6.2",
+    "@sigma/node-border": "^3.0.0",
+    "@sigma/node-image": "^3.0.0",
     "@tailwindcss/vite": "^4.3.1",
     "@vercel/analytics": "^2.0.1",
+    "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
+    "graphology-layout-forceatlas2": "^0.10.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "satori": "^0.26.0",
+    "sigma": "^3.0.3",
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
@@ -42,6 +50,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "graphology-types": "^0.24.8",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.1.0",

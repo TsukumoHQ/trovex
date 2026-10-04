@@ -26,6 +26,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from . import capacity
+from . import graphview
 from . import insights as insights_mod
 from . import offload
 from . import savings as savings_mod
@@ -47,6 +48,11 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 # be served here (it would expose the dashboard under a wrong base). Mounted at
 # /receipt only when present — see create_app.
 WEB_DIST = Path(__file__).parent.parent.parent / "web" / "dist-receipt"
+# The React knowledge-graph SPA ("the codebase's brain") — another SEPARATE
+# build (base '/graph/', via `npm run build:graph` -> web/dist-graph). Mounted
+# at /graph only when present, exactly like /receipt, so a build-less tree
+# still boots.
+GRAPH_DIST = Path(__file__).parent.parent.parent / "web" / "dist-graph"
 
 # Validation patterns for free-text filter params (finding 6). kind is a bare
 # slug; tags allow `/` (owner/alpha scope) but nothing else exotic.
@@ -330,12 +336,21 @@ async def lifespan(app: FastAPI):
             state.store.db, state.settings.data_dir / "trovex.db", WAL_CHECKPOINT_POLL_SEC
         )
     )
+    # Served-empty-store guard (incident 35c0631e, audit Q9): refresh the
+    # staleness flag once now so the first probe is accurate, then keep it fresh
+    # in the background — /healthz only ever reads the flag, never the DB.
+    try:
+        await offload.off_loop(_refresh_health, state, timeout=5.0)
+    except Exception:  # noqa: BLE001 — a startup refresh miss must not block serving
+        pass
+    health_task = asyncio.create_task(_health_refresh_timer(state, _HEALTH_REFRESH_SEC))
     try:
         async with mcp.session_manager.run():
             yield
     finally:
         watchdog_task.cancel()
         wal_checkpoint_task.cancel()
+        health_task.cancel()
         state.applier.stop()
 
 
@@ -399,6 +414,78 @@ def _sparkline(values: list[int], w: int = 100, h: int = 30, pad: int = 3) -> di
     return {"line": line, "area": area, "w": w, "h": h}
 
 
+# How often the background refresher recomputes the served-empty-store
+# staleness flag (audit Q9): /healthz itself stays LOOP-ONLY and only reads the
+# flag, so a probe never takes an offload worker or queues behind recall — the
+# refresh is one short, infrequent worker use, not one per probe.
+_HEALTH_REFRESH_SEC = 15.0
+
+
+def _refresh_health(state: Any) -> None:
+    """Recompute AppState.health OFF the request path (the refresher's worker).
+    stale=True exactly when the served connection reads 0/None docs while the DB
+    file on disk holds rows (incident 35c0631e: a frozen snapshot served empty
+    while still answering 200)."""
+    served, on_disk = _healthz_store_counts(state)
+    if not served and on_disk > 0:
+        state.health = {
+            "stale": True,
+            "detail": f"stale store: served {served!r} but db file has {on_disk}",
+        }
+    else:
+        state.health = {"stale": False, "detail": "ok"}
+
+
+async def _health_refresh_timer(state: Any, interval_sec: float) -> None:
+    """Refresh the health flag periodically on the offload pool (same pattern as
+    the WAL checkpoint timer) — never on the /healthz probe path."""
+    while True:
+        try:
+            await offload.off_loop(_refresh_health, state, timeout=5.0)
+        except Exception:  # noqa: BLE001 — a refresh miss must never crash the timer
+            pass
+        await asyncio.sleep(interval_sec)
+
+
+def _healthz_store_counts(state: Any) -> tuple[int | None, int]:
+    """(served, on_disk) for the /healthz staleness guard, run OFF the event loop.
+
+    served = docs count via the long-lived served connection (None if that read
+    raised). on_disk is read ONLY when served is 0/None, through a FRESH
+    connection (_docs_on_disk) so a frozen-snapshot server can't vouch for its
+    own stale read; it stays 0 otherwise so a healthy server never pays for the
+    second open."""
+    try:
+        served: int | None = state.searcher.db.execute(
+            "SELECT COUNT(*) AS c FROM docs"
+        ).fetchone()["c"]
+    except Exception:  # noqa: BLE001 — a dead/locked served conn is unhealthy, not a 500
+        served = None
+    on_disk = 0
+    if not served:  # 0 or None
+        on_disk = _docs_on_disk(state.settings.data_dir / "trovex.db")
+    return served, on_disk
+
+
+def _docs_on_disk(db_path: Path) -> int:
+    """Ground-truth docs count, read through a FRESH short-lived connection — never
+    the long-lived served connection (incident 35c0631e), so a server frozen on a
+    stale snapshot can't hide behind its own stale read. query_only so this never
+    writes or checkpoints. Best-effort: -1 when the file can't be read, so a genuine
+    read error can't masquerade as a populated disk and bounce a healthy server."""
+    try:
+        if not db_path.exists():
+            return -1
+        conn = sqlite3.connect(str(db_path), timeout=2.0)
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            return conn.execute("SELECT COUNT(*) FROM docs").fetchone()[0]
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 — a probe hiccup must never bounce a healthy server
+        return -1
+
+
 def build_app() -> FastAPI:
     # docs_url=None frees the /docs path for our own browse page.
     app = FastAPI(title="trovex", lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -432,6 +519,14 @@ def build_app() -> FastAPI:
         from fastapi.staticfiles import StaticFiles
 
         app.mount("/receipt", StaticFiles(directory=str(WEB_DIST), html=True), name="receipt")
+
+    # Serve the knowledge-graph SPA same-origin with /api/graph, same contract
+    # as /receipt: registered only when web/dist-graph exists, html=True for SPA
+    # fallback. Private local view (noindex) — reads the running index.
+    if GRAPH_DIST.is_dir():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/graph", StaticFiles(directory=str(GRAPH_DIST), html=True), name="graph")
 
     # ── HTML pages ───────────────────────────────────────────────────
 
@@ -656,10 +751,28 @@ def build_app() -> FastAPI:
                 "<a href='/store'>browse all docs</a></p></div></body></html>",
                 status_code=404,
             )
+        # Backlinks panel: the typed doc_links into/out of this doc, so a reader
+        # sees the decision lineage (what superseded it, what it's a verdict of)
+        # right on the page — the Jinja twin of the graph side panel. Off the loop
+        # (wedge class 2) like the render above, since node_detail reads the store.
+        detail, bl_timeout = await _offloaded(
+            graphview.node_detail, get_state().searcher.db, ext_id
+        )
+        if bl_timeout is not None:
+            return bl_timeout
+        links_out = detail["out_links"] if detail else []
+        links_in = detail["in_links"] if detail else []
         return templates.TemplateResponse(
             request,
             "doc.html",
-            {"doc": doc, "body_html": body_html, "toc": toc, "pygments_css": PYGMENTS_CSS},
+            {
+                "doc": doc,
+                "body_html": body_html,
+                "toc": toc,
+                "pygments_css": PYGMENTS_CSS,
+                "links_out": links_out,
+                "links_in": links_in,
+            },
         )
 
     @app.delete("/api/doc/{ext_id}")
@@ -1065,6 +1178,46 @@ def build_app() -> FastAPI:
             return timeout_resp
         return JSONResponse(result)
 
+    @app.get("/api/graph")
+    async def api_graph(
+        source: str | None = Query(
+            None, max_length=100, pattern=r"^[A-Za-z0-9_.:/-]+$",
+            description="restrict to one source_id partition",
+        ),
+        depth: int = Query(2, ge=0, le=6, description="k-hop radius around focus"),
+        focus: str | None = Query(
+            None, max_length=200, description="centre node id (doc id or ext_id)",
+        ),
+    ) -> JSONResponse:
+        """The knowledge graph of the live index: docs/code/tickets/decisions as
+        nodes, typed doc_links as edges, with per-node status / agent-read heat /
+        drift so the SPA can paint its engineering lenses. `focus`+`depth` limit
+        the result to a k-hop neighbourhood; bad params 422 via Query bounds.
+
+        Off the loop (wedge class 2, task 20afcaf7): build_graph scans docs +
+        doc_links + the agent-usage tables, the same store-read exposure the map
+        and stats routes offload."""
+        db = get_state().searcher.db
+        result, timeout_resp = await _offloaded(
+            graphview.build_graph, db, source=source, focus=focus, depth=depth
+        )
+        if timeout_resp is not None:
+            return timeout_resp
+        return JSONResponse(result)
+
+    @app.get("/api/graph/node/{node_id}")
+    async def api_graph_node(node_id: str) -> JSONResponse:
+        """Side-panel detail: the doc rendered + its in/out links with context."""
+        db = get_state().searcher.db
+        detail, timeout_resp = await _offloaded(graphview.node_detail, db, node_id)
+        if timeout_resp is not None:
+            return timeout_resp
+        if detail is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        html, _headings = render_markdown(detail.pop("content") or "")
+        detail["html"] = html
+        return JSONResponse(detail)
+
     def _compute_stats(db: sqlite3.Connection, usearch_partitions: set[str]) -> dict:
         total = db.execute("SELECT COUNT(*) AS c FROM docs").fetchone()["c"]
         total_tokens = db.execute("SELECT COALESCE(SUM(tokens_est), 0) AS t FROM docs").fetchone()[
@@ -1159,8 +1312,23 @@ def build_app() -> FastAPI:
         return JSONResponse(job)
 
     @app.get("/healthz", response_class=PlainTextResponse)
-    async def healthz() -> str:
-        return "ok"
+    async def healthz() -> PlainTextResponse:
+        """Liveness + served-empty-store guard (incident 35c0631e), LOOP-ONLY
+        (audit Q9).
+
+        A frozen/stale served connection (a half-open write txn pinned the
+        snapshot) kept answering 200 while serving 0 docs on a 4.7k-doc store,
+        so the whole fleet silently booted empty for days. /healthz now reads a
+        staleness flag refreshed in the BACKGROUND and returns 503 when it is
+        set — never touching the DB or the offload pool on the probe path, so a
+        health check can't queue behind recall or orphan a worker during the
+        very overload it exists to report. The flag goes stale when the served
+        connection reads 0 docs while the DB file on disk holds rows.
+        """
+        health = get_state().health
+        if health.get("stale"):
+            return PlainTextResponse(health.get("detail", "stale store"), status_code=503)
+        return PlainTextResponse("ok")
 
     def _compute_settings_context(db: sqlite3.Connection, state: Any) -> dict:
         from . import backup as backup_mod

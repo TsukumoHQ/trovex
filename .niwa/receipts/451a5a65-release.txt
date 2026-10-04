@@ -1,0 +1,24 @@
+RELEASE RECEIPT — promote dev -> main (task 8ad97489)
+
+Branch: release/promote-main-8ad97489 @ origin/dev tip 7329c92
+  (contains 35c0631e frozen-store fix + L1-L5 links).
+main -> dev is a FAST-FORWARD: origin/main is an ancestor of origin/dev,
+6 commits ahead, no merge commit needed.
+
+Migration proof (PRE-MERGE, on a COPY of the live DB — live file untouched):
+  source: ~/.trovex-data/trovex.db (403.5 MB), copied via `sqlite3 .backup`
+  model:  BAAI/bge-small-en-v1.5  (unchanged — no re-embed)
+  docs before migration: 4987
+  docs after  migration: 4987     (== before: zero doc loss)
+  migration apply time:  0.74 s   (open_db on the copy, full migration sequence)
+  new schema present after migration:
+    docs.drift column        (L5 drift)       = True
+    doc_refs table           (L1 doc_refs)    = True
+    doc_links table          (L4 typed links) = True
+    docs.source_url column   (provenance)     = True
+
+Conclusion: the live DB migrates in place on next serve start via additive
+ALTER ADD COLUMN + CREATE TABLE IF NOT EXISTS only — idempotent, sub-second on a
+real-size (4987-doc / 403 MB) store, zero doc loss.
+
+Full suite (verify_cmd uv run --extra dev python -m pytest -q): 991 passed in 600s, 0 failures.

@@ -398,8 +398,27 @@ class Searcher:
             base = f"{r.path.ljust(max_path)}  {r.marker} {r.fresh_label()}"
             if multi:
                 base += f"  @{r.source_id}"
+            base += self._link_hint(r)
             lines.append(base)
         return "\n".join(lines)
+
+    def _link_hint(self, r: SearchResult) -> str:
+        """` ⇄<in>/<out>` graph-edge counts for a result, only when the doc has
+        any (task b9687dfb) — an UNLINKED doc's line stays byte-identical, so no
+        token cost is added where there's nothing to point at."""
+        try:
+            from .links_parse import link_counts
+
+            row = self.db.execute(
+                "SELECT id FROM docs WHERE source_id = ? AND path = ? AND workspace_id = 'default'",
+                (r.source_id, r.path),
+            ).fetchone()
+            if row is None:
+                return ""
+            inc, out = link_counts(self.db, row["id"])
+            return f"  ⇄{inc}/{out}" if (inc or out) else ""
+        except Exception:  # noqa: BLE001 — a count hint must never break formatting
+            return ""
 
     def format_with_summary(self, results: list[SearchResult]) -> str:
         if not results:

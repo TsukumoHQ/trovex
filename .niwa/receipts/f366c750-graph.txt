@@ -1,0 +1,80 @@
+# AC3 receipt — f366c750 [trovex/deploy] /graph mounts in deploy
+# Proof: the deploy build step produces web/dist-graph and `trovex serve`
+# then mounts /graph (HTTP 200). server.py mounts /graph ONLY when
+# web/dist-graph/ exists (src/trovex/server.py:529, GRAPH_DIST :55).
+# generated: 2026-10-04T02:13:38Z  host: MacBook-Pro-de-Loic
+# branch: feat/trovex-deploy-graph @ 990fb7a
+# port: 8799 (spare; live fleet server is :8765)
+
+== step 0: force a clean build (remove any pre-existing dist-graph) ==
+web/dist-graph removed; present now? no
+
+== step 1: deploy build — bash deploy/build-graph.sh ==
+→ build-graph: installing web deps
+
+added 241 packages, and audited 242 packages in 4s
+
+56 packages are looking for funding
+  run `npm fund` for details
+
+8 vulnerabilities (4 moderate, 4 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm warn allow-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   esbuild@0.28.1 (postinstall: node install.js)
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+→ build-graph: npm run build:graph → web/dist-graph
+
+> trovex-web@0.0.0 build:graph
+> tsc -b && vite build --config vite.graph.config.ts && node -e "require('fs').renameSync('dist-graph/graph.html','dist-graph/index.html')"
+
+vite v8.1.0 building client environment for production...
+[2Ktransforming...✓ 53 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-graph/graph.html                   0.78 kB │ gzip:   0.44 kB
+dist-graph/assets/graph-CjGTHkmG.css   34.75 kB │ gzip:   7.47 kB
+dist-graph/assets/graph-CO4u7Xrh.js   437.62 kB │ gzip: 123.49 kB
+
+✓ built in 155ms
+✓ build-graph: web/dist-graph/index.html built — /graph will mount
+build-graph.sh exit: 0
+
+-- dist-graph artifact --
+-rw-r--r--@ 1 loic  staff  780 Oct  4 04:13 web/dist-graph/index.html
+
+== step 2: trovex serve --host 127.0.0.1 --port 8799 (local ONNX embeddings, no key) ==
+serve pid: 90115
+healthz up: 1
+
+== step 3: curl -s -o /dev/null -w %{http_code} localhost:8799/graph/ ==
+GET /graph/  -> HTTP 200
+
+-- first 400 bytes of /graph/ body (SPA shell) --
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/graph/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d1119" />
+    <!-- Private local view: reads a running instance's real index over the
+       
+
+-- control: /healthz --
+GET /healthz -> HTTP 200
+
+== teardown ==
+serve stopped
+
+== VERDICT ==
+AC3 GREEN: deploy build + trovex serve = GET /graph/ HTTP 200

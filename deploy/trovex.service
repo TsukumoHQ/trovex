@@ -17,6 +17,12 @@ Environment=TROVEX_HOST=0.0.0.0
 Environment=TROVEX_PORT=8770
 Environment=FASTEMBED_CACHE_PATH=/home/trovex/.trovex-data/fastembed_cache
 Environment=HF_HOME=/home/trovex/.trovex-data/hf_cache
+# The /graph SPA mounts only when web/dist-graph/ exists. Build it at UPDATE time,
+# NOT here: this unit is hardened with ProtectHome=read-only, so a build-at-start
+# (npm writing node_modules + web/dist-graph under /home) would be blocked. The
+# Linux deploy/update step (git pull + uv sync) must also run, from the repo root:
+#   bash deploy/build-graph.sh
+# Then systemctl restart trovex. Without it, /graph simply 404s (server still serves).
 ExecStart=/home/trovex/trovex/.venv/bin/uvicorn trovex.server:build_app --factory --host 0.0.0.0 --port 8770
 Restart=on-failure
 RestartSec=5

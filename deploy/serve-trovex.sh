@@ -160,6 +160,15 @@ if [ "$refresh" = 1 ]; then
   run git -c advice.detachedHead=false reset --hard origin/main --quiet
   echo "→ uv sync"
   run uv sync --quiet
+  # Build the /graph SPA into web/dist-graph so server.py mounts /graph (it mounts
+  # only when the build exists). Best-effort: a web build hiccup must never block
+  # the Python server coming up, so warn-and-continue instead of failing the serve.
+  echo "→ build /graph SPA"
+  if [ "$dry" = 1 ]; then
+    echo "DRY: bash $(dirname "$0")/build-graph.sh"
+  else
+    bash "$(dirname "$0")/build-graph.sh" || echo "⚠ build-graph failed — /graph will 404 until a build succeeds (server still starts)" >&2
+  fi
 fi
 
 # Stop whatever currently holds the port (the previous serve), if anything — UNLESS

@@ -1416,6 +1416,11 @@ class SqliteStore:
                     "INSERT OR IGNORE INTO doc_tags(doc_id, tag) VALUES (?, ?)",
                     (doc_id, tag),
                 )
+        # perf C (task 33ecdc9f): owner is a vec_docs metadata column derived from
+        # doc_tags. put() sets tags AFTER embedding, so refresh the vec0 owner here
+        # (in-place UPDATE, no re-embed) — the single chokepoint every tag write
+        # flows through, so owner can never drift from the owner/<agent> tag.
+        vec_sync_meta(self.db, doc_id)
 
     @_retry_on_locked
     def set_tags(
@@ -1439,6 +1444,10 @@ class SqliteStore:
                         "INSERT OR IGNORE INTO doc_tags(doc_id, tag) VALUES (?, ?)",
                         (doc_id, tag),
                     )
+            # perf C: an owner/<agent> tag added/removed here must refresh the
+            # vec_docs.owner metadata column (in-place, no re-embed) so the
+            # owner-scoped KNN filter stays correct.
+            vec_sync_meta(self.db, doc_id)
             self.db.commit()
             return [
                 r["tag"]

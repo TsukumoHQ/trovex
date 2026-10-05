@@ -26,6 +26,21 @@ VEC0_MAX_K = 4096
 # store's hybrid retrieval (store.py) so both surfaces fuse identically.
 RRF_K0 = 60
 
+# BM25 recall caps (perf C, task 33ecdc9f): the keyword side was an unbounded OR of
+# up to 24 terms with LIMIT 4096, scoring the whole corpus on common words. Cap the
+# term count, drop stopwords (they match nearly everything and add no signal), and
+# bound the result pool to 50.
+BM25_MAX_TERMS = 8
+BM25_RECALL_LIMIT = 50
+_STOPWORDS = frozenset(
+    (
+        "the", "a", "an", "and", "or", "of", "to", "in", "is", "it", "for", "on",
+        "with", "as", "at", "by", "be", "this", "that", "are", "was", "from", "but",
+        "not", "you", "your", "we", "they", "he", "she", "his", "her", "its", "our",
+        "their", "can", "will",
+    )
+)
+
 def _row_importance(r) -> float:
     """A row's importance, 0.0 if the column isn't present (older row shape)."""
     try:
@@ -130,9 +145,12 @@ class Searcher:
             results.sort(key=lambda x: -x.score)
             return results[:limit]
 
-        # Keyword side — BM25 over docs_fts, filtered post-hoc to match scope.
+        # Keyword side — BM25 over docs_fts, filtered post-hoc to match scope. An
+        # owner-scoped query pushes the owner filter INTO the id set (perf C) so the
+        # keyword side mirrors the dense side's owner pre-filter.
+        bm_owner = tags[0] if (tags and len(tags) == 1 and tags[0].startswith("owner/")) else None
         bm_order: list[int] = []
-        for did in self._bm25_ids(query, pool):
+        for did in self._bm25_ids(query, pool, owner_tag=bm_owner):
             r = row_by_id.get(did)
             if r is None:
                 r = self._fetch_doc_row(did)
@@ -226,10 +244,15 @@ class Searcher:
         targets = source_ids or [
             r["source_id"] for r in self.db.execute("SELECT DISTINCT source_id FROM docs")
         ] or [RESERVED_SOURCE_ID]
-        # A tag filter is applied AFTER the KNN (tags aren't a vec0 column), so scan
-        # the whole bounded partition; otherwise a small k suffices — every other
-        # constraint pre-filters in the KNN.
-        k = VEC0_MAX_K if tags else max(limit * 5, 50)
+        # perf C (task 33ecdc9f): a single owner tag (the boot/record hot path) is now
+        # a vec0 METADATA column, so it pushes INTO the KNN like kind/status — a small
+        # bounded k, no 4096 over-fetch. Any OTHER tag filter (multi-tag, or a non-owner
+        # tag) still has no vec0 column, so it post-filters and must scan the partition.
+        owner_tag = (
+            tags[0] if (tags and len(tags) == 1 and tags[0].startswith("owner/")) else None
+        )
+        post_filter_tags = bool(tags) and owner_tag is None
+        k = VEC0_MAX_K if post_filter_tags else max(limit * 5, 50)
         # vec0 pushes '=', '!=' and 'IN' metadata constraints INTO the KNN, but NOT
         # 'NOT IN' — a NOT IN would post-filter the k-window instead, silently
         # squeezing recall on an archived-heavy partition. So exclude with chained
@@ -253,7 +276,12 @@ class Searcher:
         if kind:
             tail += " AND v.kind = ?"
             tail_params.append(kind)
-        if tags:
+        if owner_tag is not None:
+            # Pushed INTO the KNN (perf C): only single-owner docs carry this owner
+            # in the vec0 column; multi-owner ('' ) docs are added by the fallback.
+            tail += " AND v.owner = ?"
+            tail_params.append(owner_tag)
+        elif tags:
             placeholders = ",".join("?" * len(tags))
             tail += f" AND d.id IN (SELECT doc_id FROM doc_tags WHERE tag IN ({placeholders}))"
             tail_params.extend(tags)
@@ -306,24 +334,83 @@ class Searcher:
                         rows.append(row)
                 continue
             rows.extend(self.db.execute(sql, [qblob, k, src, *tail_params]).fetchall())
-        if len(targets) > 1:
-            rows.sort(key=lambda r: r["distance"])  # merge partitions by distance
+            if owner_tag is not None:
+                rows.extend(
+                    self._owner_multi_fallback(
+                        qblob, src, owner_tag, kind, lifecycle_clause, include_duplicates, limit
+                    )
+                )
+        # The owner fast path appends its (unsorted) multi-owner fallback rows, so a
+        # single-partition owner query also needs the distance merge, not just the
+        # multi-partition case.
+        if len(targets) > 1 or owner_tag is not None:
+            rows.sort(key=lambda r: r["distance"])  # merge by distance
         return rows
 
-    def _bm25_ids(self, query: str, pool: int) -> list[int]:
-        """BM25 doc ids from docs_fts, best rank first. An OR of the query terms —
-        the same shape the chunk store uses — so any exact token can hit."""
-        terms = re.findall(r"[a-z0-9]{2,}", query.lower())[:24]
+    def _owner_multi_fallback(
+        self,
+        qblob: bytes,
+        src: str,
+        owner_tag: str,
+        kind: str | None,
+        lifecycle_clause: str,
+        include_duplicates: bool,
+        limit: int,
+    ) -> list:
+        """Recall MULTI-owner docs for an owner-scoped query (perf C, task 33ecdc9f).
+
+        A doc with >1 `owner/` tag stores owner='' in vec_docs, so the single-owner
+        fast KNN (`v.owner = ?`) misses it. Recall it here WITHOUT re-introducing the
+        4096 over-fetch: drive from doc_tags (indexed on tag → bounded to the few docs
+        carrying this owner), join vec_docs by rowid, keep only the '' rows, and score
+        with vec_distance_cosine so the distance matches the KNN metric. Empty (zero
+        cost) in the common single-owner case — which is why the fast path never
+        over-fetches. Best-effort: a vec0 access-pattern error degrades to no fallback
+        rather than failing the whole recall."""
+        extra = ""
+        params: list = [qblob, owner_tag, src]
+        if not include_duplicates:
+            extra += " AND v.status != 'duplicate'"
+        if kind:
+            extra += " AND v.kind = ?"
+            params.append(kind)
+        sql = f"""SELECT d.id, d.path, d.title, d.mtime, d.status, d.size_bytes,
+                         d.tokens_est, d.absolute_path, d.source_id, d.importance,
+                         vec_distance_cosine(v.embedding, ?) AS distance
+                  FROM doc_tags dt
+                  JOIN docs d ON d.id = dt.doc_id
+                  JOIN vec_docs v ON v.rowid = d.id
+                  WHERE dt.tag = ? AND v.source_id = ? AND v.owner = ''
+                    AND {lifecycle_clause}{extra}
+                  ORDER BY distance LIMIT ?"""
+        params.append(limit)
+        try:
+            return self.db.execute(sql, params).fetchall()
+        except sqlite3.OperationalError:
+            return []
+
+    def _bm25_ids(self, query: str, pool: int, owner_tag: str | None = None) -> list[int]:
+        """BM25 doc ids from docs_fts, best rank first.
+
+        perf C (task 33ecdc9f) caps this recall query: stopwords dropped and terms
+        capped to BM25_MAX_TERMS (an unbounded 24-term OR scored every matching row),
+        LIMIT 50, and — when the query is owner-scoped — the owner filter is ANDed
+        into the id set via a doc_tags join, so the keyword side is pre-filtered to
+        the owner instead of scoring the whole corpus and trimming later."""
+        terms = [t for t in re.findall(r"[a-z0-9]{2,}", query.lower()) if t not in _STOPWORDS]
+        terms = terms[:BM25_MAX_TERMS]
         if not terms:
             return []
+        cap = min(pool, BM25_RECALL_LIMIT)
+        sql = "SELECT doc_id FROM docs_fts WHERE docs_fts MATCH ?"
+        params: list = [" OR ".join(terms)]
+        if owner_tag is not None:
+            sql += " AND doc_id IN (SELECT doc_id FROM doc_tags WHERE tag = ?)"
+            params.append(owner_tag)
+        sql += " ORDER BY rank LIMIT ?"
+        params.append(cap)
         try:
-            return [
-                r["doc_id"]
-                for r in self.db.execute(
-                    "SELECT doc_id FROM docs_fts WHERE docs_fts MATCH ? ORDER BY rank LIMIT ?",
-                    (" OR ".join(terms), pool),
-                )
-            ]
+            return [r["doc_id"] for r in self.db.execute(sql, params)]
         except sqlite3.OperationalError:
             # No docs_fts (pre-migration store) or a malformed MATCH → dense-only.
             return []

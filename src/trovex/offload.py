@@ -130,6 +130,59 @@ async def off_loop(fn, *args, timeout=_UNSET, **kwargs):
     return await asyncio.wait_for(asyncio.wrap_future(raw_future, loop=loop), timeout=timeout)
 
 
+# ── Heavy pool (task b02389c2 AC3 / audit: perf B separate pools) ─────────────
+# A SECOND, independent pool for slow background/write work — capture (embed +
+# the OpenAI distil fallback), store writes, reindex, the WAL checkpoint tick,
+# and the health refresh. Kept apart from the recall pool above so a slow write
+# or a forced checkpoint can never occupy a worker that /api/boot and search
+# depend on: recall stays latency-critical, heavy work gets its own blast
+# radius. Same orphan-safe raw-future semantics as off_loop.
+HEAVY_WORKERS = int(os.environ.get("TROVEX_HEAVY_WORKERS", "4"))
+_heavy_pool = ThreadPoolExecutor(max_workers=HEAVY_WORKERS, thread_name_prefix="trovex-heavy")
+_heavy_lock = threading.Lock()
+_heavy_inflight: dict[int, _Call] = {}
+_heavy_next_id = 0
+
+
+def _heavy_register(label: str, timeout: float | None) -> int:
+    global _heavy_next_id
+    with _heavy_lock:
+        cid = _heavy_next_id
+        _heavy_next_id += 1
+        deadline = None if timeout is None else time.monotonic() + timeout
+        _heavy_inflight[cid] = _Call(label=label, deadline=deadline)
+    return cid
+
+
+def _heavy_unregister(cid: int) -> None:
+    with _heavy_lock:
+        _heavy_inflight.pop(cid, None)
+
+
+async def off_loop_heavy(fn, *args, timeout=_UNSET, **kwargs):
+    """Like off_loop, but on the HEAVY pool (capture, store writes, reindex,
+    checkpoint, background refreshers). Separate from recall so slow writes
+    never starve /api/boot. Same bounded-timeout + orphan-tracking contract."""
+    if timeout is _UNSET:
+        timeout = TOOL_TIMEOUT_SEC
+    label = getattr(fn, "__name__", repr(fn))
+    cid = _heavy_register(label, timeout)
+    loop = asyncio.get_running_loop()
+    raw_future = _heavy_pool.submit(fn, *args, **kwargs)
+    raw_future.add_done_callback(lambda _f: _heavy_unregister(cid))
+    return await asyncio.wait_for(asyncio.wrap_future(raw_future, loop=loop), timeout=timeout)
+
+
+def pool_saturated() -> bool:
+    """True when every offload worker is occupied right now — a further submit
+    would queue behind in-flight work rather than run immediately. Load-shed
+    paths (/api/boot, audit Q5) check this to return their empty result at once
+    instead of piling onto a saturated pool and risking the orphaned-worker
+    build-up that ends in a watchdog restart."""
+    with _lock:
+        return len(_inflight) >= OFFLOAD_MAX_WORKERS
+
+
 def saturated_for() -> float:
     """Seconds the dedicated pool has been fully occupied by calls that have
     ALREADY exceeded their own timeout (i.e. orphans, not merely busy) — 0.0

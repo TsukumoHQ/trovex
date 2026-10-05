@@ -116,8 +116,15 @@ def _isolated_offload_pool(monkeypatch):
     fresh_pool = ThreadPoolExecutor(max_workers=offload.OFFLOAD_MAX_WORKERS)
     monkeypatch.setattr(offload, "_pool", fresh_pool)
     monkeypatch.setattr(offload, "_inflight", {})
+    # task b02389c2: isolate the HEAVY pool too (capture / store writes /
+    # checkpoint run there now), so a stuck-handler orphan can't bleed into a
+    # later test's heavy-pool capacity the same way.
+    fresh_heavy = ThreadPoolExecutor(max_workers=offload.HEAVY_WORKERS)
+    monkeypatch.setattr(offload, "_heavy_pool", fresh_heavy)
+    monkeypatch.setattr(offload, "_heavy_inflight", {})
     yield
     fresh_pool.shutdown(wait=False)
+    fresh_heavy.shutdown(wait=False)
 
 
 @pytest.fixture(autouse=True)
@@ -440,7 +447,7 @@ _STORE_TOUCH_RE = re.compile(
     r"\bstore\.\w|\bsearcher\.db\b|\bsearcher\.search\(|\bindexer\.db\b|\.db\.execute\(|"
     r"_sources_meta\(|\bsavings_mod\.\w|\binsights_mod\.\w|\bbackup_mod\.\w|\bindex_jobs\.\w"
 )
-_OFF_LOOP_RE = re.compile(r"off_loop\(|_offloaded\(")
+_OFF_LOOP_RE = re.compile(r"off_loop(?:_heavy)?\(|_offloaded\(")
 
 
 def test_every_store_db_route_is_off_loop_or_allowlisted(app_state):
@@ -587,3 +594,33 @@ async def test_watchdog_disabled_when_saturation_sec_zero(monkeypatch):
     # Should return immediately (disabled), never touching on_wedged.
     await asyncio.wait_for(offload.run_watchdog(on_wedged=_on_wedged), timeout=1.0)
     assert calls["n"] == 0
+
+
+async def test_heavy_pool_independent_of_recall_pool():
+    """b02389c2 AC3 separate pools: a fully saturated HEAVY pool must not occupy
+    any RECALL worker — pool_saturated() (recall) stays False and a recall call
+    runs immediately while every heavy worker is stuck."""
+    import trovex.offload as off
+
+    release = threading.Event()
+
+    def _stuck(i):
+        release.wait(timeout=5.0)
+        return i
+
+    heavy = [
+        asyncio.create_task(off.off_loop_heavy(_stuck, i, timeout=None))
+        for i in range(off.HEAVY_WORKERS)
+    ]
+    try:
+        for _ in range(300):  # wait until every heavy worker is occupied
+            if len(off._heavy_inflight) >= off.HEAVY_WORKERS:
+                break
+            await asyncio.sleep(0.01)
+        assert len(off._heavy_inflight) >= off.HEAVY_WORKERS
+        # recall pool is untouched by the heavy saturation
+        assert off.pool_saturated() is False
+        assert await off.off_loop(lambda: "recall-ok", timeout=2.0) == "recall-ok"
+    finally:
+        release.set()
+        await asyncio.gather(*heavy)

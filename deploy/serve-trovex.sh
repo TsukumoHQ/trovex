@@ -116,7 +116,12 @@ if [ "$install" = 1 ]; then
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>ProcessType</key><string>Background</string>
+  <!-- Interactive, NOT Background: ProcessType=Background pins every server thread
+       at scheduler priority 4 (E-cores only on Apple silicon) with throttled I/O,
+       measured ~30-55x slower on boot compute and ~5x slower startup under fleet
+       load (/healthz 85s, /api/boot 54s, minute-long restarts — cto perf audit,
+       task 62c53f35). This is a latency-sensitive request server, not a batch job. -->
+  <key>ProcessType</key><string>Interactive</string>
   <key>StandardOutPath</key><string>$LOG</string>
   <key>StandardErrorPath</key><string>$LOG</string>
   <key>EnvironmentVariables</key>
@@ -158,8 +163,13 @@ if [ "$refresh" = 1 ]; then
   run git fetch origin --quiet
   run git checkout --detach origin/main --quiet
   run git -c advice.detachedHead=false reset --hard origin/main --quiet
-  echo "→ uv sync"
-  run uv sync --quiet
+  # --extra usearch: the per-partition HNSW escape hatch (capacity.py) is optional
+  # for end users but REQUIRED on the fleet host — vec_chunks['trovex'] is 13,371
+  # vectors, past sqlite-vec's 4096 brute-force KNN ceiling, so chunk search
+  # silently truncates recall without it (cto perf audit, task 62c53f35). A bare
+  # `uv sync` installs no extras, which is why the deploy venv had no usearch.
+  echo "→ uv sync (with usearch extra)"
+  run uv sync --extra usearch --quiet
   # Build the /graph SPA into web/dist-graph so server.py mounts /graph (it mounts
   # only when the build exists). Best-effort: a web build hiccup must never block
   # the Python server coming up, so warn-and-continue instead of failing the serve.

@@ -1,7 +1,10 @@
+import asyncio
 import hashlib
 import logging
+import os
 import re
 import sqlite3
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -18,6 +21,19 @@ LIKE_ESCAPE_CHAR = "\\"
 # open transaction is blocking it. Force one and warn so it shows up in logs
 # instead of silently growing until a write finally hits "database is locked".
 WAL_WARN_BYTES = 10 * 1024 * 1024
+
+# wal_autocheckpoint, in pages (SQLite's own default is 1000 ≈ 4MB at the
+# standard 4096-byte page size). Set explicitly rather than left implicit so
+# it's documented and can't silently drift from what WAL_WARN_BYTES assumes:
+# every write already runs sqlite's own automatic PASSIVE checkpoint at this
+# threshold, keeping the WAL small and routine so checkpoint_if_wal_large's
+# 10MB forced path — the one that took ~60s in prod under disk contention,
+# task 20afcaf7 — becomes a rare last resort instead of the normal case.
+WAL_AUTOCHECKPOINT_PAGES = 1000
+
+# How often run_wal_checkpoint_timer ticks (task 20afcaf7 r4): the sole owner
+# of file-shrinking (TRUNCATE) checkpoints, off the request path. 0 disables it.
+WAL_CHECKPOINT_POLL_SEC = float(os.environ.get("TROVEX_WAL_CHECKPOINT_POLL_SEC", "30"))
 
 # Kinds that are their OWN event/snapshot and never take part in SSOT collapse —
 # kept in sync with Settings.dup_ephemeral_kinds (config.py). Duplicated here as a
@@ -67,6 +83,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     # 30s: the reindex writes the whole corpus in one ~25s transaction; a chunk
     # write or backfill racing it must wait that out, not fail at 5s.
     conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute(f"PRAGMA wal_autocheckpoint={WAL_AUTOCHECKPOINT_PAGES}")  # sql-safe: module constant, no user input; PRAGMA doesn't accept bound params
     try:
         conn.enable_load_extension(True)
         sqlite_vec.load(conn)
@@ -102,6 +119,7 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     _migrate_add_index_run_metrics(conn)
     _migrate_add_index_jobs_link(conn)
     _migrate_add_provenance(conn)
+    _migrate_add_drift(conn)
     _init_schema(conn, embed_dim)
     # AFTER _init_schema: on a legacy store the flat vec tables survived CREATE IF
     # NOT EXISTS; rebuild them partitioned, reusing embeddings (P2a).
@@ -109,6 +127,9 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     # AFTER partitioning: adds the embed_model metadata column (task 6851d755),
     # so it always sees the partitioned DDL shape.
     _migrate_add_vec_embed_model(conn, embed_dim, embed_model)
+    # AFTER embed_model: adds the owner metadata column (perf C, task 33ecdc9f),
+    # populated from doc_tags, so an owner-scoped KNN filters inside the search.
+    _migrate_add_vec_owner(conn, embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
     # task 6851d755: stamp store_meta['embed_model'] once — a fresh store, or
@@ -125,6 +146,81 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
         set_store_meta(conn, "embed_model", embed_model)
         conn.commit()
     return conn
+
+
+def open_read_conn(db_path: Path) -> sqlite3.Connection:
+    """A lightweight READ connection to an ALREADY-initialised store — WAL,
+    busy_timeout, and sqlite-vec loaded (needed for the vec0 KNN), but NO
+    migrations or schema init (the primary connection from open_db owns those).
+
+    Used by ThreadLocalReadConn to give each offload worker thread its own read
+    connection, so N concurrent reads don't serialize on one connection's mutex
+    (audit b02389c2 #4: 4 threads on one searcher.db measured ~serial, 4
+    connections ~3x faster)."""
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    try:
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+    except AttributeError:
+        # sqlite3 built without loadable-extension support — open_db already
+        # raises an actionable error on the primary connection; a read conn here
+        # just goes without vec (callers that need vec never reach this build).
+        pass
+    return conn
+
+
+class ThreadLocalReadConn:
+    """Drop-in for a shared sqlite3 connection that routes reads to a PER-THREAD
+    connection (audit b02389c2 #4). Exposes ``.execute``/``.executemany`` and
+    proxies every other attribute to the calling thread's own connection, lazily
+    opened via open_read_conn and cached per thread. For the READ path only
+    (search / boot): writes must keep using the owning store/indexer connection.
+
+    Lets the recall offload pool's worker threads run their KNNs in parallel
+    instead of serializing on one connection's mutex. Wiring Searcher.db to this
+    is a one-line change owned by the search.py lane (coordinated follow-up)."""
+
+    def __init__(self, db_path: Path):
+        self._db_path = Path(db_path)
+        self._local = threading.local()
+
+    def _conn(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = open_read_conn(self._db_path)
+            self._local.conn = conn
+        return conn
+
+    def execute(self, *args, **kwargs):
+        return self._conn().execute(*args, **kwargs)
+
+    def executemany(self, *args, **kwargs):
+        return self._conn().executemany(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._conn(), name)
+
+
+# Backoff after a forced checkpoint attempt (success OR deferred), keyed by
+# db_path so independent stores in one process back off independently.
+# PASSIVE never shrinks the WAL FILE itself (only TRUNCATE does — now the
+# periodic timer's job, see run_wal_checkpoint_timer) — so once the file's
+# high-water mark crosses WAL_WARN_BYTES, a size-only gate re-forces on every
+# single write FOREVER even when each attempt succeeds cleanly, because the
+# file size that triggered it never drops. Back off after every attempt,
+# not just a deferred (locked) one (task 20afcaf7 r4, live repro 2026-09-26
+# 23:15-23:17Z: same 68548592-byte WAL, forcing/deferring every ~45s,
+# /healthz + trovex_write stalls in that window; root cause confirmed
+# 23:23Z: a 77MB high-water-mark file held only ~1.3MB of real pending
+# content). Exponential, capped at 10 minutes; the only way this fully
+# clears is the file itself dropping back under threshold, which now only
+# the periodic timer's TRUNCATE can do.
+_CHECKPOINT_BACKOFF_BASE_SECS = 30.0
+_CHECKPOINT_BACKOFF_CAP_SECS = 600.0
+_checkpoint_backoff: dict[str, tuple[float, float]] = {}  # str(db_path) -> (next_attempt_at, backoff_secs)
 
 
 def checkpoint_if_wal_large(conn: sqlite3.Connection, db_path: Path) -> None:
@@ -150,17 +246,109 @@ def checkpoint_if_wal_large(conn: sqlite3.Connection, db_path: Path) -> None:
     without waiting on anyone and returns immediately either way — it may
     leave the WAL only partially truncated under sustained load, but it never
     blocks the write path."""
+    key = str(db_path)
     try:
         wal_path = db_path.with_name(db_path.name + "-wal")
         size = wal_path.stat().st_size
         if size <= WAL_WARN_BYTES:
+            _checkpoint_backoff.pop(key, None)
             return
+        now = time.monotonic()
+        next_attempt_at, backoff = _checkpoint_backoff.get(key, (0.0, 0.0))
+        if now < next_attempt_at:
+            return  # still backing off a prior attempt; the file is still oversized either way
         log.warning("trovex.db WAL at %d bytes (> %d), forcing checkpoint", size, WAL_WARN_BYTES)
-        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        try:
+            t0 = time.monotonic()
+            row = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+            duration_ms = (time.monotonic() - t0) * 1000
+            # wal_checkpoint's result row is (busy, log_pages, checkpointed_pages);
+            # busy=1 means PASSIVE stopped early on a lock it wouldn't wait for —
+            # still logged (not an error, see the PASSIVE-vs-TRUNCATE note above).
+            busy, log_pages, checkpointed_pages = row[0], row[1], row[2]
+            log.warning(
+                "wal checkpoint mode=PASSIVE busy=%d log_pages=%d checkpointed_pages=%d duration_ms=%.1f",
+                busy,
+                log_pages,
+                checkpointed_pages,
+                duration_ms,
+            )
+        except sqlite3.Error as e:
+            log.warning("wal checkpoint deferred: %s", e)
+        # Back off regardless of outcome: PASSIVE — success or deferred — never
+        # shrinks the FILE, so the size check above would otherwise re-fire on
+        # the very next write either way.
+        backoff = min(_CHECKPOINT_BACKOFF_CAP_SECS, max(_CHECKPOINT_BACKOFF_BASE_SECS, backoff * 2))
+        _checkpoint_backoff[key] = (time.monotonic() + backoff, backoff)
     except OSError:
         pass
+
+
+def periodic_checkpoint_tick(conn: sqlite3.Connection, db_path: Path) -> tuple[int, int, int] | None:
+    """One tick of the periodic WAL-checkpoint timer (task 20afcaf7 r4 root
+    cause, measured 2026-09-26 23:23Z): checkpoint_if_wal_large's per-write
+    backstop gates on the WAL FILE's size, but a PASSIVE checkpoint never
+    shrinks that file — only TRUNCATE does, and only when nothing holds an
+    older snapshot. So once the file's high-water mark crosses WAL_WARN_BYTES
+    it stays there, and every subsequent write re-attempts a checkpoint
+    forever even when the WAL's actual pending content is tiny (e.g. a 77MB
+    file holding ~1.3MB / 323 frames of real content).
+
+    This runs off the request path entirely, on a fixed interval, regardless
+    of file size: always PASSIVE (never blocks); TRUNCATE only when PASSIVE
+    moved every frame with no contention (busy == 0 and checkpointed_pages ==
+    log_pages — the whole WAL is now in the db, nothing older is still pinned),
+    so the file's disk footprint actually shrinks without ever starving a live
+    reader. Returns None if deferred (locked) — never raises, this must not
+    crash the timer loop.
+
+    A TRUNCATE that actually shrinks the file clears checkpoint_if_wal_large's
+    backoff for this db_path: the condition that started the backoff (a
+    permanently-oversized file) is gone, so the write-path backstop goes back
+    to normal instead of staying capped at its last backoff for up to 10
+    minutes after a real cleanup."""
+    try:
+        wal_path = db_path.with_name(db_path.name + "-wal")
+        size_before = wal_path.stat().st_size if wal_path.exists() else 0
+        row = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+        busy, log_pages, checkpointed_pages = row[0], row[1], row[2]
+        # Safe to shrink the file iff the PASSIVE pass just moved EVERY pending
+        # frame into the db with no lock contention. The old gate `log_pages == 0`
+        # almost never held (incident b02389c2 / audit Q7): PRAGMA reports
+        # log_pages as the WAL's TOTAL frame count, not a remaining count, so
+        # after a full checkpoint it equals checkpointed_pages (observed 129/129)
+        # and TRUNCATE never fired — the 140MB WAL grew forever and
+        # checkpoint_if_wal_large kept warning and re-forcing. `busy == 0 and
+        # checkpointed_pages == log_pages` is the real "WAL fully flushed, nothing
+        # older still pinned" condition.
+        if busy == 0 and log_pages > 0 and checkpointed_pages == log_pages:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            size_after = wal_path.stat().st_size if wal_path.exists() else 0
+            if size_after < size_before:
+                _checkpoint_backoff.pop(str(db_path), None)
+        return busy, log_pages, checkpointed_pages
+    except OSError:
+        return None
     except sqlite3.Error as e:
-        log.warning("wal checkpoint deferred: %s", e)
+        log.debug("periodic wal checkpoint tick deferred: %s", e)
+        return None
+
+
+async def run_wal_checkpoint_timer(conn: sqlite3.Connection, db_path: Path, interval_sec: float) -> None:
+    """Background task (started at app startup, see server.lifespan): the sole
+    owner of file-shrinking WAL checkpoints now — see periodic_checkpoint_tick.
+    Runs the (potentially briefly blocking, on TRUNCATE) tick in a worker
+    thread via off_loop so a slow tick never touches the event loop."""
+    from . import offload
+
+    if interval_sec <= 0:
+        return
+    while True:
+        await asyncio.sleep(interval_sec)
+        try:
+            await offload.off_loop_heavy(periodic_checkpoint_tick, conn, db_path)
+        except TimeoutError:
+            log.warning("periodic wal checkpoint tick timed out")
 
 
 def upsert_docs_fts(conn: sqlite3.Connection, doc_id: int, title: str, body: str) -> None:
@@ -226,6 +414,25 @@ def _doc_vec_meta(conn: sqlite3.Connection, doc_id: int) -> tuple | None:
     return (r["source_id"], r["kind"] or "doc", r["lifecycle"], r["status"])
 
 
+def doc_vec_owner(conn: sqlite3.Connection, doc_id: int) -> str:
+    """The doc's SINGLE owner tag for the vec_docs.owner metadata column (perf C,
+    task 33ecdc9f). Owner lives in doc_tags as `owner/<agent>`; a record has exactly
+    one by construction, so storing it as a vec0 metadata column lets the owner
+    filter push INTO the KNN (k=limit, no 4096 over-fetch).
+
+    A doc with 0 owner tags or >1 (the rare multi-owner case) stores '' — never NULL
+    (vec0 rejects NULL metadata). The '' rows are recalled by the doc_tags post-filter
+    FALLBACK in Searcher.search, so multi-owner recall stays correct; only the
+    single-owner fast path is pushed into the KNN."""
+    owners = [
+        r["tag"]
+        for r in conn.execute(
+            "SELECT tag FROM doc_tags WHERE doc_id = ? AND tag LIKE 'owner/%'", (doc_id,)
+        )
+    ]
+    return owners[0] if len(owners) == 1 else ""
+
+
 def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes, embed_model: str = "") -> None:
     """Upsert a doc's embedding + partition/metadata into vec_docs. Does NOT commit.
 
@@ -239,11 +446,12 @@ def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes, embed_m
     if meta is None:
         return
     src, kind, lifecycle, status = meta
+    owner = doc_vec_owner(conn, doc_id)
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute(
-        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (doc_id, src, emb_blob, kind, lifecycle, status, embed_model),
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (doc_id, src, emb_blob, kind, lifecycle, status, embed_model, owner),
     )
 
 
@@ -501,7 +709,7 @@ def rebuild_vec_shadow(
             f"""CREATE VIRTUAL TABLE vec_docs USING vec0(
                 source_id TEXT partition key,
                 embedding float[{embed_dim}] distance_metric=cosine,
-                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT, owner TEXT
             )"""
         )
         conn.execute(
@@ -511,9 +719,15 @@ def rebuild_vec_shadow(
                 kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
             )"""
         )
+        # owner (perf C): a correlated subquery derives the single `owner/<agent>`
+        # tag per rebuilt doc, '' when none or multi-owner — same rule as
+        # doc_vec_owner, so a model-swap rebuild never drops the owner metadata.
         conn.execute(
-            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
-            "SELECT rid, source_id, embedding, kind, lifecycle, status, ? FROM _vec_rebuild_docs",
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+            "SELECT rid, source_id, embedding, kind, lifecycle, status, ?, "
+            "  (SELECT CASE WHEN COUNT(*) = 1 THEN MAX(tag) ELSE '' END "
+            "   FROM doc_tags WHERE doc_id = rid AND tag LIKE 'owner/%') "
+            "FROM _vec_rebuild_docs",
             (embed_model,),
         )
         conn.execute(
@@ -614,9 +828,13 @@ def vec_sync_meta(conn: sqlite3.Connection, doc_id: int) -> None:
     if meta is None:
         return
     _src, kind, lifecycle, status = meta
+    # owner (perf C, task 33ecdc9f) is a vec_docs-only metadata column, refreshed
+    # here too so a tag-only change (set_tags) that never re-embeds still keeps the
+    # vec0 owner filter in step. vec0 allows an in-place metadata UPDATE (no rebuild).
+    owner = doc_vec_owner(conn, doc_id)
     conn.execute(
-        "UPDATE vec_docs SET kind = ?, lifecycle = ?, status = ? WHERE rowid = ?",
-        (kind, lifecycle, status, doc_id),
+        "UPDATE vec_docs SET kind = ?, lifecycle = ?, status = ?, owner = ? WHERE rowid = ?",
+        (kind, lifecycle, status, owner, doc_id),
     )
     for c in conn.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
         conn.execute(
@@ -681,6 +899,14 @@ def delete_doc_cascade(conn: sqlite3.Connection, doc_id: int) -> None:
     # doc_links has TWO doc-id columns (a link's src and dst can each be the doc
     # being deleted) — not a _DOC_CHILD_TABLES member, needs its own two-sided delete.
     conn.execute("DELETE FROM doc_links WHERE src_doc_id = ? OR dst_doc_id = ?", (doc_id, doc_id))
+    # doc_refs (extracted Obsidian-style edges, task a1b5a169) is also two-sided
+    # but ASYMMETRIC: the deleted doc's OUTGOING refs die with it, while a ref
+    # that POINTED AT it survives as dangling (dst_id NULL) so it re-binds if the
+    # target reappears (e.g. a rename, which is delete+insert). Not a
+    # _DOC_CHILD_TABLES member (its FK column is src_id, and the incoming side is
+    # a reset, not a delete).
+    conn.execute("DELETE FROM doc_refs WHERE src_id = ?", (doc_id,))
+    conn.execute("UPDATE doc_refs SET dst_id = NULL WHERE dst_id = ?", (doc_id,))
     conn.execute("DELETE FROM docs_fts WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute("DELETE FROM docs WHERE id = ?", (doc_id,))
@@ -950,6 +1176,30 @@ def doc_link(source_url: str | None, absolute_path: str | None, ext_id: str | No
     if absolute_path:
         return f"file://{absolute_path}"
     return f"trovex:{ext_id}" if ext_id else ""
+
+
+def _migrate_add_drift(conn: sqlite3.Connection) -> None:
+    """Docs↔code drift (task ef1c4106, trovex/links L5): add docs.drift +
+    drift_reason to a pre-existing docs table. Additive, idempotent — a second
+    boot finds the columns and no-ops before taking a writer lock."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='docs' AND type='table'").fetchone():
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(docs)")}
+    todo = [
+        (c, t)
+        for c, t in (("drift", "INTEGER NOT NULL DEFAULT 0"), ("drift_reason", "TEXT"))
+        if c not in cols
+    ]
+    if not todo:
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        for col, typ in todo:
+            conn.execute(f"ALTER TABLE docs ADD COLUMN {col} {typ}")  # sql-safe: fixed literal tuple
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def _migrate_add_provenance(conn: sqlite3.Connection) -> None:
@@ -1438,6 +1688,56 @@ def _migrate_add_vec_embed_model(conn: sqlite3.Connection, embed_dim: int, embed
         raise
 
 
+def _migrate_add_vec_owner(conn: sqlite3.Connection, embed_dim: int) -> None:
+    """Add an `owner` vec0 metadata column to vec_docs on an existing store (perf C,
+    task 33ecdc9f) — same rebuild shape as _migrate_add_vec_embed_model (vec0 has no
+    ALTER TABLE ADD COLUMN), run AFTER it so it always sees the embed_model DDL.
+
+    Rebuilds ONLY vec_docs (owner is a doc-level filter; vec_chunks is untouched —
+    the duplicate-row multi-owner scheme for chunks is deferred to a later ticket).
+    No re-embed: existing embedding blobs are copied straight across. Each row's
+    owner is derived from doc_tags exactly as doc_vec_owner does (single `owner/<x>`
+    tag, else '').
+
+    No-ops instantly once the column exists (PRAGMA table_info is cheap)."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_docs'"
+    ).fetchone()
+    if not row:
+        return  # no vec_docs — _init_schema creates it fresh (already with owner)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(vec_docs)")}
+    if "owner" in cols:
+        return  # already migrated
+
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute(
+            "CREATE TEMP TABLE _vd_owner AS "
+            "SELECT rowid AS rid, source_id, embedding AS emb, kind, lifecycle, status, embed_model "
+            "FROM vec_docs"
+        )
+        conn.execute("DROP TABLE vec_docs")
+        conn.execute(
+            f"""CREATE VIRTUAL TABLE vec_docs USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT, owner TEXT
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+            "SELECT rid, source_id, emb, kind, lifecycle, status, embed_model, "
+            "  (SELECT CASE WHEN COUNT(*) = 1 THEN MAX(tag) ELSE '' END "
+            "   FROM doc_tags WHERE doc_id = rid AND tag LIKE 'owner/%') "
+            "FROM _vd_owner"
+        )
+        conn.execute("DROP TABLE _vd_owner")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
     conn.executescript(
         f"""
@@ -1492,6 +1792,12 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             owners TEXT,
             parents TEXT,
             fetched_at REAL,
+            -- Docs↔code drift (task ef1c4106, trovex/links L5): set when a code
+            -- file this doc cites (cites-code edge in doc_refs) has a commit
+            -- NEWER than the doc's last change. Computed at index time from git,
+            -- never per query. drift_reason names the file + commit count.
+            drift INTEGER NOT NULL DEFAULT 0,
+            drift_reason TEXT,
             UNIQUE(workspace_id, source_id, path)
         );
         CREATE INDEX IF NOT EXISTS idx_docs_status ON docs(workspace_id, status);
@@ -1717,7 +2023,12 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             kind TEXT,
             lifecycle TEXT,
             status TEXT,
-            embed_model TEXT
+            embed_model TEXT,
+            -- owner (perf C, task 33ecdc9f): the doc's SINGLE `owner/<agent>` tag,
+            -- '' when none or multi-owner. A vec0 metadata column so an owner-scoped
+            -- boot KNN pushes `owner = ?` INTO the search (k=limit, no 4096 over-
+            -- fetch); multi-owner ('' ) docs are recalled by the doc_tags fallback.
+            owner TEXT
         );
 
         -- Chunk-level retrieval (structure-aware chunks + their embeddings)
@@ -1814,6 +2125,50 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_doc_links_src ON doc_links(src_doc_id, rel);
         CREATE INDEX IF NOT EXISTS idx_doc_links_dst ON doc_links(dst_doc_id, rel);
+
+        -- Obsidian-style extracted edges (task a1b5a169, trovex/links L1) — the
+        -- AUTOMATIC counterpart to doc_links above. One row per [[wikilink]] or
+        -- relative .md link found in ANY indexed doc (file-backed included).
+        -- dst_id IS NULL = dangling: the target doc doesn't exist yet (or was
+        -- deleted), and the edge is KEPT so it binds the moment the target
+        -- appears. All parse + resolve + rebind logic lives in links_parse.py;
+        -- this is just the store. delete_doc_cascade handles both sides by hand
+        -- (outgoing removed, incoming reset to dangling) — see below.
+        --   dst_norm = rebind lookup key (target basename, no .md, lowercased).
+        --   anchor   = #heading fragment; alias = display text; kind links-to|embeds.
+        CREATE TABLE IF NOT EXISTS doc_refs (
+            id INTEGER PRIMARY KEY,
+            src_id INTEGER NOT NULL REFERENCES docs(id) ON DELETE CASCADE,
+            dst_id INTEGER REFERENCES docs(id),
+            dst_raw TEXT NOT NULL,
+            dst_norm TEXT NOT NULL,
+            anchor TEXT,
+            alias TEXT,
+            context TEXT,
+            kind TEXT NOT NULL DEFAULT 'links-to'
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_src ON doc_refs(src_id);
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_dst ON doc_refs(dst_id);
+        -- Dangling re-bind on insert is an indexed lookup on dst_norm.
+        CREATE INDEX IF NOT EXISTS idx_doc_refs_dangling
+            ON doc_refs(dst_norm) WHERE dst_id IS NULL;
+        -- UNIQUE(src_id, dst_raw, anchor) with NULL anchors deduped (SQLite
+        -- treats NULLs as distinct in a plain UNIQUE, so a COALESCE index is the
+        -- only form that collapses two anchorless links to the same target).
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_doc_refs_uniq
+            ON doc_refs(src_id, dst_raw, COALESCE(anchor, ''));
+
+        -- Git last-commit-ts cache for the L5 drift computation (task ef1c4106).
+        -- Keyed by a code file's content_hash so an UNCHANGED repo reindex reuses
+        -- the row and never shells out to git (the "no git per query/per doc"
+        -- invariant). Rebuilt lazily when a file's content changes.
+        CREATE TABLE IF NOT EXISTS code_commit_cache (
+            source_id TEXT NOT NULL,
+            path TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            last_commit_ts REAL,
+            PRIMARY KEY (source_id, path)
+        );
 
         -- Doc history: a snapshot of the previous content on every overwrite
         CREATE TABLE IF NOT EXISTS doc_versions (

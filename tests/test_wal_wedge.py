@@ -132,6 +132,15 @@ def test_locked_retry_still_works(store, monkeypatch):
     assert calls["n"] == 2  # failed once, retried, succeeded
 
 
+class _FakeCheckpointCursor:
+    """wal_checkpoint's real result row is (busy, log_pages, checkpointed_pages).
+    Fully-flushed: busy=0 and checkpointed_pages == log_pages, the condition the
+    periodic tick TRUNCATEs on (b02389c2 / audit Q7)."""
+
+    def fetchone(self):
+        return (0, 323, 323)
+
+
 def test_checkpoint_if_wal_large_forces_checkpoint(store, monkeypatch):
     calls = []
     real_db = store.db
@@ -143,7 +152,7 @@ def test_checkpoint_if_wal_large_forces_checkpoint(store, monkeypatch):
         def execute(self, sql, *a, **kw):
             calls.append(sql)
             if "wal_checkpoint" in sql:
-                return None
+                return _FakeCheckpointCursor()
             return real_db.execute(sql, *a, **kw)
 
     class _FakeStat:
@@ -171,7 +180,7 @@ def test_checkpoint_if_wal_large_uses_passive_not_truncate(store, monkeypatch):
         def execute(self, sql, *a, **kw):
             calls.append(sql)
             if "wal_checkpoint" in sql:
-                return None
+                return _FakeCheckpointCursor()
             return real_db.execute(sql, *a, **kw)
 
     class _FakeStat:
@@ -183,6 +192,339 @@ def test_checkpoint_if_wal_large_uses_passive_not_truncate(store, monkeypatch):
     checkpoint_if_wal_large(_RecordingDB(), db_path)
     checkpoint_calls = [c for c in calls if "wal_checkpoint" in c]
     assert checkpoint_calls == ["PRAGMA wal_checkpoint(PASSIVE)"]
+
+
+def test_open_db_sets_wal_autocheckpoint_bound(store):
+    """task 20afcaf7 AC2: wal_autocheckpoint is set at connection open to the
+    configured page count, not left at whatever the linked sqlite build
+    defaults to — so routine writes checkpoint themselves long before WAL_WARN_BYTES,
+    and the 10MB forced path becomes a rare last resort instead of the normal case."""
+    from trovex.db import WAL_AUTOCHECKPOINT_PAGES
+
+    value = store.db.execute("PRAGMA wal_autocheckpoint").fetchone()[0]
+    assert value == WAL_AUTOCHECKPOINT_PAGES
+
+
+def test_write_burst_never_grows_wal_past_forced_threshold(store):
+    """task 20afcaf7 AC2: with wal_autocheckpoint bound at connection open,
+    sqlite auto-checkpoints itself every WAL_AUTOCHECKPOINT_PAGES pages — a
+    burst of writes must never let the real WAL file grow past WAL_WARN_BYTES
+    (the forced-checkpoint threshold), because sqlite is checkpointing on its
+    own the whole time. Real WAL file, not a mock: this is a regression lock
+    on the PRAGMA actually taking effect, not just being sent."""
+    from trovex.db import WAL_WARN_BYTES
+
+    wal_path = store.settings.data_dir / "trovex.db-wal"
+    body = "word " * 2000  # a few KB of content per doc, embedding is hermetic
+    for i in range(300):
+        store.put(f"# Burst {i}\n\n{body}", kind="note", tags=[f"burst-{i}"])
+        if wal_path.exists():
+            assert wal_path.stat().st_size <= WAL_WARN_BYTES, (
+                f"WAL grew past the forced threshold at doc {i} despite "
+                "wal_autocheckpoint — the bound isn't taking effect"
+            )
+
+
+def test_checkpoint_journals_mode_pages_and_duration(store, monkeypatch, caplog):
+    """task 20afcaf7 AC4: every forced checkpoint logs one line carrying mode,
+    pages, and duration — so a slow prod checkpoint (the field incident: ~60s
+    for 68MB) shows up in serve.log instead of only the vague pre/post-size
+    warning that was there before."""
+    import logging
+
+    class _FakeStat:
+        st_size = 11 * 1024 * 1024  # over WAL_WARN_BYTES
+
+    db_path = store.settings.data_dir / "trovex.db"
+    monkeypatch.setattr(type(db_path.with_name("x")), "stat", lambda self: _FakeStat())
+
+    with caplog.at_level(logging.WARNING, logger="trovex.db"):
+        checkpoint_if_wal_large(store.db, db_path)
+
+    journal_lines = [r.message for r in caplog.records if "mode=PASSIVE" in r.message]
+    assert len(journal_lines) == 1
+    line = journal_lines[0]
+    assert "log_pages=" in line
+    assert "checkpointed_pages=" in line
+    assert "duration_ms=" in line
+
+
+def test_checkpoint_backoff_after_deferred_skips_retries(store, monkeypatch, caplog):
+    """task 20afcaf7 r4: a deferred (SQLITE_LOCKED) checkpoint must not be
+    re-forced on every subsequent write while the WAL stays large — live
+    repro 2026-09-26 23:15-23:17Z showed the same 68MB WAL re-forcing and
+    re-deferring roughly every 45s, each attempt re-hitting the lock. One
+    deferred attempt must back off; a call inside the backoff window must
+    not touch wal_checkpoint (or log a second 'deferred' line) at all —
+    once the backoff elapses, the next call retries normally."""
+    import logging
+
+    from trovex.db import _CHECKPOINT_BACKOFF_BASE_SECS, _checkpoint_backoff
+
+    calls = []
+    real_db = store.db
+
+    class _LockedDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, sql, *a, **kw):
+            if "wal_checkpoint" in sql:
+                calls.append(sql)
+                raise sqlite3.OperationalError("database table locked")
+            return real_db.execute(sql, *a, **kw)
+
+    class _FakeStat:
+        st_size = 11 * 1024 * 1024  # over WAL_WARN_BYTES
+
+    db_path = store.settings.data_dir / "trovex.db"
+    monkeypatch.setattr(type(db_path.with_name("x")), "stat", lambda self: _FakeStat())
+    _checkpoint_backoff.pop(str(db_path), None)  # isolate from any other test's state
+
+    fake_now = [1000.0]
+    monkeypatch.setattr("trovex.db.time.monotonic", lambda: fake_now[0])
+
+    with caplog.at_level(logging.WARNING, logger="trovex.db"):
+        checkpoint_if_wal_large(_LockedDB(), db_path)  # attempts, deferred, backs off
+        checkpoint_if_wal_large(_LockedDB(), db_path)  # still backed off: must not retry
+        fake_now[0] += _CHECKPOINT_BACKOFF_BASE_SECS + 1  # backoff window elapses
+        checkpoint_if_wal_large(_LockedDB(), db_path)  # backoff cleared: retries, defers again
+
+    assert len(calls) == 2, "the backed-off call must never touch wal_checkpoint"
+    deferred_lines = [r.message for r in caplog.records if "wal checkpoint deferred" in r.message]
+    assert len(deferred_lines) == 2
+
+
+def test_checkpoint_backoff_after_success_still_skips_retries(store, monkeypatch):
+    """task 20afcaf7 r4 root cause (measured 2026-09-26 23:23Z): PASSIVE never
+    shrinks the WAL FILE (only TRUNCATE does), so a file whose high-water mark
+    once crossed WAL_WARN_BYTES stays there forever from stat()'s point of
+    view — a size-only gate would re-force a checkpoint on every single write
+    FOREVER even when each one succeeds cleanly (busy=0, no exception). This
+    must back off exactly like the deferred case, not just the error case."""
+    calls = []
+    real_db = store.db
+
+    class _RecordingDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, sql, *a, **kw):
+            if "wal_checkpoint" in sql:
+                calls.append(sql)
+                return _FakeCheckpointCursor()  # busy=0 — a clean success
+            return real_db.execute(sql, *a, **kw)
+
+    class _FakeStat:
+        st_size = 11 * 1024 * 1024  # over WAL_WARN_BYTES — and stays there: PASSIVE never shrinks it
+
+    db_path = store.settings.data_dir / "trovex.db"
+    monkeypatch.setattr(type(db_path.with_name("x")), "stat", lambda self: _FakeStat())
+    from trovex.db import _checkpoint_backoff
+
+    _checkpoint_backoff.pop(str(db_path), None)  # isolate from any other test's state
+
+    db = _RecordingDB()
+    for _ in range(10):  # simulate 10 writes in a row, same permanently-oversized file
+        checkpoint_if_wal_large(db, db_path)
+
+    assert len(calls) == 1, "a successful-but-still-oversized checkpoint must not re-force every write"
+
+
+def test_periodic_checkpoint_tick_always_runs_passive_never_gated_on_size(store):
+    """task 20afcaf7 r4: the periodic timer's tick is unconditional — no file
+    size check at all (that's the per-write backstop's job) — so it always
+    attempts PASSIVE regardless of how big the WAL file has gotten."""
+    from trovex.db import periodic_checkpoint_tick
+
+    db_path = store.settings.data_dir / "trovex.db"
+    result = periodic_checkpoint_tick(store.db, db_path)
+    assert result is not None
+    busy, _log_pages, _checkpointed_pages = result
+    assert busy in (0, 1)
+
+
+def test_periodic_checkpoint_tick_truncates_when_fully_checkpointed(store, monkeypatch):
+    """b02389c2 / audit Q7: TRUNCATE (the only mode that shrinks the WAL FILE)
+    runs exactly when the PASSIVE pass moved EVERY frame with no contention
+    (busy == 0 and checkpointed_pages == log_pages) — the whole WAL is now in
+    the db, nothing older is still pinned. The old gate `log_pages == 0` almost
+    never held (PRAGMA reports log_pages as the total frame count, so a fully
+    checkpointed WAL still reads log_pages == checkpointed_pages > 0), so
+    TRUNCATE never fired and the file grew unbounded."""
+    from trovex.db import periodic_checkpoint_tick
+
+    calls = []
+    real_db = store.db
+
+    class _RecordingDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, sql, *a, **kw):
+            calls.append(sql)
+            if sql == "PRAGMA wal_checkpoint(PASSIVE)":
+
+                class _Row:
+                    def fetchone(self):
+                        return (0, 323, 323)  # busy=0, fully flushed (checkpointed == log)
+
+                return _Row()
+            return real_db.execute(sql, *a, **kw)
+
+    db_path = store.settings.data_dir / "trovex.db"
+    periodic_checkpoint_tick(_RecordingDB(), db_path)
+    assert calls == ["PRAGMA wal_checkpoint(PASSIVE)", "PRAGMA wal_checkpoint(TRUNCATE)"]
+
+
+def test_periodic_checkpoint_tick_skips_truncate_when_frames_pending(store):
+    """The common case: real pending WAL content (log_pages > 0) — TRUNCATE
+    must not even be attempted, only the always-safe PASSIVE."""
+    from trovex.db import periodic_checkpoint_tick
+
+    calls = []
+    real_db = store.db
+
+    class _RecordingDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, sql, *a, **kw):
+            calls.append(sql)
+            if sql == "PRAGMA wal_checkpoint(PASSIVE)":
+
+                class _Row:
+                    def fetchone(self):
+                        return (0, 323, 191)  # checkpointed (191) < log (323) — frames still pending
+
+                return _Row()
+            return real_db.execute(sql, *a, **kw)
+
+    db_path = store.settings.data_dir / "trovex.db"
+    periodic_checkpoint_tick(_RecordingDB(), db_path)
+    assert calls == ["PRAGMA wal_checkpoint(PASSIVE)"]
+
+
+def test_periodic_checkpoint_tick_deferred_returns_none_never_raises(store, monkeypatch):
+    """Same best-effort contract as checkpoint_if_wal_large: a locked PASSIVE
+    must never raise (this runs unattended in a background timer, off_loop'd,
+    with no caller to report a failure to)."""
+    from trovex.db import periodic_checkpoint_tick
+
+    class _LockedDB:
+        def execute(self, sql, *a, **kw):
+            raise sqlite3.OperationalError("database table locked")
+
+    db_path = store.settings.data_dir / "trovex.db"
+    assert periodic_checkpoint_tick(_LockedDB(), db_path) is None  # must not raise
+
+
+def test_periodic_tick_truncate_shrink_resets_write_path_backoff(store, monkeypatch):
+    """cto-tsukumo r4 condition 1: once the timer's TRUNCATE actually shrinks
+    the file, checkpoint_if_wal_large's backoff for this db_path must clear —
+    the condition that started the backoff (a permanently-oversized file) is
+    gone, so the write-path backstop goes back to normal instead of staying
+    capped at its last backoff for up to 10 minutes after a real cleanup."""
+    import time
+
+    from trovex.db import _checkpoint_backoff, periodic_checkpoint_tick
+
+    db_path = store.settings.data_dir / "trovex.db"
+    key = str(db_path)
+    _checkpoint_backoff[key] = (time.monotonic() + 600.0, 600.0)  # simulate a capped-out backoff
+
+    sizes = iter([11 * 1024 * 1024, 0])  # size_before (oversized), size_after (shrunk to 0)
+    monkeypatch.setattr(type(db_path.with_name("x")), "stat", lambda self: type("S", (), {"st_size": next(sizes)})())
+    monkeypatch.setattr(type(db_path.with_name("x")), "exists", lambda self: True)
+
+    real_db = store.db
+
+    class _RecordingDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, sql, *a, **kw):
+            if sql == "PRAGMA wal_checkpoint(PASSIVE)":
+                return _FakeCheckpointCursor()  # busy=0, fully flushed (checkpointed == log) -> TRUNCATE fires
+            if sql == "PRAGMA wal_checkpoint(TRUNCATE)":
+                return _FakeCheckpointCursor()
+            return real_db.execute(sql, *a, **kw)
+
+    periodic_checkpoint_tick(_RecordingDB(), db_path)
+    assert key not in _checkpoint_backoff, "a real shrink must clear the write-path backoff"
+
+
+def test_periodic_tick_truncate_no_shrink_keeps_write_path_backoff(store, monkeypatch):
+    """The mirror case: TRUNCATE ran but the file didn't actually shrink (e.g.
+    another reader grabbed a snapshot in between) — the backoff must stay in
+    place, since the oversized-file condition it exists for is still true."""
+    import time
+
+    from trovex.db import _checkpoint_backoff, periodic_checkpoint_tick
+
+    db_path = store.settings.data_dir / "trovex.db"
+    key = str(db_path)
+    _checkpoint_backoff[key] = (time.monotonic() + 600.0, 600.0)
+
+    sizes = iter([11 * 1024 * 1024, 11 * 1024 * 1024])  # unchanged
+    monkeypatch.setattr(type(db_path.with_name("x")), "stat", lambda self: type("S", (), {"st_size": next(sizes)})())
+    monkeypatch.setattr(type(db_path.with_name("x")), "exists", lambda self: True)
+
+    real_db = store.db
+
+    class _RecordingDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, sql, *a, **kw):
+            if sql in ("PRAGMA wal_checkpoint(PASSIVE)", "PRAGMA wal_checkpoint(TRUNCATE)"):
+                return _FakeCheckpointCursor()
+            return real_db.execute(sql, *a, **kw)
+
+    periodic_checkpoint_tick(_RecordingDB(), db_path)
+    assert key in _checkpoint_backoff, "backoff must stay while the file is still oversized"
+
+
+def test_checkpoint_backoff_logs_once_per_window_not_per_request(store, monkeypatch, caplog):
+    """cto-tsukumo r4 condition 2: the 'forcing checkpoint' WARNING logs once
+    per backoff window (the first attempt, then again only on the next
+    escalation) — never once per request, or the incident's own log spam
+    (the symptom that made it visible) never actually clears."""
+    import logging
+
+    from trovex.db import _CHECKPOINT_BACKOFF_BASE_SECS, _checkpoint_backoff
+
+    real_db = store.db
+
+    class _RecordingDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, sql, *a, **kw):
+            if "wal_checkpoint" in sql:
+                return _FakeCheckpointCursor()
+            return real_db.execute(sql, *a, **kw)
+
+    class _FakeStat:
+        st_size = 11 * 1024 * 1024
+
+    db_path = store.settings.data_dir / "trovex.db"
+    monkeypatch.setattr(type(db_path.with_name("x")), "stat", lambda self: _FakeStat())
+    _checkpoint_backoff.pop(str(db_path), None)
+
+    fake_now = [1000.0]
+    monkeypatch.setattr("trovex.db.time.monotonic", lambda: fake_now[0])
+
+    db = _RecordingDB()
+    with caplog.at_level(logging.WARNING, logger="trovex.db"):
+        for _ in range(5):  # 5 "requests" all inside the same backoff window
+            checkpoint_if_wal_large(db, db_path)
+        fake_now[0] += _CHECKPOINT_BACKOFF_BASE_SECS + 1  # escalate to the next window
+        for _ in range(5):  # 5 more, all inside the NEW window
+            checkpoint_if_wal_large(db, db_path)
+
+    forcing_lines = [r.message for r in caplog.records if "forcing checkpoint" in r.message]
+    assert len(forcing_lines) == 2, "one log line per backoff window, not one per request"
 
 
 def test_checkpoint_if_wal_large_noop_below_threshold(store):
@@ -307,3 +649,64 @@ def test_indexer_reindex_rolls_back_on_compute_status_failure(settings, tmp_path
     indexer.db.execute("INSERT INTO index_runs (ts, duration_sec, added, updated, unchanged, removed) "
                         "VALUES (0, 0, 0, 0, 0, 0)")
     indexer.db.commit()
+
+
+# ── b02389c2 / audit Q7: WAL TRUNCATE gate ───────────────────────────────────
+
+
+def test_periodic_checkpoint_tick_truncates_wal_after_full_checkpoint(store):
+    """AC5: once a PASSIVE pass has moved every frame into the db, the periodic
+    tick must TRUNCATE so the WAL file returns under its cap. The old gate
+    `log_pages == 0` never held — PRAGMA reports log_pages as the WAL's total
+    frame count, so after a full checkpoint it equals checkpointed_pages and
+    TRUNCATE never fired, leaving the WAL (140 MB in prod) to grow forever."""
+    from trovex.db import periodic_checkpoint_tick
+
+    db_path = store.settings.data_dir / "trovex.db"
+    wal_path = db_path.with_name(db_path.name + "-wal")
+
+    # Real committed writes grow the WAL; a handful of small docs stays well
+    # under the forced/auto checkpoint thresholds, so frames pile up unflushed.
+    for i in range(50):
+        store.put(f"# doc {i}\n\n" + ("lorem ipsum dolor sit amet " * 40), tags=[f"owner/n{i}"])
+    size_before = wal_path.stat().st_size
+    assert size_before > 0, "precondition: the WAL should hold committed frames"
+
+    row = periodic_checkpoint_tick(store.db, db_path)
+    assert row is not None  # (busy, log_pages, checkpointed_pages)
+
+    size_after = wal_path.stat().st_size
+    # Pre-fix (log_pages == 0 gate): TRUNCATE never fires, PASSIVE leaves the
+    # file at its high-water mark -> size unchanged. Post-fix: TRUNCATE shrinks.
+    assert size_after < size_before, (
+        f"WAL did not shrink: {size_before} -> {size_after} (TRUNCATE never fired)"
+    )
+
+
+# ── b02389c2 AC3: per-thread read connection (audit #4) ──────────────────────
+
+
+def test_threadlocal_read_conn_is_per_thread(store):
+    """Each thread gets its OWN read connection (so recall-pool workers don't
+    serialize on one connection's mutex), and every connection sees the
+    committed store (task b02389c2 AC3)."""
+    import threading as _threading
+
+    from trovex.db import ThreadLocalReadConn
+
+    store.put("# doc\n\nbody one two three", tags=["owner/x"])
+    proxy = ThreadLocalReadConn(store.settings.data_dir / "trovex.db")
+    assert proxy.execute("SELECT COUNT(*) FROM docs").fetchone()[0] >= 1
+
+    conn_ids: dict[int, int] = {}
+
+    def worker(tid: int) -> None:
+        conn_ids[tid] = id(proxy._conn())
+        assert proxy.execute("SELECT COUNT(*) FROM docs").fetchone()[0] >= 1
+
+    threads = [_threading.Thread(target=worker, args=(i,)) for i in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(set(conn_ids.values())) == 3  # three distinct per-thread connections

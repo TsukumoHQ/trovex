@@ -50,6 +50,8 @@ from .db import (
 from . import retention, usearch_index
 from .query_cache import embed_query_blob
 from .embedder import Embedder, embedder_from_settings
+from .code_refs import sync_code_refs
+from .links_parse import sync_doc_refs
 
 TROVEX_SOURCE_ID = RESERVED_SOURCE_ID
 
@@ -391,6 +393,24 @@ class SqliteStore:
             self._set_tags(doc_id, list(tags or []) + ([f"kind/{kind}"] if kind else []))
             if links:
                 self._add_links_locked(doc_id, links, created_by=author)
+            # Extracted Obsidian-style edges (task a1b5a169): parse [[links]]/.md
+            # links out of this owned doc and bind dangling refs now pointing to
+            # it. An owned doc's resolve context is (TROVEX_SOURCE_ID, its ext_id).
+            sync_doc_refs(
+                self.db, src_id=doc_id, source_id=TROVEX_SOURCE_ID, path=ext_id, content=content
+            )
+            # Code citations (task ef1c4106): an owned record often cites a task
+            # id / commit sha. git_root=None — owned docs aren't a git-backed
+            # source, so cites-code paths/drift don't apply, only ticket/commit.
+            sync_code_refs(
+                self.db,
+                src_id=doc_id,
+                source_id=TROVEX_SOURCE_ID,
+                path=ext_id,
+                content=content,
+                git_root=None,
+                doc_mtime=now,
+            )
             self.db.commit()
             # Flag near-duplicates on the live write path too (the batch pass in
             # compute_status still runs on reindex/fs-watch, but a trovex_write must
@@ -1396,6 +1416,11 @@ class SqliteStore:
                     "INSERT OR IGNORE INTO doc_tags(doc_id, tag) VALUES (?, ?)",
                     (doc_id, tag),
                 )
+        # perf C (task 33ecdc9f): owner is a vec_docs metadata column derived from
+        # doc_tags. put() sets tags AFTER embedding, so refresh the vec0 owner here
+        # (in-place UPDATE, no re-embed) — the single chokepoint every tag write
+        # flows through, so owner can never drift from the owner/<agent> tag.
+        vec_sync_meta(self.db, doc_id)
 
     @_retry_on_locked
     def set_tags(
@@ -1419,6 +1444,10 @@ class SqliteStore:
                         "INSERT OR IGNORE INTO doc_tags(doc_id, tag) VALUES (?, ?)",
                         (doc_id, tag),
                     )
+            # perf C: an owner/<agent> tag added/removed here must refresh the
+            # vec_docs.owner metadata column (in-place, no re-embed) so the
+            # owner-scoped KNN filter stays correct.
+            vec_sync_meta(self.db, doc_id)
             self.db.commit()
             return [
                 r["tag"]

@@ -31,7 +31,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import re
+import sqlite3
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -114,8 +116,15 @@ def _isolated_offload_pool(monkeypatch):
     fresh_pool = ThreadPoolExecutor(max_workers=offload.OFFLOAD_MAX_WORKERS)
     monkeypatch.setattr(offload, "_pool", fresh_pool)
     monkeypatch.setattr(offload, "_inflight", {})
+    # task b02389c2: isolate the HEAVY pool too (capture / store writes /
+    # checkpoint run there now), so a stuck-handler orphan can't bleed into a
+    # later test's heavy-pool capacity the same way.
+    fresh_heavy = ThreadPoolExecutor(max_workers=offload.HEAVY_WORKERS)
+    monkeypatch.setattr(offload, "_heavy_pool", fresh_heavy)
+    monkeypatch.setattr(offload, "_heavy_inflight", {})
     yield
     fresh_pool.shutdown(wait=False)
+    fresh_heavy.shutdown(wait=False)
 
 
 @pytest.fixture(autouse=True)
@@ -233,6 +242,249 @@ async def test_doc_mutation_routes_stay_off_loop(
     assert resp.status_code == 504
 
 
+async def test_healthz_stays_responsive_during_a_slow_wal_checkpoint(client, monkeypatch):
+    """task 20afcaf7 AC1: the field incident (~60s /healthz stall under a forced
+    WAL checkpoint on slow prod disk) reproduced hermetically by making the
+    checkpoint itself slow. checkpoint_if_wal_large runs inside
+    store._retry_on_locked, post-commit, and /api/capture already dispatches
+    capture_state (-> store.put -> the write + its post-commit checkpoint) via
+    offload.off_loop — so a slow checkpoint must stall only the offloaded
+    thread, never the event loop /healthz shares with every other route."""
+    started = threading.Event()
+
+    def _slow_checkpoint(conn, db_path):
+        started.set()
+        time.sleep(1.0)  # far past the 0.1s budget from _fast_timeout
+
+    monkeypatch.setattr("trovex.store.checkpoint_if_wal_large", _slow_checkpoint)
+
+    capture_task = asyncio.create_task(
+        client.post("/api/capture", json={"agent": "y", "summary": "s" * 25})
+    )
+    while not started.is_set():
+        await asyncio.sleep(0.005)
+
+    t0 = time.perf_counter()
+    healthz = await client.get("/healthz")
+    elapsed = time.perf_counter() - t0
+
+    assert healthz.status_code == 200
+    assert elapsed < 0.2, "a slow checkpoint must never delay /healthz"
+
+    await capture_task  # let the offloaded call finish before the fixture tears down
+
+
+async def test_api_map_stays_off_loop(client, app_state, monkeypatch):
+    """task 20afcaf7: /api/map called store.list_docs directly inline on the
+    event loop — the same bug class as the mutation routes above, just on the
+    read side. A slow store call must not block /healthz either."""
+    started = threading.Event()
+
+    def _stuck(*args, **kwargs):
+        started.set()
+        time.sleep(1.0)
+        return []
+
+    monkeypatch.setattr(app_state.store, "list_docs", _stuck)
+
+    task = asyncio.create_task(client.get("/api/map"))
+    while not started.is_set():
+        await asyncio.sleep(0.005)
+
+    t0 = time.perf_counter()
+    healthz = await client.get("/healthz")
+    elapsed = time.perf_counter() - t0
+    assert healthz.status_code == 200
+    assert elapsed < 0.5, "/api/map must not block /healthz while its store call is stuck"
+
+    resp = await task
+    assert resp.status_code == 504
+
+
+async def test_api_stats_stays_off_loop(client, app_state, monkeypatch):
+    """task 20afcaf7: /api/stats ran its db.execute() calls directly inline on
+    the event loop. sqlite3.Connection is a C type (can't monkeypatch its
+    methods in place, same constraint as test_locked_retry_still_works above)
+    so swap the whole `searcher.db` attribute for a wrapper that stalls the
+    first call."""
+    started = threading.Event()
+    real_db = app_state.searcher.db
+
+    class _StuckDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, *args, **kwargs):
+            started.set()
+            time.sleep(1.0)
+            raise sqlite3.OperationalError("stuck")
+
+    monkeypatch.setattr(app_state.searcher, "db", _StuckDB())
+
+    task = asyncio.create_task(client.get("/api/stats"))
+    while not started.is_set():
+        await asyncio.sleep(0.005)
+
+    t0 = time.perf_counter()
+    healthz = await client.get("/healthz")
+    elapsed = time.perf_counter() - t0
+    assert healthz.status_code == 200
+    assert elapsed < 0.5, "/api/stats must not block /healthz while its db call is stuck"
+
+    resp = await task
+    assert resp.status_code == 504
+
+
+async def test_api_backup_stays_off_loop(client, monkeypatch):
+    """task 20afcaf7 r3: the reviewer flagged this as THE exact wedge-class-2
+    pattern the whole ticket is about — backup_mod.make_backup runs a PASSIVE
+    checkpoint + Connection.backup() over the full store (~340MB in prod) and
+    ran inline in the route handler until now."""
+    started = threading.Event()
+
+    def _stuck_make_backup(*args, **kwargs):
+        started.set()
+        time.sleep(1.0)
+        from pathlib import Path
+
+        return Path("unused")
+
+    monkeypatch.setattr("trovex.backup.make_backup", _stuck_make_backup)
+
+    task = asyncio.create_task(client.post("/api/backup"))
+    while not started.is_set():
+        await asyncio.sleep(0.005)
+
+    t0 = time.perf_counter()
+    healthz = await client.get("/healthz")
+    elapsed = time.perf_counter() - t0
+    assert healthz.status_code == 200
+    assert elapsed < 0.5, "/api/backup must not block /healthz while make_backup is stuck"
+
+    resp = await task
+    assert resp.status_code == 504
+
+
+async def test_api_backups_list_stays_off_loop(client, monkeypatch):
+    """task 20afcaf7 r3: backup_mod.list_backups globs the backups dir and
+    stat()s every file inline — off_loop like every route above."""
+    started = threading.Event()
+
+    def _stuck_list_backups(*args, **kwargs):
+        started.set()
+        time.sleep(1.0)
+        return []
+
+    monkeypatch.setattr("trovex.backup.list_backups", _stuck_list_backups)
+
+    task = asyncio.create_task(client.get("/api/backups"))
+    while not started.is_set():
+        await asyncio.sleep(0.005)
+
+    t0 = time.perf_counter()
+    healthz = await client.get("/healthz")
+    elapsed = time.perf_counter() - t0
+    assert healthz.status_code == 200
+    assert elapsed < 0.5, "/api/backups must not block /healthz while list_backups is stuck"
+
+    resp = await task
+    assert resp.status_code == 504
+
+
+async def test_home_page_stays_off_loop(client, monkeypatch):
+    """task 20afcaf7 r3: the home page ('/') alone did ~10 db.execute() calls
+    inline building its dashboard context — spot-check representative of the
+    11 HTML routes the static audit below now covers exhaustively (all wrapped
+    via a thin _compute_*_context helper + _offloaded, same as /api/map)."""
+    started = threading.Event()
+    real_db = state_mod._state.searcher.db
+
+    class _StuckDB:
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+        def execute(self, *args, **kwargs):
+            started.set()
+            time.sleep(1.0)
+            raise sqlite3.OperationalError("stuck")
+
+    monkeypatch.setattr(state_mod._state.searcher, "db", _StuckDB())
+
+    task = asyncio.create_task(client.get("/"))
+    while not started.is_set():
+        await asyncio.sleep(0.005)
+
+    t0 = time.perf_counter()
+    healthz = await client.get("/healthz")
+    elapsed = time.perf_counter() - t0
+    assert healthz.status_code == 200
+    assert elapsed < 0.5, "/ must not block /healthz while its db calls are stuck"
+
+    resp = await task
+    assert resp.status_code == 504
+
+
+# task 20afcaf7 r3/r4: the 11 HTML dashboard routes below were previously
+# allowlisted as "human-browsed, not on the agent hot path" — but AC3 says
+# literally "every route that touches store/db is wrapped by off_loop", and
+# the r3 reviewer confirmed each of them DOES touch store/db inline. All 11
+# are now off_loop'd for real (a thin _compute_*_context helper + _offloaded)
+# instead of reasoned around, so only a genuine regex false-positive stays
+# allowlisted.
+_ALLOWED_INLINE_ROUTES = {
+    "/api/savings/benchmark": (
+        "savings_mod.benchmark_result() returns the static packaged corpus-"
+        "benchmark result, no live db/store touch — regex false-positive on "
+        "'savings_mod.'"
+    ),
+}
+
+# task 20afcaf7 r3: broadened after the reviewer found 3 gaps — backup_mod
+# (make_backup/list_backups: /api/backup, /api/backups), searcher.search (only
+# searcher.db was matched), and index_jobs.X — none previously caught, so a
+# route calling any of them inline without off_loop passed silently.
+_STORE_TOUCH_RE = re.compile(
+    r"\bstore\.\w|\bsearcher\.db\b|\bsearcher\.search\(|\bindexer\.db\b|\.db\.execute\(|"
+    r"_sources_meta\(|\bsavings_mod\.\w|\binsights_mod\.\w|\bbackup_mod\.\w|\bindex_jobs\.\w"
+)
+_OFF_LOOP_RE = re.compile(r"off_loop(?:_heavy)?\(|_offloaded\(")
+
+
+def test_every_store_db_route_is_off_loop_or_allowlisted(app_state):
+    """task 20afcaf7 AC3: static audit over the route table — every server.py
+    route touching store/searcher/indexer/a `.db` connection either goes
+    through off_loop/_offloaded, or is named in _ALLOWED_INLINE_ROUTES with a
+    reason. A future route that adds an inline store/db call and forgets
+    off_loop fails this test instead of silently reintroducing the wedge.
+
+    Needs the `app_state` fixture: build_app() eagerly calls get_state(),
+    and without a pre-populated state it falls back to real Settings() and
+    opens the actual configured trovex.db — a bare build_app() here can
+    collide with a real running trovex-serve process's WAL lock."""
+    app = build_app()
+    violations = []
+    seen_paths = set()
+    for route in app.routes:
+        endpoint = getattr(route, "endpoint", None)
+        path = getattr(route, "path", None)
+        if endpoint is None or path is None:
+            continue
+        seen_paths.add(path)
+        if path in _ALLOWED_INLINE_ROUTES:
+            continue
+        try:
+            src = inspect.getsource(endpoint)
+        except (OSError, TypeError):
+            continue
+        if _STORE_TOUCH_RE.search(src) and not _OFF_LOOP_RE.search(src):
+            violations.append(f"{path} ({endpoint.__name__})")
+    assert violations == [], f"routes touching store/db without off_loop: {violations}"
+    # The allowlist itself must stay honest: every entry must still be a real
+    # route (nothing stale left behind once a listed page is removed/renamed).
+    stale = set(_ALLOWED_INLINE_ROUTES) - seen_paths
+    assert stale == set(), f"_ALLOWED_INLINE_ROUTES has stale entries: {stale}"
+
+
 async def test_off_loop_pool_is_bounded_orphans_dont_grow_it_unbounded():
     """OFFLOAD_MAX_WORKERS bounds the dedicated pool. Firing more concurrent
     stuck calls than the pool has workers must NOT create unbounded threads —
@@ -342,3 +594,33 @@ async def test_watchdog_disabled_when_saturation_sec_zero(monkeypatch):
     # Should return immediately (disabled), never touching on_wedged.
     await asyncio.wait_for(offload.run_watchdog(on_wedged=_on_wedged), timeout=1.0)
     assert calls["n"] == 0
+
+
+async def test_heavy_pool_independent_of_recall_pool():
+    """b02389c2 AC3 separate pools: a fully saturated HEAVY pool must not occupy
+    any RECALL worker — pool_saturated() (recall) stays False and a recall call
+    runs immediately while every heavy worker is stuck."""
+    import trovex.offload as off
+
+    release = threading.Event()
+
+    def _stuck(i):
+        release.wait(timeout=5.0)
+        return i
+
+    heavy = [
+        asyncio.create_task(off.off_loop_heavy(_stuck, i, timeout=None))
+        for i in range(off.HEAVY_WORKERS)
+    ]
+    try:
+        for _ in range(300):  # wait until every heavy worker is occupied
+            if len(off._heavy_inflight) >= off.HEAVY_WORKERS:
+                break
+            await asyncio.sleep(0.01)
+        assert len(off._heavy_inflight) >= off.HEAVY_WORKERS
+        # recall pool is untouched by the heavy saturation
+        assert off.pool_saturated() is False
+        assert await off.off_loop(lambda: "recall-ok", timeout=2.0) == "recall-ok"
+    finally:
+        release.set()
+        await asyncio.gather(*heavy)

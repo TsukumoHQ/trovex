@@ -9,27 +9,64 @@ pulls a full record on demand via trovex_read(doc_id).
 
 from __future__ import annotations
 
+import logging
+import re
 import sqlite3
 
 from .search import Searcher
 from .budget import BudgetCandidate, fit_budget
 from .tokens import count_tokens as _count_tokens
 
+log = logging.getLogger("trovex.boot")
+
 BOOT_QUERY = "current state resume open work in flight next steps gotchas"
 
 # The prompt hook passes the WHOLE user prompt as q=. Agent preambles and task
 # notifications run to tens of thousands of chars, and rejecting those was a
 # silently-lost recall: the hook swallows the error, so the agent just got no
-# pointers. Truncate instead. 2000 chars ≈ the 512-token window of the default
-# encoder (bge-small-en-v1.5), so anything past it never reached the vector
-# anyway — the cap observes that limit rather than adding one. Head, not tail:
-# in these prompts the task identity (name, branch, id) leads and the
-# boilerplate trails.
-BOOT_Q_MAX = 2000
+# pointers. Truncate instead. Head, not tail: in these prompts the task identity
+# (name, branch, id) leads and the boilerplate trails.
+#
+# perf A (task 62c53f35): 2000 chars ≈ 512 tokens is the model's MAX sequence
+# length, so every long prompt paid the full quadratic forward pass (746 ms on a
+# loaded host vs 246 ms at 500 chars — measured in the cto perf audit). The
+# retrieval signal for owner-scoped recall lives in the first few hundred chars;
+# cap at 500 (~128 tokens) so boot embeds stay cheap on the request path.
+BOOT_Q_MAX = 500
+
+# Harness boilerplate that leads the prompt hook's q= and carries no retrieval
+# signal: the <task-notification>/<system-reminder>/<pasted_content> XML blocks,
+# the "You are **name**, role" agent preamble, and the relay "check your relay …"
+# nudge line. Stripping these BEFORE the length cap keeps the real task text from
+# being truncated away behind boilerplate (which would silently drop recall).
+_BOILERPLATE_BLOCK_RE = re.compile(
+    r"<(task-notification|system-reminder|pasted_content)\b[^>]*>.*?</\1>",
+    re.DOTALL | re.IGNORECASE,
+)
+_AGENT_PREAMBLE_RE = re.compile(r"You are \*\*[^*]+\*\*[^.\n]*[.\n]", re.IGNORECASE)
+_RELAY_NUDGE_RE = re.compile(r"[^\n]*check your relay[^\n]*", re.IGNORECASE)
+_WS_RE = re.compile(r"\s+")
 
 
-def _empty_pack(agent: str, budget: int | None = None) -> dict:
-    pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
+def clean_query(text: str) -> str:
+    """Strip harness boilerplate from a hook-supplied prompt, then cap length.
+
+    Pure + deterministic so the SAME transform runs on the embed path (boot
+    recall) and on the logged query text (the replay eval re-embeds what it
+    logged — the two must match or replay drifts). Boilerplate-only input
+    collapses to "" and the caller falls back to BOOT_QUERY."""
+    t = _BOILERPLATE_BLOCK_RE.sub(" ", text)
+    t = _AGENT_PREAMBLE_RE.sub(" ", t)
+    t = _RELAY_NUDGE_RE.sub(" ", t)
+    t = _WS_RE.sub(" ", t).strip()
+    return t[:BOOT_Q_MAX]
+
+
+def _empty_pack(agent: str, budget: int | None = None, degraded: str | None = None) -> dict:
+    # `degraded` names WHY the pack is empty: None = a true scope miss ("no
+    # records"); a string ("timeout"/"sqlite"/"ceiling") = recall was SHED, not
+    # absent. The prompt hook must be able to tell those apart (ticket 7df08701).
+    pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0, "degraded": degraded}
     if budget is not None:
         pack.update(budget_requested=budget, budget_used=0, trimmed=[])
     return pack
@@ -50,9 +87,10 @@ def boot_pointers(
     Best-effort: boot must NEVER 500. Any retrieval OperationalError (e.g. the
     sqlite-vec KNN ceiling on a large store, a locked/backup db) degrades to an
     empty pack instead of taking the whole fleet's Active-Memory boot down."""
+    cleaned = clean_query(q) if q else ""
     try:
         results = searcher.search(
-            (q or BOOT_QUERY)[:BOOT_Q_MAX],
+            cleaned or BOOT_QUERY,
             limit=50 if budget is not None else k,
             source_ids=["trovex"],
             kind="record",
@@ -66,8 +104,23 @@ def boot_pointers(
             # here; the dense score is the semantic-relevance gate on top.
             hybrid=False,
         )
-    except sqlite3.OperationalError:
-        return _empty_pack(agent, budget)
+    except sqlite3.OperationalError as e:
+        msg = str(e)
+        if "k value in knn query too large" in msg:
+            # Genuine sqlite-vec KNN ceiling: the partition outgrew brute-force k.
+            # A BOUNDED (not transient) empty — flagged 'ceiling' + logged so the
+            # real fix (the usearch escape hatch) is findable. This is the ONLY
+            # OperationalError the boot path treats as an empty recall.
+            log.warning("boot recall empty: sqlite-vec KNN ceiling (agent=%s): %s", agent, msg)
+            return _empty_pack(agent, budget, degraded="ceiling")
+        # Any OTHER OperationalError (lock/busy/transient under contention) is NOT
+        # "no records": surface it degraded + logged, never a silent empty pack
+        # (ticket 7df08701, real trigger = the offload deadline in server.py). The
+        # narrow except above is NOT widened to pass a transient off as a ceiling.
+        log.warning(
+            "boot recall degraded: transient sqlite OperationalError (agent=%s): %s", agent, msg
+        )
+        return _empty_pack(agent, budget, degraded="sqlite")
     results = [r for r in results if r.score >= floor]
     if not results:
         return _empty_pack(agent, budget)
@@ -110,6 +163,7 @@ def boot_pointers(
             "pointers": pointers,
             "render": render,
             "tokens_est": fitted["budget_used"],
+            "degraded": None,
             "budget_requested": budget,
             "budget_used": fitted["budget_used"],
             "trimmed": fitted["trimmed"],
@@ -125,4 +179,5 @@ def boot_pointers(
         "pointers": pointers,
         "render": render,
         "tokens_est": _count_tokens(render),
+        "degraded": None,
     }

@@ -50,9 +50,12 @@ CONTRACT: dict[str, dict[str, set[str]]] = {
     # full rung, so existing readers are unaffected.
     # task edaf8627: gained `as_of` (optional, default 0=disabled) — walks a
     # `supersedes` chain back to the version current at that timestamp. Additive.
+    # task b9687dfb: gained `links` (optional, default False) — append the doc's
+    # graph edges (outgoing + backlinks). Additive.
     "trovex_read": {
         "props": {
-            "query", "doc_id", "section", "full", "q", "tier", "versions", "version_id", "as_of",
+            "query", "doc_id", "section", "full", "q", "tier", "versions", "version_id",
+            "as_of", "links",
         },
         "required": set(),
     },

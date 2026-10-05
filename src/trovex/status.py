@@ -234,6 +234,14 @@ def compute_status(
     # changed.
     dup_count = _detect_duplicates(db, settings, driver_ids=touched_doc_ids if incremental else None)
 
+    # Inferred edges (task 07b7cdc4): unlinked mentions + sub-dup-threshold
+    # 'similar' neighbours, for the SAME driver set (touched ids incremental,
+    # all canonical/plan on a full recompute). AFTER dup detection so duplicates
+    # are already excluded from the 'similar' band.
+    from .implicit_refs import sync_implicit_refs
+
+    sync_implicit_refs(db, settings, driver_ids=touched_doc_ids if incremental else None)
+
     # Sync vec0 metadata for every doc this pass re-classified (partitioned KNN
     # pre-filters on vec_docs.status, so it must track docs.status).
     reconcile_vec_meta(db)

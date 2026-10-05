@@ -1,0 +1,43 @@
+perf C receipt — task 33ecdc9f (filter inside the vector search)
+================================================================
+Host: Darwin arm64. Real bge-small embedder for recall; synthetic real-shape index
+for the stage bench (no network at query time).
+
+A. RECALL NOT REGRESSED — owner-scoped search == brute-force ground truth
+------------------------------------------------------------------------
+The owner-scoped search (owner pushed into the KNN + the multi-owner doc_tags
+fallback) returns the SAME result set a brute-force owner-filtered cosine ranking
+(ground truth) does. Equivalence == no recall regression vs the old post-filter path.
+
+  owner        query                               new top-k == ground-truth
+  owner/alpha  how is the login token checked      True
+  owner/alpha  when is the wal shrunk              True
+  owner/beta   keyword search fused with vectors   True
+  owner/beta   shared handoff for both agents      True
+
+  result-set equivalence: 4/4 (owner-scoped recall unchanged vs ground truth)
+  multi-owner doc recalled for alpha: True; for beta: True (owner='' + doc_tags fallback)
+
+B. STAGE BENCH — vector + BM25 recall stage p50/p95 (ms), before/after
+---------------------------------------------------------------------
+Real-shape index: 8000 docs, 40 owners (~200/owner), 1 partition.
+before = owner POST-filter (KNN k=4096 + d.id IN doc_tags) / 24-term OR LIMIT 4096
+after  = owner IN the KNN (v.owner=?, k=limit) / stopworded 8-term + owner LIMIT 50
+
+  stage                   before p50/p95   after p50/p95   p50 speedup
+  vector (owner-scoped)   13.43/17.9       2.59/2.84       5.2x
+  BM25   (owner-scoped)   19.06/20.64      10.89/11.44     1.8x
+
+(cto research measured the target vec0 shape at 0.9 ms p50 on 100k x 384; the live
+trovex partition is ~1752 docs — the win is the removed linear scan, isolated here.)
+
+REPRODUCE
+---------
+Method: index a 6-topic corpus (alpha owns 4, beta 2, one SHARED multi-owner) with the
+real bge-small fp32 embedder; for each owner query compare the owner-scoped
+Searcher.search(tags=[owner], hybrid=False) result set to a brute-force owner-filtered
+cosine ranking over vec_docs; then build an 8000-doc synthetic single-partition index
+and time the two SQL shapes above (post-filter k=4096 vs v.owner=? k=limit; 24-term
+LIMIT 4096 vs stopworded 8-term + owner LIMIT 50). Also pinned by named behavioral
+tests in tests/test_server.py (8 perf-C tests, green): owner-in-KNN no-overfetch,
+multi-owner fallback, BM25 caps, migration backfill, boot-never-reranks.

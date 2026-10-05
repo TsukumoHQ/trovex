@@ -44,12 +44,14 @@ from .db import (
     sync_doc_chunks,
     upsert_docs_fts,
     vec_chunks_put,
+    vec_chunks_static_put,
     vec_docs_put,
+    vec_docs_static_put,
     vec_sync_meta,
 )
 from . import retention, usearch_index
 from .query_cache import embed_query_blob
-from .embedder import Embedder, embedder_from_settings
+from .embedder import Embedder, embedder_from_settings, static_embedder_from_settings
 from .code_refs import sync_code_refs
 from .links_parse import sync_doc_refs
 
@@ -180,12 +182,27 @@ class Store(Protocol):
 class SqliteStore:
     """Pôle A: trovex-owned docs as rows in the shared sqlite-vec DB."""
 
-    def __init__(self, settings: Settings, embedder: Embedder | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        embedder: Embedder | None = None,
+        static_embedder: Embedder | None = None,
+    ):
         self.settings = settings
         self.db: sqlite3.Connection = open_db(
-            settings.data_dir / "trovex.db", settings.resolved_embed_dim(), settings.embed_model
+            settings.data_dir / "trovex.db",
+            settings.resolved_embed_dim(),
+            settings.embed_model,
+            static_embed_dim=settings.static_embed_dim,
+            static_embed_enabled=settings.static_embed_enabled,
         )
         self.embedder = embedder or embedder_from_settings(settings)
+        # Static-embedding shadow (perf D, task ad2ad98e): None unless
+        # static_embed_enabled. When set, a captured doc's dense embed is mirrored
+        # with a static vector so owned records are recallable on the shed boot path.
+        # Accepts a shared instance (get_state builds one potion model for the whole
+        # process) or builds its own from settings when called directly.
+        self.static_embedder = static_embedder or static_embedder_from_settings(settings)
         # Serialize writes: the sqlite connection is shared across the server's
         # worker threads, and put() is a multi-statement insert+embed+commit.
         self._lock = threading.Lock()
@@ -1184,6 +1201,12 @@ class SqliteStore:
             )
             for (doc_id, _), blob in zip(to_embed, blobs, strict=True):
                 vec_docs_put(self.db, doc_id, blob, self.embedder.name)
+            self._embed_static(
+                [doc_id for doc_id, _ in to_embed],
+                [t for _, t in to_embed],
+                DOC_EMBED_NS,
+                vec_docs_static_put,
+            )
             for doc_id, tags in tag_jobs:
                 self._set_tags(doc_id, tags)
             self._embed_chunks(chunk_pairs)
@@ -1215,6 +1238,26 @@ class SqliteStore:
         )
         for (cid, _), blob in zip(pairs, blobs, strict=True):
             vec_chunks_put(self.db, cid, blob, self.embedder.name)
+        self._embed_static(
+            [cid for cid, _ in pairs], texts, MARKDOWN_CHUNK_EMBED_NS, vec_chunks_static_put
+        )
+
+    def _embed_static(self, ids: list[int], texts: list[str], namespace: str, put_fn) -> None:
+        """Mirror a dense embed with a static (potion) one → vec_*_static (perf D).
+
+        No-op when static is off. Best-effort: a static-embed failure never breaks
+        the owned-doc write (the dense vectors + FTS are the source of truth)."""
+        if not self.static_embedder or not ids:
+            return
+        try:
+            blobs, _, _ = resolve_embedding_blobs(
+                self.db, self.static_embedder, texts, self.static_embedder.name,
+                namespace, commit_before_embed=False,
+            )
+            for rowid, blob in zip(ids, blobs, strict=True):
+                put_fn(self.db, rowid, blob, self.static_embedder.name)
+        except Exception:  # noqa: BLE001 — static shadow is best-effort, never fatal
+            pass
 
     def search_chunks(
         self,
@@ -1593,6 +1636,9 @@ class SqliteStore:
             commit_before_embed=False,
         )
         vec_docs_put(self.db, doc_id, blobs[0], self.embedder.name)
+        # perf D: mirror the doc's static (potion) vector so owner-scoped records
+        # are recallable on the shed boot path. No-op when static is off.
+        self._embed_static([doc_id], [text], DOC_EMBED_NS, vec_docs_static_put)
 
 
 def _row_to_doc(row: sqlite3.Row) -> StoredDoc:

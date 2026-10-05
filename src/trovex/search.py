@@ -89,7 +89,13 @@ class SearchResult:
 class Searcher:
     def __init__(self, settings: Settings, embedder: Embedder | None = None):
         self.settings = settings
-        self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim(), settings.embed_model)
+        self.db = open_db(
+            settings.data_dir / "trovex.db",
+            settings.resolved_embed_dim(),
+            settings.embed_model,
+            static_embed_dim=settings.static_embed_dim,
+            static_embed_enabled=settings.static_embed_enabled,
+        )
         self.embedder = embedder or embedder_from_settings(settings)
 
     def search(

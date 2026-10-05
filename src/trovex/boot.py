@@ -15,6 +15,7 @@ import sqlite3
 
 from .search import Searcher
 from .budget import BudgetCandidate, fit_budget
+from .query_cache import embed_query_blob
 from .tokens import count_tokens as _count_tokens
 
 log = logging.getLogger("trovex.boot")
@@ -124,11 +125,32 @@ def boot_pointers(
     results = [r for r in results if r.score >= floor]
     if not results:
         return _empty_pack(agent, budget)
+    return build_boot_pack(searcher.db, agent, results, budget)
 
+
+class _StaticHit:
+    """A minimal result row for the static boot pack (perf D), shaped like the
+    Searcher results build_boot_pack expects: `.path` (the doc's ext_id, for the
+    budget content lookup), `.title`, `.score`."""
+
+    __slots__ = ("path", "title", "score")
+
+    def __init__(self, path: str, title: str, score: float):
+        self.path = path
+        self.title = title
+        self.score = score
+
+
+def build_boot_pack(db: sqlite3.Connection, agent: str, results, budget: int | None, degraded: str | None = None) -> dict:
+    """Assemble the pointer pack (budgeted or plain) from scored results.
+
+    Shared by the dense path (boot_pointers, degraded=None) and the static shed
+    fallback (boot_pointers_static, degraded='static'). `results` items expose
+    `.path` (doc ext_id), `.title`, `.score`."""
     if budget is not None:
         candidates = []
         for result in results:
-            row = searcher.db.execute(
+            row = db.execute(
                 "SELECT content FROM docs WHERE ext_id = ?", (result.path,)
             ).fetchone()
             content = row["content"] if row else ""
@@ -163,7 +185,7 @@ def boot_pointers(
             "pointers": pointers,
             "render": render,
             "tokens_est": fitted["budget_used"],
-            "degraded": None,
+            "degraded": degraded,
             "budget_requested": budget,
             "budget_used": fitted["budget_used"],
             "trimmed": fitted["trimmed"],
@@ -179,5 +201,60 @@ def boot_pointers(
         "pointers": pointers,
         "render": render,
         "tokens_est": _count_tokens(render),
-        "degraded": None,
+        "degraded": degraded,
     }
+
+
+def boot_pointers_static(
+    db: sqlite3.Connection,
+    static_embedder,
+    agent: str,
+    *,
+    k: int = 5,
+    floor: float = 0.62,
+    q: str | None = None,
+    budget: int | None = None,
+) -> dict:
+    """DEGRADED boot recall over the STATIC (potion) vectors (perf D, task ad2ad98e).
+
+    The shed/over-deadline fallback: an owner+record-scoped DOC-level KNN against
+    vec_docs_static (same scope as the dense path, different vector space), so an
+    agent under overload still gets a pointer pack in <10 ms instead of nothing. The
+    pack is flagged `degraded='static'` so the prompt hook knows recall was degraded,
+    not absent. Never raises — any failure (no static index, no embedder, a KNN
+    error) returns the empty pack flagged 'static', exactly as the dense shed path
+    returned the empty pack before.
+
+    Owner scope uses vec_docs_static.owner (mirrors perf C's dense owner column).
+    The static tables only exist when static_embed_enabled; absent → empty pack."""
+    empty = _empty_pack(agent, budget, degraded="static")
+    if static_embedder is None:
+        return empty
+    cleaned = clean_query(q) if q else ""
+    owner = f"owner/{agent.lower()}"
+    try:
+        qblob = embed_query_blob(static_embedder, cleaned or BOOT_QUERY)
+        rows = db.execute(
+            """SELECT d.ext_id AS path, d.title AS title, v.distance AS distance
+               FROM vec_docs_static v JOIN docs d ON d.id = v.rowid
+               WHERE v.embedding MATCH ? AND k = ? AND v.source_id = 'trovex'
+                 AND v.lifecycle != 'archived' AND v.lifecycle != 'pending_delete'
+                 AND v.status != 'duplicate'
+                 AND v.kind = 'record'
+                 AND v.owner = ?
+               ORDER BY v.distance""",
+            (qblob, max(k if budget is None else 50, 1), owner),
+        ).fetchall()
+    except sqlite3.OperationalError as e:
+        # No static table (feature off / not yet reindexed) or a KNN limit — the
+        # shed fallback degrades to the empty pack, never a 500 on the boot path.
+        log.warning("static boot recall unavailable (agent=%s): %s", agent, e)
+        return empty
+    results = [
+        _StaticHit(r["path"], r["title"], 1.0 - r["distance"])
+        for r in rows
+        if (1.0 - r["distance"]) >= floor
+    ]
+    if not results:
+        return empty
+    return build_boot_pack(db, agent, results, budget, degraded="static")

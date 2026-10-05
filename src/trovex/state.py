@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .config import Settings
-from .embedder import embedder_from_settings
+from .embedder import embedder_from_settings, query_embedder_from_settings
 from .index_jobs import Applier
 from .indexer import Indexer
 from .search import Searcher
@@ -24,6 +24,10 @@ class AppState:
     searcher: Searcher
     indexer: Indexer
     store: SqliteStore
+    # The query-side embedder (perf A): int8 raw-ORT by default, else the fp32
+    # `embedder`. Held so the lifespan warm-up can prime it. Defaults to `embedder`
+    # for tests that build AppState directly with a single injected embedder.
+    query_embedder: Any = None
     # Guards index_jobs' read-modify-write transactions (task dab8766b,
     # replacing 085f1d69/67ebd68c's per-request reindex_lock): enqueue()'s
     # coalesce-or-insert decision and the Applier's claim/finish steps all take
@@ -65,7 +69,9 @@ def get_state() -> AppState:
                 "network; set TROVEX_WRITE_TOKEN to require auth."
             )
         embedder = embedder_from_settings(settings)
-        searcher = Searcher(settings, embedder=embedder)
+        # The query path gets the int8 raw-ORT embedder (perf A); docs stay fp32.
+        query_embedder = query_embedder_from_settings(settings, embedder)
+        searcher = Searcher(settings, embedder=query_embedder)
         indexer = Indexer(settings, embedder=embedder)
         store = SqliteStore(settings, embedder=embedder)
         _state = AppState(
@@ -74,6 +80,7 @@ def get_state() -> AppState:
             searcher=searcher,
             indexer=indexer,
             store=store,
+            query_embedder=query_embedder,
         )
     return _state
 

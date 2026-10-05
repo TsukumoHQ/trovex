@@ -155,3 +155,111 @@ def embedder_from_settings(settings) -> Embedder:
         base_url=settings.openai_base_url,
         dim=settings.resolved_embed_dim(),
     )
+
+
+class Int8QueryEmbedder:
+    """Int8-quantized bge-small ONNX, QUERY-side only (perf A, task 62c53f35).
+
+    The search hot path embeds one short query per request, synchronously, on the
+    offload pool. fastembed runs that through an fp32 ONNX session whose ORT
+    intra-op pool spin-waits across every physical core (18 here) — measurably
+    slower on an oversubscribed fleet host and contending between concurrent
+    requests. fastembed exposes no way to disable spin-wait (only
+    enable_cpu_mem_arena), so this is a raw ORT session we fully control:
+      • the int8 `model_quantized.onnx` (Xenova mirror) — ~2x cheaper CPU math;
+      • intra/inter-op threads=1 and `session.intra_op.allow_spinning=0` — no
+        spin contention (cto research: 6.9 ms p50 / 62 ms p95 at 16 concurrent vs
+        16 / 172 ms with the fp32 fastembed session).
+
+    DOC vectors stay fp32 fastembed (index path) — this only touches the query
+    side. int8-query vs fp32-doc cosine drift is negligible (same model, same
+    384-d space, CLS+L2 pooling); it is checked on the replay eval before ship.
+
+    Pooling MUST match fastembed's bge path exactly or the query lands in a
+    different space than the docs: take the CLS token (last_hidden_state[:, 0])
+    then L2-normalise (see fastembed OnnxTextEmbedding._post_process_onnx_output).
+    """
+
+    def __init__(
+        self,
+        model_name: str = "Xenova/bge-small-en-v1.5",
+        model_file: str = "onnx/model_quantized.onnx",
+        dim: int = 384,
+        threads: int = 1,
+        spinning: bool = False,
+    ):
+        import onnxruntime as ort
+        from huggingface_hub import hf_hub_download
+        from tokenizers import Tokenizer
+
+        self.name = f"{model_name}:int8"
+        self.dim = dim
+        model_path = hf_hub_download(model_name, model_file)
+        tok_path = hf_hub_download(model_name, "tokenizer.json")
+        self._tok = Tokenizer.from_file(tok_path)
+        self._tok.enable_truncation(max_length=512)
+
+        so = ort.SessionOptions()
+        if threads and threads > 0:
+            so.intra_op_num_threads = threads
+            so.inter_op_num_threads = threads
+        # Disable ORT's spin-wait on a loaded host: spinning threads burn CPU that
+        # the rest of the fleet needs and add latency under oversubscription.
+        if not spinning:
+            so.add_session_config_entry("session.intra_op.allow_spinning", "0")
+            so.add_session_config_entry("session.inter_op.allow_spinning", "0")
+        self._sess = ort.InferenceSession(model_path, sess_options=so, providers=["CPUExecutionProvider"])
+        self._input_names = {i.name for i in self._sess.get_inputs()}
+
+    def embed(self, texts: Iterable[str]) -> Iterable[np.ndarray]:
+        encs = self._tok.encode_batch([t for t in texts])
+        if not encs:
+            return
+        maxlen = max(len(e.ids) for e in encs)
+        ids = np.zeros((len(encs), maxlen), dtype=np.int64)
+        mask = np.zeros((len(encs), maxlen), dtype=np.int64)
+        for row, e in enumerate(encs):
+            n = len(e.ids)
+            ids[row, :n] = e.ids
+            mask[row, :n] = e.attention_mask
+        feeds: dict[str, np.ndarray] = {"input_ids": ids, "attention_mask": mask}
+        # bge exports a token_type_ids input (all zeros for a single sequence).
+        if "token_type_ids" in self._input_names:
+            feeds["token_type_ids"] = np.zeros_like(ids)
+        feeds = {k: v for k, v in feeds.items() if k in self._input_names}
+        out = self._sess.run(None, feeds)[0]
+        # Match fastembed's bge pooling: CLS token then L2-normalise.
+        pooled = out[:, 0] if out.ndim == 3 else out
+        norms = np.linalg.norm(pooled, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        yield from (pooled / norms).astype(np.float32)
+
+
+def query_embedder_from_settings(settings, doc_embedder: Embedder) -> Embedder:
+    """The embedder for the SEARCH/query path.
+
+    Defaults to the int8 raw-ORT query session (perf A) when the doc model is the
+    local bge-small fastembed default; falls back to the shared `doc_embedder` for
+    any other provider/model (a BYO OpenAI or custom-dim model has no matching int8
+    build) or if the int8 session can't be built (offline, missing file). Falling
+    back keeps the query space identical to the doc space — never a hard failure."""
+    if not settings.query_embed_int8:
+        return doc_embedder
+    if model_provider(settings.embed_model) != "fastembed" or settings.embed_model != "BAAI/bge-small-en-v1.5":
+        return doc_embedder
+    try:
+        return Int8QueryEmbedder(
+            model_name=settings.query_embed_model,
+            model_file=settings.query_embed_file,
+            dim=settings.resolved_embed_dim(),
+            threads=settings.query_embed_threads,
+            spinning=settings.query_embed_spinning,
+        )
+    except Exception:  # noqa: BLE001 — never let the query path fail to build
+        import logging
+
+        logging.getLogger("trovex.embedder").warning(
+            "int8 query embedder unavailable — falling back to the fp32 doc embedder",
+            exc_info=True,
+        )
+        return doc_embedder

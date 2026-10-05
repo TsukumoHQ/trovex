@@ -32,7 +32,7 @@ from . import insights as insights_mod
 from . import offload
 from . import savings as savings_mod
 from . import usearch_index
-from .boot import BOOT_Q_MAX, BOOT_QUERY, boot_pointers
+from .boot import BOOT_QUERY, boot_pointers, clean_query
 from .capture import capture_state
 from .db import WAL_CHECKPOINT_POLL_SEC, like_escape, run_wal_checkpoint_timer
 from .markdown import PYGMENTS_CSS, render_markdown
@@ -306,9 +306,41 @@ def _maybe_enqueue_rebuild_vec(state) -> bool:
         return False
 
 
+def _warmup(state) -> bool:
+    """Prime the lazy, first-call-only costs BEFORE the server accepts traffic
+    (perf A, task 62c53f35): the ONNX forward pass + model page-in, the sqlite
+    query plan + cold DB pages on the boot path, and the one-time tiktoken load.
+
+    The first request after every (watchdog) restart otherwise paid 0.5-2 s for
+    these on the hot path. Standalone + returning True-on-success so it's testable
+    without the MCP session manager. Best-effort: warm-up must NEVER block or fail
+    startup, so any error degrades to an un-warmed (but correct) server."""
+    try:
+        from .tokens import count_tokens
+
+        # ONNX forward pass + model weights paged in — the query (int8) session on
+        # the boot hot path, and the fp32 doc session for the first write.
+        query_embedder = state.query_embedder or state.embedder
+        next(iter(query_embedder.embed([BOOT_QUERY])))
+        if state.embedder is not query_embedder:
+            next(iter(state.embedder.embed([BOOT_QUERY])))
+        # Full boot recall path warm (query embed cache, sqlite KNN plan, cold
+        # pages). Unknown agent → empty pack, zero writes, just exercises the read.
+        boot_pointers(state.searcher, "__warmup__")
+        # One-time tiktoken encoding load.
+        count_tokens(BOOT_QUERY)
+        return True
+    except Exception:  # noqa: BLE001 — warm-up must never block startup
+        log.debug("startup warm-up failed", exc_info=True)
+        return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state = get_state()  # warm up
+    # Prime first-call costs (embed/KNN/tiktoken) before serving so the first
+    # request after a restart isn't the one that pays them (perf A).
+    _warmup(state)
     # task 4c89b89a: build the HNSW index for every flagged partition BEFORE
     # serving — a request landing before the first reindex would otherwise see
     # an empty index and silently fall back to sqlite-vec (safe, but defeats
@@ -1142,7 +1174,10 @@ def build_app() -> FastAPI:
                 get_state().searcher.db,
                 source="prompt" if q else "boot",
                 agent=agent,
-                query=(q or BOOT_QUERY)[:BOOT_Q_MAX],
+                # Log the SAME text boot embedded (cleaned + capped), not the raw
+                # prompt: --replay re-embeds the logged query, so a mismatch here
+                # would make the replay eval drift from live recall (perf A).
+                query=clean_query(q) if q else BOOT_QUERY,
                 pointers=pack.get("pointers", []),
                 tokens_est=pack.get("tokens_est", 0),
                 elapsed_ms=int((time.perf_counter() - t0) * 1000),

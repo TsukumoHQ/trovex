@@ -29,6 +29,13 @@ dependencies = [
     # tokenizer via hf_hub_download. Already pulled transitively by fastembed; pinned
     # here because trovex now imports it directly.
     "huggingface-hub>=0.24",
+    # Static-embedding fallback (perf D, task ad2ad98e): potion-retrieval-32M
+    # (Model2Vec, MIT). A token→vector lookup + mean-pool — no NN forward pass, so
+    # ~0.06 ms p50 / 1.6 ms p95 at 16 concurrent. Used ONLY on the shed/degraded
+    # boot path (never the normal dense path); deps are light (numpy + tokenizers +
+    # safetensors, already transitive via fastembed). Imported lazily in the
+    # embedder so a missing install degrades to the empty pack, not a crash.
+    "model2vec>=0.9",
     "sqlite-vec>=0.1.6",
     "mcp>=1.2,<2",
     "jinja2>=3.1",

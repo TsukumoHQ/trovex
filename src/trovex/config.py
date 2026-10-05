@@ -134,6 +134,20 @@ class Settings(BaseSettings):
     query_embed_file: str = "onnx/model_quantized.onnx"
     query_embed_threads: int = 1  # intra/inter-op threads for the query session
     query_embed_spinning: bool = False  # ORT spin-wait; off = don't burn fleet CPU
+
+    # Static-embedding fallback (perf D, task ad2ad98e). A DEGRADED recall path used
+    # ONLY when the dense boot path sheds load or misses its deadline — never the
+    # normal path. potion-retrieval-32M (Model2Vec, MIT) is a token→vector lookup +
+    # mean-pool, no neural forward pass, so it embeds the whole corpus in seconds and
+    # answers a query in <2 ms even at 16-way concurrency (~20% lower recall than the
+    # bge-small dense path). Enabling it stores a SECOND vector per chunk
+    # (static_embed_dim, 512 for potion) maintained on every (re)index, so the worst
+    # case under overload is a slightly worse pack in <10 ms instead of an empty one.
+    # Off by default (offline-first, zero extra storage); flip TROVEX_STATIC_EMBED_ENABLED
+    # and reindex to populate the static index.
+    static_embed_enabled: bool = False
+    static_embed_model: str = "minishlab/potion-retrieval-32M"
+    static_embed_dim: int = 512
     # OpenAI-compatible endpoint for the "openai" provider. Point this at a LOCAL
     # server (Ollama / LM Studio / vLLM / LocalAI, e.g. http://localhost:11434/v1)
     # to keep embeddings on your machine, or at a proxy. Empty = OpenAI's hosted API.

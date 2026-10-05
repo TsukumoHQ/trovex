@@ -235,6 +235,60 @@ class Int8QueryEmbedder:
         yield from (pooled / norms).astype(np.float32)
 
 
+class PotionStaticEmbedder:
+    """Model2Vec static embedder for the shed/degraded recall path (perf D, ad2ad98e).
+
+    potion-retrieval-32M is a static token→vector table + mean-pool — no neural
+    forward pass — so it embeds ~87k chunks/s and answers one query in <2 ms even at
+    16-way concurrency. Recall is ~20% below bge-small dense (NanoBEIR 0.50 vs 0.63),
+    so it is used ONLY when the dense path is shed/over-deadline, never the normal
+    path. Output is `dim`-d (512 for potion) and L2-normalised so the vectors are
+    cosine-ready for sqlite-vec, in the same unit space as the dense vectors' cosine.
+
+    model2vec is imported lazily: a missing install (or a model that can't be
+    fetched offline) raises here and the caller
+    (`static_embedder_from_settings`) turns that into "no static path", so the shed
+    path falls back to the empty pack rather than crashing boot.
+    """
+
+    def __init__(self, model_name: str = "minishlab/potion-retrieval-32M", dim: int = 512):
+        from model2vec import StaticModel
+
+        self.name = f"{model_name}:static"
+        self.dim = dim
+        self._model = StaticModel.from_pretrained(model_name)
+
+    def embed(self, texts: Iterable[str]) -> Iterable[np.ndarray]:
+        arr = np.asarray(self._model.encode([t or " " for t in texts]), dtype=np.float32)
+        if arr.ndim == 1:  # single-vector shape guard
+            arr = arr.reshape(1, -1)
+        # potion vectors come out L2-normalised; re-normalise defensively so a
+        # future static model that doesn't is still cosine-correct for sqlite-vec.
+        norms = np.linalg.norm(arr, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        yield from (arr / norms).astype(np.float32)
+
+
+def static_embedder_from_settings(settings) -> Embedder | None:
+    """Build the potion static embedder (perf D), or None when disabled/unavailable.
+
+    Never raises: static recall is a best-effort DEGRADED fallback, so a disabled
+    flag, a missing model2vec install, or an un-fetchable model all resolve to None
+    (no static path → the shed boot path returns the empty pack, as before)."""
+    if not getattr(settings, "static_embed_enabled", False):
+        return None
+    try:
+        return PotionStaticEmbedder(settings.static_embed_model, dim=settings.static_embed_dim)
+    except Exception:  # noqa: BLE001 — a degraded fallback must never fail hard
+        import logging
+
+        logging.getLogger("trovex.embedder").warning(
+            "static embedder unavailable — the shed boot path will return the empty pack",
+            exc_info=True,
+        )
+        return None
+
+
 def query_embedder_from_settings(settings, doc_embedder: Embedder) -> Embedder:
     """The embedder for the SEARCH/query path.
 

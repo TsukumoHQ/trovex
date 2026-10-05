@@ -1608,7 +1608,13 @@ def facet() -> None:
 def open_db_for_read(settings: Settings):
     from .db import open_db
 
-    return open_db(settings.data_dir / "trovex.db", settings.embed_dim, settings.embed_model)
+    return open_db(
+        settings.data_dir / "trovex.db",
+        settings.embed_dim,
+        settings.embed_model,
+        static_embed_dim=settings.static_embed_dim,
+        static_embed_enabled=settings.static_embed_enabled,
+    )
 
 
 if __name__ == "__main__":

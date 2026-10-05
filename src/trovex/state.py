@@ -8,7 +8,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .config import Settings
-from .embedder import embedder_from_settings, query_embedder_from_settings
+from .embedder import (
+    embedder_from_settings,
+    query_embedder_from_settings,
+    static_embedder_from_settings,
+)
 from .index_jobs import Applier
 from .indexer import Indexer
 from .search import Searcher
@@ -28,6 +32,10 @@ class AppState:
     # `embedder`. Held so the lifespan warm-up can prime it. Defaults to `embedder`
     # for tests that build AppState directly with a single injected embedder.
     query_embedder: Any = None
+    # The static (potion) embedder (perf D): None unless static_embed_enabled. Held
+    # once per process so the shed boot path and the index/store maintenance share a
+    # single loaded model. None = no static fallback (shed → the empty pack, as before).
+    static_embedder: Any = None
     # Guards index_jobs' read-modify-write transactions (task dab8766b,
     # replacing 085f1d69/67ebd68c's per-request reindex_lock): enqueue()'s
     # coalesce-or-insert decision and the Applier's claim/finish steps all take
@@ -71,9 +79,12 @@ def get_state() -> AppState:
         embedder = embedder_from_settings(settings)
         # The query path gets the int8 raw-ORT embedder (perf A); docs stay fp32.
         query_embedder = query_embedder_from_settings(settings, embedder)
+        # The static fallback embedder (perf D): one potion model for the process,
+        # shared by index/store maintenance and the shed boot path. None when off.
+        static_embedder = static_embedder_from_settings(settings)
         searcher = Searcher(settings, embedder=query_embedder)
-        indexer = Indexer(settings, embedder=embedder)
-        store = SqliteStore(settings, embedder=embedder)
+        indexer = Indexer(settings, embedder=embedder, static_embedder=static_embedder)
+        store = SqliteStore(settings, embedder=embedder, static_embedder=static_embedder)
         _state = AppState(
             settings=settings,
             embedder=embedder,
@@ -81,6 +92,7 @@ def get_state() -> AppState:
             indexer=indexer,
             store=store,
             query_embedder=query_embedder,
+            static_embedder=static_embedder,
         )
     return _state
 

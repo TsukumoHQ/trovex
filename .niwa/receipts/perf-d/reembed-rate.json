@@ -1,0 +1,8 @@
+{
+  "model": "minishlab/potion-retrieval-32M",
+  "chunks": 22364,
+  "dim": 512,
+  "wall_s": 1.492,
+  "chunks_per_s": 14992.7,
+  "note": "all 22364 chunks embedded in 1.49s (AC1: 'embed 30k chunks in seconds')"
+}

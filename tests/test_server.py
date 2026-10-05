@@ -1186,3 +1186,141 @@ def test_api_boot_concurrent_recall_never_silent_empty(client):
     for body in results:
         recalled = [p["title"] for p in body["pointers"]] == ["COO handoff"]
         assert recalled or body["degraded"] is not None, body
+
+
+# ── perf D (ad2ad98e): static-embedding fallback on the shed/degraded boot path ──
+
+STATIC_DIM = 16
+
+
+class StaticBagEmbedder:
+    """Deterministic bag-of-words embedder at the STATIC dim — stands in for the
+    potion model so these tests never download/load a real model. Same token-cosine
+    behaviour as BagEmbedder, so a record sharing the boot query's words scores
+    high in the static space too."""
+
+    name = "static-bag"
+    dim = STATIC_DIM
+
+    def embed(self, texts):
+        for t in texts:
+            v = np.zeros(STATIC_DIM, dtype=np.float32)
+            for tok in re.findall(r"[a-z0-9]+", t.lower()):
+                idx = int.from_bytes(hashlib.md5(tok.encode()).digest()[:4], "little")
+                v[idx % STATIC_DIM] += 1.0
+            norm = float(np.linalg.norm(v)) or 1.0
+            yield v / norm
+
+
+@pytest.fixture
+def client_static(tmp_path):
+    """Like `client`, but with the static fallback ON: a second (fake) static
+    embedder + the static vec tables populated, so the shed/timeout boot path can
+    serve a degraded='static' pack instead of the empty one (perf D)."""
+    settings = Settings(
+        data_dir=tmp_path,
+        embed_model="BAAI/bge-small-en-v1.5",
+        sources_config_path=tmp_path / "no-such-sources.yaml",
+        static_embed_enabled=True,
+        static_embed_dim=STATIC_DIM,
+    )
+    embedder = BagEmbedder()
+    static_embedder = StaticBagEmbedder()
+    store = SqliteStore(settings, embedder=embedder, static_embedder=static_embedder)
+    store.put(
+        "# Auth incident\n\ncurrent state resume open work in flight next steps gotchas",
+        kind="record",
+        tags=["owner/alpha"],
+    )
+    store.put(
+        "# COO handoff\n\ncurrent state resume open work in flight next steps gotchas",
+        kind="record",
+        tags=["owner/coo"],
+    )
+    searcher = Searcher(settings, embedder=embedder)
+    indexer = Indexer(settings, embedder=embedder, static_embedder=static_embedder)
+    state_mod._state = AppState(
+        settings=settings,
+        embedder=embedder,
+        searcher=searcher,
+        indexer=indexer,
+        store=store,
+        static_embedder=static_embedder,
+    )
+    try:
+        yield TestClient(build_app())
+    finally:
+        state_mod.reset_state()
+
+
+def test_static_vectors_stored_and_maintained_on_reindex(client_static):
+    """AC1: a SECOND (static) vector is stored per doc AND per chunk when the
+    feature is on, and a re-put (reindex) keeps exactly one static row per doc —
+    not a duplicate, not a drop."""
+    db = state_mod._state.store.db
+    doc_rows = db.execute("SELECT COUNT(*) FROM vec_docs_static").fetchone()[0]
+    chunk_rows = db.execute("SELECT COUNT(*) FROM vec_chunks_static").fetchone()[0]
+    dense_docs = db.execute("SELECT COUNT(*) FROM vec_docs").fetchone()[0]
+    assert doc_rows == 2, "both records get a static doc vector"
+    assert chunk_rows >= 2, "records are chunked into static chunk vectors too"
+    # The static index mirrors the dense one exactly — one static vector per
+    # embedded doc, no more, no fewer.
+    assert doc_rows == dense_docs
+    # Maintained on re-embed: re-writing an existing doc's static vector (same
+    # rowid, as the (re)index flush does) is an UPSERT — DELETE+INSERT by rowid —
+    # so the count is unchanged, not duplicated.
+    import sqlite_vec
+
+    from trovex.db import vec_docs_static_put
+
+    rowid = db.execute("SELECT id FROM docs LIMIT 1").fetchone()[0]
+    blob = sqlite_vec.serialize_float32([0.1] * STATIC_DIM)
+    vec_docs_static_put(db, rowid, blob, "static-bag")
+    db.commit()
+    assert db.execute("SELECT COUNT(*) FROM vec_docs_static").fetchone()[0] == 2
+
+
+def test_api_boot_falls_back_to_static_on_shed(client_static, monkeypatch):
+    """AC2: on load-shed, /api/boot serves the static recall (non-empty pointers)
+    flagged degraded='static' instead of the empty pack — a pack in <10ms beats
+    nothing under overload."""
+    import trovex.offload as off
+
+    monkeypatch.setattr(off, "pool_saturated", lambda: True)
+
+    async def _boom(*a, **k):
+        raise AssertionError("static fallback must run inline, not via the pool")
+
+    monkeypatch.setattr(off, "off_loop", _boom)
+    resp = client_static.get("/api/boot", params={"agent": "coo", "floor": 0.0})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["degraded"] == "static"
+    assert [p["title"] for p in body["pointers"]] == ["COO handoff"]
+
+
+def test_api_boot_falls_back_to_static_on_timeout(client_static, monkeypatch):
+    """AC2: when the dense path blows the offload deadline, /api/boot serves the
+    static recall flagged degraded='static' (ticket 7df08701 generalised)."""
+    import trovex.offload as off
+
+    async def _timeout(*a, **k):
+        raise TimeoutError
+
+    monkeypatch.setattr(off, "pool_saturated", lambda: False)
+    monkeypatch.setattr(off, "off_loop", _timeout)
+    resp = client_static.get("/api/boot", params={"agent": "alpha", "floor": 0.0})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["degraded"] == "static"
+    assert [p["title"] for p in body["pointers"]] == ["Auth incident"]
+
+
+def test_api_boot_normal_path_is_dense_not_static(client_static):
+    """AC2 (other path pinned): with static ON but NO shed, the normal dense path
+    serves a healthy pack — degraded is None, the static fallback is not used."""
+    resp = client_static.get("/api/boot", params={"agent": "coo", "floor": 0.0})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["degraded"] is None
+    assert [p["title"] for p in body["pointers"]] == ["COO handoff"]

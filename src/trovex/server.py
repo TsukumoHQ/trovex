@@ -32,7 +32,7 @@ from . import insights as insights_mod
 from . import offload
 from . import savings as savings_mod
 from . import usearch_index
-from .boot import BOOT_QUERY, boot_pointers, clean_query
+from .boot import BOOT_QUERY, boot_pointers, boot_pointers_static, clean_query
 from .capture import capture_state
 from .db import WAL_CHECKPOINT_POLL_SEC, like_escape, run_wal_checkpoint_timer
 from .markdown import PYGMENTS_CSS, render_markdown
@@ -1137,6 +1137,19 @@ def build_app() -> FastAPI:
             # Deliberate load-shed, not "no records" — flag it so the hook can
             # tell a shed recall from an empty one (ticket 7df08701).
             log.warning("boot recall shed: offload pool saturated / client gone (agent=%s)", agent)
+            # perf D (task ad2ad98e): instead of an empty pack, serve the DEGRADED
+            # static (potion) recall when it's enabled — a pointer pack in <10 ms
+            # beats nothing under overload. Flagged degraded='static'. Run inline
+            # (the pool is saturated, and static recall is cheap): no offload worker
+            # to orphan. Static off → the original empty 'shed' pack, unchanged.
+            st = get_state()
+            if st.static_embedder is not None:
+                return JSONResponse(
+                    boot_pointers_static(
+                        st.searcher.db, st.static_embedder, agent,
+                        k=k, floor=floor, q=q, budget=budget,
+                    )
+                )
             return JSONResponse(_empty_pack(degraded="shed"))
         try:
             pack = await offload.off_loop(
@@ -1157,7 +1170,18 @@ def build_app() -> FastAPI:
                 "boot recall degraded: offload timeout %.1fs (agent=%s)",
                 _BOOT_OFFLOAD_TIMEOUT_SEC, agent,
             )
-            pack = _empty_pack(degraded="timeout")
+            # perf D: the dense path blew the deadline — fall back to the cheap
+            # static recall (degraded='static') when enabled, else the empty
+            # 'timeout' pack as before. Inline: the slow dense worker is already
+            # abandoned; static recall is <10 ms.
+            st = get_state()
+            if st.static_embedder is not None:
+                pack = boot_pointers_static(
+                    st.searcher.db, st.static_embedder, agent,
+                    k=k, floor=floor, q=q, budget=budget,
+                )
+            else:
+                pack = _empty_pack(degraded="timeout")
         # task 2b7974cf: log every boot/prompt-hook call — the fleet's real
         # recall traffic, invisible to the replay eval until this landed. `q`
         # present = the UserPromptSubmit hook (trovex-prompt.sh); absent = the

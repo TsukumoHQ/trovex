@@ -1,0 +1,9 @@
+{
+  "model": "bge-small",
+  "single_p50": 27.13,
+  "single_p95": 33.56,
+  "conc16_p50": 247.49,
+  "conc16_p95": 327.58,
+  "conc16_wall_sec": 5.04,
+  "note": "fp32 fastembed, OMP=1. bge-small prod query path is int8 (perf A: 6.9/62ms p50/p95 @16-way)."
+}

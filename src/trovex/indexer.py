@@ -905,7 +905,7 @@ class Indexer:
         if not self.static_embedder or not ids:
             return
         try:
-            blobs, hits, misses = resolve_embedding_blobs(
+            blobs, _, _ = resolve_embedding_blobs(
                 self.db, self.static_embedder, texts, self.static_embedder.name, namespace
             )
             for rowid, blob in zip(ids, blobs, strict=True):

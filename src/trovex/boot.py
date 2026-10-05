@@ -133,7 +133,7 @@ class _StaticHit:
     Searcher results build_boot_pack expects: `.path` (the doc's ext_id, for the
     budget content lookup), `.title`, `.score`."""
 
-    __slots__ = ("path", "title", "score")
+    __slots__ = ("path", "score", "title")
 
     def __init__(self, path: str, title: str, score: float):
         self.path = path

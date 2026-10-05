@@ -9,11 +9,14 @@ pulls a full record on demand via trovex_read(doc_id).
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 
 from .search import Searcher
 from .budget import BudgetCandidate, fit_budget
 from .tokens import count_tokens as _count_tokens
+
+log = logging.getLogger("trovex.boot")
 
 BOOT_QUERY = "current state resume open work in flight next steps gotchas"
 
@@ -28,8 +31,11 @@ BOOT_QUERY = "current state resume open work in flight next steps gotchas"
 BOOT_Q_MAX = 2000
 
 
-def _empty_pack(agent: str, budget: int | None = None) -> dict:
-    pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
+def _empty_pack(agent: str, budget: int | None = None, degraded: str | None = None) -> dict:
+    # `degraded` names WHY the pack is empty: None = a true scope miss ("no
+    # records"); a string ("timeout"/"sqlite"/"ceiling") = recall was SHED, not
+    # absent. The prompt hook must be able to tell those apart (ticket 7df08701).
+    pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0, "degraded": degraded}
     if budget is not None:
         pack.update(budget_requested=budget, budget_used=0, trimmed=[])
     return pack
@@ -66,8 +72,23 @@ def boot_pointers(
             # here; the dense score is the semantic-relevance gate on top.
             hybrid=False,
         )
-    except sqlite3.OperationalError:
-        return _empty_pack(agent, budget)
+    except sqlite3.OperationalError as e:
+        msg = str(e)
+        if "k value in knn query too large" in msg:
+            # Genuine sqlite-vec KNN ceiling: the partition outgrew brute-force k.
+            # A BOUNDED (not transient) empty — flagged 'ceiling' + logged so the
+            # real fix (the usearch escape hatch) is findable. This is the ONLY
+            # OperationalError the boot path treats as an empty recall.
+            log.warning("boot recall empty: sqlite-vec KNN ceiling (agent=%s): %s", agent, msg)
+            return _empty_pack(agent, budget, degraded="ceiling")
+        # Any OTHER OperationalError (lock/busy/transient under contention) is NOT
+        # "no records": surface it degraded + logged, never a silent empty pack
+        # (ticket 7df08701, real trigger = the offload deadline in server.py). The
+        # narrow except above is NOT widened to pass a transient off as a ceiling.
+        log.warning(
+            "boot recall degraded: transient sqlite OperationalError (agent=%s): %s", agent, msg
+        )
+        return _empty_pack(agent, budget, degraded="sqlite")
     results = [r for r in results if r.score >= floor]
     if not results:
         return _empty_pack(agent, budget)
@@ -110,6 +131,7 @@ def boot_pointers(
             "pointers": pointers,
             "render": render,
             "tokens_est": fitted["budget_used"],
+            "degraded": None,
             "budget_requested": budget,
             "budget_used": fitted["budget_used"],
             "trimmed": fitted["trimmed"],
@@ -125,4 +147,5 @@ def boot_pointers(
         "pointers": pointers,
         "render": render,
         "tokens_est": _count_tokens(render),
+        "degraded": None,
     }

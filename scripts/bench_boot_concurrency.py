@@ -98,7 +98,7 @@ def _pct(values: list[float], p: float) -> float:
     if not values:
         return 0.0
     values = sorted(values)
-    k = max(0, min(len(values) - 1, int(round((p / 100.0) * (len(values) - 1)))))
+    k = max(0, min(len(values) - 1, round((p / 100.0) * (len(values) - 1))))
     return values[k]
 
 

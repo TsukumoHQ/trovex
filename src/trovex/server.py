@@ -1083,8 +1083,11 @@ def build_app() -> FastAPI:
         # must NEVER 500 (boot_pointers' own contract) — a timeout degrades to
         # the same empty pack boot_pointers itself returns on a retrieval error,
         # rather than surfacing as an error to the prompt hook.
-        def _empty_pack() -> dict:
-            pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
+        def _empty_pack(degraded: str | None = None) -> dict:
+            # degraded names WHY it's empty: None = true scope miss; a string
+            # = recall shed ("timeout"/"shed"), so the prompt hook can tell a
+            # shed recall from "no records" (ticket 7df08701).
+            pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0, "degraded": degraded}
             if budget is not None:
                 pack.update(budget_requested=budget, budget_used=0, trimmed=[])
             return pack
@@ -1099,7 +1102,10 @@ def build_app() -> FastAPI:
         # retrieval sheds the same way instead of holding a worker.
         t0 = time.perf_counter()
         if offload.pool_saturated() or await request.is_disconnected():
-            return JSONResponse(_empty_pack())
+            # Deliberate load-shed, not "no records" — flag it so the hook can
+            # tell a shed recall from an empty one (ticket 7df08701).
+            log.warning("boot recall shed: offload pool saturated / client gone (agent=%s)", agent)
+            return JSONResponse(_empty_pack(degraded="shed"))
         try:
             pack = await offload.off_loop(
                 boot_pointers,
@@ -1112,7 +1118,14 @@ def build_app() -> FastAPI:
                 timeout=_BOOT_OFFLOAD_TIMEOUT_SEC,
             )
         except TimeoutError:
-            pack = _empty_pack()
+            # The REAL trigger (ticket 7df08701): the offload worker blew the
+            # boot wall-deadline under CPU starvation. NOT "no records" — flag
+            # degraded='timeout' + log so the prompt hook can tell them apart.
+            log.warning(
+                "boot recall degraded: offload timeout %.1fs (agent=%s)",
+                _BOOT_OFFLOAD_TIMEOUT_SEC, agent,
+            )
+            pack = _empty_pack(degraded="timeout")
         # task 2b7974cf: log every boot/prompt-hook call — the fleet's real
         # recall traffic, invisible to the replay eval until this landed. `q`
         # present = the UserPromptSubmit hook (trovex-prompt.sh); absent = the

@@ -14,3 +14,4 @@
 - - [LEGACY_OPPORTUNITY] check_duplicate's similarity `1 - distance/2` is not a cosine for a cosine-metric vec0 column (it maps cos 0.9 to 0.95); dup_cosine_threshold is tuned against that scale, do not unify blindly.
 - [LEGACY_OPPORTUNITY] `SqliteStore.put_batch` (store.py:~1084) upserts owned docs without calling `sync_doc_refs`, so a batch-created doc neither emits its own refs nor triggers dangling re-bind until individually re-written; L1 scope wired only the single `put` path the AC exercises.
 - [LEGACY_OPPORTUNITY] L3 `similar` band is defined on the store's `1 - distance/2` quantity, which for vec0's cosine-distance metric is `(1 + cos)/2`, NOT true cosine (maps cos 0.65 → 0.825) — the band [0.75, 0.90) is tuned against that same non-cosine scale as `dup_cosine_threshold`, per the existing DEBT note; do not unify to real cosine without re-tuning both.
+- [LEGACY_OPPORTUNITY] db.py `ThreadLocalReadConn` exists and its docstring invites

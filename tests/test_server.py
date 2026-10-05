@@ -95,6 +95,17 @@ def client(tmp_path):
         state_mod.reset_state()
 
 
+@pytest.fixture(autouse=True)
+def _generous_boot_deadline(monkeypatch):
+    """The 2.5s offload deadline is a PROD load-shed knob; a slow/contended CI
+    host must not turn it into a false 'empty recall'. Correctness tests assert
+    recall, not host speed — so give boot a generous deadline here. The prod
+    default (server._BOOT_OFFLOAD_TIMEOUT_SEC) is unchanged (ticket 7df08701)."""
+    from trovex import server as _server_mod
+
+    monkeypatch.setattr(_server_mod, "_BOOT_OFFLOAD_TIMEOUT_SEC", 30.0)
+
+
 def test_api_search_scopes_by_kind_and_tags(client):
     """/api/search threads kind + (comma-separated) tags into the store scope."""
     q = "current state resume work"
@@ -676,3 +687,105 @@ def test_api_boot_enqueues_log_no_synchronous_write(client, monkeypatch):
     finally:
         usage.stop_query_log_writer()
     assert sync["n"] == 0  # enqueued, not written synchronously
+
+
+# ---------------------------------------------------------------------------
+# ticket 7df08701: /api/boot must NEVER return a silently empty pack under
+# contention. Corrected root cause (investigated, repro'd): the real trigger is
+# the offload wall-deadline (server._BOOT_OFFLOAD_TIMEOUT_SEC, blown under CPU
+# starvation -> TimeoutError -> empty pack in api_boot). The OperationalError
+# swallow in boot.boot_pointers is a second, latent silent-empty path. The
+# shared-connection race was investigated and did NOT reproduce (sqlite3's
+# per-connection mutex serialises reads+writes). Both empty paths must carry a
+# `degraded` flag naming which path, so the prompt hook can tell "no records"
+# from "recall shed".
+# ---------------------------------------------------------------------------
+
+
+class _RaisingSearcher:
+    """Searcher stand-in whose .search raises a chosen exception — the
+    deterministic seam for boot_pointers' degraded-path contract."""
+
+    def __init__(self, exc):
+        self._exc = exc
+        self.db = None  # never reached: search raises before the budget path
+
+    def search(self, *a, **k):
+        raise self._exc
+
+
+def test_boot_pointers_flags_transient_sqlite_error_not_silent():
+    """A transient (lock/busy) sqlite OperationalError during boot search must
+    surface as a degraded='sqlite' pack, never an unflagged empty one."""
+    from trovex.boot import boot_pointers
+
+    pack = boot_pointers(
+        _RaisingSearcher(sqlite3.OperationalError("database is locked")),
+        "coo",
+        floor=0.0,
+    )
+    assert pack["pointers"] == []
+    assert pack["degraded"] == "sqlite"
+
+
+def test_boot_pointers_flags_vec_ceiling_distinctly():
+    """The genuine sqlite-vec KNN ceiling is a bounded empty flagged 'ceiling',
+    distinct from a transient — so the narrow except is not widened to pass a
+    transient off as a ceiling."""
+    from trovex.boot import boot_pointers
+
+    ceiling = sqlite3.OperationalError(
+        "k value in knn query too large, provided 5000 and the limit is 4096"
+    )
+    pack = boot_pointers(_RaisingSearcher(ceiling), "coo", floor=0.0)
+    assert pack["pointers"] == []
+    assert pack["degraded"] == "ceiling"
+
+
+def test_boot_healthy_recall_is_not_degraded(client):
+    """A normal recall carries degraded=None — the flag is always in the schema."""
+    out = client.get("/api/boot", params={"agent": "coo", "floor": 0.0}).json()
+    assert [p["title"] for p in out["pointers"]] == ["COO handoff"]
+    assert out["degraded"] is None
+
+
+def test_api_boot_timeout_is_flagged_not_silent(client, monkeypatch):
+    """REAL trigger: the offload deadline blown under load -> TimeoutError.
+    api_boot must return 200 with degraded='timeout', never a silent empty pack
+    the prompt hook can't distinguish from 'no records'."""
+    from trovex import server as server_mod
+
+    async def _boom(*a, **k):
+        raise TimeoutError
+
+    monkeypatch.setattr(server_mod.offload, "off_loop", _boom)
+    resp = client.get("/api/boot", params={"agent": "coo", "floor": 0.0})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["pointers"] == []
+    assert body["degraded"] == "timeout"
+
+
+def test_api_boot_concurrent_recall_never_silent_empty(client):
+    """AC3 guard: hammer /api/boot concurrently; every response either recalls
+    the COO record or is explicitly flagged degraded — never a silent empty."""
+    import threading
+
+    results = []
+    lock = threading.Lock()
+
+    def hit():
+        body = client.get("/api/boot", params={"agent": "coo", "floor": 0.0}).json()
+        with lock:
+            results.append(body)
+
+    threads = [threading.Thread(target=hit) for _ in range(16)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(results) == 16
+    for body in results:
+        recalled = [p["title"] for p in body["pointers"]] == ["COO handoff"]
+        assert recalled or body["degraded"] is not None, body

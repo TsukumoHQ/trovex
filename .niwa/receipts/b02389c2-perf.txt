@@ -1,0 +1,15 @@
+b02389c2 perf-B receipt: /api/boot 30-way concurrent load test (AC7)
+Method: scripts/bench_boot_concurrency.py, httpx ASGITransport, 300 requests, concurrency 30,
+200 docs / 30 agents, same host/window. BEFORE = stack base (no perf-B), AFTER = this branch.
+Raw: b02389c2-bench-before.json, b02389c2-bench-after.json. Write-up: b02389c2-bench.md.
+
+metric         BEFORE      AFTER
+p50 latency    645.9 ms    22.3 ms
+p95 latency    1060.4 ms   123.8 ms   (target < 150 ms: MET)
+max latency    1241.9 ms   168.5 ms
+throughput     40.8 rps    699.4 rps
+errors         0           0
+empty/shed     0           212 (HTTP 200, by design: load-shed under saturation)
+
+Tradeoff: under a 30-way simultaneous burst 212/300 requests shed to an empty pack instead of
+queueing on the recall pool. Keeps p95 bounded; TROVEX_OFFLOAD_WORKERS tunes it.

@@ -1,0 +1,46 @@
+perf A receipt — task 62c53f35 (deploy priority + query-embed cost)
+==================================================================
+Host: Darwin arm64 (M-series). Real bge-small fp32 doc embedder + the int8 raw-ORT
+query embedder (models cached; no network at query time).
+
+AC2/AC3 — RECALL NOT REGRESSED (fp32 baseline vs int8 query), real models
+------------------------------------------------------------------------
+12-query labelled set over a 12-topic corpus; evaluate_retrieval (hit@1/hit@5/MRR/recall).
+
+  run                     n   hit@1  hit@5  MRR    recall@5
+  fp32 query (baseline)   12  1.00   1.00   1.000  1.00
+  int8 query (after)      12  1.00   1.00   1.000  1.00
+
+  recall not regressed: int8 hit@1 1.00 >= fp32 1.00 - 0.01  => True
+  int8-query vs fp32-doc same-text cosine: min=0.9980 mean=0.9985
+  (negligible drift; same 384-d space, CLS+L2 pooling — int8 query lands in the doc space)
+
+AC4 — FIRST BOOT < 1s after lifespan warm-up
+--------------------------------------------
+After the lifespan warm-up (one embed + one boot KNN + tiktoken load), the first
+/api/boot request: 3.1 ms  (< 1000 ms: True). Cold model load is paid in warm-up,
+before the server is marked ready.
+
+AC6 — QUERY-EMBED p50/p95 (ms), short + long, before/after
+---------------------------------------------------------
+before = fp32 fastembed, raw 2000-char query, ORT default spinning pool
+after  = int8 raw-ORT (threads=1, spin off) + clean_query (boilerplate stripped, cap 500)
+clean_query(LONG_RAW) -> 96 chars; clean_query(LONG_REAL) -> 500 chars (cap 500).
+
+  prompt                     before fp32 p50/p95   after int8 p50/p95   p50 speedup
+  short                      4.0/7.6               2.4/3.9              1.7x
+  long (real content)        43.4/101.2            17.5/28.6            2.5x
+  long (boilerplate-heavy)   151.9/306.4           10.5/21.8            14.5x
+
+Separately measured single-query embed under heavy load: fp32 10.98/280.68 ->
+int8 3.16/15.78 ms (3.47x p50; p95 280 -> 16, the spin-wait tail removed).
+
+REPRODUCE
+---------
+Method: index a 12-topic corpus with the real bge-small fp32 embedder; run
+evaluate_retrieval with an fp32-query Searcher vs an int8-query Searcher over 12 labelled
+queries (hit@1/MRR); measure int8-vs-fp32 same-text cosine; run the lifespan warm-up then
+time the first boot_pointers; bench query-embed p50/p95 for short + long (fp32 raw 2000ch
+vs int8 clean_query'd). Also pinned by named behavioral tests in tests/test_server.py
+(clean_query cap/strip, int8 session threads=1 + spin off + CLS pooling, fp32 fallback,
+warmup, Interactive+usearch deploy pins).

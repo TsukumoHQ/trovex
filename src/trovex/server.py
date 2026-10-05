@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import secrets
 import sqlite3
@@ -31,7 +32,7 @@ from . import insights as insights_mod
 from . import offload
 from . import savings as savings_mod
 from . import usearch_index
-from .boot import BOOT_Q_MAX, BOOT_QUERY, boot_pointers
+from .boot import BOOT_QUERY, boot_pointers, clean_query
 from .capture import capture_state
 from .db import WAL_CHECKPOINT_POLL_SEC, like_escape, run_wal_checkpoint_timer
 from .markdown import PYGMENTS_CSS, render_markdown
@@ -40,6 +41,13 @@ from .state import get_state
 from .usage import UserHeaderMiddleware
 
 log = logging.getLogger("trovex.server")
+
+# /api/boot recall deadline (audit Q5): the fleet's hot path uses a short,
+# boot-specific timeout instead of the 30s default, so a slow retrieval sheds
+# to boot's empty pack rather than holding an offload worker for 30s and
+# feeding the orphaned-worker pile-up that ends in a watchdog restart. The
+# prompt hook itself abandons at ~2s.
+_BOOT_OFFLOAD_TIMEOUT_SEC = float(os.environ.get("TROVEX_BOOT_TIMEOUT_SEC", "2.5"))
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 # The React savings-receipt bundle — a SEPARATE build from the marketing site.
@@ -130,13 +138,16 @@ async def _read_json(request: Request) -> tuple[dict | None, JSONResponse | None
     return body, None
 
 
-async def _offloaded(fn, *args, **kwargs) -> tuple[Any, JSONResponse | None]:
-    """Run a store/indexer call via offload.off_loop, returning (result, None)
+async def _offloaded(fn, *args, pool: str = "recall", **kwargs) -> tuple[Any, JSONResponse | None]:
+    """Run a store/indexer call via the offload pool, returning (result, None)
     or (None, 504-response) on timeout — the uniform wedge-class-2 error shape
-    for every write route below, instead of letting a bounded-but-still-an-
-    error TimeoutError surface as a bare unhandled 500."""
+    for every route below, instead of letting a bounded-but-still-an-error
+    TimeoutError surface as a bare unhandled 500. `pool="heavy"` routes writes /
+    re-embeds to the heavy pool so they never occupy a recall worker (task
+    b02389c2 AC3); reads default to the recall pool."""
+    runner = offload.off_loop_heavy if pool == "heavy" else offload.off_loop
     try:
-        return await offload.off_loop(fn, *args, **kwargs), None
+        return await runner(fn, *args, **kwargs), None
     except TimeoutError:
         return None, JSONResponse(
             {"error": f"{getattr(fn, '__name__', 'call')} timed out"}, status_code=504
@@ -295,9 +306,41 @@ def _maybe_enqueue_rebuild_vec(state) -> bool:
         return False
 
 
+def _warmup(state) -> bool:
+    """Prime the lazy, first-call-only costs BEFORE the server accepts traffic
+    (perf A, task 62c53f35): the ONNX forward pass + model page-in, the sqlite
+    query plan + cold DB pages on the boot path, and the one-time tiktoken load.
+
+    The first request after every (watchdog) restart otherwise paid 0.5-2 s for
+    these on the hot path. Standalone + returning True-on-success so it's testable
+    without the MCP session manager. Best-effort: warm-up must NEVER block or fail
+    startup, so any error degrades to an un-warmed (but correct) server."""
+    try:
+        from .tokens import count_tokens
+
+        # ONNX forward pass + model weights paged in — the query (int8) session on
+        # the boot hot path, and the fp32 doc session for the first write.
+        query_embedder = state.query_embedder or state.embedder
+        next(iter(query_embedder.embed([BOOT_QUERY])))
+        if state.embedder is not query_embedder:
+            next(iter(state.embedder.embed([BOOT_QUERY])))
+        # Full boot recall path warm (query embed cache, sqlite KNN plan, cold
+        # pages). Unknown agent → empty pack, zero writes, just exercises the read.
+        boot_pointers(state.searcher, "__warmup__")
+        # One-time tiktoken encoding load.
+        count_tokens(BOOT_QUERY)
+        return True
+    except Exception:  # noqa: BLE001 — warm-up must never block startup
+        log.debug("startup warm-up failed", exc_info=True)
+        return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state = get_state()  # warm up
+    # Prime first-call costs (embed/KNN/tiktoken) before serving so the first
+    # request after a restart isn't the one that pays them (perf A).
+    _warmup(state)
     # task 4c89b89a: build the HNSW index for every flagged partition BEFORE
     # serving — a request landing before the first reindex would otherwise see
     # an empty index and silently fall back to sqlite-vec (safe, but defeats
@@ -340,10 +383,15 @@ async def lifespan(app: FastAPI):
     # staleness flag once now so the first probe is accurate, then keep it fresh
     # in the background — /healthz only ever reads the flag, never the DB.
     try:
-        await offload.off_loop(_refresh_health, state, timeout=5.0)
+        await offload.off_loop_heavy(_refresh_health, state, timeout=5.0)
     except Exception:  # noqa: BLE001 — a startup refresh miss must not block serving
         pass
     health_task = asyncio.create_task(_health_refresh_timer(state, _HEALTH_REFRESH_SEC))
+    # Background query-log writer (task b02389c2 AC2): drains /api/boot's enqueued
+    # rows on its own connection, off the request path and off the offload pool.
+    from .usage import start_query_log_writer, stop_query_log_writer
+
+    start_query_log_writer(state.settings.data_dir)
     try:
         async with mcp.session_manager.run():
             yield
@@ -351,6 +399,7 @@ async def lifespan(app: FastAPI):
         watchdog_task.cancel()
         wal_checkpoint_task.cancel()
         health_task.cancel()
+        stop_query_log_writer()
         state.applier.stop()
 
 
@@ -441,7 +490,7 @@ async def _health_refresh_timer(state: Any, interval_sec: float) -> None:
     the WAL checkpoint timer) — never on the /healthz probe path."""
     while True:
         try:
-            await offload.off_loop(_refresh_health, state, timeout=5.0)
+            await offload.off_loop_heavy(_refresh_health, state, timeout=5.0)
         except Exception:  # noqa: BLE001 — a refresh miss must never crash the timer
             pass
         await asyncio.sleep(interval_sec)
@@ -783,7 +832,7 @@ def build_app() -> FastAPI:
             return _unauthorized()
         # Off the loop (wedge class 2): store.delete retries on SQLITE_BUSY with
         # a real time.sleep backoff — inline, that backoff runs on the loop.
-        ok, timeout_resp = await _offloaded(get_state().store.delete, ext_id)
+        ok, timeout_resp = await _offloaded(get_state().store.delete, ext_id, pool="heavy")
         if timeout_resp:
             return timeout_resp
         return JSONResponse({"deleted": ok}, status_code=200 if ok else 404)
@@ -878,7 +927,7 @@ def build_app() -> FastAPI:
             return JSONResponse({"error": "name required"}, status_code=400)
         flt = {k: v for k, v in (("tag", body.get("tag")), ("kind", body.get("kind"))) if v}
         # Off the loop (wedge class 2): retry-on-locked backoff, see api_doc_delete.
-        _, timeout_resp = await _offloaded(get_state().store.create_collection, name, flt)
+        _, timeout_resp = await _offloaded(get_state().store.create_collection, name, flt, pool="heavy")
         if timeout_resp:
             return timeout_resp
         return JSONResponse({"ok": True, "name": name, "filter": flt})
@@ -888,7 +937,7 @@ def build_app() -> FastAPI:
     async def api_collection_delete(name: str, request: Request) -> JSONResponse:
         if not _write_authorized(request):
             return _unauthorized()
-        _, timeout_resp = await _offloaded(get_state().store.delete_collection, name)
+        _, timeout_resp = await _offloaded(get_state().store.delete_collection, name, pool="heavy")
         if timeout_resp:
             return timeout_resp
         return JSONResponse({"deleted": True})
@@ -920,7 +969,9 @@ def build_app() -> FastAPI:
             return JSONResponse({"error": "version_id must be an integer"}, status_code=400)
         # Off the loop (wedge class 2): restore_version re-embeds via put() —
         # onnxruntime inference, the exact class of call that wedged the loop.
-        ok, timeout_resp = await _offloaded(get_state().store.restore_version, ext_id, version_id)
+        ok, timeout_resp = await _offloaded(
+            get_state().store.restore_version, ext_id, version_id, pool="heavy"
+        )
         if timeout_resp:
             return timeout_resp
         return JSONResponse({"restored": ok}, status_code=200 if ok else 404)
@@ -942,7 +993,9 @@ def build_app() -> FastAPI:
             return _unauthorized()
         # Off the loop (wedge class 2): restore_deleted re-embeds via put() —
         # same class of call that wedged the loop (see offload.py).
-        restored, timeout_resp = await _offloaded(get_state().store.restore_deleted, ext_id=ext_id)
+        restored, timeout_resp = await _offloaded(
+            get_state().store.restore_deleted, ext_id=ext_id, pool="heavy"
+        )
         if timeout_resp:
             return timeout_resp
         return JSONResponse(
@@ -964,6 +1017,7 @@ def build_app() -> FastAPI:
             ext_id,
             add=[t.strip() for t in (body.get("add") or "").split(",") if t.strip()],
             remove=[t.strip() for t in (body.get("remove") or "").split(",") if t.strip()],
+            pool="heavy",
         )
         if timeout_resp:
             return timeout_resp
@@ -1061,7 +1115,29 @@ def build_app() -> FastAPI:
         # must NEVER 500 (boot_pointers' own contract) — a timeout degrades to
         # the same empty pack boot_pointers itself returns on a retrieval error,
         # rather than surfacing as an error to the prompt hook.
+        def _empty_pack(degraded: str | None = None) -> dict:
+            # degraded names WHY it's empty: None = true scope miss; a string
+            # = recall shed ("timeout"/"shed"), so the prompt hook can tell a
+            # shed recall from "no records" (ticket 7df08701).
+            pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0, "degraded": degraded}
+            if budget is not None:
+                pack.update(budget_requested=budget, budget_used=0, trimmed=[])
+            return pack
+
+        # Load-shed (audit Q5): /api/boot is the fleet's hot path — every agent
+        # prompt hits it. If the offload pool is already saturated, or the client
+        # (the prompt hook, which abandons at ~2s) has already disconnected, do
+        # NOT queue a recall that would just orphan a worker and feed the pile-up
+        # that ends in a watchdog restart. Return boot's own empty pack (200) at
+        # once — identical to "nothing cleared scope". The recall itself is
+        # bounded by the short boot deadline, not the 30s default, so a slow
+        # retrieval sheds the same way instead of holding a worker.
         t0 = time.perf_counter()
+        if offload.pool_saturated() or await request.is_disconnected():
+            # Deliberate load-shed, not "no records" — flag it so the hook can
+            # tell a shed recall from an empty one (ticket 7df08701).
+            log.warning("boot recall shed: offload pool saturated / client gone (agent=%s)", agent)
+            return JSONResponse(_empty_pack(degraded="shed"))
         try:
             pack = await offload.off_loop(
                 boot_pointers,
@@ -1071,29 +1147,37 @@ def build_app() -> FastAPI:
                 floor=floor,
                 q=q,
                 budget=budget,
+                timeout=_BOOT_OFFLOAD_TIMEOUT_SEC,
             )
         except TimeoutError:
-            pack = {"agent": agent, "pointers": [], "render": "", "tokens_est": 0}
-            if budget is not None:
-                pack.update(budget_requested=budget, budget_used=0, trimmed=[])
+            # The REAL trigger (ticket 7df08701): the offload worker blew the
+            # boot wall-deadline under CPU starvation. NOT "no records" — flag
+            # degraded='timeout' + log so the prompt hook can tell them apart.
+            log.warning(
+                "boot recall degraded: offload timeout %.1fs (agent=%s)",
+                _BOOT_OFFLOAD_TIMEOUT_SEC, agent,
+            )
+            pack = _empty_pack(degraded="timeout")
         # task 2b7974cf: log every boot/prompt-hook call — the fleet's real
         # recall traffic, invisible to the replay eval until this landed. `q`
         # present = the UserPromptSubmit hook (trovex-prompt.sh); absent = the
         # generic SessionStart hook (trovex-boot.sh). Best-effort, never blocks
         # or fails the response — boot must never 500.
+        # Query logging is off the request path entirely now (task b02389c2 AC2 /
+        # audit Q6): enqueue to the single background writer — non-blocking,
+        # dropped if the queue is full — instead of taking an offload worker and
+        # busy-waiting on the served connection's write lock. Zero DB work here.
         try:
-            from .usage import log_pointer_query
+            from .usage import enqueue_pointer_query
 
-            # Off the loop (wedge class 2, task 20afcaf7): this INSERT ran
-            # inline here even though the main recall above is already
-            # off-loaded — a slow write (disk contention, a forced checkpoint)
-            # would still stall the loop right after boot's own fast path.
-            await offload.off_loop(
-                log_pointer_query,
+            enqueue_pointer_query(
                 get_state().searcher.db,
                 source="prompt" if q else "boot",
                 agent=agent,
-                query=(q or BOOT_QUERY)[:BOOT_Q_MAX],
+                # Log the SAME text boot embedded (cleaned + capped), not the raw
+                # prompt: --replay re-embeds the logged query, so a mismatch here
+                # would make the replay eval drift from live recall (perf A).
+                query=clean_query(q) if q else BOOT_QUERY,
                 pointers=pack.get("pointers", []),
                 tokens_est=pack.get("tokens_est", 0),
                 elapsed_ms=int((time.perf_counter() - t0) * 1000),
@@ -1131,7 +1215,9 @@ def build_app() -> FastAPI:
         # additionally makes a blocking OpenAI network call (up to 20s). Off the
         # loop like every other write path now.
         try:
-            result = await offload.off_loop(
+            # Heavy pool (task b02389c2 AC3): capture is embed + a possible 20s
+            # OpenAI distil call — it must never occupy a recall worker.
+            result = await offload.off_loop_heavy(
                 capture_state,
                 get_state().store,
                 agent,
@@ -1380,7 +1466,10 @@ def build_app() -> FastAPI:
 
         state = get_state()
         dest, timeout_resp = await _offloaded(
-            backup_mod.make_backup, state.settings.data_dir / "trovex.db", state.settings.data_dir
+            backup_mod.make_backup,
+            state.settings.data_dir / "trovex.db",
+            state.settings.data_dir,
+            pool="heavy",
         )
         if timeout_resp is not None:
             return timeout_resp

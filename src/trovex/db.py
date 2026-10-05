@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sqlite3
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -126,6 +127,9 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     # AFTER partitioning: adds the embed_model metadata column (task 6851d755),
     # so it always sees the partitioned DDL shape.
     _migrate_add_vec_embed_model(conn, embed_dim, embed_model)
+    # AFTER embed_model: adds the owner metadata column (perf C, task 33ecdc9f),
+    # populated from doc_tags, so an owner-scoped KNN filters inside the search.
+    _migrate_add_vec_owner(conn, embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
     # task 6851d755: stamp store_meta['embed_model'] once — a fresh store, or
@@ -142,6 +146,62 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
         set_store_meta(conn, "embed_model", embed_model)
         conn.commit()
     return conn
+
+
+def open_read_conn(db_path: Path) -> sqlite3.Connection:
+    """A lightweight READ connection to an ALREADY-initialised store — WAL,
+    busy_timeout, and sqlite-vec loaded (needed for the vec0 KNN), but NO
+    migrations or schema init (the primary connection from open_db owns those).
+
+    Used by ThreadLocalReadConn to give each offload worker thread its own read
+    connection, so N concurrent reads don't serialize on one connection's mutex
+    (audit b02389c2 #4: 4 threads on one searcher.db measured ~serial, 4
+    connections ~3x faster)."""
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    try:
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+    except AttributeError:
+        # sqlite3 built without loadable-extension support — open_db already
+        # raises an actionable error on the primary connection; a read conn here
+        # just goes without vec (callers that need vec never reach this build).
+        pass
+    return conn
+
+
+class ThreadLocalReadConn:
+    """Drop-in for a shared sqlite3 connection that routes reads to a PER-THREAD
+    connection (audit b02389c2 #4). Exposes ``.execute``/``.executemany`` and
+    proxies every other attribute to the calling thread's own connection, lazily
+    opened via open_read_conn and cached per thread. For the READ path only
+    (search / boot): writes must keep using the owning store/indexer connection.
+
+    Lets the recall offload pool's worker threads run their KNNs in parallel
+    instead of serializing on one connection's mutex. Wiring Searcher.db to this
+    is a one-line change owned by the search.py lane (coordinated follow-up)."""
+
+    def __init__(self, db_path: Path):
+        self._db_path = Path(db_path)
+        self._local = threading.local()
+
+    def _conn(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = open_read_conn(self._db_path)
+            self._local.conn = conn
+        return conn
+
+    def execute(self, *args, **kwargs):
+        return self._conn().execute(*args, **kwargs)
+
+    def executemany(self, *args, **kwargs):
+        return self._conn().executemany(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._conn(), name)
 
 
 # Backoff after a forced checkpoint attempt (success OR deferred), keyed by
@@ -236,10 +296,11 @@ def periodic_checkpoint_tick(conn: sqlite3.Connection, db_path: Path) -> tuple[i
 
     This runs off the request path entirely, on a fixed interval, regardless
     of file size: always PASSIVE (never blocks); TRUNCATE only when PASSIVE
-    reports zero pending frames (log_pages == 0 — nothing left an older
-    snapshot could still need), so the file's disk footprint actually shrinks
-    without ever contending with a live reader. Returns None if deferred
-    (locked) — never raises, this must not crash the timer loop.
+    moved every frame with no contention (busy == 0 and checkpointed_pages ==
+    log_pages — the whole WAL is now in the db, nothing older is still pinned),
+    so the file's disk footprint actually shrinks without ever starving a live
+    reader. Returns None if deferred (locked) — never raises, this must not
+    crash the timer loop.
 
     A TRUNCATE that actually shrinks the file clears checkpoint_if_wal_large's
     backoff for this db_path: the condition that started the backoff (a
@@ -251,7 +312,16 @@ def periodic_checkpoint_tick(conn: sqlite3.Connection, db_path: Path) -> tuple[i
         size_before = wal_path.stat().st_size if wal_path.exists() else 0
         row = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
         busy, log_pages, checkpointed_pages = row[0], row[1], row[2]
-        if log_pages == 0:
+        # Safe to shrink the file iff the PASSIVE pass just moved EVERY pending
+        # frame into the db with no lock contention. The old gate `log_pages == 0`
+        # almost never held (incident b02389c2 / audit Q7): PRAGMA reports
+        # log_pages as the WAL's TOTAL frame count, not a remaining count, so
+        # after a full checkpoint it equals checkpointed_pages (observed 129/129)
+        # and TRUNCATE never fired — the 140MB WAL grew forever and
+        # checkpoint_if_wal_large kept warning and re-forcing. `busy == 0 and
+        # checkpointed_pages == log_pages` is the real "WAL fully flushed, nothing
+        # older still pinned" condition.
+        if busy == 0 and log_pages > 0 and checkpointed_pages == log_pages:
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             size_after = wal_path.stat().st_size if wal_path.exists() else 0
             if size_after < size_before:
@@ -276,7 +346,7 @@ async def run_wal_checkpoint_timer(conn: sqlite3.Connection, db_path: Path, inte
     while True:
         await asyncio.sleep(interval_sec)
         try:
-            await offload.off_loop(periodic_checkpoint_tick, conn, db_path)
+            await offload.off_loop_heavy(periodic_checkpoint_tick, conn, db_path)
         except TimeoutError:
             log.warning("periodic wal checkpoint tick timed out")
 
@@ -344,6 +414,25 @@ def _doc_vec_meta(conn: sqlite3.Connection, doc_id: int) -> tuple | None:
     return (r["source_id"], r["kind"] or "doc", r["lifecycle"], r["status"])
 
 
+def doc_vec_owner(conn: sqlite3.Connection, doc_id: int) -> str:
+    """The doc's SINGLE owner tag for the vec_docs.owner metadata column (perf C,
+    task 33ecdc9f). Owner lives in doc_tags as `owner/<agent>`; a record has exactly
+    one by construction, so storing it as a vec0 metadata column lets the owner
+    filter push INTO the KNN (k=limit, no 4096 over-fetch).
+
+    A doc with 0 owner tags or >1 (the rare multi-owner case) stores '' — never NULL
+    (vec0 rejects NULL metadata). The '' rows are recalled by the doc_tags post-filter
+    FALLBACK in Searcher.search, so multi-owner recall stays correct; only the
+    single-owner fast path is pushed into the KNN."""
+    owners = [
+        r["tag"]
+        for r in conn.execute(
+            "SELECT tag FROM doc_tags WHERE doc_id = ? AND tag LIKE 'owner/%'", (doc_id,)
+        )
+    ]
+    return owners[0] if len(owners) == 1 else ""
+
+
 def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes, embed_model: str = "") -> None:
     """Upsert a doc's embedding + partition/metadata into vec_docs. Does NOT commit.
 
@@ -357,11 +446,12 @@ def vec_docs_put(conn: sqlite3.Connection, doc_id: int, emb_blob: bytes, embed_m
     if meta is None:
         return
     src, kind, lifecycle, status = meta
+    owner = doc_vec_owner(conn, doc_id)
     conn.execute("DELETE FROM vec_docs WHERE rowid = ?", (doc_id,))
     conn.execute(
-        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (doc_id, src, emb_blob, kind, lifecycle, status, embed_model),
+        "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (doc_id, src, emb_blob, kind, lifecycle, status, embed_model, owner),
     )
 
 
@@ -619,7 +709,7 @@ def rebuild_vec_shadow(
             f"""CREATE VIRTUAL TABLE vec_docs USING vec0(
                 source_id TEXT partition key,
                 embedding float[{embed_dim}] distance_metric=cosine,
-                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT, owner TEXT
             )"""
         )
         conn.execute(
@@ -629,9 +719,15 @@ def rebuild_vec_shadow(
                 kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT
             )"""
         )
+        # owner (perf C): a correlated subquery derives the single `owner/<agent>`
+        # tag per rebuilt doc, '' when none or multi-owner — same rule as
+        # doc_vec_owner, so a model-swap rebuild never drops the owner metadata.
         conn.execute(
-            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
-            "SELECT rid, source_id, embedding, kind, lifecycle, status, ? FROM _vec_rebuild_docs",
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+            "SELECT rid, source_id, embedding, kind, lifecycle, status, ?, "
+            "  (SELECT CASE WHEN COUNT(*) = 1 THEN MAX(tag) ELSE '' END "
+            "   FROM doc_tags WHERE doc_id = rid AND tag LIKE 'owner/%') "
+            "FROM _vec_rebuild_docs",
             (embed_model,),
         )
         conn.execute(
@@ -732,9 +828,13 @@ def vec_sync_meta(conn: sqlite3.Connection, doc_id: int) -> None:
     if meta is None:
         return
     _src, kind, lifecycle, status = meta
+    # owner (perf C, task 33ecdc9f) is a vec_docs-only metadata column, refreshed
+    # here too so a tag-only change (set_tags) that never re-embeds still keeps the
+    # vec0 owner filter in step. vec0 allows an in-place metadata UPDATE (no rebuild).
+    owner = doc_vec_owner(conn, doc_id)
     conn.execute(
-        "UPDATE vec_docs SET kind = ?, lifecycle = ?, status = ? WHERE rowid = ?",
-        (kind, lifecycle, status, doc_id),
+        "UPDATE vec_docs SET kind = ?, lifecycle = ?, status = ?, owner = ? WHERE rowid = ?",
+        (kind, lifecycle, status, owner, doc_id),
     )
     for c in conn.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
         conn.execute(
@@ -1588,6 +1688,56 @@ def _migrate_add_vec_embed_model(conn: sqlite3.Connection, embed_dim: int, embed
         raise
 
 
+def _migrate_add_vec_owner(conn: sqlite3.Connection, embed_dim: int) -> None:
+    """Add an `owner` vec0 metadata column to vec_docs on an existing store (perf C,
+    task 33ecdc9f) — same rebuild shape as _migrate_add_vec_embed_model (vec0 has no
+    ALTER TABLE ADD COLUMN), run AFTER it so it always sees the embed_model DDL.
+
+    Rebuilds ONLY vec_docs (owner is a doc-level filter; vec_chunks is untouched —
+    the duplicate-row multi-owner scheme for chunks is deferred to a later ticket).
+    No re-embed: existing embedding blobs are copied straight across. Each row's
+    owner is derived from doc_tags exactly as doc_vec_owner does (single `owner/<x>`
+    tag, else '').
+
+    No-ops instantly once the column exists (PRAGMA table_info is cheap)."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_docs'"
+    ).fetchone()
+    if not row:
+        return  # no vec_docs — _init_schema creates it fresh (already with owner)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(vec_docs)")}
+    if "owner" in cols:
+        return  # already migrated
+
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute(
+            "CREATE TEMP TABLE _vd_owner AS "
+            "SELECT rowid AS rid, source_id, embedding AS emb, kind, lifecycle, status, embed_model "
+            "FROM vec_docs"
+        )
+        conn.execute("DROP TABLE vec_docs")
+        conn.execute(
+            f"""CREATE VIRTUAL TABLE vec_docs USING vec0(
+                source_id TEXT partition key,
+                embedding float[{embed_dim}] distance_metric=cosine,
+                kind TEXT, lifecycle TEXT, status TEXT, embed_model TEXT, owner TEXT
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO vec_docs(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+            "SELECT rid, source_id, emb, kind, lifecycle, status, embed_model, "
+            "  (SELECT CASE WHEN COUNT(*) = 1 THEN MAX(tag) ELSE '' END "
+            "   FROM doc_tags WHERE doc_id = rid AND tag LIKE 'owner/%') "
+            "FROM _vd_owner"
+        )
+        conn.execute("DROP TABLE _vd_owner")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
     conn.executescript(
         f"""
@@ -1873,7 +2023,12 @@ def _init_schema(conn: sqlite3.Connection, embed_dim: int) -> None:
             kind TEXT,
             lifecycle TEXT,
             status TEXT,
-            embed_model TEXT
+            embed_model TEXT,
+            -- owner (perf C, task 33ecdc9f): the doc's SINGLE `owner/<agent>` tag,
+            -- '' when none or multi-owner. A vec0 metadata column so an owner-scoped
+            -- boot KNN pushes `owner = ?` INTO the search (k=limit, no 4096 over-
+            -- fetch); multi-owner ('' ) docs are recalled by the doc_tags fallback.
+            owner TEXT
         );
 
         -- Chunk-level retrieval (structure-aware chunks + their embeddings)

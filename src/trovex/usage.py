@@ -10,8 +10,12 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import logging
+import queue
 import re
+import sqlite3
+import threading
 import time
+from pathlib import Path
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -229,6 +233,53 @@ def log_query(
     db.commit()
 
 
+def _insert_pointer_query(
+    db,
+    *,
+    source: str,
+    agent: str,
+    query: str,
+    pointers: list[dict],
+    tokens_est: int,
+    elapsed_ms: int,
+    budget_requested: int | None = None,
+    budget_used: int = 0,
+) -> None:
+    """The mcp_queries + mcp_query_results INSERTs for one boot/prompt row, WITHOUT
+    committing — shared by log_pointer_query (commit-per-call) and the background
+    QueryLogWriter (batched commit)."""
+    cur = db.execute(
+        """INSERT INTO mcp_queries
+           (ts, user, session_id, query, n_results, source,
+            response_tokens_est, top_result_tokens, elapsed_ms,
+            budget_requested, budget_used)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            time.time(),
+            agent,
+            agent,
+            redact_secrets(query)[:500],
+            len(pointers),
+            source,
+            tokens_est,
+            tokens_est,
+            elapsed_ms,
+            budget_requested,
+            budget_used,
+        ),
+    )
+    query_id = cur.lastrowid
+    if pointers and query_id is not None:
+        db.executemany(
+            """INSERT INTO mcp_query_results (query_id, rank, path, status, tokens_est, score)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            [
+                (query_id, i, p["id"], "canonical", 0, p.get("score", 0.0))
+                for i, p in enumerate(pointers)
+            ],
+        )
+
+
 def log_pointer_query(
     db,
     *,
@@ -258,36 +309,17 @@ def log_pointer_query(
     (boot_pointers' own "never 500" contract).
     """
     try:
-        cur = db.execute(
-            """INSERT INTO mcp_queries
-               (ts, user, session_id, query, n_results, source,
-                response_tokens_est, top_result_tokens, elapsed_ms,
-                budget_requested, budget_used)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                time.time(),
-                agent,
-                agent,
-                redact_secrets(query)[:500],
-                len(pointers),
-                source,
-                tokens_est,
-                tokens_est,
-                elapsed_ms,
-                budget_requested,
-                budget_used,
-            ),
+        _insert_pointer_query(
+            db,
+            source=source,
+            agent=agent,
+            query=query,
+            pointers=pointers,
+            tokens_est=tokens_est,
+            elapsed_ms=elapsed_ms,
+            budget_requested=budget_requested,
+            budget_used=budget_used,
         )
-        query_id = cur.lastrowid
-        if pointers and query_id is not None:
-            db.executemany(
-                """INSERT INTO mcp_query_results (query_id, rank, path, status, tokens_est, score)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                [
-                    (query_id, i, p["id"], "canonical", 0, p.get("score", 0.0))
-                    for i, p in enumerate(pointers)
-                ],
-            )
         db.commit()
     except Exception:  # noqa: BLE001 — a boot call must never 500 on a log failure
         # CRITICAL (incident 35c0631e): the mcp_queries INSERT above opens an
@@ -301,3 +333,123 @@ def log_pointer_query(
         with contextlib.suppress(Exception):
             db.rollback()
         log.debug("log_pointer_query failed", exc_info=True)
+
+
+# ── Background query-log writer (task b02389c2 AC2 / audit Q6) ────────────────
+#
+# The per-request boot/prompt log INSERT used to run on the shared offload pool
+# through the SERVED connection; when it waited on the write lock (held by the
+# reindex/store/checkpoint) it busy-waited up to 30s while holding that
+# connection's mutex, stalling every boot read behind it. Move it off the
+# request path entirely: /api/boot enqueues a row (non-blocking, dropped if the
+# queue is full) and ONE background thread with its OWN short-busy_timeout
+# connection drains the queue in batches and commits. The boot path does zero
+# DB work for logging.
+
+_QUERYLOG_QUEUE_MAX = 2000
+_QUERYLOG_BATCH_MAX = 64
+_QUERYLOG_BUSY_TIMEOUT_MS = 100  # drop-on-busy: never hold the write lock for logging
+
+
+class QueryLogWriter:
+    def __init__(self, db_path: Path, maxsize: int = _QUERYLOG_QUEUE_MAX):
+        self._db_path = db_path
+        self._q: queue.Queue = queue.Queue(maxsize=maxsize)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    @property
+    def running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self) -> None:
+        if self.running:
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._run, name="trovex-querylog-writer", daemon=True
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+
+    def enqueue(self, fields: dict) -> None:
+        """Non-blocking; drop the row if the queue is full — a logging miss must
+        never slow or fail a boot call."""
+        try:
+            self._q.put_nowait(fields)
+        except queue.Full:
+            log.debug("query-log queue full — dropping a row")
+
+    def _run(self) -> None:
+        # timeout= sets sqlite busy_timeout without a formatted PRAGMA string
+        conn = sqlite3.connect(
+            str(self._db_path),
+            check_same_thread=False,
+            timeout=_QUERYLOG_BUSY_TIMEOUT_MS / 1000,
+        )
+        conn.row_factory = sqlite3.Row
+        try:
+            while True:
+                try:
+                    first = self._q.get(timeout=0.5)
+                except queue.Empty:
+                    if self._stop.is_set():
+                        break
+                    continue
+                batch = [first]
+                while len(batch) < _QUERYLOG_BATCH_MAX:
+                    try:
+                        batch.append(self._q.get_nowait())
+                    except queue.Empty:
+                        break
+                self._write_batch(conn, batch)
+        finally:
+            with contextlib.suppress(Exception):
+                conn.close()
+
+    def _write_batch(self, conn: sqlite3.Connection, batch: list[dict]) -> None:
+        try:
+            for fields in batch:
+                _insert_pointer_query(conn, **fields)
+            conn.commit()
+        except sqlite3.Error as e:
+            # Drop the whole batch on a busy/locked DB rather than hold the lock
+            # or crash the writer — logging is best-effort (audit Q6).
+            with contextlib.suppress(Exception):
+                conn.rollback()
+            log.debug("query-log batch dropped (%d rows): %s", len(batch), e)
+
+
+_WRITER: QueryLogWriter | None = None
+
+
+def start_query_log_writer(data_dir: Path) -> QueryLogWriter:
+    global _WRITER
+    if _WRITER is None or not _WRITER.running:
+        _WRITER = QueryLogWriter(Path(data_dir) / "trovex.db")
+        _WRITER.start()
+    return _WRITER
+
+
+def stop_query_log_writer() -> None:
+    global _WRITER
+    if _WRITER is not None:
+        _WRITER.stop()
+        _WRITER = None
+
+
+def enqueue_pointer_query(db, **fields) -> None:
+    """Route a boot/prompt log row to the background writer (zero DB work on the
+    caller's path). If no writer is running — tests, CLI, any non-served context
+    — fall back to a direct synchronous write on `db` so logging still happens;
+    the server's lifespan always starts the writer, so the hot path never takes
+    that branch."""
+    writer = _WRITER
+    if writer is not None and writer.running:
+        writer.enqueue(fields)
+        return
+    log_pointer_query(db, **fields)

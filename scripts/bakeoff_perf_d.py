@@ -139,6 +139,107 @@ def overlap(k: int = 5, sample: int = 50) -> dict:
     return out
 
 
+class _StaticReplaySearcher:
+    """Minimal Searcher-shaped object for replay_eval over the STATIC vectors: a
+    global (unscoped) doc KNN against vec_docs_static, returning rows with `.path`
+    — the same shape eval_replay reads off the dense Searcher."""
+
+    def __init__(self, conn: sqlite3.Connection, model):
+        from types import SimpleNamespace
+
+        self.db = conn
+        self._model = model
+        self._ns = SimpleNamespace
+
+    def search(self, query: str, limit: int = 20, **_):
+        import sqlite_vec
+
+        vec = _norm(np.array(self._model.encode([query[:2000]]), dtype=np.float32))[0]
+        blob = sqlite_vec.serialize_float32(vec.tolist())
+        rows = self.db.execute(
+            """SELECT d.path AS path, v.distance AS distance
+               FROM vec_docs_static v JOIN docs d ON d.id = v.rowid
+               WHERE v.embedding MATCH ? AND k = ? AND v.source_id = 'trovex'
+               ORDER BY v.distance""",
+            (blob, max(limit, 1)),
+        ).fetchall()
+        return [self._ns(path=r["path"], score=1.0 - (r["distance"] or 0.0)) for r in rows]
+
+
+def replay() -> dict:
+    """AC3 (literal): run the REAL eval_replay.replay_eval for the dense AND the
+    static recall paths over trovex's own logged queries, and report both reports'
+    recall numbers. Operates on a COPY of the live DB (never mutates it): the copy
+    gets its vec_docs_static populated with potion, then dense and static searchers
+    replay the same query log. With 0 used-labelled rows (bug c03d169a) both report
+    n_used_labeled=0 ⇒ hit@1/MRR 0.0 — the literal recall@k is DEFERRED, which this
+    receipt makes self-evident from the named tool's own output (see overlap.json
+    for the computable static-vs-dense signal in the meantime)."""
+    import shutil
+    import tempfile
+
+    from trovex.config import Settings
+    from trovex.db import vec_docs_static_put
+    from trovex.eval_replay import replay_eval
+    from trovex.embedder import embedder_from_settings, query_embedder_from_settings
+    from trovex.search import Searcher
+
+    tmp = Path(tempfile.mkdtemp())
+    shutil.copy(DB_PATH, tmp / "trovex.db")
+    for ext in ("-wal", "-shm"):
+        src = Path(DB_PATH + ext)
+        if src.exists():
+            shutil.copy(src, tmp / ("trovex.db" + ext))
+    settings = Settings(
+        data_dir=tmp,
+        sources_config_path=tmp / "no.yaml",
+        static_embed_enabled=True,
+        static_embed_dim=512,
+    )
+    dense = embedder_from_settings(settings)
+    qembed = query_embedder_from_settings(settings, dense)
+    searcher = Searcher(settings, embedder=qembed)
+
+    # Populate static doc vectors on the copy so the static searcher has an index.
+    stat = _static_model()
+    conn = searcher.db
+    docs = [(r["id"], f'{r["title"]}\n\n{r["content"]}'[:8000])
+            for r in conn.execute("SELECT id, title, content FROM docs")]
+    vecs = _norm(np.array(stat.encode([t for _, t in docs]), dtype=np.float32))
+    import sqlite_vec
+    for (did, _), v in zip(docs, vecs, strict=True):
+        vec_docs_static_put(conn, did, sqlite_vec.serialize_float32(v.tolist()), "static")
+    conn.commit()
+
+    static_searcher = _StaticReplaySearcher(conn, stat)
+    window = 10 * 365 * 24 * 3600  # all history
+    dense_rep = replay_eval(conn, searcher, since_seconds=window, limit=200, k=5)
+    static_rep = replay_eval(conn, static_searcher, since_seconds=window, limit=200, k=5)
+
+    def _row(rep) -> dict:
+        return {
+            "n": rep.n,
+            "n_used_labeled": rep.n_used_labeled,
+            "hit_at_1_used": round(rep.hit_at_1_used, 3),
+            "hit_at_k_used": round(rep.hit_at_k_used, 3),
+            "mrr_used": round(rep.mrr_used, 3),
+        }
+
+    out = {
+        "tool": "trovex.eval_replay.replay_eval",
+        "k": 5,
+        "dense": _row(dense_rep),
+        "static": _row(static_rep),
+        "recall_status": "DEFERRED — 0 used-labelled rows (bug c03d169a); hit@1/MRR "
+        "are 0.0 for BOTH paths because the replay eval has no relevance signal, not "
+        "because recall is zero. Absolute recall@k runs on the blind pool once "
+        "c03d169a lands; overlap.json is the computable static-vs-dense signal now.",
+    }
+    (OUT / "replay.json").write_text(json.dumps(out, indent=2) + "\n")
+    print(json.dumps(out, indent=2))
+    return out
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     stage = sys.argv[1] if len(sys.argv) > 1 else "all"
@@ -146,3 +247,5 @@ if __name__ == "__main__":
         reembed_rate()
     if stage in ("overlap", "all"):
         overlap()
+    if stage in ("replay", "all"):
+        replay()

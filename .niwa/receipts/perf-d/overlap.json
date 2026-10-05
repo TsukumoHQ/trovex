@@ -1,0 +1,11 @@
+{
+  "static_model": "minishlab/potion-retrieval-32M",
+  "dense_model": "BAAI/bge-small-en-v1.5",
+  "k": 5,
+  "pool_record_docs": 2238,
+  "queries_scored": 50,
+  "mean_overlap_at_k": 0.056,
+  "static_top1_in_dense_topk": 0.12,
+  "n_used_labelled": 0,
+  "note": "absolute recall@k DEFERRED (0 used-labels, bug c03d169a); this is the static-vs-dense agreement on live boot traffic \u2014 how much the degraded fallback preserves the normal path's ranking."
+}

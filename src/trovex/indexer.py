@@ -2,6 +2,7 @@ import fnmatch
 import functools
 import hashlib
 import json
+import logging
 import os
 import re
 import time
@@ -23,11 +24,15 @@ from .db import (
     sync_doc_chunks,
     upsert_docs_fts,
     vec_chunks_put,
+    vec_chunks_static_put,
     vec_docs_put,
+    vec_docs_static_put,
 )
 from .code_refs import recompute_drift_for_code_docs, sync_code_refs
 from .links_parse import sync_doc_refs
-from .embedder import Embedder, embedder_from_settings
+from .embedder import Embedder, embedder_from_settings, static_embedder_from_settings
+
+log = logging.getLogger("trovex.indexer")
 
 MARKDOWN_EXTENSIONS = ("md", "mdx", "markdown")
 
@@ -154,10 +159,27 @@ def _walk_files(root: Path, ignore_dirs: set[str]) -> Iterator[Path]:
 
 
 class Indexer:
-    def __init__(self, settings: Settings, embedder: Embedder | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        embedder: Embedder | None = None,
+        static_embedder: Embedder | None = None,
+    ):
         self.settings = settings
-        self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim(), settings.embed_model)
+        self.db = open_db(
+            settings.data_dir / "trovex.db",
+            settings.resolved_embed_dim(),
+            settings.embed_model,
+            static_embed_dim=settings.static_embed_dim,
+            static_embed_enabled=settings.static_embed_enabled,
+        )
         self.embedder = embedder or embedder_from_settings(settings)
+        # Static-embedding shadow (perf D, task ad2ad98e): None unless
+        # static_embed_enabled. When set, every dense (re)embed also writes a
+        # parallel static vector so the shed boot path has a maintained static
+        # index. static_embedder_from_settings returns None when the feature is off
+        # or model2vec is unavailable, so this stays a no-op by default.
+        self.static_embedder = static_embedder or static_embedder_from_settings(settings)
         sources_mod.import_yaml_once(self.db, settings)
         # Per-run phase/cache counters (task cbb8e8fb). Reset at the top of
         # reindex()/reindex_paths() — _upsert_doc and _flush_*embeddings, called
@@ -859,6 +881,7 @@ class Indexer:
         for doc_id, blob in zip(ids, blobs, strict=True):
             vec_docs_put(self.db, doc_id, blob, self.embedder.name)
         self._phase_ms["write"] += (time.monotonic() - t0) * 1000
+        self._flush_static(ids, texts, DOC_EMBED_NS, vec_docs_static_put)
 
     def _flush_chunk_embeddings(self, batch: list[tuple[int, str]]) -> None:
         if not batch:
@@ -870,6 +893,25 @@ class Indexer:
         for chunk_id, blob in zip(ids, blobs, strict=True):
             vec_chunks_put(self.db, chunk_id, blob, self.embedder.name)
         self._phase_ms["write"] += (time.monotonic() - t0) * 1000
+        self._flush_static(ids, texts, CHUNKER_VERSION, vec_chunks_static_put)
+
+    def _flush_static(self, ids: list[int], texts: list[str], namespace: str, put_fn) -> None:
+        """Parallel static embed → vec_*_static (perf D). No-op when static is off.
+
+        Same texts, same cache path (keyed by the static model's name so it never
+        collides with the dense cache), written through the given static put helper.
+        Kept best-effort: a static-embed failure under load must never break the
+        dense (re)index, which is the source of truth."""
+        if not self.static_embedder or not ids:
+            return
+        try:
+            blobs, _, _ = resolve_embedding_blobs(
+                self.db, self.static_embedder, texts, self.static_embedder.name, namespace
+            )
+            for rowid, blob in zip(ids, blobs, strict=True):
+                put_fn(self.db, rowid, blob, self.static_embedder.name)
+        except Exception:  # noqa: BLE001 — static shadow is best-effort, never fatal
+            log.warning("static embed flush failed (feature degraded, dense index intact)", exc_info=True)
 
     @staticmethod
     def _embed_text(content: str, title: str) -> str:

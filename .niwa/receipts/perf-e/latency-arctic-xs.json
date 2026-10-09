@@ -1,0 +1,9 @@
+{
+  "model": "arctic-xs",
+  "single_p50": 13.93,
+  "single_p95": 19.59,
+  "conc16_p50": 115.05,
+  "conc16_p95": 179.58,
+  "conc16_wall_sec": 2.48,
+  "note": "fp32 fastembed, OMP=1. bge-small prod query path is int8 (perf A: 6.9/62ms p50/p95 @16-way)."
+}

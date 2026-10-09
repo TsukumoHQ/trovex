@@ -1,0 +1,19 @@
+{
+  "tool": "trovex.eval_replay.replay_eval",
+  "k": 5,
+  "dense": {
+    "n": 200,
+    "n_used_labeled": 0,
+    "hit_at_1_used": 0.0,
+    "hit_at_k_used": 0.0,
+    "mrr_used": 0.0
+  },
+  "static": {
+    "n": 200,
+    "n_used_labeled": 0,
+    "hit_at_1_used": 0.0,
+    "hit_at_k_used": 0.0,
+    "mrr_used": 0.0
+  },
+  "recall_status": "DEFERRED \u2014 0 used-labelled rows (bug c03d169a); hit@1/MRR are 0.0 for BOTH paths because the replay eval has no relevance signal, not because recall is zero. Absolute recall@k runs on the blind pool once c03d169a lands; overlap.json is the computable static-vs-dense signal now."
+}

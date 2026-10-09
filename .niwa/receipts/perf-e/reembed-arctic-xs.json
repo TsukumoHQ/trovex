@@ -1,0 +1,10 @@
+{
+  "model": "arctic-xs",
+  "sample": 2000,
+  "sample_wall_sec": 63.2,
+  "chunks_per_sec_omp4": 31.7,
+  "n_chunks": 21923,
+  "extrapolated_full_reembed_sec": 692.3,
+  "extrapolated_full_reembed_min": 11.5,
+  "note": "OMP_NUM_THREADS=4 in a niwa slot; extrapolated from the subset."
+}

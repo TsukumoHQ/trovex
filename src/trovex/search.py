@@ -1,3 +1,4 @@
+import logging
 import re
 import sqlite3
 import time
@@ -9,6 +10,8 @@ from .config import RESERVED_SOURCE_ID, Settings
 from .db import open_db
 from .embedder import Embedder, embedder_from_settings
 from .query_cache import embed_query_blob
+
+log = logging.getLogger("trovex.search")
 
 # vec0's hard API ceiling on a KNN `k` — sqlite-vec RAISES past this, it does not
 # clamp. With the partitioned index (P2a) each source is its OWN bounded shard,
@@ -86,7 +89,13 @@ class SearchResult:
 class Searcher:
     def __init__(self, settings: Settings, embedder: Embedder | None = None):
         self.settings = settings
-        self.db = open_db(settings.data_dir / "trovex.db", settings.resolved_embed_dim(), settings.embed_model)
+        self.db = open_db(
+            settings.data_dir / "trovex.db",
+            settings.resolved_embed_dim(),
+            settings.embed_model,
+            static_embed_dim=settings.static_embed_dim,
+            static_embed_enabled=settings.static_embed_enabled,
+        )
         self.embedder = embedder or embedder_from_settings(settings)
 
     def search(
@@ -505,6 +514,7 @@ class Searcher:
             inc, out = link_counts(self.db, row["id"])
             return f"  ⇄{inc}/{out}" if (inc or out) else ""
         except Exception:  # noqa: BLE001 — a count hint must never break formatting
+            log.debug("link hint failed for %s:%s", r.source_id, r.path, exc_info=True)
             return ""
 
     def format_with_summary(self, results: list[SearchResult]) -> str:

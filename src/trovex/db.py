@@ -71,7 +71,13 @@ def like_escape(s: str) -> str:
     )
 
 
-def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlite3.Connection:
+def open_db(
+    db_path: Path,
+    embed_dim: int = 384,
+    embed_model: str = "",
+    static_embed_dim: int = 0,
+    static_embed_enabled: bool = False,
+) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -130,6 +136,12 @@ def open_db(db_path: Path, embed_dim: int = 384, embed_model: str = "") -> sqlit
     # AFTER embed_model: adds the owner metadata column (perf C, task 33ecdc9f),
     # populated from doc_tags, so an owner-scoped KNN filters inside the search.
     _migrate_add_vec_owner(conn, embed_dim)
+    # Static-embedding fallback (perf D, task ad2ad98e): a SECOND vec0 table pair
+    # (potion/static dim, typ. 512) that shadows vec_docs/vec_chunks. Created only
+    # when the feature is on — default off = no extra tables, zero schema/storage
+    # cost. Runs AFTER the dense tables exist so it sits beside them.
+    if static_embed_enabled and static_embed_dim > 0:
+        _migrate_add_static_vec(conn, static_embed_dim)
     _backfill_docs_fts(conn)
     _migrate_purge_orphans(conn)
     # task 6851d755: stamp store_meta['embed_model'] once — a fresh store, or
@@ -469,6 +481,108 @@ def vec_chunks_put(conn: sqlite3.Connection, chunk_id: int, emb_blob: bytes, emb
     conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (chunk_id,))
     conn.execute(
         "INSERT INTO vec_chunks(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (chunk_id, src, emb_blob, kind, lifecycle, status, embed_model),
+    )
+
+
+def _static_vec_dim(conn: sqlite3.Connection) -> int:
+    """The `float[N]` dim of vec_docs_static, or 0 if the static tables are absent.
+
+    Read off the live DDL (same probe `_migrate_embed_dim` uses for the dense dim),
+    so a caller can tell whether the static index exists and at what dimension
+    without threading settings down."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_docs_static'"
+    ).fetchone()
+    if not row or not row["sql"]:
+        return 0
+    m = re.search(r"float\[(\d+)\]", row["sql"])
+    return int(m.group(1)) if m else 0
+
+
+def _migrate_add_static_vec(conn: sqlite3.Connection, static_embed_dim: int) -> None:
+    """Create the static-embedding vec0 table pair (perf D, task ad2ad98e).
+
+    `vec_docs_static` / `vec_chunks_static` shadow `vec_docs` / `vec_chunks` at the
+    static (potion) dimension so the shed/degraded boot path can run an owner-scoped
+    doc KNN in the static space while the normal path keeps using the dense tables.
+    Same partitioning + metadata columns as the dense tables (owner lives on the doc
+    table — the owner-scoped boot KNN needs it); mirrors db.py:2020 / :2064.
+
+    Idempotent (CREATE IF NOT EXISTS). If the tables already exist at a DIFFERENT
+    dim (the static model's dim changed), drop + recreate empty: static vectors are
+    a disposable rebuilt-on-reindex shadow, never the source of truth, so wiping is
+    safe and the next (re)index repopulates them."""
+    existing = _static_vec_dim(conn)
+    if existing and existing != static_embed_dim:
+        conn.execute("DROP TABLE IF EXISTS vec_docs_static")
+        conn.execute("DROP TABLE IF EXISTS vec_chunks_static")
+        log.info(
+            "static vec dim changed %d -> %d; dropped static tables (rebuilt on next reindex)",
+            existing, static_embed_dim,
+        )
+    conn.executescript(
+        f"""
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_docs_static USING vec0(
+            source_id TEXT partition key,
+            embedding float[{static_embed_dim}] distance_metric=cosine,
+            kind TEXT,
+            lifecycle TEXT,
+            status TEXT,
+            embed_model TEXT,
+            owner TEXT
+        );
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks_static USING vec0(
+            source_id TEXT partition key,
+            embedding float[{static_embed_dim}] distance_metric=cosine,
+            kind TEXT,
+            lifecycle TEXT,
+            status TEXT,
+            embed_model TEXT
+        );
+        """
+    )
+
+
+def vec_docs_static_put(
+    conn: sqlite3.Connection, doc_id: int, emb_blob: bytes, embed_model: str = ""
+) -> None:
+    """Upsert a doc's STATIC embedding into vec_docs_static (perf D). No-op if the
+    static tables don't exist (feature off). Mirrors vec_docs_put, incl. the owner
+    metadata column the owner-scoped boot KNN filters on. Does NOT commit."""
+    if _static_vec_dim(conn) == 0:
+        return
+    meta = _doc_vec_meta(conn, doc_id)
+    if meta is None:
+        return
+    src, kind, lifecycle, status = meta
+    owner = doc_vec_owner(conn, doc_id)
+    conn.execute("DELETE FROM vec_docs_static WHERE rowid = ?", (doc_id,))
+    conn.execute(
+        "INSERT INTO vec_docs_static(rowid, source_id, embedding, kind, lifecycle, status, embed_model, owner) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (doc_id, src, emb_blob, kind, lifecycle, status, embed_model, owner),
+    )
+
+
+def vec_chunks_static_put(
+    conn: sqlite3.Connection, chunk_id: int, emb_blob: bytes, embed_model: str = ""
+) -> None:
+    """Upsert a chunk's STATIC embedding into vec_chunks_static (perf D). No-op if
+    the static tables don't exist. Mirrors vec_chunks_put. Does NOT commit."""
+    if _static_vec_dim(conn) == 0:
+        return
+    parent = conn.execute("SELECT doc_id FROM chunks WHERE id = ?", (chunk_id,)).fetchone()
+    if parent is None:
+        return
+    meta = _doc_vec_meta(conn, parent["doc_id"])
+    if meta is None:
+        return
+    src, kind, lifecycle, status = meta
+    conn.execute("DELETE FROM vec_chunks_static WHERE rowid = ?", (chunk_id,))
+    conn.execute(
+        "INSERT INTO vec_chunks_static(rowid, source_id, embedding, kind, lifecycle, status, embed_model) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (chunk_id, src, emb_blob, kind, lifecycle, status, embed_model),
     )
@@ -836,11 +950,26 @@ def vec_sync_meta(conn: sqlite3.Connection, doc_id: int) -> None:
         "UPDATE vec_docs SET kind = ?, lifecycle = ?, status = ?, owner = ? WHERE rowid = ?",
         (kind, lifecycle, status, owner, doc_id),
     )
-    for c in conn.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)).fetchall():
+    chunk_ids = [c["id"] for c in conn.execute("SELECT id FROM chunks WHERE doc_id = ?", (doc_id,))]
+    for cid in chunk_ids:
         conn.execute(
             "UPDATE vec_chunks SET kind = ?, lifecycle = ?, status = ? WHERE rowid = ?",
-            (kind, lifecycle, status, c["id"]),
+            (kind, lifecycle, status, cid),
         )
+    # perf D (task ad2ad98e): the static shadow tables carry the SAME metadata
+    # (incl. owner on the doc table — the shed boot path owner-scopes its static
+    # KNN), so a tag-only change must sync them in step too. No-op when the static
+    # tables don't exist (feature off).
+    if _static_vec_dim(conn):
+        conn.execute(
+            "UPDATE vec_docs_static SET kind = ?, lifecycle = ?, status = ?, owner = ? WHERE rowid = ?",
+            (kind, lifecycle, status, owner, doc_id),
+        )
+        for cid in chunk_ids:
+            conn.execute(
+                "UPDATE vec_chunks_static SET kind = ?, lifecycle = ?, status = ? WHERE rowid = ?",
+                (kind, lifecycle, status, cid),
+            )
 
 
 def reconcile_vec_meta(

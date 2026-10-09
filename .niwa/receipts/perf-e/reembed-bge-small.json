@@ -1,0 +1,10 @@
+{
+  "model": "bge-small",
+  "sample": 2000,
+  "sample_wall_sec": 118.2,
+  "chunks_per_sec_omp4": 16.9,
+  "n_chunks": 21923,
+  "extrapolated_full_reembed_sec": 1296.2,
+  "extrapolated_full_reembed_min": 21.6,
+  "note": "OMP_NUM_THREADS=4 in a niwa slot; extrapolated from the subset."
+}

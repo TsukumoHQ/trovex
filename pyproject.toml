@@ -61,6 +61,9 @@ dependencies = [
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
+    # Parallel test runner: the full suite is ~300s serial and overran the gate's
+    # 900s slot cap under fleet load (ticket 38c5c8a0). -n auto drops it to ~130s.
+    "pytest-xdist>=3.6",
     "httpx>=0.28",
     "ruff>=0.8",
     # so the usearch equivalence test (test_usearch_index.py) actually runs in
@@ -147,3 +150,16 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Run the suite in parallel so it clears the gate's 900s slot cap even under
+# fleet load (ticket 38c5c8a0). Tests are isolation-safe: every test gets its
+# own tmp data_dir + sqlite file (no shared on-disk path, no fixed port bind,
+# no module/session fixtures). worksteal balances the few long reindex tests
+# (test_status_incremental, test_reindex_embed_perf) across idle workers.
+#
+# -n 3 (NOT auto): a FIXED, bounded worker count that matches the gate's job
+# budget and leaves CPU headroom. -n auto (18 workers) saturates the cores and
+# the ~1s TOOL_TIMEOUT_SEC capture-deadline tests (test_wedge_class2_recurrence
+# ::test_fast_capture_is_unaffected and the other /api/capture deadline tests)
+# 504 under the starvation. 3 workers keep those timings honest while still
+# cutting the suite from ~300s serial to well under the cap.
+addopts = "-n 3 --dist worksteal"

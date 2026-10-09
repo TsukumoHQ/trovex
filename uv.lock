@@ -2210,6 +2210,16 @@ usearch = [
     { name = "usearch" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-xdist" },
+    { name = "ruff" },
+    { name = "usearch" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
@@ -2245,6 +2255,16 @@ requires-dist = [
     { name = "watchdog", specifier = ">=6.0" },
 ]
 provides-extras = ["dev", "usearch"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "pytest-xdist", specifier = ">=3.6" },
+    { name = "ruff", specifier = ">=0.8" },
+    { name = "usearch", specifier = ">=2.16" },
+]
 
 [[package]]
 name = "typer"

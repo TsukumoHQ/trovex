@@ -77,6 +77,23 @@ usearch = [
     "usearch>=2.16",
 ]
 
+# PEP 735 default group: uv auto-syncs [dependency-groups].dev on `uv run` and
+# `uv sync` (no --extra needed), so a bare `uv run pytest -q` always has pytest
+# AND pytest-xdist. Without this, 38c5c8a0's addopts `-n 3 --dist worksteal`
+# exit-4 on any venv synced before xdist landed (the [dev] EXTRA is not synced
+# by `uv run`), which rejected r5's gate validate. The [project.optional-
+# dependencies].dev extra above is kept verbatim for CI that calls
+# `uv sync --extra dev`.
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-xdist>=3.6",
+    "httpx>=0.28",
+    "ruff>=0.8",
+    "usearch>=2.16",
+]
+
 # Floors for vulnerable *transitive* deps (pulled by mcp[crypto]) so the
 # pip-audit CI gate stays green. Constraints only bound versions already in the
 # graph — they don't add new deps. Revisit when mcp bumps these itself.

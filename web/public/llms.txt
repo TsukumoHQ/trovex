@@ -63,11 +63,11 @@
 ## Access
 - Status: public beta. The repository is public; install it and run it on your own repo.
 - Install: `uv tool install trovex` (a GitHub star helps other devs find it).
-- Community: questions or comparing setups, join the Slack at https://tsukumo.ch/slack.
+- Community: questions or comparing setups, join the Discord at https://tsukumo.ch/discord.
 
 ## Links
 - [GitHub repository](https://github.com/TsukumoHQ/trovex): public; install it and a star helps.
-- [Community Slack](https://tsukumo.ch/slack): questions and setup help.
+- [Community Discord](https://tsukumo.ch/discord): questions and setup help.
 - [Website](https://trovex.dev): the landing page.
 - [Token-savings calculator](https://trovex.dev/savings): a free client-side tool to estimate how many tokens your coding agents waste rereading the repo, and what one canonical answer saves (~60% fewer per doc lookup). No install, nothing leaves the page.
 - [5-minute agent-docs self-audit](https://trovex.dev/audit): a free self-audit to spot whether your coding agents are burning tokens rereading docs, and what to fix.

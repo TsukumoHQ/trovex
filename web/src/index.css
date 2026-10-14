@@ -345,6 +345,10 @@ a { color: inherit; text-decoration: none; }
 .cmd-row { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cmd-copy { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 2px 7px; cursor: pointer; transition: color .15s, border-color .15s; }
 .cmd-copy:hover { color: var(--accent); border-color: var(--accent); }
+/* DS-01 copy feedback: 180ms colour + settle on the existing accent tokens, no layout shift. */
+.cmd-copy { transition: color .18s var(--ease), border-color .18s var(--ease), background-color .18s var(--ease); }
+.cmd-copy[data-state="copied"] { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); animation: copy-settle .2s var(--ease); }
+@keyframes copy-settle { from { transform: scale(0.94); } to { transform: none; } }
 
 /* trust band */
 .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -412,11 +416,19 @@ a { color: inherit; text-decoration: none; }
 .footer { border-top: 1px solid var(--border); padding: 40px 0 64px; margin-top: clamp(72px, 10vw, 120px); }
 .footer-in { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 .footer .sp { flex: 1; }
-.footer .lks { display: flex; gap: 20px; font-size: 14px; color: var(--fg-muted); }
+.footer .lks { display: flex; flex-wrap: wrap; max-width: 100%; gap: 12px 20px; font-size: 14px; color: var(--fg-muted); }
 .footer .lks a:hover { color: var(--accent); }
 .footer small { color: var(--fg-subtle); font-family: var(--font-mono); font-size: 12px; flex-basis: 100%; }
-.footer-suite a { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 3px; }
+.footer-suite { flex-basis: 100%; display: grid; gap: 10px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 13px; color: var(--fg-subtle); }
+.footer-suite ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.footer-suite a { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 3px; transition: color .15s; }
 .footer-suite a:hover { color: var(--accent); }
+.footer-suite .tsk-sig { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; text-decoration: none; color: var(--fg-subtle); }
+.footer-suite .tsk-note { color: var(--fg-faint); }
+/* Tsukumo signature beside the wordmark (audit 2026-10-13 TR-01). The footer suite carries it on phones. */
+.nav .tsk-sig { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--fg-subtle); border-left: 1px solid var(--border-strong); padding-left: 14px; white-space: nowrap; transition: color .18s; }
+.nav .tsk-sig:hover { color: var(--accent); }
+@media (max-width: 640px) { .nav .tsk-sig { display: none; } }
 
 /* reveal */
 .reveal { opacity: 0; transform: translateY(20px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
@@ -436,4 +448,5 @@ a { color: inherit; text-decoration: none; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .window { transform: none !important; }
   .sav-fill { transition: none; }
+  .cmd-copy, .nav .tsk-sig { transition: none; }
 }

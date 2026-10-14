@@ -197,3 +197,25 @@
 }
 .sv-foot a { color: var(--fg-subtle); }
 .sv-foot a:hover { color: var(--fg-muted); }
+
+/* ---- Tsukumo affiliation (audit 2026-10-13 TR-01), SSOT src/suite.json ---- */
+.sv-sig { display: block; margin: -12px 0 18px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-subtle); transition: color 0.18s var(--ease); }
+.sv-sig:hover { color: var(--accent); }
+.sv-suite { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.sv-suite .sv-sig { display: inline; margin: 0; }
+.sv-suite a { color: var(--fg-subtle); }
+.sv-suite a:hover { color: var(--accent); }
+
+/* ---- DS-01 calculator feedback: 150-250ms, existing accent tokens, no layout shift ---- */
+.sv-share-btn { transition: border-color 0.18s var(--ease), color 0.18s var(--ease), background-color 0.18s var(--ease); }
+.sv-share-btn[data-state="copied"] { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); animation: sv-settle 0.2s var(--ease); }
+.sv-reset { transition: color 0.18s var(--ease); }
+/* Result figures re-key on change: a 200ms settle so the edit visibly lands. */
+.sv-tick { display: inline-block; animation: sv-tick 0.2s var(--ease); }
+.sv-result-pct.sv-tick { display: block; }
+@keyframes sv-tick { from { opacity: 0.55; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes sv-settle { from { transform: scale(0.95); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .sv-tick, .sv-share-btn[data-state="copied"] { animation: none; }
+  .sv-share-btn, .sv-reset, .sv-sig { transition: none; }
+}

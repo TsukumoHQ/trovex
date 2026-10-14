@@ -14,6 +14,8 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { track, trackAuditView, trackTsukumoClick } from '../analytics'
+import QS from '../quickstart.json'
+import SUITE from '../suite.json'
 
 // The single soft consulting endplate (9+ band). LINKS canon: the canonical branded
 // short link, never a hand-rolled UTM. /go/consulting fires the Plausible Link Click
@@ -118,7 +120,10 @@ export default function Audit() {
 
   return (
     <main className="audit">
-      <a className="audit-home" href="/">← trovex</a>
+      <a className="audit-home" href="/">← trovex</a>{' '}
+      <a className="audit-sig" href={SUITE.signature.href} target="_blank" rel="noopener noreferrer" onClick={() => trackTsukumoClick('audit_header')}>
+        {SUITE.signature.label}
+      </a>
 
       <header className="audit-head">
         <h1>Is your coding agent burning tokens on docs?</h1>
@@ -169,7 +174,7 @@ export default function Audit() {
             <strong>Measure it first.</strong> Don't guess at the guessing. Point trovex at the
             repo and read the savings number on your own docs:
             <span className="audit-cmds">
-              <CopyCmd cmd="uvx trovex index /path/to/your/repo" id="audit-index" />
+              <CopyCmd cmd={QS.tryIndex} id="audit-index" />
               <CopyCmd cmd="uvx trovex serve" id="audit-serve" />
             </span>
             <span className="audit-note">
@@ -234,6 +239,15 @@ export default function Audit() {
           >
             GitHub
           </a>
+        </p>
+        {/* Suite line — same SSOT (src/suite.json) as every trovex.dev page. */}
+        <p>
+          <a href={SUITE.signature.href} target="_blank" rel="noopener noreferrer" onClick={() => trackTsukumoClick('audit_footer')}>{SUITE.signature.label}</a>
+          {SUITE.products.filter((p) => p.id !== 'trovex').map((p) => (
+            <span key={p.id}>{' · '}<a href={p.href} target="_blank" rel="noopener noreferrer">{p.name}</a></span>
+          ))}
+          {' · '}<a href={SUITE.community.href} target="_blank" rel="noopener noreferrer">{SUITE.community.label}</a>
+          {' · '}<a href={SUITE.publisher.href} target="_blank" rel="noopener noreferrer">{SUITE.publisher.label}</a>
         </p>
       </footer>
     </main>

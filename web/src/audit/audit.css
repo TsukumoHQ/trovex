@@ -105,3 +105,5 @@
 
 .audit-foot { margin-top: 3rem; font-size: 0.85rem; opacity: 0.6; }
 .audit-foot a { text-decoration: underline; text-underline-offset: 2px; }
+/* Tsukumo signature (audit 2026-10-13 TR-01), existing muted treatment. */
+.audit-sig { margin-left: 0.75rem; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.6; }

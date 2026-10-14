@@ -40,13 +40,13 @@ trovex is in public beta, on PyPI. No clone needed; `uv tool install` puts `trov
 on your PATH:
 
 ```bash
-uv tool install trovex   # one-time, no clone
-trovex setup             # wire into Claude Code (skill + hooks + MCP); idempotent
-
-trovex index /path/to/your/repo        # index your markdown (~1 min)
+uv tool install trovex                          # one-time, no clone
+trovex index /path/to/repo                      # index your markdown (~1 min)
 trovex search "how do we roll back a deploy?"   # ask, prints the tokens it saved
-trovex serve                           # wire into your agent: MCP at /mcp, dashboard at /savings
+trovex serve                                    # MCP at http://localhost:8765/mcp, dashboard at /savings
 ```
+
+Then point your agent at it (next section). On Claude Code, `trovex setup` does that in one step.
 
 Don't have `uv`? It's a one-line install: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 (or `brew install uv`).
@@ -56,8 +56,10 @@ prints how many tokens that saved versus reading the top few candidates. Once tr
 wired into your agent over MCP, the same numbers accumulate on the savings dashboard at
 `http://localhost:8765/savings`.
 
-> Prefer not to install anything yet? `uvx trovex search "..."` runs a single command in a
-> throwaway environment, no install.
+> Prefer not to install anything yet? Run the same two steps through `uvx`, which uses a
+> throwaway environment: `uvx trovex index /path/to/repo`, then
+> `uvx trovex search "how do we roll back a deploy?"`. The search needs the index first;
+> on its own it has nothing to search and prints no savings line.
 
 ## Wire it into your agent
 
@@ -135,8 +137,8 @@ sequenceDiagram
 The ~60% is a claim you can run, not a number to take on faith. Two commands:
 
 ```bash
-trovex bench /path/to/your/repo          # token-accounting model, instant, no LLM, no key
-trovex bench /path/to/your/repo --eval   # full answer+judge A/B at equal task-success (needs OPENAI_API_KEY)
+trovex bench /path/to/repo          # token-accounting model, instant, no LLM, no key
+trovex bench /path/to/repo --eval   # full answer+judge A/B at equal task-success (needs OPENAI_API_KEY)
 ```
 
 `bench` reports the distribution (median + spread), not a best case: the cost of reading the

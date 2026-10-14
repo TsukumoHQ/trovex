@@ -25,6 +25,7 @@ import {
   trackTsukumoClick,
 } from '../analytics'
 import { downloadReceiptCard } from './receiptCard'
+import SUITE from '../suite.json'
 
 const GITHUB = 'https://github.com/TsukumoHQ/trovex'
 const INSTALL_HREF = `${GITHUB}?utm_source=trovex&utm_medium=tool&utm_campaign=savings-calculator`
@@ -232,6 +233,10 @@ export default function Savings() {
         <a className="sv-brand mono" href="https://trovex.dev/">
           trovex<span>.dev</span>
         </a>
+        {/* Tsukumo signature (audit 2026-10-13 TR-01), from the shared SSOT src/suite.json. */}
+        <a className="sv-sig mono" href={SUITE.signature.href} target="_blank" rel="noopener noreferrer" onClick={() => trackTsukumoClick('savings_header')}>
+          {SUITE.signature.label}
+        </a>
         <p className="sv-eyebrow mono">token-savings estimate</p>
         <h1 className="sv-h1">how many tokens do your agents burn rereading the repo?</h1>
         <p className="sv-sub">
@@ -255,11 +260,12 @@ export default function Savings() {
         </form>
 
         <div className="sv-result">
-          <div className="sv-result-pct mono">~{pct}%</div>
+          {/* key remounts on change → one 200ms tick (DS-01); reduced motion: static. */}
+          <div className="sv-result-pct mono sv-tick" key={pct}>~{pct}%</div>
           <div className="sv-result-label">fewer tokens per doc lookup</div>
           <div className="sv-result-roll">
-            <span><b className="mono">{humanTokens(m.tokensPerMonth)}</b> tokens / month</span>
-            <span><b className="mono">~{money(m.dollarsPerMonth)}</b> / month</span>
+            <span><b className="mono sv-tick" key={`t${m.tokensPerMonth}`}>{humanTokens(m.tokensPerMonth)}</b> tokens / month</span>
+            <span><b className="mono sv-tick" key={`d${m.dollarsPerMonth}`}>~{money(m.dollarsPerMonth)}</b> / month</span>
           </div>
           <p className="sv-estimate">
             An estimate on the inputs you set, using the same model as trovex's own savings number.
@@ -304,16 +310,16 @@ same model as the product (src/trovex/savings.py). every input above is editable
             >
               post to X →
             </a>
-            <button type="button" className="sv-share-btn mono" onClick={() => copy(shareUrl, 'link')}>
+            <button type="button" className="sv-share-btn mono" data-state={copied === 'link' ? 'copied' : undefined} onClick={() => copy(shareUrl, 'link')}>
               {copied === 'link' ? 'copied ✓' : 'copy link'}
             </button>
-            <button type="button" className="sv-share-btn mono" onClick={() => copy(tweetLine, 'tweet')}>
+            <button type="button" className="sv-share-btn mono" data-state={copied === 'tweet' ? 'copied' : undefined} onClick={() => copy(tweetLine, 'tweet')}>
               {copied === 'tweet' ? 'copied ✓' : 'copy post'}
             </button>
-            <button type="button" className="sv-share-btn mono" onClick={() => copy(badge, 'badge')}>
+            <button type="button" className="sv-share-btn mono" data-state={copied === 'badge' ? 'copied' : undefined} onClick={() => copy(badge, 'badge')}>
               {copied === 'badge' ? 'copied ✓' : 'copy README badge'}
             </button>
-            <button type="button" className="sv-share-btn mono" onClick={saveCard}>
+            <button type="button" className="sv-share-btn mono" data-state={copied === 'card' ? 'copied' : undefined} onClick={saveCard}>
               {copied === 'card' ? 'saved ✓' : 'save card (png)'}
             </button>
           </div>
@@ -332,6 +338,15 @@ same model as the product (src/trovex/savings.py). every input above is editable
       <footer className="sv-foot">
         <span>© 2026 trovex · one source of truth for your agents' docs</span>
         <a href={INSTALL_HREF} onClick={() => trackInstallClick()} target="_blank" rel="noopener noreferrer">GitHub</a>
+        {/* Suite block — same SSOT (src/suite.json) as the landing and every static page. */}
+        <nav className="sv-suite" aria-label="Tsukumo suite">
+          <a className="sv-sig mono" href={SUITE.signature.href} target="_blank" rel="noopener noreferrer" onClick={() => trackTsukumoClick('savings_footer')}>{SUITE.signature.label}</a>
+          {SUITE.products.map((p) => (
+            <a key={p.id} href={p.href.startsWith('/') ? 'https://trovex.dev/' : p.href} target={p.href.startsWith('/') ? undefined : '_blank'} rel={p.href.startsWith('/') ? undefined : 'noopener noreferrer'}>{p.name}</a>
+          ))}
+          <a href={SUITE.community.href} target="_blank" rel="noopener noreferrer">{SUITE.community.label}</a>
+          <a href={SUITE.publisher.href} target="_blank" rel="noopener noreferrer" onClick={() => trackTsukumoClick('savings_footer')}>{SUITE.publisher.label}</a>
+        </nav>
       </footer>
     </main>
   )

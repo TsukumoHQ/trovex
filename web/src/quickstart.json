@@ -1,0 +1,19 @@
+{
+  "_comment": "SSOT for the canonical trovex quickstart (audit 2026-10-13 TR-03). The landing imports it; README.md, docs/quickstart.md and the static /for/* pages are checked against it by scripts/check-quickstart.mjs in `npm run build`. Commands mirror src/trovex/cli.py (index/search/serve/setup) and pyproject [project.scripts]. Change a command HERE first, then fix the pages the check names.",
+  "requires": "uv (https://docs.astral.sh/uv/)",
+  "install": "uv tool install trovex",
+  "index": "trovex index /path/to/repo",
+  "search": "trovex search \"how do we roll back a deploy?\"",
+  "serve": "trovex serve",
+  "mcpUrl": "http://localhost:8765/mcp",
+  "claudeCode": "claude mcp add --transport http trovex http://localhost:8765/mcp",
+  "claudeCodeSetup": "trovex setup",
+  "tryIndex": "uvx trovex index /path/to/repo",
+  "trySearch": "uvx trovex search \"how do we roll back a deploy?\"",
+  "stale": [
+    "uv run trovex index",
+    "uv run trovex search",
+    "uv run trovex serve",
+    "/path/to/your/repo"
+  ]
+}

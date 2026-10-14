@@ -35,7 +35,8 @@
             function () {
               var prev = btn.getAttribute('data-label') || 'copy'
               btn.textContent = 'copied'
-              setTimeout(function () { btn.textContent = prev }, 1500)
+              btn.setAttribute('data-state', 'copied') // DS-01: 180ms feedback in compare.css
+              setTimeout(function () { btn.textContent = prev; btn.removeAttribute('data-state') }, 1500)
               track('command_copied', { location: loc, command: btn.getAttribute('data-cmd') || 'cmd' })
             },
             function () {} // clipboard blocked — no-op; the command is still selectable

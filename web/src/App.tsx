@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { track, trackLandingView, trackSectionViews, trackInstallClick, trackTsukumoClick, trackNewsletterSignup, trackOssAdopt, getAttribution } from './analytics'
+// SSOTs (audit 2026-10-13): the canonical quickstart (TR-03) and the Tsukumo suite /
+// community links (TR-01/TR-02). The static public/ pages are checked against the same files.
+import QS from './quickstart.json'
+import SUITE from './suite.json'
 
 // trovex is public beta: the primary action is install + a GitHub star. The consult band
 // is the suite→Tsukumo handoff: trovex is one of four OSS products that feed Tsukumo
@@ -95,7 +99,7 @@ function CopyCmd({ cmd, id }: { cmd: string; id: string }) {
   return (
     <span className="cmd-row">
       <code>{cmd}</code>
-      <button type="button" className="cmd-copy" onClick={copy} aria-label={`Copy: ${cmd}`}>
+      <button type="button" className="cmd-copy" data-state={copied ? 'copied' : undefined} onClick={copy} aria-label={`Copy: ${cmd}`}>
         {copied ? 'copied' : 'copy'}
       </button>
     </span>
@@ -267,12 +271,10 @@ const FEATURES = [
 
 // trovex is open source + public beta — the install command is the conversion.
 const GITHUB = 'https://github.com/TsukumoHQ/trovex'
-// Community: the canonical /discord redirect (swappable + UTM-tracked), not raw discord.gg.
-const DISCORD_HERO = 'https://tsukumo.ch/go/discord?s=landing'
-// Public-beta support channel (one redirect everyone links — tsukumo.ch/slack).
-const SLACK_URL = 'https://tsukumo.ch/slack'
-// Sibling OSS tool in the tsukumo suite — now has its own landing (live).
-const WRAITH_URL = 'https://tsukumo.ch/go/wraith?s=landing'
+// Community: ONE channel, Discord (cmo: "Discord only", 1900a82), via the code-defined
+// tsukumo.ch/discord route (no CMS lookup). Not /go/discord for now: it 503s whenever the
+// shortlink store is down (audit 2026-10-13, UNKNOWNS U-02). Placement is tracked client-side.
+const DISCORD_URL = SUITE.community.href
 // Shared newsletter hub — ONE Resend audience across the suite (fullstack contract).
 // source_site routes attribution; CORS allows trovex.dev. Privacy controller = tsukumo.
 const NEWSLETTER_API = 'https://tsukumo.ch/api/newsletter'
@@ -382,6 +384,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-in">
           <a className="brand" href="/">trovex</a>
+          <a className="tsk-sig" href={SUITE.signature.href} target="_blank" rel="noopener noreferrer" onClick={() => trackTsukumoClick('nav')}>{SUITE.signature.label}</a>
           <span className="sp" />
           <a className="lk hide" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'product', location: 'nav' })}>Product</a>
           <a className="lk hide" href="#start" onClick={() => track('cta_clicked', { cta_id: 'quickstart', location: 'nav' })}>Quickstart</a>
@@ -410,7 +413,7 @@ export default function App() {
                 no scroll, no signup. command_copied = the install-intent signal. */}
             <div className="hero-install">
               <span className="hero-install-lab">install</span>
-              <CopyCmd cmd="uv tool install trovex" id="hero-install" />
+              <CopyCmd cmd={QS.install} id="hero-install" />
             </div>
             {/* Kills the silent `command not found: uv` dead-end on the primary path, and
                 routes the not-ready-to-install dev to the zero-install uvx taste at #start —
@@ -427,7 +430,7 @@ export default function App() {
               <a className="btn btn-ghost" href="#start" onClick={() => track('cta_clicked', { cta_id: 'quickstart', location: 'hero' })}>quickstart</a>
               {/* Secondary, beside quickstart — keeps the install command the one primary action.
                   Fires the canonical oss_adopt('discord') so the rollout is measurable. */}
-              <a className="btn btn-ghost" href={DISCORD_HERO} target="_blank" rel="noopener noreferrer" onClick={() => trackOssAdopt('discord')}>join Discord</a>
+              <a className="btn btn-ghost" href={DISCORD_URL} target="_blank" rel="noopener noreferrer" onClick={() => trackOssAdopt('discord')}>join Discord</a>
             </div>
             <a className="hero-see" href="#tour" onClick={() => track('cta_clicked', { cta_id: 'see-it-work', location: 'hero' })}>see it work ↓</a>
           </div>
@@ -513,14 +516,16 @@ export default function App() {
               <h2>Get started.</h2>
               <p>trovex is open source and in public beta. Install it, point your agent at it, and you're running in about a minute. No account, no keys.</p>
               <ol className="start-steps">
-                <li><CopyCmd cmd="uv tool install trovex" id="install" /></li>
-                <li><CopyCmd cmd="trovex index /path/to/your/repo" id="index" /></li>
-                <li><CopyCmd cmd={'trovex search "how do we roll back a deploy?"'} id="search" /> and it prints the tokens it saved.</li>
+                <li><CopyCmd cmd={QS.install} id="install" /></li>
+                <li><CopyCmd cmd={QS.index} id="index" /></li>
+                <li><CopyCmd cmd={QS.search} id="search" /> and it prints the tokens it saved.</li>
               </ol>
-              {/* The zero-install escape hatch (README): one command, nothing installed,
-                  still prints the savings number. Lowest-commitment path to the aha. */}
-              <p className="start-try">Not ready to install? Run one command, nothing installed, and it still prints the tokens saved:</p>
-              <div className="start-try-cmd"><CopyCmd cmd={'uvx trovex search "how do we roll back a deploy?"'} id="uvx-try" /></div>
+              {/* The zero-install escape hatch (README). Tested from an empty env (audit
+                  2026-10-13): a bare `uvx trovex search` has no index and prints nothing
+                  to save, so the no-install path is index + search, both via uvx. */}
+              <p className="start-try">Not ready to install? Two commands, nothing installed: index a repo, then search it, and it prints the tokens saved:</p>
+              <div className="start-try-cmd"><CopyCmd cmd={QS.tryIndex} id="uvx-index" /></div>
+              <div className="start-try-cmd"><CopyCmd cmd={QS.trySearch} id="uvx-try" /></div>
               <p className="start-setup">
                 Then point your agent at it:{' '}
                 <a href="/for/claude-code" onClick={() => track('setup_clicked', { location: 'start', tool: 'claude-code' })}>Claude Code</a> ·{' '}
@@ -535,7 +540,7 @@ export default function App() {
               <p className="cta-note">No cloud, no API keys. Your docs never leave your machine.</p>
               <p className="cta-note">
                 Questions, or stuck on setup?{' '}
-                <a href={SLACK_URL} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'slack', location: 'start' })}>Join the Slack →</a>
+                <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" onClick={() => trackOssAdopt('discord')}>Join the Discord →</a>
               </p>
             </div>
           </div>
@@ -574,20 +579,31 @@ export default function App() {
             <a href="/use-cases/" onClick={() => track('cta_clicked', { cta_id: 'use_cases', location: 'footer' })}>Use cases</a>
             <a href="/for/" onClick={() => track('setup_clicked', { location: 'footer' })}>Setup</a>
             <a href="/savings" onClick={() => track('cta_clicked', { cta_id: 'savings', location: 'footer' })}>Savings</a>
-            <a href={SLACK_URL} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'slack', location: 'footer' })}>Slack</a>
+            <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" onClick={() => trackOssAdopt('discord')}>{SUITE.community.label}</a>
             <a
-              href="https://tsukumo.ch/go/site?s=landing"
+              href={SUITE.publisher.href}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => trackTsukumoClick('footer')}
             >
-              built by tsukumo ↗
+              {SUITE.publisher.label} ↗
             </a>
           </nav>
-          <small className="footer-suite">
-            part of the tsukumo suite: <a href="/">trovex</a> (docs) ·{" "}
-            <a href={WRAITH_URL} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: 'wraith', location: 'footer-suite' })}>wrai.th</a> (agent orchestration)
-          </small>
+          {/* Suite block — same SSOT (src/suite.json) as every static page's footer. */}
+          <nav className="footer-suite" aria-label="Tsukumo suite">
+            <a className="tsk-sig" href={SUITE.signature.href} target="_blank" rel="noopener noreferrer" onClick={() => trackTsukumoClick('footer')}>{SUITE.signature.label}</a>
+            <ul>
+              {SUITE.products.map((p) => (
+                <li key={p.id}>
+                  {p.href.startsWith('/')
+                    ? <a href={p.href}>{p.name}</a>
+                    : <a href={p.href} target="_blank" rel="noopener noreferrer" onClick={() => track('cta_clicked', { cta_id: p.id, location: 'footer-suite' })}>{p.name}</a>}
+                  {' '}<span className="tsk-note">{[p.role, 'status' in p ? p.status : ''].filter(Boolean).join(', ')}</span>
+                </li>
+              ))}
+            </ul>
+            <a href="https://tsukumo.ch/privacy" target="_blank" rel="noopener noreferrer">privacy</a>
+          </nav>
           <small>© 2026 trovex · one source of truth for your agents' docs</small>
         </div>
       </footer>

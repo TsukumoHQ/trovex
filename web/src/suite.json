@@ -1,0 +1,22 @@
+{
+  "_comment": "SSOT for the Tsukumo affiliation on every trovex.dev surface (audit 2026-10-13 TR-01/TR-02). The React landing + /savings import this file; the static public/ pages are rendered from it by scripts/sync-suite.mjs (build runs it in --check mode, so a hand-edit that drifts fails the deploy). Edit HERE, then run `node scripts/sync-suite.mjs`.",
+  "signature": {
+    "label": "A Tsukumo product",
+    "href": "https://tsukumo.ch/products"
+  },
+  "community": {
+    "label": "Discord",
+    "href": "https://tsukumo.ch/discord"
+  },
+  "products": [
+    { "id": "niwa", "name": "niwa", "role": "autonomous engineering crews", "status": "early access", "href": "https://niwa.build" },
+    { "id": "trovex", "name": "trovex", "role": "context", "href": "/" },
+    { "id": "yoru", "name": "yoru", "role": "session receipts", "href": "https://www.yoru.sh" },
+    { "id": "wraith", "name": "wrai.th", "role": "agent orchestration", "href": "https://tsukumo.ch/wraith" },
+    { "id": "dokan", "name": "dokan", "role": "deterministic execution", "href": "https://tsukumo.ch/dokan" }
+  ],
+  "publisher": {
+    "label": "built by tsukumo",
+    "href": "https://tsukumo.ch"
+  }
+}

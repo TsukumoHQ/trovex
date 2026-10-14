@@ -22,23 +22,23 @@ The "aha" is seeing a real savings number on *your* repo. Get there first, explo
 1. **Index a real, doc-heavy repo.** Not a toy one. The savings show up where you actually
    have overlapping `.md`.
    ```bash
-   uv sync
-   uv run trovex index /path/to/your/repo
+   uv tool install trovex
+   trovex index /path/to/repo
    ```
 2. **Ask it something your docs answer**, and watch the tokens it saved versus reading the
    top candidates:
    ```bash
-   uv run trovex search "how do we deploy?"
+   trovex search "how do we roll back a deploy?"
    ```
 3. **Wire it into your agent and open the dashboard:**
    ```bash
-   uv run trovex serve   # MCP at /mcp, savings dashboard at /savings
+   trovex serve   # MCP at http://localhost:8765/mcp, savings dashboard at /savings
    ```
    Work a normal session, then open `http://localhost:8765/savings`. The would-have-read
    versus actual number is the point.
 
-Full setup detail is in the [quickstart](./quickstart.md); objection-style questions are in
-the [FAQ](./faq.md).
+Full setup detail is in the [quickstart](./quickstart.md); per-editor MCP config is at
+[trovex.dev/for](https://trovex.dev/for/).
 
 ## If the savings number is small
 

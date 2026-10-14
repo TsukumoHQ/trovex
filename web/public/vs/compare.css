@@ -154,3 +154,27 @@ footer a { color: var(--fg-muted); }
 .qs-copy { flex-shrink: 0; font-family: 'Fira Code', ui-monospace, monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); background: none; border: 1px solid var(--line-strong); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
 .qs-copy:hover { color: var(--accent); border-color: var(--accent); }
 .qs .qs-aha { border-color: var(--accent-line); background: var(--accent-soft); }
+
+/* ---- Tsukumo affiliation (rendered from src/suite.json by scripts/sync-suite.mjs) ----
+   Existing tokens only: --fg-subtle/--fg-muted text, --line hairlines, Fira Code labels. */
+.topbar .tsk-sig { font-family: 'Fira Code', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--fg-subtle); border-left: 1px solid var(--line-strong); padding-left: 12px; white-space: nowrap; transition: color 0.18s ease; }
+.topbar .tsk-sig:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 640px) { .topbar .tsk-sig { display: none; } } /* the footer suite carries it on phones */
+.tsk-suite { flex-basis: 100%; margin-top: 10px; padding-top: 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.tsk-suite .tsk-sig { font-family: 'Fira Code', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-subtle); }
+.tsk-suite .tsk-sig:hover { color: var(--accent); text-decoration: none; }
+.tsk-suite ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.tsk-suite li a { color: var(--fg); }
+.tsk-suite .tsk-note { color: var(--fg-subtle); }
+.tsk-suite .tsk-meta { margin: 0; }
+
+/* ---- DS-01 copy feedback (audit 2026-10-13): 180ms colour + settle, no layout shift.
+   quickstart.js sets data-state="copied" for 1.5s; reduced motion keeps the text change only. */
+.qs-copy { transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease; }
+.qs-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qs-copy[data-state="copied"] { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); animation: tsk-settle 0.2s ease-out; }
+@keyframes tsk-settle { from { transform: scale(0.94); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .topbar .tsk-sig, .qs-copy { transition: none; }
+  .qs-copy[data-state="copied"] { animation: none; }
+}

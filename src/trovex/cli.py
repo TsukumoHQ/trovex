@@ -91,18 +91,18 @@ def index(
     if indexed == 0:
         console.print(
             "\n[yellow]No markdown to index here.[/yellow] Point trovex at a repo "
-            "with [cyan].md[/cyan] docs: [cyan]uv run trovex index /path/to/repo[/cyan]"
+            "with [cyan].md[/cyan] docs: [cyan]trovex index /path/to/repo[/cyan]"
         )
         return
 
     # Point first-run users straight at the aha: the savings number on query 1.
     console.print("\n[bold]Next[/bold] — ask a question, see the tokens saved:")
     console.print(
-        '  [cyan]uv run trovex search "how do we deploy?"[/cyan]'
+        '  [cyan]trovex search "how do we roll back a deploy?"[/cyan]'
         "  [dim](use a real question about your repo)[/dim]"
     )
     console.print(
-        "[dim]Then wire it into your agent — [/dim][cyan]uv run trovex serve[/cyan]"
+        "[dim]Then wire it into your agent — [/dim][cyan]trovex serve[/cyan]"
         "[dim] — and savings add up on the dashboard at http://localhost:8765/savings[/dim]"
     )
 
@@ -184,7 +184,7 @@ def search(
     if not results:
         console.print(
             "[dim]No match. Try different words, or re-run [/dim]"
-            "[cyan]uv run trovex index <repo>[/cyan][dim] if your docs changed.[/dim]"
+            "[cyan]trovex index <repo>[/cyan][dim] if your docs changed.[/dim]"
         )
         return
     if savings:
@@ -1017,8 +1017,8 @@ def import_(
     )
     console.print(
         "[bold]Next[/bold] — query them: "
-        '[cyan]uv run trovex search "..."[/cyan]  '
-        "[dim]or browse at[/dim] [cyan]uv run trovex serve[/cyan] → http://localhost:8765"
+        '[cyan]trovex search "..."[/cyan]  '
+        "[dim]or browse at[/dim] [cyan]trovex serve[/cyan] → http://localhost:8765"
     )
 
 
@@ -1096,7 +1096,7 @@ def onboard() -> None:
     console.print(f"\n[green]Imported {written} docs[/green], dated + tagged + queryable.")
 
     if not typer.confirm("Start the server now?", default=True):
-        console.print("[dim]Later:[/dim] [cyan]uv run trovex serve[/cyan] → http://localhost:8765")
+        console.print("[dim]Later:[/dim] [cyan]trovex serve[/cyan] → http://localhost:8765")
         return
     console.print(
         f"[dim]Serving at[/dim] [cyan]http://localhost:{settings.port}[/cyan] "
